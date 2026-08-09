@@ -56,6 +56,50 @@ module.exports = async (env, options) => {
         template: "./src/taskpane/taskpane.html",
         chunks: ["polyfill", "taskpane"],
       }),
+      new HtmlWebpackPlugin({
+  filename: "index.html",
+  templateContent: `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Word AI Assistant</title>
+      <style>
+        body {
+          margin: 0;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: Arial, sans-serif;
+          background: #f5f7fa;
+          color: #202124;
+        }
+
+        .container {
+          text-align: center;
+          padding: 40px;
+        }
+
+        h1 {
+          margin-bottom: 10px;
+        }
+
+        p {
+          color: #6b7280;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Word AI Assistant</h1>
+        <p>Office Add-in is running.</p>
+      </div>
+    </body>
+    </html>
+  `,
+}),
       new CopyWebpackPlugin({
         patterns: [
           {
