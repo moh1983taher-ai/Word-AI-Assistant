@@ -1,0 +1,772 @@
+<!-- =========================================
+     Word AI Assistant - Task Pane
+     ========================================= -->
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Word AI Assistant</title>
+
+    <link rel="stylesheet"
+          href="taskpane.css">
+
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+</head>
+
+
+<body>
+
+
+<!-- =========================================
+     SIDEBAR
+     ========================================= -->
+
+<div class="sidebar">
+
+
+    <!-- الشعار -->
+
+    <div class="brand-icon"
+         title="Word AI Assistant">
+
+        ✦
+
+    </div>
+
+
+
+    <!-- زر إظهار وإخفاء القائمة -->
+
+    <button class="side-icon"
+            id="sidebar-toggle-btn"
+            title="إظهار القائمة">
+
+        ☰
+
+    </button>
+
+
+
+    <!-- =====================================
+         Sidebar Top
+         ===================================== -->
+
+    <div class="sidebar-top">
+
+
+        <button class="side-icon"
+        id="new-chat-btn"
+        title="محادثة جديدة">
+
+    <span class="new-chat-icon">✎</span>
+
+</button>
+
+
+        
+<!-- المحادثات -->
+
+<button class="side-icon"
+        id="chat-btn"
+        title="المحادثات">
+
+    <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true">
+
+        <path
+            d="M20 11.5a8 8 0 0 1-8 8
+               8.5 8.5 0 0 1-4.2-1.1
+               L4 19.5l1.1-3.3
+               A8 8 0 1 1 20 11.5z">
+        </path>
+
+        <path
+            d="M8 10h8">
+        </path>
+
+        <path
+            d="M8 14h5">
+        </path>
+
+    </svg>
+
+</button>
+
+
+
+
+
+        <!-- المشاريع -->
+
+        <button class="side-icon"
+                id="projects-btn"
+                title="المشاريع">
+
+            ▣
+
+        </button>
+
+
+
+        <!-- المستندات -->
+
+        <button class="side-icon"
+                id="files-btn"
+                title="المستندات">
+
+            ▤
+
+        </button>
+
+
+
+        <!-- البحث -->
+
+        <button class="side-icon"
+                id="search-btn"
+                title="البحث">
+
+            ⌕
+
+        </button>
+
+
+    </div>
+
+
+
+    <!-- =====================================
+         Sidebar Bottom
+         ===================================== -->
+
+    <div class="sidebar-bottom">
+
+
+        <!-- الإعدادات -->
+
+        <button class="side-icon"
+                id="settings-btn"
+                title="الإعدادات">
+
+            ⚙
+
+        </button>
+
+
+
+        <!-- الوضع الليلي -->
+
+        <button class="side-icon"
+                id="theme-btn"
+                title="الوضع الليلي">
+
+            ☾
+
+        </button>
+
+
+
+        <!-- المساعدة -->
+
+        <button class="side-icon"
+                id="help-btn"
+                title="المساعدة">
+
+            ?
+
+        </button>
+
+
+    </div>
+
+
+</div>
+
+
+
+<!-- =====================================
+     Expanded Sidebar Content
+     ===================================== -->
+
+<!-- =====================================
+     عنوان القائمة
+     ===================================== -->
+<div id="expanded-sidebar">
+     
+<div class="expand-header">
+
+    أدوات الباحث
+
+</div>
+
+
+
+<!-- =====================================
+     محادثة جديدة
+     ===================================== -->
+
+<div class="expand-item section-toggle"
+     data-target="new-chat-section">
+
+    <span class="section-arrow">
+        ›
+    </span>
+
+    <span>
+        محادثة جديدة
+    </span>
+
+</div>
+
+
+<div id="new-chat-section"
+     class="section-content">
+
+    <div id="new-chat-section">
+</div>
+
+</div>
+
+
+
+<!-- =====================================
+     المحادثات
+     ===================================== -->
+
+<div class="expand-item section-toggle"
+     data-target="chat-list-section">
+
+    <span class="section-arrow">
+        ›
+    </span>
+
+    <span>
+        المحادثات
+    </span>
+
+</div>
+
+
+<div id="chat-list-section"
+     class="section-content">
+
+    <div id="chat-list">
+    </div>
+
+</div>
+
+
+
+<!-- =====================================
+     المشاريع
+     ===================================== -->
+
+<div class="expand-item section-toggle"
+     id="expanded-projects"
+     data-target="projects-section">
+
+    <span class="section-arrow" id="expanded-projects-arrow">
+        ›
+    </span>
+
+    <span>
+        المشاريع
+    </span>
+
+</div>
+
+
+<div id="projects-section"
+     class="section-content">
+
+    <div id="expanded-projects-list">
+</div>
+
+</div>
+<div id="projects-section">
+</div>
+
+
+<!-- =====================================
+     المستندات
+     ===================================== -->
+
+<div class="expand-item section-toggle"
+     data-target="files-section">
+
+    <span class="section-arrow">
+        ›
+    </span>
+
+    <span>
+        المستندات
+    </span>
+
+</div>
+
+
+<div id="files-section"
+     class="section-content">
+
+    <!-- محتوى المستندات يوضع هنا لاحقًا -->
+
+</div>
+
+
+
+<!-- =====================================
+     المراجع
+     ===================================== -->
+
+<div class="expand-item section-toggle"
+     data-target="references-section">
+
+    <span class="section-arrow">
+        ›
+    </span>
+
+    <span>
+        المراجع
+    </span>
+
+</div>
+
+
+<div id="references-section"
+     class="section-content">
+
+    <!-- محتوى المراجع يوضع هنا لاحقًا -->
+
+</div>
+
+</div>
+
+<!-- =========================================
+     MAIN
+     ========================================= -->
+
+<div class="main">
+
+
+    <!-- عنوان المستند -->
+
+    <div id="document-title">
+
+        لا يوجد مستند مفتوح
+
+    </div>
+
+
+
+    <!-- =====================================
+         CHAT AREA
+         ===================================== -->
+
+    <div id="chat-area">
+
+
+        <div class="welcome">
+
+
+            <div class="ai-symbol">
+
+                ✦
+
+            </div>
+
+
+            <h2>
+
+                مرحبًا بك
+
+            </h2>
+
+
+            <p>
+
+                ابدأ محادثة جديدة
+
+            </p>
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <!-- =====================================
+         INPUT AREA
+         ===================================== -->
+ 
+<div class="input-area">
+
+    <div class="message-box">
+
+        <textarea
+            id="user-input"
+            placeholder="اكتب سؤالك هنا..."
+            rows="1"></textarea>
+
+        <button
+            id="send-btn"
+            type="button"
+            aria-label="إرسال">
+
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 19V5"></path>
+                <path d="M6 11l6-6 6 6"></path>
+            </svg>
+
+        </button>
+
+    </div>
+
+</div>
+
+
+
+
+
+<!-- =========================================
+     CHAT POPUP
+     ========================================= -->
+
+<div id="chat-popup">
+
+
+    <div class="chat-popup-header">
+
+        المحادثات
+
+    </div>
+
+
+
+    <div id="recent-chat-list">
+
+    </div>
+
+
+</div>
+
+
+
+<!-- =========================================
+     SEARCH POPUP
+     ========================================= -->
+
+<div class="search-popup"
+     id="search-popup">
+
+
+    <input
+        id="search-input"
+        type="text"
+        placeholder="ابحث في المحادثات...">
+
+
+
+    <div id="search-results">
+
+    </div>
+
+
+</div>
+
+
+
+<!-- =========================================
+     PROJECTS POPUP
+     ========================================= -->
+
+<div class="projects-popup"
+     id="projects-popup">
+
+
+    <!-- رأس نافذة المشاريع -->
+
+    <div class="projects-header">
+
+
+        <span>
+
+
+            <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                aria-hidden="true">
+
+                <path
+                    d="M3 6h7l2 2h9v11H3z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"/>
+
+            </svg>
+
+
+            المشاريع
+
+
+        </span>
+
+
+
+        <button
+            id="new-project-btn"
+            type="button"
+            title="مشروع جديد">
+
+            ＋
+
+        </button>
+
+
+    </div>
+
+
+
+    <!-- قائمة المشاريع -->
+
+    <div id="projects-list">
+
+    </div>
+
+
+</div>
+
+
+
+
+<!-- =====================================
+     نافذة إعدادات الذكاء الاصطناعي
+     ===================================== -->
+
+<div id="settings-window">
+
+
+    <!-- رأس الإعدادات -->
+
+    <div id="settings-header">
+
+        <span>
+            ⚙ إعدادات الذكاء الاصطناعي
+        </span>
+
+
+        <button
+            id="close-settings"
+            type="button"
+            title="إغلاق">
+
+            ×
+
+        </button>
+
+    </div>
+
+
+    <!-- =================================
+         مزود الذكاء الاصطناعي
+         ================================= -->
+
+    <label for="provider-select">
+
+        مزود الذكاء الاصطناعي
+
+    </label>
+
+
+    <select id="provider-select">
+
+        <option value="openrouter">
+            OpenRouter
+        </option>
+
+        <option value="openai">
+            OpenAI
+        </option>
+
+        <option value="gemini">
+            Gemini
+        </option>
+
+    </select>
+
+
+    <!-- =================================
+         مفتاح API
+         ================================= -->
+
+    <label for="api-key">
+
+        مفتاح API
+
+    </label>
+
+
+    <div class="key-box">
+
+        <input
+            id="api-key"
+            type="password"
+            placeholder="أدخل مفتاح API"
+            autocomplete="off">
+
+
+        <button
+            id="show-key"
+            type="button"
+            title="إظهار المفتاح">
+
+            👁
+
+        </button>
+
+    </div>
+
+
+    <!-- =================================
+         النماذج
+         ================================= -->
+
+    <label for="model-select">
+
+        النموذج
+
+    </label>
+
+
+    <div class="model-box">
+
+        <select id="model-select">
+
+            <option value="">
+
+                أدخل المفتاح ثم حدّث النماذج
+
+            </option>
+
+        </select>
+
+
+        <button
+            id="refresh-models"
+            type="button"
+            title="تحديث النماذج">
+
+            ↻
+
+        </button>
+
+    </div>
+
+
+    <!-- =================================
+         عناصر توافق JavaScript
+         مخفية ولا تؤثر على التصميم
+         ================================= -->
+
+    <input
+        id="model-name"
+        type="hidden"
+        value="">
+
+
+    <input
+        id="api-url"
+        type="hidden"
+        value="">
+
+
+    <div
+        id="custom-url-section"
+        style="display:none;">
+
+    </div>
+
+
+    <!-- =================================
+         معلومات الاتصال
+         ================================= -->
+
+    <div id="provider-info">
+
+        سيتم تحديد رابط الاتصال تلقائيًا
+        حسب مزود الذكاء الاصطناعي.
+
+    </div>
+
+
+    <!-- =================================
+         أزرار الإعدادات
+         ================================= -->
+
+    <div class="settings-buttons">
+
+        <button
+            id="test-connection"
+            type="button">
+
+            اختبار الاتصال
+
+        </button>
+
+
+        <button
+            id="save-settings"
+            type="button">
+
+            حفظ
+
+        </button>
+
+    </div>
+
+
+    <!-- =================================
+         حالة الإعدادات
+         ================================= -->
+
+    <div id="settings-status">
+
+    </div>
+
+
+</div>
+
+
+
+
+
+
+<!-- =========================================
+     JAVASCRIPT
+     ========================================= -->
+
+<script src="taskpane.js"></script>
+
+
+</body>
+
+</html>
