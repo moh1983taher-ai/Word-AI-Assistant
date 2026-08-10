@@ -4385,19 +4385,20 @@ async function sendMessage() {
 
     if (currentChat.isTemporary) {
 
-        currentChat.isTemporary =
-            false;
+    currentChat.isTemporary = false;
 
+    currentChat.title =
+        text.substring(0, 30);
 
-        currentChat.title =
-            text.substring(0, 30);
+    chats.unshift(currentChat);
 
+    saveChats();
 
-        chats.unshift(
-            currentChat
-        );
-
-    }
+    // إظهار المحادثة الجديدة فورًا في القائمة الجانبية
+    renderChatList();
+    renderSidebarChats();
+    renderRecentChats();
+}
 
 
     currentChat.messages.push({
