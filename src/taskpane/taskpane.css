@@ -1,6 +1,7 @@
 /* =========================================================
    WORD AI ASSISTANT
    CLEAN / CONSOLIDATED CSS
+   الإصدار المنظم — مع الحفاظ على أسماء العناصر المستقرة
    ========================================================= */
 
 
@@ -155,15 +156,38 @@ body {
 
 
 /* =========================================================
-   4. THREE-LEVEL TYPOGRAPHY
+   4. SIDEBAR TYPOGRAPHY
+   =========================================================
+
+   التدرج المقصود:
+
+   المستوى الأول:
+   أدوات الباحث
+   15px / Bold
+
+   المستوى الثاني:
+   محادثة جديدة
+   المحادثات
+   المشاريع
+   المستندات
+   المراجع
+   14px / Bold
+
+   المستوى الثالث:
+   أسماء المحادثات والمشاريع والمستندات والمراجع
+   13px / Regular
+
+   المستوى الرابع:
+   أي تفريع داخل عنصر من المستوى الثالث
+   12px / Regular
+   مع إزاحة إضافية إلى اليمين
+
    ========================================================= */
 
-/*
-   المستوى الأول
-   ----------------
-   العنوان الرئيسي:
-   أدوات الباحث
-*/
+
+/* =========================================================
+   المستوى الأول — العنوان الرئيسي
+   ========================================================= */
 
 .expand-header {
     height: 55px;
@@ -182,16 +206,9 @@ body {
 }
 
 
-/*
-   المستوى الثاني
-   ----------------
-   عناوين الأقسام:
-   محادثة جديدة
-   المحادثات
-   المشاريع
-   المستندات
-   المراجع
-*/
+/* =========================================================
+   المستوى الثاني — عناوين الأقسام
+   ========================================================= */
 
 .expand-section-header {
     width: 100%;
@@ -208,7 +225,6 @@ body {
     border-radius: 8px;
 
     color: #444;
-
     background: transparent;
 
     user-select: none;
@@ -227,9 +243,7 @@ body {
 }
 
 
-/*
-   الأيقونة + اسم القسم
-*/
+/* اسم القسم + الأيقونة */
 
 .expand-section-title {
     display: flex;
@@ -246,9 +260,7 @@ body {
 }
 
 
-/*
-   أيقونة القسم
-*/
+/* أيقونة القسم */
 
 .section-icon {
     width: 20px;
@@ -266,9 +278,7 @@ body {
 }
 
 
-/*
-   السهم
-*/
+/* سهم القسم */
 
 .section-arrow {
     width: 18px;
@@ -301,14 +311,9 @@ body {
 }
 
 
-/*
-   المستوى الثالث
-   ----------------
-   العناصر التي تظهر تحت المستوى الثاني.
-   
-   أصغر بصريًا + غير عريض + داخلة إلى اليمين
-   حتى يظهر بوضوح أنها فرع من القسم.
-*/
+/* =========================================================
+   المستوى الثالث — محتوى القسم
+   ========================================================= */
 
 .expand-section-content {
     display: none;
@@ -326,7 +331,7 @@ body {
 
 
 /* =========================================================
-   المستوى الثالث - العناصر العامة
+   المستوى الثالث — العناصر العامة
    ========================================================= */
 
 .expand-item {
@@ -365,9 +370,16 @@ body {
 }
 
 
-/*
-   أي عناصر فرعية أخرى تستخدم section-content
-*/
+/* =========================================================
+   تفريعات المستوى الرابع
+   =========================================================
+
+   هذه القواعد مهمة حتى لا تظهر التفريعات بنفس
+   حجم وموضع العناصر الرئيسية.
+
+   إذا كانت البنية الحالية تستخدم section-content
+   للعناصر الفرعية، تبقى الأسماء كما هي.
+   ========================================================= */
 
 .section-content {
     display: none;
@@ -379,9 +391,58 @@ body {
     display: block;
 }
 
-.section-title,
-.expand-item {
-    position: relative;
+
+/* العناصر الموجودة داخل section-content
+   تصبح أصغر بصريًا من العنصر الأب */
+
+.section-content .expand-item {
+    width: calc(100% - 8px);
+
+    padding: 6px 9px;
+
+    margin: 1px 0;
+
+    font-size: 12px;
+    font-weight: 400;
+
+    color: #666;
+
+    border-radius: 6px;
+}
+
+
+/* التفريع الأعمق */
+
+.section-content .section-content {
+    padding-left: 14px;
+}
+
+.section-content .section-content .expand-item {
+    font-size: 11.5px;
+
+    padding: 5px 8px;
+
+    color: #707070;
+}
+
+
+/* =========================================================
+   منع القواعد العامة من تسوية المستويات
+   ========================================================= */
+
+.expand-section-content > .expand-item {
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.expand-section-content > .section-content > .expand-item {
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.expand-section-content > .section-content > .section-content > .expand-item {
+    font-size: 11.5px;
+    font-weight: 400;
 }
 
 
@@ -400,9 +461,7 @@ body {
 }
 
 
-/*
-   توحيد عناصر المستوى الثالث
-*/
+/* عناصر المستوى الثالث */
 
 #new-chat-list .expanded-project-item,
 #new-chat-list .new-chat-item {
@@ -554,11 +613,6 @@ body {
    7. PROJECTS
    ========================================================= */
 
-/*
-   نافذة المشاريع:
-   تبقى نافذة مستقلة ولا تقص القوائم المنبثقة.
-*/
-
 .projects-popup {
     display: none;
 
@@ -592,11 +646,6 @@ body {
    PROJECTS HEADER
    ========================================================= */
 
-/*
-   عنوان المشاريع في النافذة المنبثقة.
-   زر + يكون في نفس السطر مع العنوان.
-*/
-
 .projects-header {
     display: flex;
 
@@ -625,11 +674,7 @@ body {
 }
 
 
-/*
-   زر إضافة مشروع
-   إذا كان موجودًا بهذا الـID أو الـclass
-   سيظهر في مكانه الطبيعي بجوار العنوان.
-*/
+/* زر إضافة مشروع */
 
 #add-project,
 .add-project,
@@ -688,10 +733,10 @@ body {
 }
 
 
-/*
-   أسماء المشاريع داخل القائمة الجانبية
-   مستوى ثالث: أصغر وغير عريض.
-*/
+/* =========================================================
+   أسماء المشاريع
+   المستوى الثالث
+   ========================================================= */
 
 .expanded-project-item {
     display: flex;
@@ -736,6 +781,9 @@ body {
     font-size: 13px;
     font-weight: 400;
 }
+
+
+/* المشروع داخل النافذة المنبثقة */
 
 .project-item {
     display: flex;
@@ -1024,7 +1072,6 @@ body {
 
 /* =========================================================
    11. CHAT POPUP
-   نافذة مستقلة عن صندوق المراسلة
    ========================================================= */
 
 #chat-popup {
@@ -1225,7 +1272,6 @@ body {
 
 /* =========================================================
    14. SEARCH POPUP
-   نفس نمط ومكان النوافذ المنبثقة الأخرى
    ========================================================= */
 
 .search-popup {
@@ -2269,13 +2315,6 @@ body.dark #save-settings,
    25. POPUP FONT UNIFICATION
    ========================================================= */
 
-/*
-   جميع النصوص داخل النوافذ المنبثقة الجانبية
-   تستخدم نفس التدرج:
-   العنوان = 14px عريض
-   المحتوى = 13px عادي
-*/
-
 .projects-popup,
 .chat-popup,
 .search-popup {
@@ -2293,6 +2332,159 @@ body.dark #save-settings,
 .chat-popup .popup-item,
 .search-popup .popup-item {
     font-size: 13px;
+    font-weight: 400;
+}
+
+
+/* =========================================================
+   26. FINAL SIDEBAR HIERARCHY PROTECTION
+   =========================================================
+
+   هذه المنطقة هي الأهم في النسخة المعدلة.
+
+   الهدف:
+   عدم السماح لأي قاعدة عامة لاحقة بأن تجعل
+   جميع العناصر داخل "أدوات الباحث" متساوية.
+
+   المستوى 1 = العنوان الرئيسي
+   المستوى 2 = عناوين الأقسام
+   المستوى 3 = العناصر التابعة المباشرة
+   المستوى 4 = التفريعات
+   ========================================================= */
+
+
+/* المستوى الأول */
+
+#expanded-sidebar > .expand-header {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+
+/* المستوى الثاني */
+
+#expanded-sidebar > .expand-section > .expand-section-header,
+#expanded-sidebar .expand-section-header {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+
+/* المستوى الثالث */
+
+#expanded-sidebar > .expand-section > .expand-section-content > .expand-item,
+#expanded-sidebar > .expand-section > .expand-section-content > .chat-history-item,
+#expanded-sidebar > .expand-section > .expand-section-content > .expanded-project-item,
+#expanded-sidebar > .expand-section > .expand-section-content > .new-chat-item {
+    font-size: 13px;
+    font-weight: 400;
+}
+
+
+/* المستوى الرابع */
+
+#expanded-sidebar > .expand-section
+    > .expand-section-content
+    > .section-content
+    > .expand-item,
+
+#expanded-sidebar > .expand-section
+    > .expand-section-content
+    > .section-content
+    > .chat-history-item,
+
+#expanded-sidebar > .expand-section
+    > .expand-section-content
+    > .section-content
+    > .expanded-project-item,
+
+#expanded-sidebar > .expand-section
+    > .expand-section-content
+    > .section-content
+    > .new-chat-item {
+    font-size: 12px;
+    font-weight: 400;
+
+    padding-left: 9px;
+}
+
+
+/* المستوى الخامس — إن وجد */
+
+#expanded-sidebar > .expand-section
+    > .expand-section-content
+    > .section-content
+    > .section-content
+    > .expand-item {
+    font-size: 11.5px;
+    font-weight: 400;
+
+    color: #707070;
+}
+
+
+/* =========================================================
+   27. SIDEBAR INDENTATION
+   =========================================================
+
+   كلما نزلنا مستوى زادت الإزاحة.
+   ========================================================= */
+
+
+/* المستوى الثالث */
+
+#expanded-sidebar
+    > .expand-section
+    > .expand-section-content {
+    padding-left: 14px;
+}
+
+
+/* المستوى الرابع */
+
+#expanded-sidebar
+    > .expand-section
+    > .expand-section-content
+    > .section-content {
+    padding-left: 14px;
+}
+
+
+/* المستوى الخامس */
+
+#expanded-sidebar
+    > .expand-section
+    > .expand-section-content
+    > .section-content
+    > .section-content {
+    padding-left: 14px;
+}
+
+
+/* =========================================================
+   28. FINAL TEXT RULES
+   ========================================================= */
+
+/* لا تسمح للعناوين الفرعية بأن ترث وزنًا عريضًا من الأب */
+
+.expand-section-content .expand-item,
+.section-content .expand-item,
+#chat-list .chat-history-item,
+#new-chat-list .new-chat-item,
+#new-chat-list .expanded-project-item,
+#expanded-projects-list .expanded-project-item {
+    font-weight: 400;
+}
+
+
+/* النصوص داخل العناصر الفرعية */
+
+.expand-section-content .expand-item span,
+.section-content .expand-item span,
+#chat-list .chat-title,
+#new-chat-list .new-chat-item span,
+#new-chat-list .expanded-project-item span,
+#expanded-projects-list .expanded-project-item span {
     font-weight: 400;
 }
 
