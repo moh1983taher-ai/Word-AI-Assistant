@@ -18,7 +18,6 @@
 
 html,
 body {
-    width: 100%;
     height: 100%;
     overflow: hidden;
     background: #ffffff;
@@ -80,8 +79,9 @@ body {
 
     border-radius: 8px;
 
-    transition: background .2s ease,
-                color .2s ease;
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
 }
 
 .side-icon:hover {
@@ -95,19 +95,38 @@ body {
     transform: scaleX(-1);
 }
 
-#search-btn:hover {
-    transform: scaleX(-1);
+
+/* =========================================================
+   3. MAIN
+   ========================================================= */
+
+.main {
+    height: 100vh;
+
+    margin-left: 52px;
+
+    display: flex;
+    flex-direction: column;
 }
 
-.new-chat-icon,
-.new-chat-pencil {
-    display: inline-block;
-    transform: scaleX(-1);
+#document-title {
+    height: 45px;
+
+    border-bottom: 1px solid #eee;
+
+    display: flex;
+    align-items: center;
+
+    padding: 0 18px;
+
+    font-size: 13px;
+
+    color: #666;
 }
 
 
 /* =========================================================
-   3. EXPANDED SIDEBAR
+   4. EXPANDED SIDEBAR
    ========================================================= */
 
 #expanded-sidebar {
@@ -123,11 +142,13 @@ body {
 
     border-right: 1px solid #ddd;
 
-    box-shadow: 5px 0 18px rgba(0, 0, 0, 0.08);
+    box-shadow:
+        5px 0 18px rgba(0, 0, 0, 0.08);
 
     transform: translateX(-250px);
 
-    transition: transform .25s ease;
+    transition:
+        transform 0.25s ease;
 
     z-index: 90;
 
@@ -141,11 +162,6 @@ body {
 #expanded-sidebar.open {
     transform: translateX(0);
 }
-
-
-/* =========================================================
-   4. EXPANDED SIDEBAR SCROLLBAR
-   ========================================================= */
 
 #expanded-sidebar::-webkit-scrollbar {
     width: 7px;
@@ -178,38 +194,15 @@ body {
     padding: 15px;
 
     font-weight: 600;
-    font-size: 14px;
 
     border-bottom: 1px solid #eee;
 }
 
 
 /* =========================================================
-   6. GENERAL EXPANDED ITEMS
-   ========================================================= */
-
-.expand-item {
-    display: flex;
-    align-items: center;
-
-    gap: 12px;
-
-    padding: 11px 16px;
-
-    font-size: 14px;
-
-    color: #444;
-
-    cursor: pointer;
-}
-
-.expand-item:hover {
-    background: #f5f5f5;
-}
-
-
-/* =========================================================
-   7. EXPANDED SIDEBAR SECTIONS
+   6. SIDEBAR SECTIONS
+   القاعدة الموحدة لعناوين:
+   محادثة جديدة / المحادثات / المشاريع / المستندات
    ========================================================= */
 
 .expand-section {
@@ -219,34 +212,32 @@ body {
 }
 
 
-/* =========================================================
-   8. SECTION HEADER
-   القاعدة الموحدة لعناوين:
-   محادثة جديدة / المحادثات / المشاريع / المستندات
-   ========================================================= */
+/* العنوان الرئيسي للقسم */
 
 .expand-section-header {
     width: 100%;
-    min-height: 40px;
+    min-height: 42px;
 
     display: flex;
     align-items: center;
     justify-content: space-between;
 
-    padding: 7px 10px;
-
-    cursor: pointer;
+    padding: 8px 12px;
 
     border-radius: 8px;
 
-    color: #444;
+    color: #333;
     background: transparent;
 
+    cursor: pointer;
     user-select: none;
 
+    font-size: 14px;
+    font-weight: 700;
+
     transition:
-        background .2s ease,
-        color .2s ease;
+        background 0.2s ease,
+        color 0.2s ease;
 }
 
 .expand-section-header:hover {
@@ -256,46 +247,36 @@ body {
 
 
 /* =========================================================
-   9. SECTION TITLE
-   العنوان الرئيسي للقسم
+   7. SECTION TITLE
    ========================================================= */
 
 .expand-section-title {
     display: flex;
     align-items: center;
 
-    gap: 9px;
+    gap: 8px;
 
     min-width: 0;
+
     flex: 1;
 
     font-size: 14px;
-    font-weight: 600;
-
-    color: #3f3f3f;
+    font-weight: 700;
 }
 
+.section-title,
+.expand-item {
+    position: relative;
 
-/* العناصر التي قد تستخدم section-title بدل
-   expand-section-title في البنية الحالية */
-
-.section-title {
     display: flex;
     align-items: center;
 
     gap: 6px;
-
-    position: relative;
-
-    font-size: 14px;
-    font-weight: 600;
-
-    color: #3f3f3f;
 }
 
 
 /* =========================================================
-   10. SECTION ICON
+   8. SECTION ICON
    ========================================================= */
 
 .section-icon {
@@ -303,6 +284,7 @@ body {
     min-width: 20px;
 
     display: inline-flex;
+
     align-items: center;
     justify-content: center;
 
@@ -314,8 +296,8 @@ body {
 
 
 /* =========================================================
-   11. SECTION ARROW
-   قاعدة واحدة لجميع الأسهم
+   9. SECTION ARROW
+   قاعدة واحدة فقط للسهم
    ========================================================= */
 
 .section-arrow {
@@ -329,6 +311,8 @@ body {
     align-items: center;
     justify-content: center;
 
+    flex-shrink: 0;
+
     margin-right: 2px;
 
     font-size: 19px;
@@ -339,13 +323,9 @@ body {
     opacity: 1 !important;
     visibility: visible !important;
 
-    flex-shrink: 0;
-
-    transition: transform .2s ease;
+    transition:
+        transform 0.2s ease;
 }
-
-
-/* السهم عند فتح القسم */
 
 .expand-section.open .section-arrow,
 .section-title.open .section-arrow,
@@ -355,10 +335,11 @@ body {
 
 
 /* =========================================================
-   12. SECTION CONTENT
+   10. SECTION CONTENT
    ========================================================= */
 
-.expand-section-content {
+.expand-section-content,
+.section-content {
     display: none;
 
     width: 100%;
@@ -368,51 +349,84 @@ body {
     box-sizing: border-box;
 }
 
-.expand-section.open .expand-section-content {
-    display: block;
-}
-
-
-/* دعم البنية الأخرى إن وجدت */
-
-.section-content {
-    display: none;
-}
-
+.expand-section.open .expand-section-content,
 .section-content.open {
     display: block;
 }
 
 
 /* =========================================================
-   13. UNIFIED SUB-ITEMS
-   العناصر التي تظهر تحت عناوين الأقسام
+   11. GENERIC EXPAND ITEM
    ========================================================= */
 
-/*
-   هذه هي القاعدة الأساسية الموحدة للمحتوى الموجود
-   تحت عناوين القائمة الجانبية.
+.expand-item {
+    padding: 9px 14px;
 
-   وتشمل:
-   #new-chat-list
-   #chat-list
-   #expanded-projects-list
-*/
+    font-size: 13px;
+    font-weight: 400;
 
-#new-chat-list > *,
-#chat-list > *,
-#expanded-projects-list > *,
+    color: #555;
+
+    cursor: pointer;
+
+    border-radius: 8px;
+
+    margin: 3px 8px;
+
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.expand-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+
+/* =========================================================
+   12. UNIFIED SUB-LIST RULE
+   =========================================================
+   هذه أهم قاعدة في التنظيف الجديد.
+
+   العناصر الموجودة تحت:
+   محادثة جديدة
+   المحادثات
+   المشاريع
+   المستندات
+   تحصل على التدرج نفسه.
+   ========================================================= */
+
+#new-chat-list,
+#chat-list,
+#expanded-projects-list {
+    width: 100%;
+
+    padding: 2px 2px 8px 0;
+    margin: 0;
+
+    font-size: 13px;
+}
+
+
+/* =========================================================
+   13. UNIFIED SUB ITEMS
+   ========================================================= */
+
 #new-chat-list .expanded-project-item,
 #new-chat-list .new-chat-item,
 #chat-list .chat-history-item,
-#expanded-projects-list .expanded-project-item {
+#expanded-projects-list .expanded-project-item,
+#expanded-projects-list .project-item {
     display: flex;
     align-items: center;
 
-    min-height: 32px;
+    width: calc(100% - 16px);
 
-    padding: 7px 12px;
-    margin: 4px 8px;
+    min-height: 34px;
+
+    padding: 7px 10px;
+    margin: 3px 8px;
 
     border-radius: 8px;
 
@@ -427,41 +441,35 @@ body {
 
     box-sizing: border-box;
 
-    overflow: hidden;
+    position: relative;
 
     transition:
-        background .15s ease,
-        color .15s ease;
+        background 0.15s ease,
+        color 0.15s ease;
 }
 
 
-/* =========================================================
-   14. UNIFIED SUB-ITEM HOVER
-   ========================================================= */
+/* hover موحد */
 
-#new-chat-list > *:hover,
-#chat-list > *:hover,
-#expanded-projects-list > *:hover,
 #new-chat-list .expanded-project-item:hover,
 #new-chat-list .new-chat-item:hover,
 #chat-list .chat-history-item:hover,
-#expanded-projects-list .expanded-project-item:hover {
+#expanded-projects-list .expanded-project-item:hover,
+#expanded-projects-list .project-item:hover {
     background: #f3f3f3;
     color: #111;
 }
 
 
 /* =========================================================
-   15. SUB-ITEM TEXT
+   14. TEXT INSIDE SUB ITEMS
    ========================================================= */
 
-#new-chat-list > * span,
-#chat-list > * span,
-#expanded-projects-list > * span,
 #new-chat-list .expanded-project-item span,
 #new-chat-list .new-chat-item span,
 #chat-list .chat-title,
-#expanded-projects-list .expanded-project-item span {
+#expanded-projects-list .expanded-project-item span,
+#expanded-projects-list .project-item span {
     min-width: 0;
 
     overflow: hidden;
@@ -472,23 +480,22 @@ body {
 
     font-size: 13px;
     font-weight: 400;
+
+    line-height: 1.4;
 }
 
 
 /* =========================================================
-   16. NEW CHAT LIST
+   15. NEW CHAT LIST
    ========================================================= */
 
 #new-chat-list {
-    width: 100%;
-
-    padding: 0;
-    margin: 0;
+    padding-top: 1px;
 }
 
 
 /* =========================================================
-   17. CHAT LIST
+   16. CHAT HISTORY
    ========================================================= */
 
 #chat-list {
@@ -496,29 +503,20 @@ body {
 
     overflow-y: auto;
     overflow-x: hidden;
-
-    padding: 2px 2px 8px 0;
 }
 
 
 /* =========================================================
-   18. CHAT HISTORY ITEM
+   إزالة الخطوط بين المحادثات
    ========================================================= */
 
-.chat-history-item {
-    position: relative;
-
-    justify-content: space-between;
-}
-
-.chat-title {
-    flex: 1;
+#chat-list .recent-chat-item,
+#chat-list .chat-history-item {
+    border-bottom: none;
 }
 
 
-/* =========================================================
-   19. CHAT LIST SCROLLBAR
-   ========================================================= */
+/* scrollbar */
 
 #chat-list::-webkit-scrollbar {
     width: 6px;
@@ -539,58 +537,49 @@ body {
 
 
 /* =========================================================
-   20. EXPANDED PROJECT ITEMS
+   17. CHAT HISTORY ITEM
    ========================================================= */
 
-.expanded-project-item {
-    justify-content: flex-start;
+.chat-history-item {
+    justify-content: space-between;
 }
 
-.expanded-project-item span {
+.chat-title {
     flex: 1;
 }
 
 
 /* =========================================================
-   21. PROJECTS LIST
+   18. CHAT MENU BUTTON
    ========================================================= */
 
-#expanded-projects-list {
-    width: 100%;
+.chat-menu {
+    width: 26px;
+    height: 26px;
 
-    max-height: calc(100vh - 145px);
+    flex-shrink: 0;
 
-    overflow-y: auto;
-    overflow-x: visible;
+    border: none;
 
-    padding-right: 2px;
-}
-
-
-/* =========================================================
-   22. PROJECT LIST SCROLLBAR
-   ========================================================= */
-
-#expanded-projects-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-#expanded-projects-list::-webkit-scrollbar-track {
     background: transparent;
+
+    font-size: 17px;
+
+    cursor: pointer;
+
+    color: #777;
+
+    border-radius: 6px;
 }
 
-#expanded-projects-list::-webkit-scrollbar-thumb {
-    background: #cfcfcf;
-    border-radius: 10px;
-}
-
-#expanded-projects-list::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
+.chat-menu:hover {
+    background: #eaeaea;
+    color: #111;
 }
 
 
 /* =========================================================
-   23. PROJECTS POPUP
+   19. PROJECTS
    ========================================================= */
 
 .projects-popup {
@@ -601,7 +590,7 @@ body {
     top: 60px;
     left: 70px;
 
-    width: 240px;
+    width: 260px;
     max-width: calc(100vw - 90px);
 
     background: #ffffff;
@@ -622,39 +611,32 @@ body {
     display: block;
 }
 
+#projects-list {
+    max-height: calc(100vh - 145px);
+
+    overflow-y: auto;
+    overflow-x: visible;
+
+    padding-right: 2px;
+}
+
 
 /* =========================================================
-   24. PROJECT HEADER / ITEMS
+   20. PROJECT HEADER / ITEMS
    ========================================================= */
 
 .projects-header span,
 .project-item span {
     display: flex;
+
     align-items: center;
 
     gap: 8px;
 }
 
-.project-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    padding: 10px;
-
-    cursor: pointer;
-
-    position: relative;
-
-    border-radius: 8px;
-}
-
-.project-item:hover {
-    background: #f4f4f4;
-}
-
 .folder-icon {
     display: inline-flex;
+
     align-items: center;
 
     margin-left: 6px;
@@ -662,35 +644,66 @@ body {
     color: #555;
 }
 
+.project-item {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding: 8px 10px;
+
+    cursor: pointer;
+
+    position: relative;
+
+    border-radius: 8px;
+
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.project-item:hover {
+    background: #f4f4f4;
+}
+
+
+/* =========================================================
+   21. PROJECT MENU
+   ========================================================= */
+
 .project-menu {
+    width: 26px;
+    height: 26px;
+
     border: none;
-    background: none;
+
+    background: transparent;
 
     cursor: pointer;
 
     font-size: 18px;
 
     color: #777;
+
+    border-radius: 6px;
 }
 
 .project-menu:hover {
+    background: #eaeaea;
     color: #111;
 }
 
 
 /* =========================================================
-   25. PROJECT OPTIONS MENU
+   22. PROJECT OPTIONS MENU
    ========================================================= */
 
-.project-options-menu {
+.project-options-menu,
+.chat-options-menu {
     position: absolute;
 
-    right: 35px;
-    top: 5px;
-
     width: 140px;
-
-    max-height: calc(100vh - 20px);
 
     background: #ffffff;
 
@@ -705,43 +718,78 @@ body {
 
     z-index: 50000;
 
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
+
+    font-size: 13px;
 }
 
-.project-options-menu.open {
+.project-options-menu {
+    right: 35px;
+    top: 5px;
+}
+
+.chat-options-menu {
+    right: 35px;
+    top: 5px;
+}
+
+.project-options-menu.open,
+.chat-options-menu.open {
     display: block;
 }
 
-.project-options-menu.open-up {
-    top: auto;
-    bottom: 5px;
-}
-
-.project-options-menu div {
-    padding: 10px 12px;
+.project-options-menu div,
+.chat-options-menu div {
+    padding: 9px 11px;
 
     cursor: pointer;
 
     font-size: 13px;
 
+    font-weight: 400;
+
     color: #444;
+
+    line-height: 1.4;
 }
 
-.project-options-menu div:hover {
+.project-options-menu div:hover,
+.chat-options-menu div:hover {
     background: #f3f3f3;
 }
 
+
+/* =========================================================
+   23. OPEN UP
+   ========================================================= */
+
+.project-options-menu.open-up,
+.chat-options-menu.open-up {
+    top: auto;
+    bottom: 5px;
+}
+
+
+/* =========================================================
+   24. RENAME / DELETE
+   ========================================================= */
+
+.rename-chat,
+.delete-chat,
 .rename-project,
 .delete-project {
     display: flex;
+
     align-items: center;
 
     gap: 8px;
 
-    padding: 10px 12px;
+    padding: 9px 11px;
 
     font-size: 13px;
+    font-weight: 400;
+
+    line-height: 1.4;
 
     color: #444;
 
@@ -752,6 +800,8 @@ body {
     z-index: 100000;
 }
 
+.rename-chat:hover,
+.delete-chat:hover,
 .rename-project:hover,
 .delete-project:hover {
     background: #f3f3f3;
@@ -759,7 +809,243 @@ body {
 
 
 /* =========================================================
-   26. NEW PROJECT BOX
+   25. CHAT ACTION MENU
+   ========================================================= */
+
+.chat-action-menu {
+    position: fixed;
+
+    right: 70px;
+    top: 200px;
+
+    width: 150px;
+
+    background: #ffffff;
+
+    border: 1px solid #ddd;
+
+    border-radius: 10px;
+
+    box-shadow:
+        0 5px 20px rgba(0, 0, 0, 0.15);
+
+    z-index: 90000;
+
+    overflow: hidden;
+}
+
+.chat-action-menu div {
+    padding: 10px 12px;
+
+    cursor: pointer;
+
+    font-size: 13px;
+}
+
+.chat-action-menu div:hover {
+    background: #f5f5f5;
+}
+
+
+/* =========================================================
+   26. CHAT POPUP
+   ========================================================= */
+
+#chat-popup {
+    display: none;
+
+    position: absolute;
+
+    top: 60px;
+    left: 70px;
+
+    width: 260px;
+    max-width: calc(100vw - 90px);
+
+    max-height: calc(100vh - 80px);
+
+    background: #ffffff;
+
+    border-radius: 12px;
+
+    box-shadow:
+        0 5px 25px rgba(0, 0, 0, 0.2);
+
+    z-index: 40000;
+
+    overflow: visible;
+}
+
+#chat-popup.open {
+    display: block;
+}
+
+.chat-popup-header {
+    padding: 12px 14px;
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    border-bottom: 1px solid #eee;
+}
+
+
+/* =========================================================
+   27. RECENT CHAT ITEMS
+   ========================================================= */
+
+.recent-chat-item {
+    padding: 9px 12px;
+
+    cursor: pointer;
+
+    font-size: 13px;
+
+    line-height: 1.4;
+
+    border-bottom: none;
+
+    border-radius: 7px;
+
+    margin: 2px 5px;
+}
+
+.recent-chat-item:hover {
+    background: #f5f5f5;
+}
+
+
+/* =========================================================
+   28. EMPTY CHAT
+   ========================================================= */
+
+.empty-chat {
+    padding: 14px;
+
+    color: #777;
+
+    font-size: 13px;
+
+    line-height: 1.5;
+}
+
+
+/* =========================================================
+   29. SEARCH POPUP
+   ========================================================= */
+
+.search-popup {
+    position: absolute;
+
+    top: 60px;
+    right: 70px;
+
+    width: 260px;
+    max-width: calc(100vw - 90px);
+
+    background: #ffffff;
+
+    border: 1px solid #e2e2e2;
+
+    border-radius: 14px;
+
+    box-shadow:
+        0 8px 25px rgba(0, 0, 0, 0.15);
+
+    padding: 10px;
+
+    display: none;
+
+    z-index: 5000;
+
+    overflow: visible;
+}
+
+.search-popup.open {
+    display: block;
+}
+
+
+/* =========================================================
+   30. SEARCH INPUT
+   ========================================================= */
+
+#search-input {
+    width: 100%;
+    height: 40px;
+
+    padding: 8px 11px;
+
+    border: 1px solid #d8d8d8;
+
+    border-radius: 10px;
+
+    outline: none;
+
+    background: #ffffff;
+    color: #222;
+
+    font-size: 13px;
+
+    direction: rtl;
+    text-align: right;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+#search-input:focus {
+    border-color: #999;
+
+    box-shadow:
+        0 0 0 2px rgba(0, 0, 0, 0.04);
+}
+
+
+/* =========================================================
+   31. SEARCH RESULTS
+   ========================================================= */
+
+#search-results {
+    margin-top: 8px;
+
+    max-height: 280px;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    direction: rtl;
+}
+
+.search-result-item {
+    padding: 8px 10px;
+
+    margin-bottom: 2px;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    font-size: 13px;
+
+    line-height: 1.45;
+
+    color: #444;
+
+    direction: rtl;
+    text-align: right;
+}
+
+.search-result-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+
+/* =========================================================
+   32. NEW PROJECT BOX
    ========================================================= */
 
 .project-create-box {
@@ -778,8 +1064,6 @@ body {
 .project-create-box .rename-dialog {
     width: 240px;
 
-    max-width: calc(100vw - 30px);
-
     background: #ffffff;
 
     border: 1px solid #ddd;
@@ -791,11 +1075,6 @@ body {
     box-shadow:
         0 8px 25px rgba(0, 0, 0, 0.18);
 }
-
-
-/* =========================================================
-   27. PROJECT NAME INPUT
-   ========================================================= */
 
 .project-create-box input {
     width: 100%;
@@ -811,7 +1090,7 @@ body {
 
     margin-bottom: 10px;
 
-    font-size: 14px;
+    font-size: 13px;
 
     background: #ffffff;
 }
@@ -819,11 +1098,6 @@ body {
 .project-create-box input:focus {
     border-color: #999;
 }
-
-
-/* =========================================================
-   28. PROJECT BUTTONS
-   ========================================================= */
 
 .project-create-box button {
     padding: 7px 15px;
@@ -850,1209 +1124,12 @@ body {
 }
 
 .project-create-box button:hover {
-    opacity: .9;
+    opacity: 0.9;
 }
 
 
 /* =========================================================
-   29. CHAT OPTIONS MENU
-   ========================================================= */
-
-.chat-options-menu {
-    position: absolute;
-
-    right: 35px;
-    top: 5px;
-
-    width: 140px;
-
-    max-height: calc(100vh - 20px);
-
-    background: #ffffff;
-
-    border: 1px solid #ddd;
-
-    border-radius: 10px;
-
-    box-shadow:
-        0 4px 15px rgba(0, 0, 0, 0.15);
-
-    display: none;
-
-    z-index: 50000;
-
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-.chat-options-menu.open {
-    display: block;
-}
-
-.chat-options-menu.open-up {
-    top: auto;
-    bottom: 5px;
-}
-
-.chat-options-menu div {
-    padding: 10px 12px;
-
-    cursor: pointer;
-
-    font-size: 13px;
-
-    color: #444;
-}
-
-.chat-options-menu div:hover {
-    background: #f3f3f3;
-}
-
-.rename-chat,
-.delete-chat {
-    display: flex;
-    align-items: center;
-
-    gap: 8px;
-
-    padding: 10px 12px;
-
-    font-size: 13px;
-
-    color: #444;
-
-    cursor: pointer;
-
-    position: relative;
-
-    z-index: 100000;
-}
-
-.rename-chat:hover,
-.delete-chat:hover {
-    background: #f3f3f3;
-}
-
-
-/* =========================================================
-   30. CHAT OPTIONS BUTTON
-   ========================================================= */
-
-.chat-menu {
-    border: none;
-    background: none;
-
-    font-size: 18px;
-
-    cursor: pointer;
-
-    color: #777;
-}
-
-.chat-menu:hover {
-    color: #111;
-}
-
-
-/* =========================================================
-   31. CHAT ACTION MENU
-   ========================================================= */
-
-.chat-action-menu {
-    position: fixed;
-
-    right: 70px;
-    top: 200px;
-
-    width: 150px;
-
-    max-height: calc(100vh - 20px);
-
-    background: #ffffff;
-
-    border: 1px solid #ddd;
-
-    border-radius: 10px;
-
-    box-shadow:
-        0 5px 20px rgba(0, 0, 0, 0.15);
-
-    z-index: 90000;
-
-    overflow-y: auto;
-}
-
-.chat-action-menu div {
-    padding: 12px;
-
-    cursor: pointer;
-
-    font-size: 13px;
-}
-
-.chat-action-menu div:hover {
-    background: #f5f5f5;
-}
-
-
-/* =========================================================
-   32. CHAT POPUP
-   ========================================================= */
-
-#chat-popup {
-    display: none;
-
-    position: absolute;
-
-    top: 60px;
-    left: 70px;
-
-    width: 240px;
-    max-width: calc(100vw - 90px);
-
-    max-height: calc(100vh - 80px);
-
-    background: #ffffff;
-
-    border-radius: 12px;
-
-    box-shadow:
-        0 5px 25px rgba(0, 0, 0, 0.2);
-
-    z-index: 40000;
-
-    overflow-y: auto;
-    overflow-x: visible;
-}
-
-#chat-popup.open {
-    display: block;
-}
-
-.chat-popup-header {
-    padding: 12px;
-
-    font-weight: 600;
-    font-size: 14px;
-
-    border-bottom: 1px solid #ddd;
-}
-
-.recent-chat-item {
-    padding: 10px 12px;
-
-    font-size: 13px;
-
-    cursor: pointer;
-
-    border-bottom: 1px solid #eee;
-}
-
-.recent-chat-item:hover {
-    background: #f5f5f5;
-}
-
-.empty-chat {
-    padding: 15px;
-
-    font-size: 13px;
-
-    color: #777;
-}
-
-
-/* =========================================================
-   33. SEARCH POPUP
-   ========================================================= */
-
-.search-popup {
-    position: absolute;
-
-    top: 60px;
-    right: 70px;
-
-    width: 280px;
-    max-width: calc(100vw - 90px);
-
-    max-height: calc(100vh - 80px);
-
-    background: #ffffff;
-
-    border: 1px solid #e2e2e2;
-
-    border-radius: 14px;
-
-    box-shadow:
-        0 8px 25px rgba(0, 0, 0, 0.15);
-
-    padding: 12px;
-
-    display: none;
-
-    z-index: 5000;
-
-    overflow: visible;
-}
-
-.search-popup.open {
-    display: block;
-}
-
-
-/* =========================================================
-   34. SEARCH INPUT
-   ========================================================= */
-
-#search-input {
-    width: 100%;
-    height: 42px;
-
-    padding: 9px 12px;
-
-    border: 1px solid #d8d8d8;
-
-    border-radius: 10px;
-
-    outline: none;
-
-    background: #ffffff;
-    color: #222;
-
-    font-size: 14px;
-
-    direction: rtl;
-    text-align: right;
-
-    transition:
-        border-color .2s ease,
-        box-shadow .2s ease;
-}
-
-#search-input:focus {
-    border-color: #999;
-
-    box-shadow:
-        0 0 0 2px rgba(0, 0, 0, 0.04);
-}
-
-
-/* =========================================================
-   35. SEARCH RESULTS
-   ========================================================= */
-
-#search-results {
-    margin-top: 10px;
-
-    max-height: 280px;
-
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    direction: rtl;
-}
-
-#search-results::-webkit-scrollbar {
-    width: 6px;
-}
-
-#search-results::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#search-results::-webkit-scrollbar-thumb {
-    background: #c8c8c8;
-    border-radius: 10px;
-}
-
-#search-results::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
-}
-
-.search-result-item {
-    padding: 10px 11px;
-
-    margin-bottom: 3px;
-
-    border-radius: 8px;
-
-    cursor: pointer;
-
-    font-size: 14px;
-    line-height: 1.5;
-
-    color: #444;
-
-    direction: rtl;
-    text-align: right;
-
-    transition:
-        background .15s ease,
-        color .15s ease;
-}
-
-.search-result-item:hover {
-    background: #f3f3f3;
-    color: #111;
-}
-
-
-/* =========================================================
-   36. MAIN
-   ========================================================= */
-
-.main {
-    height: 100vh;
-
-    margin-left: 52px;
-
-    display: flex;
-    flex-direction: column;
-}
-
-#document-title {
-    height: 45px;
-
-    border-bottom: 1px solid #eee;
-
-    display: flex;
-    align-items: center;
-
-    padding: 0 18px;
-
-    font-size: 13px;
-
-    color: #666;
-}
-
-
-/* =========================================================
-   37. CHAT AREA
-   ========================================================= */
-
-#chat-area {
-    flex: 1;
-
-    overflow-y: auto;
-
-    padding: 25px;
-}
-
-.welcome {
-    height: 100%;
-
-    display: flex;
-    flex-direction: column;
-
-    align-items: center;
-    justify-content: center;
-
-    text-align: center;
-
-    color: #666;
-}
-
-.ai-symbol {
-    font-size: 55px;
-
-    color: #444;
-
-    margin-bottom: 15px;
-}
-
-.welcome h2 {
-    font-size: 22px;
-
-    color: #222;
-
-    margin-bottom: 10px;
-}
-
-.welcome p {
-    font-size: 14px;
-}
-
-
-/* =========================================================
-   38. MESSAGES
-   ========================================================= */
-
-.message {
-    max-width: 80%;
-
-    padding: 12px 15px;
-
-    margin-bottom: 12px;
-
-    border-radius: 14px;
-
-    line-height: 1.6;
-
-    font-size: 14px;
-}
-
-.user-message {
-    background: #222;
-    color: #ffffff;
-
-    margin-left: auto;
-}
-
-.ai-message {
-    background: #f2f2f2;
-    color: #222;
-
-    margin-right: auto;
-}
-
-
-/* =========================================================
-   39. INPUT AREA
-   ========================================================= */
-
-.input-area {
-    min-height: 68px;
-    height: 68px;
-
-    border-top: 1px solid #eee;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    padding: 5px 15px 13px;
-}
-
-
-/* =========================================================
-   40. MESSAGE BOX
-   ========================================================= */
-
-.message-box {
-    width: calc(100% - 10px);
-
-    height: 46px;
-    min-height: 46px;
-
-    display: flex;
-    align-items: center;
-
-    background: #ffffff;
-
-    border: 1px solid #d9d9d9;
-
-    border-radius: 23px;
-
-    padding: 2px 2px 2px 14px;
-
-    margin: 0 5px;
-
-    box-shadow:
-        0 1px 3px rgba(0, 0, 0, 0.05);
-
-    transition:
-        border-color .2s ease,
-        box-shadow .2s ease,
-        height .15s ease;
-}
-
-.message-box:focus-within {
-    border-color: #b5b5b5;
-
-    box-shadow:
-        0 1px 5px rgba(0, 0, 0, 0.08);
-}
-
-
-/* =========================================================
-   41. TEXTAREA
-   ========================================================= */
-
-#user-input {
-    flex: 1;
-
-    width: 100%;
-
-    height: 38px;
-    min-height: 38px;
-    max-height: 140px;
-
-    resize: none;
-
-    border: none;
-    outline: none;
-
-    background: transparent;
-
-    padding: 8px 5px;
-
-    font-size: 14px;
-    line-height: 1.45;
-
-    overflow-y: auto;
-}
-
-#user-input::placeholder {
-    color: #999;
-}
-
-
-/* =========================================================
-   42. SEND BUTTON
-   ========================================================= */
-
-#send-btn {
-    flex: 0 0 38px;
-
-    width: 38px;
-    height: 38px;
-
-    min-width: 38px;
-    min-height: 38px;
-
-    margin-left: auto;
-    margin-right: 0;
-
-    padding: 0;
-
-    border: none;
-
-    border-radius: 50%;
-
-    background: #222;
-    color: #fff;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    cursor: pointer;
-
-    transition:
-        background .2s ease,
-        transform .15s ease;
-}
-
-#send-btn:hover {
-    background: #111;
-    transform: scale(1.03);
-}
-
-#send-btn:active {
-    transform: scale(.94);
-}
-
-#send-btn svg {
-    width: 19px;
-    height: 19px;
-
-    fill: none;
-
-    stroke: currentColor;
-    stroke-width: 2.5;
-
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-
-/* =========================================================
-   43. SETTINGS WINDOW
-   ========================================================= */
-
-#settings-window {
-    position: absolute;
-
-    top: 50%;
-    left: 50%;
-
-    width: min(430px, calc(100% - 32px));
-
-    max-height: calc(100% - 32px);
-
-    transform: translate(-50%, -46%);
-
-    background: var(--panel-bg, #ffffff);
-
-    border: 1px solid var(--border-color, #e2e5e9);
-
-    border-radius: 16px;
-
-    box-shadow:
-        0 18px 50px rgba(0, 0, 0, 0.16);
-
-    padding: 0;
-
-    overflow: hidden;
-
-    z-index: 10000;
-
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-
-    transition:
-        opacity .18s ease,
-        transform .18s ease,
-        visibility .18s ease;
-}
-
-#settings-window.open {
-    opacity: 1;
-
-    visibility: visible;
-
-    pointer-events: auto;
-
-    transform: translate(-50%, -50%);
-}
-
-
-/* =========================================================
-   44. SETTINGS HEADER
-   ========================================================= */
-
-#settings-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    height: 58px;
-
-    padding: 0 18px;
-
-    background:
-        var(--panel-header-bg, #f7f8fa);
-
-    border-bottom:
-        1px solid var(--border-color, #e2e5e9);
-
-    font-size: 16px;
-    font-weight: 700;
-
-    color:
-        var(--text-color, #202124);
-
-    direction: rtl;
-}
-
-#settings-header > span {
-    display: flex;
-    align-items: center;
-
-    gap: 8px;
-
-    white-space: nowrap;
-}
-
-#close-settings {
-    width: 32px;
-    height: 32px;
-
-    border: none;
-
-    border-radius: 8px;
-
-    background: transparent;
-
-    color:
-        var(--muted-text, #6b7280);
-
-    font-size: 23px;
-    line-height: 1;
-
-    cursor: pointer;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    transition:
-        background .15s ease,
-        color .15s ease;
-}
-
-#close-settings:hover {
-    background:
-        rgba(0, 0, 0, .07);
-
-    color:
-        var(--text-color, #202124);
-}
-
-
-/* =========================================================
-   45. SETTINGS LABELS
-   ========================================================= */
-
-#settings-window > label {
-    display: block;
-
-    margin: 17px 20px 7px;
-
-    font-size: 13px;
-    font-weight: 600;
-
-    color:
-        var(--text-color, #30343b);
-
-    text-align: right;
-
-    direction: rtl;
-}
-
-
-/* =========================================================
-   46. PROVIDER SELECT
-   ========================================================= */
-
-#provider-select {
-    display: block;
-
-    width: calc(100% - 40px);
-    height: 42px;
-
-    margin: 0 20px;
-
-    padding: 0 12px;
-
-    border: 1px solid
-        var(--border-color, #d9dde3);
-
-    border-radius: 9px;
-
-    background:
-        var(--input-bg, #ffffff);
-
-    color:
-        var(--text-color, #202124);
-
-    font-size: 14px;
-
-    outline: none;
-
-    cursor: pointer;
-
-    direction: ltr;
-
-    transition:
-        border-color .15s ease,
-        box-shadow .15s ease;
-}
-
-#provider-select:focus {
-    border-color: #6b7280;
-
-    box-shadow:
-        0 0 0 3px rgba(107, 114, 128, .12);
-}
-
-
-/* =========================================================
-   47. API KEY
-   ========================================================= */
-
-.key-box {
-    display: flex;
-    align-items: center;
-
-    width: calc(100% - 40px);
-    height: 42px;
-
-    margin: 0 20px;
-
-    border: 1px solid
-        var(--border-color, #d9dde3);
-
-    border-radius: 9px;
-
-    background:
-        var(--input-bg, #ffffff);
-
-    overflow: hidden;
-
-    transition:
-        border-color .15s ease,
-        box-shadow .15s ease;
-}
-
-.key-box:focus-within {
-    border-color: #6b7280;
-
-    box-shadow:
-        0 0 0 3px rgba(107, 114, 128, .12);
-}
-
-#api-key {
-    flex: 1;
-
-    min-width: 0;
-    height: 100%;
-
-    border: none;
-    outline: none;
-
-    background: transparent;
-
-    padding: 0 12px;
-
-    color:
-        var(--text-color, #202124);
-
-    font-size: 13px;
-
-    direction: ltr;
-    text-align: left;
-}
-
-#api-key::placeholder {
-    color:
-        var(--muted-text, #9aa0a6);
-}
-
-#show-key {
-    width: 42px;
-    height: 100%;
-
-    border: none;
-
-    border-right:
-        1px solid var(--border-color, #e2e5e9);
-
-    background: transparent;
-
-    cursor: pointer;
-
-    font-size: 16px;
-
-    color:
-        var(--muted-text, #6b7280);
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#show-key:hover {
-    background:
-        rgba(0, 0, 0, .045);
-}
-
-
-/* =========================================================
-   48. MODEL BOX
-   ========================================================= */
-
-.model-box {
-    display: flex;
-    align-items: center;
-
-    gap: 8px;
-
-    width: calc(100% - 40px);
-    height: 42px;
-
-    margin: 0 20px;
-}
-
-#model-select {
-    flex: 1;
-
-    min-width: 0;
-
-    height: 42px;
-
-    padding: 0 10px;
-
-    border: 1px solid
-        var(--border-color, #d9dde3);
-
-    border-radius: 9px;
-
-    background:
-        var(--input-bg, #ffffff);
-
-    color:
-        var(--text-color, #202124);
-
-    font-size: 13px;
-
-    outline: none;
-
-    direction: ltr;
-
-    cursor: pointer;
-}
-
-#model-select:focus {
-    border-color: #6b7280;
-
-    box-shadow:
-        0 0 0 3px rgba(107, 114, 128, .12);
-}
-
-#refresh-models {
-    width: 42px;
-    height: 42px;
-
-    flex-shrink: 0;
-
-    border: 1px solid
-        var(--border-color, #d9dde3);
-
-    border-radius: 9px;
-
-    background:
-        var(--input-bg, #ffffff);
-
-    color:
-        var(--text-color, #50555c);
-
-    font-size: 19px;
-
-    cursor: pointer;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    transition:
-        background .15s ease,
-        border-color .15s ease,
-        transform .15s ease;
-}
-
-#refresh-models:hover {
-    background:
-        var(--hover-bg, #f3f4f6);
-
-    border-color: #c5cad1;
-}
-
-#refresh-models:active {
-    transform: rotate(-25deg);
-}
-
-#refresh-models:disabled {
-    opacity: .5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-
-/* =========================================================
-   49. PROVIDER INFO
-   ========================================================= */
-
-#provider-info {
-    margin: 16px 20px 0;
-
-    padding: 11px 12px;
-
-    border-radius: 9px;
-
-    background:
-        var(--info-bg, #f5f7fa);
-
-    border: 1px solid
-        var(--border-color, #e5e7eb);
-
-    color:
-        var(--muted-text, #6b7280);
-
-    font-size: 12px;
-
-    line-height: 1.7;
-
-    text-align: right;
-
-    direction: rtl;
-}
-
-
-/* =========================================================
-   50. SETTINGS BUTTONS
-   ========================================================= */
-
-.settings-buttons {
-    display: flex;
-
-    gap: 9px;
-
-    margin: 18px 20px 0;
-}
-
-.settings-buttons button {
-    flex: 1;
-
-    height: 40px;
-
-    border-radius: 9px;
-
-    font-size: 13px;
-    font-weight: 600;
-
-    cursor: pointer;
-
-    transition:
-        background .15s ease,
-        border-color .15s ease,
-        transform .1s ease;
-}
-
-#test-connection {
-    border: 1px solid
-        var(--border-color, #d9dde3);
-
-    background:
-        var(--input-bg, #ffffff);
-
-    color:
-        var(--text-color, #30343b);
-}
-
-#test-connection:hover {
-    background:
-        var(--hover-bg, #f3f4f6);
-}
-
-#save-settings {
-    border: 1px solid #30343b;
-
-    background: #30343b;
-
-    color: #ffffff;
-}
-
-#save-settings:hover {
-    background: #202124;
-
-    border-color: #202124;
-}
-
-.settings-buttons button:active {
-    transform: translateY(1px);
-}
-
-.settings-buttons button:disabled {
-    opacity: .55;
-
-    cursor: not-allowed;
-}
-
-
-/* =========================================================
-   51. SETTINGS STATUS
-   ========================================================= */
-
-#settings-status {
-    min-height: 20px;
-
-    margin: 12px 20px 18px;
-
-    font-size: 12px;
-
-    line-height: 1.6;
-
-    text-align: center;
-
-    direction: rtl;
-
-    color:
-        var(--muted-text, #6b7280);
-}
-
-
-/* =========================================================
-   52. DARK MODE - SETTINGS
-   ========================================================= */
-
-body.dark #settings-window,
-.dark #settings-window {
-    background:
-        var(--panel-bg, #202124);
-
-    border-color:
-        var(--border-color, #3a3d42);
-
-    box-shadow:
-        0 18px 50px rgba(0, 0, 0, .45);
-}
-
-body.dark #settings-header,
-.dark #settings-header {
-    background:
-        var(--panel-header-bg, #292b2f);
-
-    border-bottom-color:
-        var(--border-color, #3a3d42);
-
-    color:
-        var(--text-color, #f1f3f4);
-}
-
-body.dark #provider-select,
-body.dark #api-key,
-body.dark #model-select,
-.dark #provider-select,
-.dark #api-key,
-.dark #model-select {
-    background:
-        var(--input-bg, #292b2f);
-
-    color:
-        var(--text-color, #f1f3f4);
-
-    border-color:
-        var(--border-color, #41444a);
-}
-
-body.dark .key-box,
-.dark .key-box {
-    background:
-        var(--input-bg, #292b2f);
-
-    border-color:
-        var(--border-color, #41444a);
-}
-
-body.dark #refresh-models,
-body.dark #test-connection,
-.dark #refresh-models,
-.dark #test-connection {
-    background:
-        var(--input-bg, #292b2f);
-
-    color:
-        var(--text-color, #f1f3f4);
-
-    border-color:
-        var(--border-color, #41444a);
-}
-
-body.dark #provider-info,
-.dark #provider-info {
-    background:
-        var(--info-bg, #292b2f);
-
-    border-color:
-        var(--border-color, #41444a);
-
-    color:
-        var(--muted-text, #aeb4bd);
-}
-
-body.dark #save-settings,
-.dark #save-settings {
-    background: #f1f3f4;
-
-    color: #202124;
-
-    border-color: #f1f3f4;
-}
-
-
-/* =========================================================
-   53. DELETE CHAT CONFIRMATION
+   33. DELETE CONFIRMATION
    ========================================================= */
 
 .delete-confirm,
@@ -2064,7 +1141,7 @@ body.dark #save-settings,
     width: 100%;
     height: 100%;
 
-    background: rgba(0, 0, 0, .4);
+    background: rgba(0, 0, 0, 0.4);
 
     display: flex;
 
@@ -2079,8 +1156,11 @@ body.dark #save-settings,
     position: relative;
 
     width: 320px;
+
     max-width: calc(100vw - 30px);
     max-height: calc(100vh - 30px);
+
+    overflow-y: auto;
 
     background: #ffffff;
 
@@ -2091,11 +1171,9 @@ body.dark #save-settings,
     border-radius: 12px;
 
     box-shadow:
-        0 5px 30px rgba(0, 0, 0, .3);
+        0 5px 30px rgba(0, 0, 0, 0.3);
 
     text-align: center;
-
-    overflow-y: auto;
 
     z-index: 1000000;
 }
@@ -2143,16 +1221,937 @@ body.dark #save-settings,
 
 .delete-confirm button:hover,
 .project-delete-confirm button:hover {
-    opacity: .9;
+    opacity: 0.9;
 }
 
 
 /* =========================================================
-   54. RENAME DIALOG
+   34. SCROLLBARS
    ========================================================= */
 
+#search-results::-webkit-scrollbar,
+#chat-list::-webkit-scrollbar,
+#projects-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#search-results::-webkit-scrollbar-track,
+#chat-list::-webkit-scrollbar-track,
+#projects-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#search-results::-webkit-scrollbar-thumb,
+#chat-list::-webkit-scrollbar-thumb,
+#projects-list::-webkit-scrollbar-thumb {
+    background: #c8c8c8;
+
+    border-radius: 10px;
+}
+
+#search-results::-webkit-scrollbar-thumb:hover,
+#chat-list::-webkit-scrollbar-thumb:hover,
+#projects-list::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+}
+
+
+/* =========================================================
+   35. NEW CHAT ICONS
+   ========================================================= */
+
+.new-chat-icon,
+.new-chat-pencil {
+    display: inline-block;
+
+    transform: scaleX(-1);
+}
+
+
+/* =========================================================
+   36. EXPANDED PROJECT ITEM
+   ========================================================= */
+
+.expanded-project-item {
+    display: flex;
+    align-items: center;
+
+    padding: 7px 10px;
+    margin: 3px 8px;
+
+    border-radius: 8px;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #555;
+
+    cursor: pointer;
+
+    line-height: 1.4;
+}
+
+.expanded-project-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+.expanded-project-item span {
+    min-width: 0;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+
+    font-size: 13px;
+    font-weight: 400;
+}
+
+
+/* =========================================================
+   37. SETTINGS WINDOW
+   ========================================================= */
+
+#settings-window {
+    position: absolute;
+
+    top: 50%;
+    left: 50%;
+
+    width: min(430px, calc(100% - 32px));
+
+    max-height: calc(100% - 32px);
+
+    transform: translate(-50%, -46%);
+
+    background: var(--panel-bg, #ffffff);
+
+    border: 1px solid var(--border-color, #e2e5e9);
+
+    border-radius: 16px;
+
+    box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.16);
+
+    padding: 0;
+
+    overflow: hidden;
+
+    z-index: 10000;
+
+    opacity: 0;
+    visibility: hidden;
+
+    pointer-events: none;
+
+    transition:
+        opacity 0.18s ease,
+        transform 0.18s ease,
+        visibility 0.18s ease;
+}
+
+#settings-window.open {
+    opacity: 1;
+
+    visibility: visible;
+
+    pointer-events: auto;
+
+    transform: translate(-50%, -50%);
+}
+
+
+/* =========================================================
+   38. SETTINGS HEADER
+   ========================================================= */
+
+#settings-header {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    height: 58px;
+
+    padding: 0 18px;
+
+    background:
+        var(--panel-header-bg, #f7f8fa);
+
+    border-bottom:
+        1px solid var(--border-color, #e2e5e9);
+
+    font-size: 16px;
+
+    font-weight: 700;
+
+    color:
+        var(--text-color, #202124);
+
+    direction: rtl;
+}
+
+#settings-header > span {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    white-space: nowrap;
+}
+
+#close-settings {
+    width: 32px;
+    height: 32px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background: transparent;
+
+    color:
+        var(--muted-text, #6b7280);
+
+    font-size: 23px;
+
+    line-height: 1;
+
+    cursor: pointer;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+}
+
+#close-settings:hover {
+    background:
+        rgba(0, 0, 0, 0.07);
+
+    color:
+        var(--text-color, #202124);
+}
+
+
+/* =========================================================
+   39. SETTINGS LABELS
+   ========================================================= */
+
+#settings-window > label {
+    display: block;
+
+    margin: 17px 20px 7px;
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+    color:
+        var(--text-color, #30343b);
+
+    text-align: right;
+
+    direction: rtl;
+}
+
+
+/* =========================================================
+   40. SETTINGS INPUTS
+   ========================================================= */
+
+#provider-select,
+#model-select {
+    background:
+        var(--input-bg, #ffffff);
+
+    color:
+        var(--text-color, #202124);
+
+    border:
+        1px solid var(--border-color, #d9dde3);
+}
+
+#provider-select {
+    display: block;
+
+    width: calc(100% - 40px);
+
+    height: 42px;
+
+    margin: 0 20px;
+
+    padding: 0 12px;
+
+    border-radius: 9px;
+
+    font-size: 14px;
+
+    outline: none;
+
+    cursor: pointer;
+
+    direction: ltr;
+}
+
+#provider-select:focus,
+#model-select:focus {
+    border-color: #6b7280;
+
+    box-shadow:
+        0 0 0 3px rgba(107, 114, 128, 0.12);
+}
+
+
+/* =========================================================
+   41. API KEY
+   ========================================================= */
+
+.key-box {
+    display: flex;
+
+    align-items: center;
+
+    width: calc(100% - 40px);
+
+    height: 42px;
+
+    margin: 0 20px;
+
+    border:
+        1px solid var(--border-color, #d9dde3);
+
+    border-radius: 9px;
+
+    background:
+        var(--input-bg, #ffffff);
+
+    overflow: hidden;
+}
+
+.key-box:focus-within {
+    border-color: #6b7280;
+
+    box-shadow:
+        0 0 0 3px rgba(107, 114, 128, 0.12);
+}
+
+#api-key {
+    flex: 1;
+
+    min-width: 0;
+
+    height: 100%;
+
+    border: none;
+
+    outline: none;
+
+    background: transparent;
+
+    padding: 0 12px;
+
+    color:
+        var(--text-color, #202124);
+
+    font-size: 13px;
+
+    direction: ltr;
+
+    text-align: left;
+}
+
+#api-key::placeholder {
+    color:
+        var(--muted-text, #9aa0a6);
+}
+
+#show-key {
+    width: 42px;
+    height: 100%;
+
+    border: none;
+
+    border-right:
+        1px solid var(--border-color, #e2e5e9);
+
+    background: transparent;
+
+    cursor: pointer;
+
+    font-size: 16px;
+
+    color:
+        var(--muted-text, #6b7280);
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+}
+
+#show-key:hover {
+    background:
+        rgba(0, 0, 0, 0.045);
+}
+
+
+/* =========================================================
+   42. MODEL
+   ========================================================= */
+
+.model-box {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    width: calc(100% - 40px);
+
+    height: 42px;
+
+    margin: 0 20px;
+}
+
+#model-select {
+    flex: 1;
+
+    min-width: 0;
+
+    height: 42px;
+
+    padding: 0 10px;
+
+    border-radius: 9px;
+
+    font-size: 13px;
+
+    outline: none;
+
+    direction: ltr;
+
+    cursor: pointer;
+}
+
+#refresh-models {
+    width: 42px;
+    height: 42px;
+
+    flex-shrink: 0;
+
+    border:
+        1px solid var(--border-color, #d9dde3);
+
+    border-radius: 9px;
+
+    background:
+        var(--input-bg, #ffffff);
+
+    color:
+        var(--text-color, #50555c);
+
+    font-size: 19px;
+
+    cursor: pointer;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.15s ease;
+}
+
+#refresh-models:hover {
+    background:
+        var(--hover-bg, #f3f4f6);
+
+    border-color: #c5cad1;
+}
+
+#refresh-models:active {
+    transform: rotate(-25deg);
+}
+
+#refresh-models:disabled {
+    opacity: 0.5;
+
+    cursor: not-allowed;
+
+    transform: none;
+}
+
+
+/* =========================================================
+   43. PROVIDER INFO
+   ========================================================= */
+
+#provider-info {
+    margin: 16px 20px 0;
+
+    padding: 11px 12px;
+
+    border-radius: 9px;
+
+    background:
+        var(--info-bg, #f5f7fa);
+
+    border:
+        1px solid var(--border-color, #e5e7eb);
+
+    color:
+        var(--muted-text, #6b7280);
+
+    font-size: 12px;
+
+    line-height: 1.7;
+
+    text-align: right;
+
+    direction: rtl;
+}
+
+
+/* =========================================================
+   44. SETTINGS BUTTONS
+   ========================================================= */
+
+.settings-buttons {
+    display: flex;
+
+    gap: 9px;
+
+    margin: 18px 20px 0;
+}
+
+.settings-buttons button {
+    flex: 1;
+
+    height: 40px;
+
+    border-radius: 9px;
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+#test-connection {
+    border:
+        1px solid var(--border-color, #d9dde3);
+
+    background:
+        var(--input-bg, #ffffff);
+
+    color:
+        var(--text-color, #30343b);
+}
+
+#test-connection:hover {
+    background:
+        var(--hover-bg, #f3f4f6);
+}
+
+#save-settings {
+    border: 1px solid #30343b;
+
+    background: #30343b;
+
+    color: #ffffff;
+}
+
+#save-settings:hover {
+    background: #202124;
+
+    border-color: #202124;
+}
+
+.settings-buttons button:active {
+    transform: translateY(1px);
+}
+
+.settings-buttons button:disabled {
+    opacity: 0.55;
+
+    cursor: not-allowed;
+}
+
+
+/* =========================================================
+   45. SETTINGS STATUS
+   ========================================================= */
+
+#settings-status {
+    min-height: 20px;
+
+    margin: 12px 20px 18px;
+
+    font-size: 12px;
+
+    line-height: 1.6;
+
+    text-align: center;
+
+    direction: rtl;
+
+    color:
+        var(--muted-text, #6b7280);
+}
+
+
+/* =========================================================
+   46. CHAT AREA
+   ========================================================= */
+
+#chat-area {
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding: 25px;
+}
+
+.welcome {
+    height: 100%;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+
+    color: #666;
+}
+
+.ai-symbol {
+    font-size: 55px;
+
+    color: #444;
+
+    margin-bottom: 15px;
+}
+
+.welcome h2 {
+    font-size: 22px;
+
+    color: #222;
+
+    margin-bottom: 10px;
+}
+
+.welcome p {
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   47. MESSAGES
+   ========================================================= */
+
+.message {
+    max-width: 80%;
+
+    padding: 12px 15px;
+
+    margin-bottom: 12px;
+
+    border-radius: 14px;
+
+    line-height: 1.6;
+
+    font-size: 14px;
+}
+
+.user-message {
+    background: #222;
+
+    color: #ffffff;
+
+    margin-left: auto;
+}
+
+.ai-message {
+    background: #f2f2f2;
+
+    color: #222;
+
+    margin-right: auto;
+}
+
+
+/* =========================================================
+   48. INPUT AREA
+   ========================================================= */
+
+.input-area {
+    min-height: 68px;
+    height: 68px;
+
+    border-top: 1px solid #eee;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 5px 15px 13px;
+}
+
+.message-box {
+    width: calc(100% - 10px);
+
+    height: 46px;
+    min-height: 46px;
+
+    display: flex;
+
+    align-items: center;
+
+    background: #ffffff;
+
+    border: 1px solid #d9d9d9;
+
+    border-radius: 23px;
+
+    padding: 2px 2px 2px 14px;
+
+    margin: 0 5px;
+
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.05);
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        height 0.15s ease;
+}
+
+.message-box:focus-within {
+    border-color: #b5b5b5;
+
+    box-shadow:
+        0 1px 5px rgba(0, 0, 0, 0.08);
+}
+
+#user-input {
+    flex: 1;
+
+    width: 100%;
+
+    height: 38px;
+    min-height: 38px;
+    max-height: 140px;
+
+    resize: none;
+
+    border: none;
+    outline: none;
+
+    background: transparent;
+
+    padding: 8px 5px;
+
+    font-size: 14px;
+
+    line-height: 1.45;
+
+    overflow-y: auto;
+}
+
+#user-input::placeholder {
+    color: #999;
+}
+
+
+/* =========================================================
+   49. SEND BUTTON
+   ========================================================= */
+
+#send-btn {
+    flex: 0 0 38px;
+
+    width: 38px;
+    height: 38px;
+
+    min-width: 38px;
+    min-height: 38px;
+
+    margin-left: auto;
+    margin-right: 0;
+
+    padding: 0;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background: #222;
+
+    color: #fff;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+}
+
+#send-btn:hover {
+    background: #111;
+
+    transform: scale(1.03);
+}
+
+#send-btn:active {
+    transform: scale(0.94);
+}
+
+#send-btn svg {
+    width: 19px;
+    height: 19px;
+
+    fill: none;
+
+    stroke: currentColor;
+
+    stroke-width: 2.5;
+
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+
+/* =========================================================
+   50. DARK MODE - SETTINGS
+   ========================================================= */
+
+body.dark #settings-window,
+.dark #settings-window {
+    background:
+        var(--panel-bg, #202124);
+
+    border-color:
+        var(--border-color, #3a3d42);
+
+    box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+body.dark #settings-header,
+.dark #settings-header {
+    background:
+        var(--panel-header-bg, #292b2f);
+
+    border-bottom-color:
+        var(--border-color, #3a3d42);
+
+    color:
+        var(--text-color, #f1f3f4);
+}
+
+body.dark #provider-select,
+body.dark #api-key,
+body.dark #model-select,
+.dark #provider-select,
+.dark #api-key,
+.dark #model-select {
+    background:
+        var(--input-bg, #292b2f);
+
+    color:
+        var(--text-color, #f1f3f4);
+
+    border-color:
+        var(--border-color, #41444a);
+}
+
+body.dark .key-box,
+.dark .key-box {
+    background:
+        var(--input-bg, #292b2b);
+
+    border-color:
+        var(--border-color, #41444a);
+}
+
+body.dark #refresh-models,
+body.dark #test-connection,
+.dark #refresh-models,
+.dark #test-connection {
+    background:
+        var(--input-bg, #292b2f);
+
+    color:
+        var(--text-color, #f1f3f4);
+
+    border-color:
+        var(--border-color, #41444a);
+}
+
+body.dark #provider-info,
+.dark #provider-info {
+    background:
+        var(--info-bg, #292b2f);
+
+    border-color:
+        var(--border-color, #41444a);
+
+    color:
+        var(--muted-text, #aeb4bd);
+}
+
+body.dark #save-settings,
+.dark #save-settings {
+    background: #f1f3f4;
+
+    color: #202124;
+
+    border-color: #f1f3f4;
+}
+
+
+/* =========================================================
+   51. WINDOW POSITIONING
+   منع خروج النوافذ من حدود الشاشة
+   ========================================================= */
+
+/*
+   النوافذ المنبثقة لا تُقص داخل الحاويات.
+*/
+.projects-popup,
+#chat-popup,
+.search-popup {
+    overflow: visible;
+}
+
+
+/*
+   عند وجود القائمة قرب أسفل الشاشة،
+   يستخدم JavaScript الكلاس open-up.
+*/
+.project-options-menu.open-up,
+.chat-options-menu.open-up {
+    top: auto;
+    bottom: 5px;
+}
+
+
+/*
+   نوافذ إعادة التسمية والتأكيد
+*/
 .rename-dialog {
-    max-width: calc(100vw - 30px);
     max-height: calc(100vh - 30px);
 
     overflow-y: auto;
@@ -2160,93 +2159,13 @@ body.dark #save-settings,
 
 
 /* =========================================================
-   55. GLOBAL SCROLLBAR
-   ========================================================= */
-
-::-webkit-scrollbar {
-    width: 7px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #ccc;
-
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
-}
-
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-
-/* =========================================================
-   56. POPUP POSITIONING NEAR SCREEN EDGES
+   52. GENERAL POPUP SAFETY
    ========================================================= */
 
 .projects-popup,
-.chat-popup {
-    overflow: visible;
-}
-
-
-/*
-   هذه القاعدة تستخدم عندما يقرر JavaScript
-   أن القائمة قريبة من أسفل الشاشة.
-*/
-
-.project-options-menu.open-up,
-.chat-options-menu.open-up {
-    top: auto;
-
-    bottom: 5px;
-}
-
-
-/* =========================================================
-   57. UNIFIED POPUP SIZING
-   ========================================================= */
-
-/*
-   النوافذ المنبثقة الأساسية في الشريط الجانبي
-   لها عرض متقارب ومنظم.
-*/
-
 #chat-popup,
-.projects-popup {
-    width: 240px;
-}
-
 .search-popup {
-    width: 280px;
-}
-
-
-/* =========================================================
-   58. POPUP EDGE SAFETY
-   ========================================================= */
-
-#chat-popup,
-.projects-popup,
-.search-popup,
-.chat-action-menu,
-.chat-options-menu,
-.project-options-menu {
-    max-height: calc(100vh - 20px);
-}
-
-
-/* =========================================================
-   59. POPUP MENU CONTENT
-   ========================================================= */
-
-.chat-options-menu,
-.project-options-menu {
-    max-width: calc(100vw - 20px);
-
-    overflow-y: auto;
+    max-height: calc(100vh - 80px);
 }
 
 
