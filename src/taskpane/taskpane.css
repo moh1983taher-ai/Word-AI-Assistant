@@ -26,11 +26,16 @@ body {
 
 /* =========================================================
    2. SIDEBAR
-   نظام إظهار تلقائي + تثبيت
+   الشريط الجانبي المصغر
+
+   مهم:
+   هذا الشريط مستقل تمامًا عن القائمة الجانبية الموسعة.
+   ظهوره واختفاؤه لا علاقة له بفتح القائمة الموسعة.
    ========================================================= */
 
 .sidebar {
     position: fixed;
+
     left: 0;
     top: 0;
     bottom: 0;
@@ -59,39 +64,7 @@ body {
 
 
 /* =========================================================
-   منطقة حساسة على الحافة اليسرى
-   ========================================================= */
-
-.sidebar::before {
-    content: "";
-
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-
-    width: 7px;
-
-    background: transparent;
-
-    z-index: -1;
-}
-
-
-/* =========================================================
-   إظهار الشريط عند المرور عليه
-   ========================================================= */
-
-.sidebar:hover {
-    transform: translateX(0);
-
-    box-shadow:
-        3px 0 14px rgba(0, 0, 0, 0.08);
-}
-
-
-/* =========================================================
-   منطقة الإظهار عند الحافة
+   منطقة حساسة على حافة الشاشة لإظهار الشريط
    ========================================================= */
 
 .sidebar-hover-zone {
@@ -109,7 +82,25 @@ body {
 }
 
 
-/* إظهار الشريط عند المرور على منطقة الحافة */
+/* =========================================================
+   إظهار الشريط عند المرور عليه
+   ========================================================= */
+
+.sidebar:hover {
+    transform: translateX(0);
+
+    box-shadow:
+        3px 0 14px rgba(0, 0, 0, 0.08);
+}
+
+
+/* =========================================================
+   إظهار الشريط عند المرور على منطقة الحافة
+
+   مهم:
+   هذه القاعدة تخص الشريط فقط.
+   لا تفتح القائمة الجانبية الموسعة.
+   ========================================================= */
 
 .sidebar-hover-zone:hover + .sidebar {
     transform: translateX(0);
@@ -185,6 +176,43 @@ body {
 
 
 /* =========================================================
+   زر القائمة الجانبية
+
+   هذا الزر هو المسؤول الوحيد عن فتح وإغلاق
+   القائمة الجانبية الموسعة.
+   ========================================================= */
+
+#sidebar-menu-btn {
+    width: 34px;
+    height: 34px;
+
+    border: none;
+    background: transparent;
+
+    color: #555;
+
+    font-size: 18px;
+
+    cursor: pointer;
+
+    border-radius: 8px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
+}
+
+#sidebar-menu-btn:hover {
+    background: #f1f1f1;
+    color: #111;
+}
+
+
+/* =========================================================
    زر تثبيت الشريط
    ========================================================= */
 
@@ -195,9 +223,9 @@ body {
     border: none;
     background: transparent;
 
-    color: #555;
+    color: #777;
 
-    font-size: 16px;
+    font-size: 17px;
 
     cursor: pointer;
 
@@ -206,8 +234,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-
-    filter: grayscale(1);
 
     transition:
         background 0.2s ease,
@@ -222,13 +248,18 @@ body {
 
 #pin-sidebar.pinned {
     color: #222;
+
     background: #f1f1f1;
+
     transform: rotate(-45deg);
 }
 
 
 /* =========================================================
    الشريط المثبت
+
+   مهم:
+   تثبيت الشريط لا يفتح القائمة الموسعة.
    ========================================================= */
 
 .sidebar.pinned {
@@ -241,12 +272,36 @@ body {
 
 /* =========================================================
    3. EXPANDED SIDEBAR
+   القائمة الجانبية الموسعة
+
+   مهم جدًا:
+
+   هذه القائمة مستقلة تمامًا عن .sidebar.
+
+   لا تستخدم:
+   .sidebar:hover + #expanded-sidebar
+   .sidebar:not(:hover) + #expanded-sidebar
+   .sidebar.pinned + #expanded-sidebar
+
+   ولا تعتمد على ظهور الشريط.
+
+   الحالة الافتراضية:
+   مخفية.
+
+   الفتح:
+   فقط بواسطة إضافة class="open"
+   إليها من زر القائمة.
    ========================================================= */
 
 #expanded-sidebar {
     position: fixed;
 
-    left: 52px;
+    /*
+       موضع مستقل.
+       لا نربطه بعرض الشريط 52px.
+    */
+    left: 0;
+
     top: 0;
     bottom: 0;
 
@@ -259,7 +314,12 @@ body {
     box-shadow:
         5px 0 18px rgba(0, 0, 0, 0.08);
 
-    transform: translateX(-250px);
+    /*
+       مخفية افتراضيًا.
+       لا تظهر عند hover.
+       لا تظهر مع ظهور الشريط.
+    */
+    transform: translateX(-100%);
 
     transition:
         transform 0.25s ease;
@@ -274,7 +334,11 @@ body {
 }
 
 
-/* فتح القائمة */
+/* =========================================================
+   فتح القائمة
+
+   هذه هي الحالة الوحيدة التي تظهر فيها القائمة.
+   ========================================================= */
 
 #expanded-sidebar.open {
     transform: translateX(0);
@@ -282,20 +346,19 @@ body {
 
 
 /* =========================================================
-   علاقة القائمة الموسعة بالشريط الجانبي
+   لا توجد أي علاقة بين الشريط والقائمة
+
+   هذه القواعد تمنع أي سلوك قديم من فتح القائمة
+   بسبب hover أو pinned للشريط.
    ========================================================= */
 
-/* عند مرور المؤشر على الشريط */
-
-.sidebar:hover + #expanded-sidebar {
-    transform: translateX(0);
-}
-
-
-/* عند تثبيت الشريط */
-
+.sidebar:hover + #expanded-sidebar,
+.sidebar:not(:hover) + #expanded-sidebar,
 .sidebar.pinned + #expanded-sidebar {
-    transform: translateX(0);
+    /*
+       لا نغير شيئًا هنا.
+       تركنا التحكم بالكامل لـ .open.
+    */
 }
 
 
@@ -327,10 +390,10 @@ body {
    ========================================================= */
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    المستوى الأول:
    أدوات الباحث
-   --------------------------------------------------------- */
+   ========================================================= */
 
 .expand-header {
     height: 55px;
@@ -349,10 +412,14 @@ body {
 }
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    المستوى الثاني:
-   عناوين الأقسام
-   --------------------------------------------------------- */
+   محادثة جديدة
+   المحادثات
+   المشاريع
+   المستندات
+   المراجع
+   ========================================================= */
 
 .expand-section-header {
     width: 100%;
@@ -388,9 +455,9 @@ body {
 }
 
 
-/* ---------------------------------------------------------
-   اسم القسم
-   --------------------------------------------------------- */
+/* =========================================================
+   النص الفعلي داخل عنوان القسم
+   ========================================================= */
 
 .expand-section-header > span:not(.section-arrow) {
     font-size: 14px;
@@ -402,9 +469,9 @@ body {
 }
 
 
-/* ---------------------------------------------------------
-   تركيب عنوان القسم مع الأيقونة
-   --------------------------------------------------------- */
+/* =========================================================
+   أيقونة + اسم القسم
+   ========================================================= */
 
 .expand-section-title {
     display: flex;
@@ -421,9 +488,9 @@ body {
 }
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    أيقونة القسم
-   --------------------------------------------------------- */
+   ========================================================= */
 
 .section-icon {
     width: 20px;
@@ -441,9 +508,9 @@ body {
 }
 
 
-/* ---------------------------------------------------------
+/* =========================================================
    السهم
-   --------------------------------------------------------- */
+   ========================================================= */
 
 .section-arrow {
     width: 18px;
@@ -472,9 +539,6 @@ body {
         transform 0.2s ease;
 }
 
-
-/* دوران السهم عند فتح القسم */
-
 .expand-section.open .section-arrow {
     transform: rotate(90deg);
 }
@@ -482,7 +546,7 @@ body {
 
 /* =========================================================
    المستوى الثالث
-   عناصر الأقسام
+   العناصر التابعة للأقسام
    ========================================================= */
 
 .expand-section-content {
@@ -501,7 +565,7 @@ body {
 
 
 /* =========================================================
-   العناصر العامة التابعة للأقسام
+   العناصر العامة التابعة
    ========================================================= */
 
 .expand-item {
@@ -541,7 +605,7 @@ body {
 
 
 /* =========================================================
-   القسم الفرعي
+   عناصر فرعية أخرى
    ========================================================= */
 
 .section-content {
@@ -575,8 +639,6 @@ body {
     box-sizing: border-box;
 }
 
-
-/* عناصر المستوى الثالث */
 
 #new-chat-list .expanded-project-item,
 #new-chat-list .new-chat-item {
@@ -628,8 +690,7 @@ body {
 
 /* =========================================================
    6. CHAT LIST
-   المستوى الثالث تحت "المحادثات"
-   لا يوجد Scroll مستقل
+   لا يوجد تمرير مستقل للمحادثات
    ========================================================= */
 
 #chat-list {
@@ -643,8 +704,6 @@ body {
     box-sizing: border-box;
 }
 
-
-/* عناصر المحادثات */
 
 .chat-history-item {
     display: flex;
@@ -681,8 +740,6 @@ body {
 }
 
 
-/* عنوان المحادثة */
-
 .chat-title {
     overflow: hidden;
 
@@ -696,8 +753,6 @@ body {
     font-weight: 400;
 }
 
-
-/* زر قائمة المحادثة */
 
 .chat-menu {
     border: none;
@@ -842,7 +897,9 @@ body {
 }
 
 
-/* أسماء المشاريع */
+/* =========================================================
+   أسماء المشاريع
+   ========================================================= */
 
 .expanded-project-item {
     display: flex;
@@ -889,10 +946,6 @@ body {
 }
 
 
-/* =========================================================
-   PROJECT ITEM
-   ========================================================= */
-
 .project-item {
     display: flex;
 
@@ -927,10 +980,6 @@ body {
 }
 
 
-/* =========================================================
-   FOLDER ICON
-   ========================================================= */
-
 .folder-icon {
     display: inline-flex;
 
@@ -941,10 +990,6 @@ body {
     color: #555;
 }
 
-
-/* =========================================================
-   PROJECT MENU
-   ========================================================= */
 
 .project-menu {
     border: none;
@@ -1001,6 +1046,7 @@ body {
     top: auto;
     bottom: 5px;
 }
+
 
 .project-options-menu div,
 .rename-project,
@@ -1326,9 +1372,7 @@ body {
     position: relative;
 
     width: 320px;
-
     max-width: calc(100vw - 30px);
-
     max-height: calc(100vh - 30px);
 
     background: #ffffff;
@@ -1407,7 +1451,6 @@ body {
     left: 70px;
 
     width: 260px;
-
     max-width: calc(100vw - 90px);
 
     max-height: calc(100vh - 80px);
@@ -1516,15 +1559,8 @@ body {
     color: #111;
 }
 
-
-/* Search scrollbar */
-
 #search-results::-webkit-scrollbar {
     width: 6px;
-}
-
-#search-results::-webkit-scrollbar-track {
-    background: transparent;
 }
 
 #search-results::-webkit-scrollbar-thumb {
@@ -1536,6 +1572,10 @@ body {
     background: #aaa;
 }
 
+#search-results::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 
 /* =========================================================
    15. MAIN
@@ -1544,10 +1584,13 @@ body {
 .main {
     height: 100vh;
 
+    /*
+       يبقى المحتوى الرئيسي كما هو.
+       لا نغيره بناءً على ظهور القائمة الجانبية.
+    */
     margin-left: 52px;
 
     display: flex;
-
     flex-direction: column;
 }
 
@@ -1562,7 +1605,6 @@ body {
     border-bottom: 1px solid #eee;
 
     display: flex;
-
     align-items: center;
 
     padding: 0 18px;
@@ -1585,16 +1627,10 @@ body {
     padding: 25px;
 }
 
-
-/* =========================================================
-   WELCOME
-   ========================================================= */
-
 .welcome {
     height: 100%;
 
     display: flex;
-
     flex-direction: column;
 
     align-items: center;
@@ -1667,7 +1703,6 @@ body {
 
 .input-area {
     min-height: 68px;
-
     height: 68px;
 
     border-top: 1px solid #eee;
@@ -1687,15 +1722,12 @@ body {
 
 .message-box {
     width: calc(100% - 4px);
-
     max-width: none;
 
     height: 46px;
-
     min-height: 46px;
 
     display: flex;
-
     align-items: center;
 
     background: #ffffff;
@@ -1737,15 +1769,12 @@ body {
     width: 100%;
 
     height: 38px;
-
     min-height: 38px;
-
     max-height: 140px;
 
     resize: none;
 
     border: none;
-
     outline: none;
 
     background: transparent;
@@ -1755,7 +1784,6 @@ body {
     box-sizing: border-box;
 
     font-size: 14px;
-
     line-height: 1.45;
 
     overflow-y: auto;
@@ -1827,7 +1855,6 @@ body {
     stroke-width: 2.5;
 
     stroke-linecap: round;
-
     stroke-linejoin: round;
 }
 
@@ -1899,7 +1926,6 @@ body {
     z-index: 10000;
 
     opacity: 0;
-
     visibility: hidden;
 
     pointer-events: none;
@@ -1941,7 +1967,6 @@ body {
         1px solid var(--border-color, #e2e5e9);
 
     font-size: 16px;
-
     font-weight: 700;
 
     color: var(--text-color, #202124);
@@ -1959,11 +1984,6 @@ body {
     white-space: nowrap;
 }
 
-
-/* =========================================================
-   CLOSE SETTINGS
-   ========================================================= */
-
 #close-settings {
     width: 32px;
     height: 32px;
@@ -1977,7 +1997,6 @@ body {
     color: var(--muted-text, #6b7280);
 
     font-size: 23px;
-
     line-height: 1;
 
     cursor: pointer;
@@ -2009,7 +2028,6 @@ body {
     margin: 17px 20px 7px;
 
     font-size: 13px;
-
     font-weight: 600;
 
     color: var(--text-color, #30343b);
@@ -2109,7 +2127,6 @@ body {
     height: 100%;
 
     border: none;
-
     outline: none;
 
     background: transparent;
@@ -2121,7 +2138,6 @@ body {
     font-size: 13px;
 
     direction: ltr;
-
     text-align: left;
 }
 
@@ -2129,14 +2145,8 @@ body {
     color: var(--muted-text, #9aa0a6);
 }
 
-
-/* =========================================================
-   SHOW API KEY
-   ========================================================= */
-
 #show-key {
     width: 42px;
-
     height: 100%;
 
     border: none;
@@ -2215,14 +2225,8 @@ body {
         0 0 0 3px rgba(107, 114, 128, 0.12);
 }
 
-
-/* =========================================================
-   REFRESH MODELS
-   ========================================================= */
-
 #refresh-models {
     width: 42px;
-
     height: 42px;
 
     flex-shrink: 0;
@@ -2318,7 +2322,6 @@ body {
     border-radius: 9px;
 
     font-size: 13px;
-
     font-weight: 600;
 
     cursor: pointer;
@@ -2328,9 +2331,6 @@ body {
         border-color 0.15s ease,
         transform 0.1s ease;
 }
-
-
-/* Test */
 
 #test-connection {
     border:
@@ -2345,9 +2345,6 @@ body {
     background: var(--hover-bg, #f3f4f6);
 }
 
-
-/* Save */
-
 #save-settings {
     border: 1px solid #30343b;
 
@@ -2361,9 +2358,6 @@ body {
 
     border-color: #202124;
 }
-
-
-/* Button states */
 
 .settings-buttons button:active {
     transform: translateY(1px);
@@ -2415,8 +2409,7 @@ body.dark #settings-header,
 .dark #settings-header {
     background: var(--panel-header-bg, #292b2f);
 
-    border-bottom-color:
-        var(--border-color, #3a3d42);
+    border-bottom-color: var(--border-color, #3a3d42);
 
     color: var(--text-color, #f1f3f4);
 }
@@ -2431,16 +2424,14 @@ body.dark #model-select,
 
     color: var(--text-color, #f1f3f4);
 
-    border-color:
-        var(--border-color, #41444a);
+    border-color: var(--border-color, #41444a);
 }
 
 body.dark .key-box,
 .dark .key-box {
     background: var(--input-bg, #292b2f);
 
-    border-color:
-        var(--border-color, #41444a);
+    border-color: var(--border-color, #41444a);
 }
 
 body.dark #refresh-models,
@@ -2451,16 +2442,14 @@ body.dark #test-connection,
 
     color: var(--text-color, #f1f3f4);
 
-    border-color:
-        var(--border-color, #41444a);
+    border-color: var(--border-color, #41444a);
 }
 
 body.dark #provider-info,
 .dark #provider-info {
     background: var(--info-bg, #292b2f);
 
-    border-color:
-        var(--border-color, #41444a);
+    border-color: var(--border-color, #41444a);
 
     color: var(--muted-text, #aeb4bd);
 }
@@ -2513,55 +2502,36 @@ body.dark #save-settings,
     font-family: "Segoe UI", Arial, sans-serif;
 }
 
-
-/* Popup titles */
-
 .projects-popup .popup-title,
 .chat-popup .popup-title,
 .search-popup .popup-title {
     font-size: 14px;
-
     font-weight: 700;
 }
-
-
-/* Popup items */
 
 .projects-popup .popup-item,
 .chat-popup .popup-item,
 .search-popup .popup-item {
     font-size: 13px;
-
     font-weight: 400;
 }
 
 
 /* =========================================================
-   26. SIDEBAR FINAL TYPOGRAPHY
-   المحافظة على المستويات الثلاثة
+   26. EXPANDED SIDEBAR TYPOGRAPHY
+   القائمة الجانبية فقط
    ========================================================= */
-
-
-/* ---------------------------------------------------------
-   المستوى الأول
-   --------------------------------------------------------- */
 
 #expanded-sidebar .expand-header {
     font-size: 15px;
-
     font-weight: 700;
 
     color: #222;
 }
 
 
-/* ---------------------------------------------------------
-   المستوى الثاني
-   --------------------------------------------------------- */
-
 #expanded-sidebar .expand-section-header {
     font-size: 14px;
-
     font-weight: 700;
 
     color: #444;
@@ -2573,52 +2543,35 @@ body.dark #save-settings,
     display: flex;
 
     align-items: center;
-
     justify-content: space-between;
 
     box-sizing: border-box;
 }
 
 
-/* اسم القسم */
-
-#expanded-sidebar
-.expand-section-header
-> span:not(.section-arrow) {
+#expanded-sidebar .expand-section-header > span:not(.section-arrow) {
     font-size: 14px;
-
     font-weight: 700;
 
     color: #444;
 }
 
 
-/* ---------------------------------------------------------
-   السهم
-   --------------------------------------------------------- */
-
 #expanded-sidebar .section-arrow {
     font-size: 20px;
-
     font-weight: 400;
 
     width: 18px;
-
     min-width: 18px;
 
     display: inline-flex;
 
     align-items: center;
-
     justify-content: center;
 
     color: #666;
 }
 
-
-/* ---------------------------------------------------------
-   المستوى الثالث
-   --------------------------------------------------------- */
 
 #expanded-sidebar #new-chat-list,
 #expanded-sidebar #chat-list,
@@ -2629,18 +2582,9 @@ body.dark #save-settings,
 }
 
 
-/* ---------------------------------------------------------
-   محادثة جديدة
-   --------------------------------------------------------- */
-
-#expanded-sidebar
-#new-chat-list
-.new-chat-item,
-#expanded-sidebar
-#new-chat-list
-.expanded-project-item {
+#expanded-sidebar #new-chat-list .new-chat-item,
+#expanded-sidebar #new-chat-list .expanded-project-item {
     font-size: 13px;
-
     font-weight: 400;
 
     color: #555;
@@ -2655,15 +2599,8 @@ body.dark #save-settings,
 }
 
 
-/* ---------------------------------------------------------
-   المحادثات
-   --------------------------------------------------------- */
-
-#expanded-sidebar
-#chat-list
-.chat-history-item {
+#expanded-sidebar #chat-list .chat-history-item {
     font-size: 13px;
-
     font-weight: 400;
 
     color: #555;
@@ -2678,28 +2615,16 @@ body.dark #save-settings,
 }
 
 
-/* اسم المحادثة */
-
-#expanded-sidebar
-#chat-list
-.chat-title {
+#expanded-sidebar #chat-list .chat-title {
     font-size: 13px;
-
     font-weight: 400;
 
     color: #555;
 }
 
 
-/* ---------------------------------------------------------
-   المشاريع
-   --------------------------------------------------------- */
-
-#expanded-sidebar
-#expanded-projects-list
-.expanded-project-item {
+#expanded-sidebar #expanded-projects-list .expanded-project-item {
     font-size: 13px;
-
     font-weight: 400;
 
     color: #555;
@@ -2714,21 +2639,11 @@ body.dark #save-settings,
 }
 
 
-/* اسم المشروع */
-
-#expanded-sidebar
-#expanded-projects-list
-.expanded-project-item
-span {
+#expanded-sidebar #expanded-projects-list .expanded-project-item span {
     font-size: 13px;
-
     font-weight: 400;
 }
 
-
-/* ---------------------------------------------------------
-   المستندات والمراجع
-   --------------------------------------------------------- */
 
 #expanded-sidebar .expand-section-content {
     padding-left: 14px;
@@ -2737,28 +2652,17 @@ span {
 }
 
 
-/* ---------------------------------------------------------
-   Hover
-   --------------------------------------------------------- */
-
 #expanded-sidebar .expand-section-header:hover {
     background: #f3f3f3;
 
     color: #111;
 }
 
-#expanded-sidebar
-#new-chat-list
-.new-chat-item:hover,
-#expanded-sidebar
-#new-chat-list
-.expanded-project-item:hover,
-#expanded-sidebar
-#chat-list
-.chat-history-item:hover,
-#expanded-sidebar
-#expanded-projects-list
-.expanded-project-item:hover {
+
+#expanded-sidebar #new-chat-list .new-chat-item:hover,
+#expanded-sidebar #new-chat-list .expanded-project-item:hover,
+#expanded-sidebar #chat-list .chat-history-item:hover,
+#expanded-sidebar #expanded-projects-list .expanded-project-item:hover {
     background: #f3f3f3;
 
     color: #111;
@@ -2766,12 +2670,48 @@ span {
 
 
 /* =========================================================
-   27. ICON DIRECTION
+   27. IMPORTANT ISOLATION RULES
+   قواعد العزل النهائية
+
+   هذه القواعد هي جوهر الإصلاح.
+
+   1. الشريط الجانبي لا يفتح القائمة.
+   2. hover على الشريط لا يفتح القائمة.
+   3. pinned لا يفتح القائمة.
+   4. القائمة لا تظهر إلا بوجود .open.
    ========================================================= */
 
-.new-chat-icon,
-.new-chat-pencil {
-    transform: scaleX(-1);
+
+/*
+   لا تجعل القائمة تظهر بسبب hover للشريط
+*/
+.sidebar:hover + #expanded-sidebar {
+    transform: translateX(-100%);
+}
+
+
+/*
+   لا تجعل القائمة تظهر عند اختفاء الشريط
+*/
+.sidebar:not(:hover) + #expanded-sidebar {
+    transform: translateX(-100%);
+}
+
+
+/*
+   لا تجعل القائمة تظهر عند تثبيت الشريط
+*/
+.sidebar.pinned + #expanded-sidebar {
+    transform: translateX(-100%);
+}
+
+
+/*
+   الاستثناء الوحيد:
+   إذا كانت القائمة نفسها تحمل open
+*/
+#expanded-sidebar.open {
+    transform: translateX(0);
 }
 
 
