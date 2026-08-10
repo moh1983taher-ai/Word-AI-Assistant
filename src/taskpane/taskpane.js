@@ -1348,18 +1348,11 @@ function createNewChat() {
     };
 
 
-    // إضافة المحادثة الجديدة مباشرة إلى القائمة
-    chats.unshift(
-        currentChat
-    );
+    // لا نضيف المحادثة إلى chats هنا
+    // لأنها لم تصبح محادثة فعلية بعد
 
 
-    saveChats();
-
-
-    // تحديث جميع قوائم المحادثات
-    renderChatList();
-
+    // تحديث قائمة آخر 8 محادثات فقط
     renderSidebarChats();
 
     renderRecentChats();
@@ -4173,7 +4166,9 @@ if (chatBtn) {
             }
 
 
-            renderRecentChats();
+            // عرض جميع المحادثات
+            renderChatList();
+
 
             chatPopup.classList.add(
                 "open"
@@ -4182,7 +4177,6 @@ if (chatBtn) {
         };
 
 }
-
 
 // ======================================
 // Search
