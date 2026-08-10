@@ -2503,13 +2503,12 @@ body.dark #save-settings,
 }
 
 /* =========================================================
-   NEW CHAT CONTENT
-   مطابق تمامًا لتنسيق محتوى المشاريع
+   NEW CHAT LIST
+   مطابقة تنسيق محتوى المشاريع
    ========================================================= */
 
 #new-chat-list .expanded-project-item,
 #new-chat-list .new-chat-item {
-
     display: flex;
     align-items: center;
 
@@ -2529,11 +2528,10 @@ body.dark #save-settings,
 }
 
 
-/* النص داخل محادثة جديدة */
+/* النص داخل العنصر */
 
 #new-chat-list .expanded-project-item span,
 #new-chat-list .new-chat-item span {
-
     overflow: hidden;
 
     white-space: nowrap;
@@ -2544,11 +2542,10 @@ body.dark #save-settings,
 }
 
 
-/* عند المرور بالماوس */
+/* عند مرور الماوس */
 
 #new-chat-list .expanded-project-item:hover,
 #new-chat-list .new-chat-item:hover {
-
     background: #f3f3f3;
     color: #111;
 }
