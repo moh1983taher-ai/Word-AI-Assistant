@@ -1244,6 +1244,11 @@ function renderExpandedProjects() {
 // Sidebar Chat List
 // ======================================
 
+// ======================================
+// عرض آخر 8 محادثات فقط
+// بدون حذف أو إعادة تسمية
+// ======================================
+
 function renderSidebarChats() {
 
     const list =
@@ -1251,101 +1256,84 @@ function renderSidebarChats() {
             "new-chat-list"
         );
 
-
-    if (!list)
+        if (!list)
         return;
 
+            list.innerHTML = "";
 
-    list.innerHTML =
-        "";
+    // لا توجد محادثات
+        if (chats.length === 0) {
 
-
-    if (chats.length === 0) {
-
-        list.innerHTML = `
-
+            list.innerHTML = `
             <div class="empty-chat">
                 لا توجد محادثات
             </div>
-
         `;
 
         return;
-
     }
 
-
+    // عرض آخر 8 محادثات فقط
     chats
         .slice(0, 8)
-        .forEach(
-            function (chat) {
+        .forEach(function (chat) {
 
-                const item =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                item.className =
-                    "recent-chat-item";
-
-
-                item.innerHTML = `
-
-                    <span>
-                        ◯ ${chat.title}
-                    </span>
-
-                `;
-
-
-                item.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        currentChat =
-                            chat;
-
-
-                        renderChat();
-
-
-                        if (
-                            expandedSidebar
-                        ) {
-
-                            expandedSidebar
-                                .classList
-                                .remove(
-                                    "open"
-                                );
-
-                        }
-
-
-                        if (sidebarToggleBtn) {
-
-                            sidebarToggleBtn.innerHTML =
-                                "☰";
-
-                            sidebarToggleBtn.title =
-                                "إظهار القائمة";
-
-                        }
-
-                    };
-
-
-                list.appendChild(
-                    item
+            const item =
+                document.createElement(
+                    "div"
                 );
 
-            }
-        );
+            item.className =
+                "recent-chat-item";
 
+            item.innerHTML = `
+                ◯
+                <span>
+                    ${chat.title}
+                </span>
+            `;
+
+            // فتح المحادثة عند الضغط
+            item.onclick =
+                function (e) {
+
+                    e.stopPropagation();
+
+                    currentChat =
+                        chat;
+
+                    renderChat();
+
+                    // إذا كانت القائمة الجانبية الموسعة مفتوحة
+                    if (expandedSidebar) {
+
+                        expandedSidebar
+                            .classList
+                            .remove(
+                                "open"
+                            );
+
+                    }
+
+                    if (sidebarToggleBtn) {
+
+                        sidebarToggleBtn.innerHTML =
+                            "☰";
+
+                        sidebarToggleBtn.title =
+                            "إظهار القائمة";
+
+                    }
+
+                };
+
+            list.appendChild(
+                item
+            );
+
+        });
 }
+
 
 
 // ======================================
