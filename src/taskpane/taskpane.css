@@ -2501,3 +2501,60 @@ body.dark #save-settings,
     white-space: nowrap;
     text-overflow: ellipsis;
 }
+
+/* =========================================================
+   NEW CHAT LIST
+   نفس تنسيق قائمة المحادثات
+========================================================= */
+
+#new-chat-list {
+    width: 100%;
+    box-sizing: border-box;
+
+    padding: 2px 2px 8px 0;
+
+    overflow-x: hidden;
+}
+
+
+/* عناصر القائمة داخل محادثة جديدة
+   تجعلها بنفس شكل عناصر المحادثات */
+
+#new-chat-list .chat-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 8px 12px;
+
+    margin: 4px 8px;
+
+    border-radius: 8px;
+
+    font-size: 13px;
+
+    cursor: pointer;
+
+    color: #555;
+
+    position: relative;
+}
+
+
+#new-chat-list .chat-history-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+
+/* عنوان المحادثة */
+
+#new-chat-list .chat-title {
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+
+    flex: 1;
+}
