@@ -25,6 +25,7 @@ body {
 
 /* =========================================================
 2. SIDEBAR
+نظام إظهار تلقائي + تثبيت
 ========================================================= */
 
 .sidebar {
@@ -46,13 +47,86 @@ body {
     padding: 12px 0;
 
     z-index: 100;
+
+    /* مخفي افتراضيًا */
+    transform: translateX(-48px);
+
+    transition:
+        transform 0.22s ease,
+        box-shadow 0.22s ease;
 }
+
+/* =========================================================
+منطقة حساسة على الحافة اليسرى
+تكفي لتحريك الماوس إليها لإظهار الشريط
+========================================================= */
+
+.sidebar::before {
+    content: "";
+
+    position: fixed;
+
+    left: 0;
+    top: 0;
+    bottom: 0;
+
+    width: 7px;
+
+    background: transparent;
+
+    z-index: -1;
+}
+
+/* =========================================================
+إظهار الشريط عند المرور عليه
+========================================================= */
+
+.sidebar:hover {
+    transform: translateX(0);
+
+    box-shadow:
+        3px 0 14px rgba(0, 0, 0, 0.08);
+}
+
+/* =========================================================
+منطقة الإظهار عند الحافة
+========================================================= */
+
+.sidebar-hover-zone {
+    position: fixed;
+
+    left: 0;
+    top: 0;
+    bottom: 0;
+
+    width: 10px;
+
+    z-index: 99;
+
+    background: transparent;
+}
+
+/* عندما تكون منطقة الحافة فعالة */
+.sidebar-hover-zone:hover + .sidebar {
+    transform: translateX(0);
+
+    box-shadow:
+        3px 0 14px rgba(0, 0, 0, 0.08);
+}
+
+/* =========================================================
+الشعار
+========================================================= */
 
 .brand-icon {
     font-size: 22px;
     color: #444;
     margin-bottom: 12px;
 }
+
+/* =========================================================
+أعلى وأسفل الشريط
+========================================================= */
 
 .sidebar-top,
 .sidebar-bottom {
@@ -61,6 +135,10 @@ body {
     align-items: center;
     gap: 10px;
 }
+
+/* =========================================================
+أيقونات الشريط
+========================================================= */
 
 .side-icon {
     width: 34px;
@@ -93,6 +171,65 @@ body {
     transform: scaleX(-1);
 }
 
+/* =========================================================
+زر تثبيت الشريط
+========================================================= */
+
+#pin-sidebar {
+    width: 34px;
+    height: 34px;
+
+    border: none;
+    background: transparent;
+
+    color: #777;
+
+    font-size: 17px;
+
+    cursor: pointer;
+
+    border-radius: 8px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease;
+}
+
+#pin-sidebar:hover {
+    background: #f1f1f1;
+    color: #111;
+}
+
+#pin-sidebar.pinned {
+    color: #222;
+
+    background: #f1f1f1;
+
+    transform: rotate(-45deg);
+}
+
+/* =========================================================
+الشريط المثبت
+========================================================= */
+
+.sidebar.pinned {
+    transform: translateX(0);
+
+    box-shadow:
+        3px 0 14px rgba(0, 0, 0, 0.08);
+}
+#pin-sidebar {
+    background: transparent;
+    color: #555;
+    border: none;
+    font-size: 16px;
+    filter: grayscale(1);
+}
 
 /* =========================================================
 3. EXPANDED SIDEBAR
@@ -2472,9 +2609,6 @@ body.dark #save-settings,
     color: #111;
 }
 
-/* =========================================================
-   END - تنسيق قائمة أدوات الباحث فقط
-   ========================================================= */
 
 
 /* =========================================================

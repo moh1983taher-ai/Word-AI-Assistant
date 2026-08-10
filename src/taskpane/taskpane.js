@@ -4581,3 +4581,32 @@ renderChat();
 loadSettings();
 
 });
+
+const sidebar = document.querySelector(".sidebar");
+const pinSidebar = document.getElementById("pin-sidebar");
+
+if (pinSidebar && sidebar) {
+
+    let sidebarPinned =
+        localStorage.getItem("sidebarPinned") === "true";
+
+    if (sidebarPinned) {
+        sidebar.classList.add("pinned");
+        pinSidebar.classList.add("pinned");
+    }
+
+    pinSidebar.addEventListener("click", function (e) {
+
+        e.stopPropagation();
+
+        sidebarPinned = !sidebarPinned;
+
+        sidebar.classList.toggle("pinned", sidebarPinned);
+        pinSidebar.classList.toggle("pinned", sidebarPinned);
+
+        localStorage.setItem(
+            "sidebarPinned",
+            sidebarPinned ? "true" : "false"
+        );
+    });
+}
