@@ -1,11 +1,12 @@
 /* =========================================================
-WORD AI ASSISTANT
-CLEAN / CONSOLIDATED CSS
-========================================================= */
+   WORD AI ASSISTANT
+   CLEAN / CONSOLIDATED CSS
+   ========================================================= */
+
 
 /* =========================================================
-1. BASIC
-========================================================= */
+   1. BASIC
+   ========================================================= */
 
 * {
     box-sizing: border-box;
@@ -24,9 +25,9 @@ body {
 
 
 /* =========================================================
-2. SIDEBAR
-نظام إظهار تلقائي + تثبيت
-========================================================= */
+   2. SIDEBAR
+   نظام إظهار تلقائي + تثبيت
+   ========================================================= */
 
 .sidebar {
     position: fixed;
@@ -56,16 +57,15 @@ body {
         box-shadow 0.22s ease;
 }
 
+
 /* =========================================================
-منطقة حساسة على الحافة اليسرى
-تكفي لتحريك الماوس إليها لإظهار الشريط
-========================================================= */
+   منطقة حساسة على الحافة اليسرى
+   ========================================================= */
 
 .sidebar::before {
     content: "";
 
     position: fixed;
-
     left: 0;
     top: 0;
     bottom: 0;
@@ -77,9 +77,10 @@ body {
     z-index: -1;
 }
 
+
 /* =========================================================
-إظهار الشريط عند المرور عليه
-========================================================= */
+   إظهار الشريط عند المرور عليه
+   ========================================================= */
 
 .sidebar:hover {
     transform: translateX(0);
@@ -88,9 +89,10 @@ body {
         3px 0 14px rgba(0, 0, 0, 0.08);
 }
 
+
 /* =========================================================
-منطقة الإظهار عند الحافة
-========================================================= */
+   منطقة الإظهار عند الحافة
+   ========================================================= */
 
 .sidebar-hover-zone {
     position: fixed;
@@ -106,7 +108,9 @@ body {
     background: transparent;
 }
 
-/* عندما تكون منطقة الحافة فعالة */
+
+/* إظهار الشريط عند المرور على منطقة الحافة */
+
 .sidebar-hover-zone:hover + .sidebar {
     transform: translateX(0);
 
@@ -114,9 +118,10 @@ body {
         3px 0 14px rgba(0, 0, 0, 0.08);
 }
 
+
 /* =========================================================
-الشعار
-========================================================= */
+   الشعار
+   ========================================================= */
 
 .brand-icon {
     font-size: 22px;
@@ -124,9 +129,10 @@ body {
     margin-bottom: 12px;
 }
 
+
 /* =========================================================
-أعلى وأسفل الشريط
-========================================================= */
+   أعلى وأسفل الشريط
+   ========================================================= */
 
 .sidebar-top,
 .sidebar-bottom {
@@ -136,9 +142,10 @@ body {
     gap: 10px;
 }
 
+
 /* =========================================================
-أيقونات الشريط
-========================================================= */
+   أيقونات الشريط
+   ========================================================= */
 
 .side-icon {
     width: 34px;
@@ -165,15 +172,21 @@ body {
     color: #111;
 }
 
+
+/* =========================================================
+   زر البحث
+   ========================================================= */
+
 #search-btn {
     font-size: 24px;
     line-height: 1;
     transform: scaleX(-1);
 }
 
+
 /* =========================================================
-زر تثبيت الشريط
-========================================================= */
+   زر تثبيت الشريط
+   ========================================================= */
 
 #pin-sidebar {
     width: 34px;
@@ -182,9 +195,9 @@ body {
     border: none;
     background: transparent;
 
-    color: #777;
+    color: #555;
 
-    font-size: 17px;
+    font-size: 16px;
 
     cursor: pointer;
 
@@ -193,6 +206,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+
+    filter: grayscale(1);
 
     transition:
         background 0.2s ease,
@@ -207,15 +222,14 @@ body {
 
 #pin-sidebar.pinned {
     color: #222;
-
     background: #f1f1f1;
-
     transform: rotate(-45deg);
 }
 
+
 /* =========================================================
-الشريط المثبت
-========================================================= */
+   الشريط المثبت
+   ========================================================= */
 
 .sidebar.pinned {
     transform: translateX(0);
@@ -223,17 +237,11 @@ body {
     box-shadow:
         3px 0 14px rgba(0, 0, 0, 0.08);
 }
-#pin-sidebar {
-    background: transparent;
-    color: #555;
-    border: none;
-    font-size: 16px;
-    filter: grayscale(1);
-}
+
 
 /* =========================================================
-3. EXPANDED SIDEBAR
-========================================================= */
+   3. EXPANDED SIDEBAR
+   ========================================================= */
 
 #expanded-sidebar {
     position: fixed;
@@ -248,11 +256,13 @@ body {
 
     border-right: 1px solid #ddd;
 
-    box-shadow: 5px 0 18px rgba(0, 0, 0, 0.08);
+    box-shadow:
+        5px 0 18px rgba(0, 0, 0, 0.08);
 
     transform: translateX(-250px);
 
-    transition: transform 0.25s ease;
+    transition:
+        transform 0.25s ease;
 
     z-index: 90;
 
@@ -263,15 +273,35 @@ body {
     scrollbar-color: #c7c7c7 transparent;
 }
 
+
+/* فتح القائمة */
+
 #expanded-sidebar.open {
     transform: translateX(0);
 }
 
 
 /* =========================================================
-EXPANDED SIDEBAR SCROLLBAR
-هذا هو شريط التمرير الوحيد للقائمة الجانبية
-========================================================= */
+   علاقة القائمة الموسعة بالشريط الجانبي
+   ========================================================= */
+
+/* عند مرور المؤشر على الشريط */
+
+.sidebar:hover + #expanded-sidebar {
+    transform: translateX(0);
+}
+
+
+/* عند تثبيت الشريط */
+
+.sidebar.pinned + #expanded-sidebar {
+    transform: translateX(0);
+}
+
+
+/* =========================================================
+   EXPANDED SIDEBAR SCROLLBAR
+   ========================================================= */
 
 #expanded-sidebar::-webkit-scrollbar {
     width: 7px;
@@ -292,14 +322,15 @@ EXPANDED SIDEBAR SCROLLBAR
 
 
 /* =========================================================
-4. SIDEBAR TYPOGRAPHY
-ثلاثة مستويات واضحة
-========================================================= */
+   4. SIDEBAR TYPOGRAPHY
+   ثلاثة مستويات واضحة
+   ========================================================= */
 
-/*
-المستوى الأول:
-أدوات الباحث
-*/
+
+/* ---------------------------------------------------------
+   المستوى الأول:
+   أدوات الباحث
+   --------------------------------------------------------- */
 
 .expand-header {
     height: 55px;
@@ -318,14 +349,10 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-المستوى الثاني:
-محادثة جديدة
-المحادثات
-المشاريع
-المستندات
-المراجع
-*/
+/* ---------------------------------------------------------
+   المستوى الثاني:
+   عناوين الأقسام
+   --------------------------------------------------------- */
 
 .expand-section-header {
     width: 100%;
@@ -361,14 +388,9 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-النص الفعلي داخل عنوان القسم.
-
-مهم:
-الـHTML يستخدم span عاديًا للنص،
-وليس expand-section-title.
-لذلك نستهدف span الذي ليس section-arrow.
-*/
+/* ---------------------------------------------------------
+   اسم القسم
+   --------------------------------------------------------- */
 
 .expand-section-header > span:not(.section-arrow) {
     font-size: 14px;
@@ -380,10 +402,9 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-أيقونة + اسم القسم إذا استُخدم هذا التركيب
-في بعض أجزاء HTML.
-*/
+/* ---------------------------------------------------------
+   تركيب عنوان القسم مع الأيقونة
+   --------------------------------------------------------- */
 
 .expand-section-title {
     display: flex;
@@ -400,9 +421,9 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-أيقونة القسم
-*/
+/* ---------------------------------------------------------
+   أيقونة القسم
+   --------------------------------------------------------- */
 
 .section-icon {
     width: 20px;
@@ -420,9 +441,9 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-السهم
-*/
+/* ---------------------------------------------------------
+   السهم
+   --------------------------------------------------------- */
 
 .section-arrow {
     width: 18px;
@@ -447,8 +468,12 @@ EXPANDED SIDEBAR SCROLLBAR
 
     flex-shrink: 0;
 
-    transition: transform 0.2s ease;
+    transition:
+        transform 0.2s ease;
 }
+
+
+/* دوران السهم عند فتح القسم */
 
 .expand-section.open .section-arrow {
     transform: rotate(90deg);
@@ -456,9 +481,9 @@ EXPANDED SIDEBAR SCROLLBAR
 
 
 /* =========================================================
-المستوى الثالث
-العناصر التابعة للأقسام
-========================================================= */
+   المستوى الثالث
+   عناصر الأقسام
+   ========================================================= */
 
 .expand-section-content {
     display: none;
@@ -475,9 +500,9 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-العناصر العامة التابعة
-*/
+/* =========================================================
+   العناصر العامة التابعة للأقسام
+   ========================================================= */
 
 .expand-item {
     position: relative;
@@ -515,9 +540,9 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-أي عناصر فرعية أخرى
-*/
+/* =========================================================
+   القسم الفرعي
+   ========================================================= */
 
 .section-content {
     display: none;
@@ -536,23 +561,22 @@ EXPANDED SIDEBAR SCROLLBAR
 
 
 /* =========================================================
-5. NEW CHAT LIST
-المستوى الثالث تحت "محادثة جديدة"
-========================================================= */
+   5. NEW CHAT LIST
+   المستوى الثالث تحت "محادثة جديدة"
+   ========================================================= */
 
 #new-chat-list {
     width: 100%;
 
     padding: 2px 0 5px 14px;
+
     margin: 0;
 
     box-sizing: border-box;
 }
 
 
-/*
-عناصر المستوى الثالث
-*/
+/* عناصر المستوى الثالث */
 
 #new-chat-list .expanded-project-item,
 #new-chat-list .new-chat-item {
@@ -562,6 +586,7 @@ EXPANDED SIDEBAR SCROLLBAR
     width: calc(100% - 10px);
 
     padding: 7px 10px;
+
     margin: 2px 0;
 
     border-radius: 7px;
@@ -602,13 +627,10 @@ EXPANDED SIDEBAR SCROLLBAR
 
 
 /* =========================================================
-6. CHAT LIST
-المستوى الثالث تحت "المحادثات"
-
-مهم:
-لا يوجد شريط تمرير مستقل للمحادثات.
-القائمة الجانبية نفسها هي التي تتحرك.
-========================================================= */
+   6. CHAT LIST
+   المستوى الثالث تحت "المحادثات"
+   لا يوجد Scroll مستقل
+   ========================================================= */
 
 #chat-list {
     max-height: none;
@@ -622,9 +644,7 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-عناصر المحادثات
-*/
+/* عناصر المحادثات */
 
 .chat-history-item {
     display: flex;
@@ -660,6 +680,9 @@ EXPANDED SIDEBAR SCROLLBAR
     color: #111;
 }
 
+
+/* عنوان المحادثة */
+
 .chat-title {
     overflow: hidden;
 
@@ -672,6 +695,9 @@ EXPANDED SIDEBAR SCROLLBAR
     font-size: 13px;
     font-weight: 400;
 }
+
+
+/* زر قائمة المحادثة */
 
 .chat-menu {
     border: none;
@@ -689,19 +715,9 @@ EXPANDED SIDEBAR SCROLLBAR
 }
 
 
-/*
-تم حذف:
-#chat-list::-webkit-scrollbar
-#chat-list::-webkit-scrollbar-track
-#chat-list::-webkit-scrollbar-thumb
-
-لأنه لا نريد شريط تمرير داخلي للمحادثات.
-*/
-
-
 /* =========================================================
-7. PROJECTS
-========================================================= */
+   7. PROJECTS
+   ========================================================= */
 
 .projects-popup {
     display: none;
@@ -720,7 +736,8 @@ EXPANDED SIDEBAR SCROLLBAR
 
     padding: 8px;
 
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.15);
 
     z-index: 1000;
 
@@ -733,8 +750,8 @@ EXPANDED SIDEBAR SCROLLBAR
 
 
 /* =========================================================
-PROJECTS HEADER
-========================================================= */
+   PROJECTS HEADER
+   ========================================================= */
 
 .projects-header {
     display: flex;
@@ -764,9 +781,9 @@ PROJECTS HEADER
 }
 
 
-/*
-زر إضافة مشروع
-*/
+/* =========================================================
+   زر إضافة مشروع
+   ========================================================= */
 
 #add-project,
 .add-project,
@@ -808,8 +825,8 @@ PROJECTS HEADER
 
 
 /* =========================================================
-PROJECTS LIST
-========================================================= */
+   PROJECTS LIST
+   ========================================================= */
 
 #projects-list {
     max-height: calc(100vh - 145px);
@@ -825,10 +842,7 @@ PROJECTS LIST
 }
 
 
-/*
-أسماء المشاريع في القائمة الجانبية
-المستوى الثالث
-*/
+/* أسماء المشاريع */
 
 .expanded-project-item {
     display: flex;
@@ -874,6 +888,11 @@ PROJECTS LIST
     font-weight: 400;
 }
 
+
+/* =========================================================
+   PROJECT ITEM
+   ========================================================= */
+
 .project-item {
     display: flex;
 
@@ -907,6 +926,11 @@ PROJECTS LIST
     font-weight: 400;
 }
 
+
+/* =========================================================
+   FOLDER ICON
+   ========================================================= */
+
 .folder-icon {
     display: inline-flex;
 
@@ -916,6 +940,11 @@ PROJECTS LIST
 
     color: #555;
 }
+
+
+/* =========================================================
+   PROJECT MENU
+   ========================================================= */
 
 .project-menu {
     border: none;
@@ -935,8 +964,8 @@ PROJECTS LIST
 
 
 /* =========================================================
-8. PROJECT OPTIONS MENU
-========================================================= */
+   8. PROJECT OPTIONS MENU
+   ========================================================= */
 
 .project-options-menu {
     position: absolute;
@@ -954,7 +983,8 @@ PROJECTS LIST
 
     border-radius: 10px;
 
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.15);
 
     display: none;
 
@@ -1006,8 +1036,8 @@ PROJECTS LIST
 
 
 /* =========================================================
-9. NEW PROJECT BOX
-========================================================= */
+   9. NEW PROJECT BOX
+   ========================================================= */
 
 .project-create-box {
     position: absolute;
@@ -1033,7 +1063,8 @@ PROJECTS LIST
 
     padding: 15px;
 
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
+    box-shadow:
+        0 8px 25px rgba(0, 0, 0, 0.18);
 }
 
 .project-create-box input {
@@ -1089,8 +1120,8 @@ PROJECTS LIST
 
 
 /* =========================================================
-10. CHAT OPTIONS MENUS
-========================================================= */
+   10. CHAT OPTIONS MENUS
+   ========================================================= */
 
 .chat-options-menu {
     position: absolute;
@@ -1108,7 +1139,8 @@ PROJECTS LIST
 
     border-radius: 10px;
 
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.15);
 
     display: none;
 
@@ -1160,8 +1192,8 @@ PROJECTS LIST
 
 
 /* =========================================================
-11. CHAT POPUP
-========================================================= */
+   11. CHAT POPUP
+   ========================================================= */
 
 #chat-popup {
     display: none;
@@ -1180,7 +1212,8 @@ PROJECTS LIST
 
     border-radius: 12px;
 
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+    box-shadow:
+        0 5px 25px rgba(0, 0, 0, 0.2);
 
     z-index: 40000;
 
@@ -1226,8 +1259,8 @@ PROJECTS LIST
 
 
 /* =========================================================
-12. CHAT ACTION MENU
-========================================================= */
+   12. CHAT ACTION MENU
+   ========================================================= */
 
 .chat-action-menu {
     position: fixed;
@@ -1243,7 +1276,8 @@ PROJECTS LIST
 
     border-radius: 10px;
 
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 5px 20px rgba(0, 0, 0, 0.15);
 
     z-index: 90000;
 
@@ -1265,8 +1299,8 @@ PROJECTS LIST
 
 
 /* =========================================================
-13. DELETE CONFIRMATION
-========================================================= */
+   13. DELETE CONFIRMATION
+   ========================================================= */
 
 .delete-confirm,
 .project-delete-confirm {
@@ -1292,7 +1326,9 @@ PROJECTS LIST
     position: relative;
 
     width: 320px;
+
     max-width: calc(100vw - 30px);
+
     max-height: calc(100vh - 30px);
 
     background: #ffffff;
@@ -1303,7 +1339,8 @@ PROJECTS LIST
 
     border-radius: 12px;
 
-    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    box-shadow:
+        0 5px 30px rgba(0, 0, 0, 0.3);
 
     text-align: center;
 
@@ -1360,8 +1397,8 @@ PROJECTS LIST
 
 
 /* =========================================================
-14. SEARCH POPUP
-========================================================= */
+   14. SEARCH POPUP
+   ========================================================= */
 
 .search-popup {
     position: fixed;
@@ -1370,6 +1407,7 @@ PROJECTS LIST
     left: 70px;
 
     width: 260px;
+
     max-width: calc(100vw - 90px);
 
     max-height: calc(100vh - 80px);
@@ -1380,7 +1418,8 @@ PROJECTS LIST
 
     border-radius: 12px;
 
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 5px 25px rgba(0, 0, 0, 0.15);
 
     padding: 10px;
 
@@ -1397,8 +1436,8 @@ PROJECTS LIST
 
 
 /* =========================================================
-SEARCH INPUT
-========================================================= */
+   SEARCH INPUT
+   ========================================================= */
 
 #search-input {
     width: 100%;
@@ -1434,8 +1473,8 @@ SEARCH INPUT
 
 
 /* =========================================================
-SEARCH RESULTS
-========================================================= */
+   SEARCH RESULTS
+   ========================================================= */
 
 #search-results {
     margin-top: 8px;
@@ -1477,8 +1516,15 @@ SEARCH RESULTS
     color: #111;
 }
 
+
+/* Search scrollbar */
+
 #search-results::-webkit-scrollbar {
     width: 6px;
+}
+
+#search-results::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 #search-results::-webkit-scrollbar-thumb {
@@ -1490,14 +1536,10 @@ SEARCH RESULTS
     background: #aaa;
 }
 
-#search-results::-webkit-scrollbar-track {
-    background: transparent;
-}
-
 
 /* =========================================================
-15. MAIN
-========================================================= */
+   15. MAIN
+   ========================================================= */
 
 .main {
     height: 100vh;
@@ -1505,8 +1547,14 @@ SEARCH RESULTS
     margin-left: 52px;
 
     display: flex;
+
     flex-direction: column;
 }
+
+
+/* =========================================================
+   DOCUMENT TITLE
+   ========================================================= */
 
 #document-title {
     height: 45px;
@@ -1514,6 +1562,7 @@ SEARCH RESULTS
     border-bottom: 1px solid #eee;
 
     display: flex;
+
     align-items: center;
 
     padding: 0 18px;
@@ -1525,8 +1574,8 @@ SEARCH RESULTS
 
 
 /* =========================================================
-16. CHAT AREA
-========================================================= */
+   16. CHAT AREA
+   ========================================================= */
 
 #chat-area {
     flex: 1;
@@ -1536,10 +1585,16 @@ SEARCH RESULTS
     padding: 25px;
 }
 
+
+/* =========================================================
+   WELCOME
+   ========================================================= */
+
 .welcome {
     height: 100%;
 
     display: flex;
+
     flex-direction: column;
 
     align-items: center;
@@ -1572,8 +1627,8 @@ SEARCH RESULTS
 
 
 /* =========================================================
-17. MESSAGES
-========================================================= */
+   17. MESSAGES
+   ========================================================= */
 
 .message {
     max-width: 80%;
@@ -1607,11 +1662,12 @@ SEARCH RESULTS
 
 
 /* =========================================================
-18. INPUT AREA
-========================================================= */
+   18. INPUT AREA
+   ========================================================= */
 
 .input-area {
     min-height: 68px;
+
     height: 68px;
 
     border-top: 1px solid #eee;
@@ -1626,17 +1682,20 @@ SEARCH RESULTS
 
 
 /* =========================================================
-MESSAGE BOX
-========================================================= */
+   MESSAGE BOX
+   ========================================================= */
 
 .message-box {
     width: calc(100% - 4px);
+
     max-width: none;
 
     height: 46px;
+
     min-height: 46px;
 
     display: flex;
+
     align-items: center;
 
     background: #ffffff;
@@ -1669,8 +1728,8 @@ MESSAGE BOX
 
 
 /* =========================================================
-TEXTAREA
-========================================================= */
+   TEXTAREA
+   ========================================================= */
 
 #user-input {
     flex: 1;
@@ -1678,12 +1737,15 @@ TEXTAREA
     width: 100%;
 
     height: 38px;
+
     min-height: 38px;
+
     max-height: 140px;
 
     resize: none;
 
     border: none;
+
     outline: none;
 
     background: transparent;
@@ -1693,6 +1755,7 @@ TEXTAREA
     box-sizing: border-box;
 
     font-size: 14px;
+
     line-height: 1.45;
 
     overflow-y: auto;
@@ -1704,8 +1767,8 @@ TEXTAREA
 
 
 /* =========================================================
-SEND BUTTON
-========================================================= */
+   SEND BUTTON
+   ========================================================= */
 
 #send-btn {
     flex: 0 0 38px;
@@ -1745,6 +1808,7 @@ SEND BUTTON
 
 #send-btn:hover {
     background: #111;
+
     transform: scale(1.03);
 }
 
@@ -1763,13 +1827,14 @@ SEND BUTTON
     stroke-width: 2.5;
 
     stroke-linecap: round;
+
     stroke-linejoin: round;
 }
 
 
 /* =========================================================
-19. CHAT ICONS
-========================================================= */
+   19. CHAT ICONS
+   ========================================================= */
 
 .new-chat-icon,
 .new-chat-pencil {
@@ -1780,8 +1845,8 @@ SEND BUTTON
 
 
 /* =========================================================
-20. GLOBAL SCROLLBAR
-========================================================= */
+   20. GLOBAL SCROLLBAR
+   ========================================================= */
 
 ::-webkit-scrollbar {
     width: 7px;
@@ -1803,8 +1868,8 @@ SEND BUTTON
 
 
 /* =========================================================
-21. AI SETTINGS WINDOW
-========================================================= */
+   21. AI SETTINGS WINDOW
+   ========================================================= */
 
 #settings-window {
     position: absolute;
@@ -1834,6 +1899,7 @@ SEND BUTTON
     z-index: 10000;
 
     opacity: 0;
+
     visibility: hidden;
 
     pointer-events: none;
@@ -1856,8 +1922,8 @@ SEND BUTTON
 
 
 /* =========================================================
-SETTINGS HEADER
-========================================================= */
+   SETTINGS HEADER
+   ========================================================= */
 
 #settings-header {
     display: flex;
@@ -1875,6 +1941,7 @@ SETTINGS HEADER
         1px solid var(--border-color, #e2e5e9);
 
     font-size: 16px;
+
     font-weight: 700;
 
     color: var(--text-color, #202124);
@@ -1892,6 +1959,11 @@ SETTINGS HEADER
     white-space: nowrap;
 }
 
+
+/* =========================================================
+   CLOSE SETTINGS
+   ========================================================= */
+
 #close-settings {
     width: 32px;
     height: 32px;
@@ -1905,6 +1977,7 @@ SETTINGS HEADER
     color: var(--muted-text, #6b7280);
 
     font-size: 23px;
+
     line-height: 1;
 
     cursor: pointer;
@@ -1927,8 +2000,8 @@ SETTINGS HEADER
 
 
 /* =========================================================
-SETTINGS LABELS
-========================================================= */
+   SETTINGS LABELS
+   ========================================================= */
 
 #settings-window > label {
     display: block;
@@ -1936,6 +2009,7 @@ SETTINGS LABELS
     margin: 17px 20px 7px;
 
     font-size: 13px;
+
     font-weight: 600;
 
     color: var(--text-color, #30343b);
@@ -1947,8 +2021,8 @@ SETTINGS LABELS
 
 
 /* =========================================================
-PROVIDER
-========================================================= */
+   PROVIDER
+   ========================================================= */
 
 #provider-select {
     display: block;
@@ -1992,8 +2066,8 @@ PROVIDER
 
 
 /* =========================================================
-API KEY
-========================================================= */
+   API KEY
+   ========================================================= */
 
 .key-box {
     display: flex;
@@ -2035,6 +2109,7 @@ API KEY
     height: 100%;
 
     border: none;
+
     outline: none;
 
     background: transparent;
@@ -2046,6 +2121,7 @@ API KEY
     font-size: 13px;
 
     direction: ltr;
+
     text-align: left;
 }
 
@@ -2053,8 +2129,14 @@ API KEY
     color: var(--muted-text, #9aa0a6);
 }
 
+
+/* =========================================================
+   SHOW API KEY
+   ========================================================= */
+
 #show-key {
     width: 42px;
+
     height: 100%;
 
     border: none;
@@ -2082,8 +2164,8 @@ API KEY
 
 
 /* =========================================================
-MODEL
-========================================================= */
+   MODEL
+   ========================================================= */
 
 .model-box {
     display: flex;
@@ -2133,8 +2215,14 @@ MODEL
         0 0 0 3px rgba(107, 114, 128, 0.12);
 }
 
+
+/* =========================================================
+   REFRESH MODELS
+   ========================================================= */
+
 #refresh-models {
     width: 42px;
+
     height: 42px;
 
     flex-shrink: 0;
@@ -2183,8 +2271,8 @@ MODEL
 
 
 /* =========================================================
-PROVIDER INFO
-========================================================= */
+   PROVIDER INFO
+   ========================================================= */
 
 #provider-info {
     margin: 16px 20px 0;
@@ -2211,8 +2299,8 @@ PROVIDER INFO
 
 
 /* =========================================================
-SETTINGS BUTTONS
-========================================================= */
+   SETTINGS BUTTONS
+   ========================================================= */
 
 .settings-buttons {
     display: flex;
@@ -2230,6 +2318,7 @@ SETTINGS BUTTONS
     border-radius: 9px;
 
     font-size: 13px;
+
     font-weight: 600;
 
     cursor: pointer;
@@ -2239,6 +2328,9 @@ SETTINGS BUTTONS
         border-color 0.15s ease,
         transform 0.1s ease;
 }
+
+
+/* Test */
 
 #test-connection {
     border:
@@ -2252,6 +2344,9 @@ SETTINGS BUTTONS
 #test-connection:hover {
     background: var(--hover-bg, #f3f4f6);
 }
+
+
+/* Save */
 
 #save-settings {
     border: 1px solid #30343b;
@@ -2267,6 +2362,9 @@ SETTINGS BUTTONS
     border-color: #202124;
 }
 
+
+/* Button states */
+
 .settings-buttons button:active {
     transform: translateY(1px);
 }
@@ -2279,8 +2377,8 @@ SETTINGS BUTTONS
 
 
 /* =========================================================
-SETTINGS STATUS
-========================================================= */
+   SETTINGS STATUS
+   ========================================================= */
 
 #settings-status {
     min-height: 20px;
@@ -2300,8 +2398,8 @@ SETTINGS STATUS
 
 
 /* =========================================================
-22. DARK MODE - SETTINGS
-========================================================= */
+   22. DARK MODE - SETTINGS
+   ========================================================= */
 
 body.dark #settings-window,
 .dark #settings-window {
@@ -2317,7 +2415,8 @@ body.dark #settings-header,
 .dark #settings-header {
     background: var(--panel-header-bg, #292b2f);
 
-    border-bottom-color: var(--border-color, #3a3d42);
+    border-bottom-color:
+        var(--border-color, #3a3d42);
 
     color: var(--text-color, #f1f3f4);
 }
@@ -2332,14 +2431,16 @@ body.dark #model-select,
 
     color: var(--text-color, #f1f3f4);
 
-    border-color: var(--border-color, #41444a);
+    border-color:
+        var(--border-color, #41444a);
 }
 
 body.dark .key-box,
 .dark .key-box {
     background: var(--input-bg, #292b2f);
 
-    border-color: var(--border-color, #41444a);
+    border-color:
+        var(--border-color, #41444a);
 }
 
 body.dark #refresh-models,
@@ -2350,14 +2451,16 @@ body.dark #test-connection,
 
     color: var(--text-color, #f1f3f4);
 
-    border-color: var(--border-color, #41444a);
+    border-color:
+        var(--border-color, #41444a);
 }
 
 body.dark #provider-info,
 .dark #provider-info {
     background: var(--info-bg, #292b2f);
 
-    border-color: var(--border-color, #41444a);
+    border-color:
+        var(--border-color, #41444a);
 
     color: var(--muted-text, #aeb4bd);
 }
@@ -2373,8 +2476,8 @@ body.dark #save-settings,
 
 
 /* =========================================================
-23. SAFETY FOR POPUPS NEAR BOTTOM
-========================================================= */
+   23. SAFETY FOR POPUPS NEAR BOTTOM
+   ========================================================= */
 
 .projects-popup,
 .chat-popup {
@@ -2389,8 +2492,8 @@ body.dark #save-settings,
 
 
 /* =========================================================
-24. POPUP OPEN-UP BEHAVIOR
-========================================================= */
+   24. POPUP OPEN-UP BEHAVIOR
+   ========================================================= */
 
 .project-options-menu.open-up,
 .chat-options-menu.open-up {
@@ -2401,15 +2504,8 @@ body.dark #save-settings,
 
 
 /* =========================================================
-25. POPUP FONT UNIFICATION
-========================================================= */
-
-/*
-النوافذ المنبثقة الجانبية:
-
-العنوان = 14px عريض
-المحتوى = 13px عادي
-*/
+   25. POPUP FONT UNIFICATION
+   ========================================================= */
 
 .projects-popup,
 .chat-popup,
@@ -2417,49 +2513,57 @@ body.dark #save-settings,
     font-family: "Segoe UI", Arial, sans-serif;
 }
 
+
+/* Popup titles */
+
 .projects-popup .popup-title,
 .chat-popup .popup-title,
 .search-popup .popup-title {
     font-size: 14px;
+
     font-weight: 700;
 }
+
+
+/* Popup items */
 
 .projects-popup .popup-item,
 .chat-popup .popup-item,
 .search-popup .popup-item {
     font-size: 13px;
+
     font-weight: 400;
 }
 
+
 /* =========================================================
-   الباحث - تنسيق القائمة الجانبية فقط
-   لا يحذف أو يغيّر أي عنصر أو وظيفة
+   26. SIDEBAR FINAL TYPOGRAPHY
+   المحافظة على المستويات الثلاثة
    ========================================================= */
+
 
 /* ---------------------------------------------------------
    المستوى الأول
-   أدوات الباحث
    --------------------------------------------------------- */
 
 #expanded-sidebar .expand-header {
     font-size: 15px;
+
     font-weight: 700;
+
     color: #222;
 }
 
+
 /* ---------------------------------------------------------
    المستوى الثاني
-   عناوين الأقسام:
-   محادثة جديدة
-   المحادثات
-   المشاريع
-   المستندات
-   المراجع
    --------------------------------------------------------- */
 
 #expanded-sidebar .expand-section-header {
     font-size: 14px;
+
     font-weight: 700;
+
     color: #444;
 
     min-height: 40px;
@@ -2467,62 +2571,82 @@ body.dark #save-settings,
     padding: 7px 10px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: space-between;
 
     box-sizing: border-box;
 }
 
-/* اسم القسم نفسه */
 
-#expanded-sidebar .expand-section-header > span:not(.section-arrow) {
+/* اسم القسم */
+
+#expanded-sidebar
+.expand-section-header
+> span:not(.section-arrow) {
     font-size: 14px;
+
     font-weight: 700;
+
     color: #444;
 }
 
+
 /* ---------------------------------------------------------
-   أيقونة/سهم القسم
+   السهم
    --------------------------------------------------------- */
 
 #expanded-sidebar .section-arrow {
     font-size: 20px;
+
     font-weight: 400;
 
     width: 18px;
+
     min-width: 18px;
 
     display: inline-flex;
+
     align-items: center;
+
     justify-content: center;
 
     color: #666;
 }
 
+
 /* ---------------------------------------------------------
    المستوى الثالث
-   القوائم الموجودة تحت عناوين الأقسام
    --------------------------------------------------------- */
 
 #expanded-sidebar #new-chat-list,
 #expanded-sidebar #chat-list,
 #expanded-sidebar #expanded-projects-list {
     padding-left: 14px;
+
     box-sizing: border-box;
 }
 
+
 /* ---------------------------------------------------------
-   عناصر محادثة جديدة
+   محادثة جديدة
    --------------------------------------------------------- */
 
-#expanded-sidebar #new-chat-list .new-chat-item,
-#expanded-sidebar #new-chat-list .expanded-project-item {
+#expanded-sidebar
+#new-chat-list
+.new-chat-item,
+#expanded-sidebar
+#new-chat-list
+.expanded-project-item {
     font-size: 13px;
+
     font-weight: 400;
 
     color: #555;
 
     padding: 7px 10px;
+
     margin: 2px 0;
 
     border-radius: 7px;
@@ -2530,43 +2654,58 @@ body.dark #save-settings,
     box-sizing: border-box;
 }
 
+
 /* ---------------------------------------------------------
-   عناصر المحادثات
+   المحادثات
    --------------------------------------------------------- */
 
-#expanded-sidebar #chat-list .chat-history-item {
+#expanded-sidebar
+#chat-list
+.chat-history-item {
     font-size: 13px;
+
     font-weight: 400;
 
     color: #555;
 
     padding: 7px 10px;
+
     margin: 2px 0;
 
     border-radius: 7px;
 
     box-sizing: border-box;
 }
+
 
 /* اسم المحادثة */
 
-#expanded-sidebar #chat-list .chat-title {
+#expanded-sidebar
+#chat-list
+.chat-title {
     font-size: 13px;
+
     font-weight: 400;
+
     color: #555;
 }
 
+
 /* ---------------------------------------------------------
-   عناصر المشاريع
+   المشاريع
    --------------------------------------------------------- */
 
-#expanded-sidebar #expanded-projects-list .expanded-project-item {
+#expanded-sidebar
+#expanded-projects-list
+.expanded-project-item {
     font-size: 13px;
+
     font-weight: 400;
 
     color: #555;
 
     padding: 7px 10px;
+
     margin: 2px 0;
 
     border-radius: 7px;
@@ -2574,43 +2713,68 @@ body.dark #save-settings,
     box-sizing: border-box;
 }
 
+
 /* اسم المشروع */
 
-#expanded-sidebar #expanded-projects-list .expanded-project-item span {
+#expanded-sidebar
+#expanded-projects-list
+.expanded-project-item
+span {
     font-size: 13px;
+
     font-weight: 400;
 }
 
+
 /* ---------------------------------------------------------
    المستندات والمراجع
-   إذا أضيفت عناصر لاحقًا ستأخذ مستوى العناصر الثالث
    --------------------------------------------------------- */
 
 #expanded-sidebar .expand-section-content {
     padding-left: 14px;
+
     box-sizing: border-box;
 }
 
+
 /* ---------------------------------------------------------
    Hover
-   نحافظ على شكل القائمة الحالي
    --------------------------------------------------------- */
 
 #expanded-sidebar .expand-section-header:hover {
     background: #f3f3f3;
+
     color: #111;
 }
 
-#expanded-sidebar #new-chat-list .new-chat-item:hover,
-#expanded-sidebar #new-chat-list .expanded-project-item:hover,
-#expanded-sidebar #chat-list .chat-history-item:hover,
-#expanded-sidebar #expanded-projects-list .expanded-project-item:hover {
+#expanded-sidebar
+#new-chat-list
+.new-chat-item:hover,
+#expanded-sidebar
+#new-chat-list
+.expanded-project-item:hover,
+#expanded-sidebar
+#chat-list
+.chat-history-item:hover,
+#expanded-sidebar
+#expanded-projects-list
+.expanded-project-item:hover {
     background: #f3f3f3;
+
     color: #111;
 }
-
 
 
 /* =========================================================
-END
-========================================================= */
+   27. ICON DIRECTION
+   ========================================================= */
+
+.new-chat-icon,
+.new-chat-pencil {
+    transform: scaleX(-1);
+}
+
+
+/* =========================================================
+   END
+   ========================================================= */
