@@ -1,4 +1,3 @@
-```css
 /* =========================================================
    WORD AI ASSISTANT
    CLEAN / CONSOLIDATED CSS
@@ -87,12 +86,14 @@ body {
     color: #111;
 }
 
+
+/* =========================================================
+   SEARCH BUTTON
+   ========================================================= */
+
 #search-btn {
     font-size: 24px;
     line-height: 1;
-}
-
-#search-btn {
     transform: scaleX(-1);
 }
 
@@ -100,9 +101,10 @@ body {
     transform: scaleX(-1);
 }
 
+
 /* =========================================================
    EXPANDED SIDEBAR
-========================================================= */
+   ========================================================= */
 
 #expanded-sidebar {
     position: fixed;
@@ -125,23 +127,22 @@ body {
 
     z-index: 90;
 
-    /* السماح بتمرير محتوى القائمة عند طوله */
     overflow-y: auto;
-
-    /* منع التمدد الأفقي */
     overflow-x: hidden;
 
-    /* تحسين ظهور شريط التمرير */
     scrollbar-width: thin;
     scrollbar-color: #c7c7c7 transparent;
 }
 
+#expanded-sidebar.open {
+    transform: translateX(0);
+}
+
 
 /* =========================================================
-   EXPANDED SIDEBAR - SCROLLBAR
-========================================================= */
+   EXPANDED SIDEBAR SCROLLBAR
+   ========================================================= */
 
-/* Chrome / Edge / WebView */
 #expanded-sidebar::-webkit-scrollbar {
     width: 7px;
 }
@@ -160,13 +161,9 @@ body {
 }
 
 
-#expanded-sidebar.open {
-    transform: translateX(0);
-}
-
-#expanded-sidebar.open {
-    transform: translateX(0);
-}
+/* =========================================================
+   EXPANDED SIDEBAR HEADER / ITEMS
+   ========================================================= */
 
 .expand-header {
     height: 55px;
@@ -200,22 +197,16 @@ body {
     background: #f5f5f5;
 }
 
-/* =========================================================
-   EXPANDED SIDEBAR - COLLAPSIBLE SECTIONS
-========================================================= */
 
-/* القسم كاملًا */
+/* =========================================================
+   EXPANDED SIDEBAR SECTIONS
+   ========================================================= */
 
 .expand-section {
     width: 100%;
     margin: 0;
     padding: 0;
 }
-
-
-/* =========================================================
-   عنوان القسم
-========================================================= */
 
 .expand-section-header {
     width: 100%;
@@ -225,16 +216,15 @@ body {
     align-items: center;
     justify-content: space-between;
 
-    box-sizing: border-box;
-
     padding: 7px 10px;
+
+    box-sizing: border-box;
 
     cursor: pointer;
 
     border-radius: 8px;
 
     color: #444;
-
     background: transparent;
 
     user-select: none;
@@ -244,16 +234,10 @@ body {
         color 0.2s ease;
 }
 
-
 .expand-section-header:hover {
     background: #f3f3f3;
     color: #111;
 }
-
-
-/* =========================================================
-   الأيقونة + اسم القسم
-========================================================= */
 
 .expand-section-title {
     display: flex;
@@ -262,17 +246,14 @@ body {
     gap: 9px;
 
     min-width: 0;
-
     flex: 1;
 }
-
 
 .section-icon {
     width: 20px;
     min-width: 20px;
 
     display: inline-flex;
-
     align-items: center;
     justify-content: center;
 
@@ -284,17 +265,15 @@ body {
 
 
 /* =========================================================
-   سهم الفتح والإغلاق
-========================================================= */
+   SECTION ARROW
+   ========================================================= */
 
 .section-arrow {
     width: 18px;
     height: 18px;
-
     min-width: 18px;
 
     display: inline-flex !important;
-
     align-items: center;
     justify-content: center;
 
@@ -305,28 +284,27 @@ body {
 
     color: #666;
 
-    opacity: 1;
-    visibility: visible;
-
     flex-shrink: 0;
 
-    transition:
-        transform 0.2s ease;
+    opacity: 1 !important;
+    visibility: visible !important;
+
+    transition: transform 0.2s ease;
 }
 
-
-/* السهم عند فتح القسم */
-
-.expand-section.open .section-arrow {
+.expand-section.open .section-arrow,
+.section-title.open .section-arrow,
+.expand-item.open .section-arrow {
     transform: rotate(90deg);
 }
 
 
 /* =========================================================
-   محتوى القسم
-========================================================= */
+   SECTION CONTENT
+   ========================================================= */
 
-.expand-section-content {
+.expand-section-content,
+.section-content {
     display: none;
 
     width: 100%;
@@ -336,13 +314,26 @@ body {
     padding: 0;
 }
 
-
-/* المحتوى عند فتح القسم */
-
-.expand-section.open
-.expand-section-content {
+.expand-section.open .expand-section-content,
+.section-content.open {
     display: block;
 }
+
+
+/* =========================================================
+   INTERNAL SECTION ITEMS
+   ========================================================= */
+
+.section-title,
+.expand-item {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+
+    gap: 6px;
+}
+
 
 /* =========================================================
    MAIN
@@ -469,14 +460,13 @@ body {
     align-items: center;
     justify-content: center;
 
-    /* رفع مربع الكتابة قليلًا عن أسفل الشاشة */
     padding: 5px 15px 13px;
 }
 
 
 /* =========================================================
    MESSAGE BOX
-========================================================= */
+   ========================================================= */
 
 .message-box {
     width: calc(100% - 10px);
@@ -503,13 +493,10 @@ body {
         0 1px 3px rgba(0, 0, 0, 0.05);
 
     transition:
-        border-color .2s ease,
-        box-shadow .2s ease,
-        height .15s ease;
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        height 0.15s ease;
 }
-
-
-/* عند الكتابة */
 
 .message-box:focus-within {
     border-color: #b5b5b5;
@@ -520,8 +507,43 @@ body {
 
 
 /* =========================================================
+   TEXTAREA
+   ========================================================= */
+
+#user-input {
+    flex: 1;
+
+    width: 100%;
+
+    height: 38px;
+    min-height: 38px;
+    max-height: 140px;
+
+    resize: none;
+
+    border: none;
+    outline: none;
+
+    background: transparent;
+
+    padding: 8px 5px;
+
+    box-sizing: border-box;
+
+    font-size: 14px;
+    line-height: 1.45;
+
+    overflow-y: auto;
+}
+
+#user-input::placeholder {
+    color: #999;
+}
+
+
+/* =========================================================
    SEND BUTTON
-========================================================= */
+   ========================================================= */
 
 #send-btn {
     flex: 0 0 38px;
@@ -552,76 +574,18 @@ body {
     box-sizing: border-box;
 
     transition:
-        background .2s ease,
-        transform .15s ease;
+        background 0.2s ease,
+        transform 0.15s ease;
 }
-
 
 #send-btn:hover {
     background: #111;
     transform: scale(1.03);
 }
 
-
 #send-btn:active {
-    transform: scale(.94);
+    transform: scale(0.94);
 }
-
-
-#send-btn svg {
-    width: 18px;
-    height: 18px;
-
-    fill: none;
-
-    stroke: currentColor;
-    stroke-width: 2.5;
-
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-
-/* =========================================================
-   TEXTAREA
-========================================================= */
-
-#user-input {
-    flex: 1;
-
-    width: 100%;
-
-    height: 38px;
-    min-height: 38px;
-    max-height: 140px;
-
-    resize: none;
-
-    border: none;
-    outline: none;
-
-    background: transparent;
-
-    padding: 8px 5px;
-
-    box-sizing: border-box;
-
-    font-size: 14px;
-    line-height: 1.45;
-
-    overflow-y: auto;
-}
-
-
-#user-input::placeholder {
-    color: #999;
-}
-
-
-
-/* =========================================================
-   SEND ICON
-========================================================= */
 
 #send-btn svg {
     width: 19px;
@@ -630,7 +594,6 @@ body {
     fill: none;
 
     stroke: currentColor;
-
     stroke-width: 2.5;
 
     stroke-linecap: round;
@@ -638,13 +601,13 @@ body {
 }
 
 
-/* =========================================
+/* =========================================================
    AI SETTINGS WINDOW
-   إعدادات الذكاء الاصطناعي
-   ========================================= */
+   ========================================================= */
 
 #settings-window {
     position: absolute;
+
     top: 50%;
     left: 50%;
 
@@ -671,7 +634,6 @@ body {
 
     opacity: 0;
     visibility: hidden;
-
     pointer-events: none;
 
     transition:
@@ -680,32 +642,22 @@ body {
         visibility 0.18s ease;
 }
 
-
-/* عند الفتح */
-
 #settings-window.open {
-
     opacity: 1;
-
     visibility: visible;
-
     pointer-events: auto;
 
-    transform:
-        translate(-50%, -50%);
+    transform: translate(-50%, -50%);
 }
 
 
-/* =========================================
-   Settings Header
-   ========================================= */
+/* =========================================================
+   SETTINGS HEADER
+   ========================================================= */
 
 #settings-header {
-
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
 
     height: 58px;
@@ -719,7 +671,6 @@ body {
         1px solid var(--border-color, #e2e5e9);
 
     font-size: 16px;
-
     font-weight: 700;
 
     color:
@@ -728,13 +679,8 @@ body {
     direction: rtl;
 }
 
-
-/* عنوان الإعدادات */
-
 #settings-header > span {
-
     display: flex;
-
     align-items: center;
 
     gap: 8px;
@@ -743,16 +689,15 @@ body {
 }
 
 
-/* زر الإغلاق */
+/* =========================================================
+   CLOSE SETTINGS
+   ========================================================= */
 
 #close-settings {
-
     width: 32px;
-
     height: 32px;
 
     border: none;
-
     border-radius: 8px;
 
     background: transparent;
@@ -761,15 +706,12 @@ body {
         var(--muted-text, #6b7280);
 
     font-size: 23px;
-
     line-height: 1;
 
     cursor: pointer;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     transition:
@@ -777,9 +719,7 @@ body {
         color 0.15s ease;
 }
 
-
 #close-settings:hover {
-
     background:
         rgba(0, 0, 0, 0.07);
 
@@ -788,48 +728,40 @@ body {
 }
 
 
-/* =========================================
-   Settings Content
-   ========================================= */
+/* =========================================================
+   SETTINGS LABELS
+   ========================================================= */
 
 #settings-window > label {
-
     display: block;
 
     margin:
         17px 20px 7px;
 
     font-size: 13px;
-
     font-weight: 600;
 
     color:
         var(--text-color, #30343b);
 
     text-align: right;
-
     direction: rtl;
 }
 
 
-/* =========================================
-   Provider Select
-   ========================================= */
+/* =========================================================
+   PROVIDER SELECT
+   ========================================================= */
 
 #provider-select {
-
     display: block;
 
-    width:
-        calc(100% - 40px);
-
+    width: calc(100% - 40px);
     height: 42px;
 
-    margin:
-        0 20px;
+    margin: 0 20px;
 
-    padding:
-        0 12px;
+    padding: 0 12px;
 
     border:
         1px solid var(--border-color, #d9dde3);
@@ -855,34 +787,26 @@ body {
         box-shadow 0.15s ease;
 }
 
-
 #provider-select:focus {
-
-    border-color:
-        #6b7280;
+    border-color: #6b7280;
 
     box-shadow:
         0 0 0 3px rgba(107, 114, 128, 0.12);
 }
 
 
-/* =========================================
-   API Key
-   ========================================= */
+/* =========================================================
+   API KEY
+   ========================================================= */
 
 .key-box {
-
     display: flex;
-
     align-items: center;
 
-    width:
-        calc(100% - 40px);
-
+    width: calc(100% - 40px);
     height: 42px;
 
-    margin:
-        0 20px;
+    margin: 0 20px;
 
     border:
         1px solid var(--border-color, #d9dde3);
@@ -899,33 +823,25 @@ body {
         box-shadow 0.15s ease;
 }
 
-
 .key-box:focus-within {
-
-    border-color:
-        #6b7280;
+    border-color: #6b7280;
 
     box-shadow:
         0 0 0 3px rgba(107, 114, 128, 0.12);
 }
 
-
 #api-key {
-
     flex: 1;
-
     min-width: 0;
 
     height: 100%;
 
     border: none;
-
     outline: none;
 
     background: transparent;
 
-    padding:
-        0 12px;
+    padding: 0 12px;
 
     color:
         var(--text-color, #202124);
@@ -933,22 +849,16 @@ body {
     font-size: 13px;
 
     direction: ltr;
-
     text-align: left;
 }
 
-
 #api-key::placeholder {
-
     color:
         var(--muted-text, #9aa0a6);
 }
 
-
 #show-key {
-
     width: 42px;
-
     height: 100%;
 
     border: none;
@@ -966,52 +876,39 @@ body {
         var(--muted-text, #6b7280);
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 }
 
-
 #show-key:hover {
-
     background:
         rgba(0, 0, 0, 0.045);
 }
 
 
-/* =========================================
-   Model Box
-   ========================================= */
+/* =========================================================
+   MODEL BOX
+   ========================================================= */
 
 .model-box {
-
     display: flex;
-
     align-items: center;
 
     gap: 8px;
 
-    width:
-        calc(100% - 40px);
-
+    width: calc(100% - 40px);
     height: 42px;
 
-    margin:
-        0 20px;
+    margin: 0 20px;
 }
 
-
 #model-select {
-
     flex: 1;
-
     min-width: 0;
 
     height: 42px;
 
-    padding:
-        0 10px;
+    padding: 0 10px;
 
     border:
         1px solid var(--border-color, #d9dde3);
@@ -1033,23 +930,20 @@ body {
     cursor: pointer;
 }
 
-
 #model-select:focus {
-
-    border-color:
-        #6b7280;
+    border-color: #6b7280;
 
     box-shadow:
         0 0 0 3px rgba(107, 114, 128, 0.12);
 }
 
 
-/* زر تحديث النماذج */
+/* =========================================================
+   REFRESH MODELS
+   ========================================================= */
 
 #refresh-models {
-
     width: 42px;
-
     height: 42px;
 
     flex-shrink: 0;
@@ -1070,9 +964,7 @@ body {
     cursor: pointer;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     transition:
@@ -1081,9 +973,7 @@ body {
         transform 0.15s ease;
 }
 
-
 #refresh-models:hover {
-
     background:
         var(--hover-bg, #f3f4f6);
 
@@ -1091,30 +981,22 @@ body {
         #c5cad1;
 }
 
-
 #refresh-models:active {
-
-    transform:
-        rotate(-25deg);
+    transform: rotate(-25deg);
 }
 
-
 #refresh-models:disabled {
-
     opacity: 0.5;
-
     cursor: not-allowed;
-
     transform: none;
 }
 
 
-/* =========================================
-   Provider Information
-   ========================================= */
+/* =========================================================
+   PROVIDER INFORMATION
+   ========================================================= */
 
 #provider-info {
-
     margin:
         16px 20px 0;
 
@@ -1133,21 +1015,18 @@ body {
         var(--muted-text, #6b7280);
 
     font-size: 12px;
-
     line-height: 1.7;
 
     text-align: right;
-
     direction: rtl;
 }
 
 
-/* =========================================
-   Settings Buttons
-   ========================================= */
+/* =========================================================
+   SETTINGS BUTTONS
+   ========================================================= */
 
 .settings-buttons {
-
     display: flex;
 
     gap: 9px;
@@ -1156,9 +1035,7 @@ body {
         18px 20px 0;
 }
 
-
 .settings-buttons button {
-
     flex: 1;
 
     height: 40px;
@@ -1166,7 +1043,6 @@ body {
     border-radius: 9px;
 
     font-size: 13px;
-
     font-weight: 600;
 
     cursor: pointer;
@@ -1177,11 +1053,7 @@ body {
         transform 0.1s ease;
 }
 
-
-/* اختبار الاتصال */
-
 #test-connection {
-
     border:
         1px solid var(--border-color, #d9dde3);
 
@@ -1192,18 +1064,12 @@ body {
         var(--text-color, #30343b);
 }
 
-
 #test-connection:hover {
-
     background:
         var(--hover-bg, #f3f4f6);
 }
 
-
-/* حفظ */
-
 #save-settings {
-
     border:
         1px solid #30343b;
 
@@ -1214,9 +1080,7 @@ body {
         #ffffff;
 }
 
-
 #save-settings:hover {
-
     background:
         #202124;
 
@@ -1224,39 +1088,30 @@ body {
         #202124;
 }
 
-
 .settings-buttons button:active {
-
-    transform:
-        translateY(1px);
+    transform: translateY(1px);
 }
 
-
 .settings-buttons button:disabled {
-
     opacity: 0.55;
-
     cursor: not-allowed;
 }
 
 
-/* =========================================
-   Settings Status
-   ========================================= */
+/* =========================================================
+   SETTINGS STATUS
+   ========================================================= */
 
 #settings-status {
-
     min-height: 20px;
 
     margin:
         12px 20px 18px;
 
     font-size: 12px;
-
     line-height: 1.6;
 
     text-align: center;
-
     direction: rtl;
 
     color:
@@ -1264,14 +1119,12 @@ body {
 }
 
 
-/* =========================================
-   Dark Mode
-   يعتمد على متغيرات المشروع إن كانت موجودة
-   ========================================= */
+/* =========================================================
+   DARK MODE - SETTINGS
+   ========================================================= */
 
 body.dark #settings-window,
 .dark #settings-window {
-
     background:
         var(--panel-bg, #202124);
 
@@ -1282,10 +1135,8 @@ body.dark #settings-window,
         0 18px 50px rgba(0, 0, 0, 0.45);
 }
 
-
 body.dark #settings-header,
 .dark #settings-header {
-
     background:
         var(--panel-header-bg, #292b2f);
 
@@ -1296,14 +1147,12 @@ body.dark #settings-header,
         var(--text-color, #f1f3f4);
 }
 
-
 body.dark #provider-select,
 body.dark #api-key,
 body.dark #model-select,
 .dark #provider-select,
 .dark #api-key,
 .dark #model-select {
-
     background:
         var(--input-bg, #292b2f);
 
@@ -1314,23 +1163,19 @@ body.dark #model-select,
         var(--border-color, #41444a);
 }
 
-
 body.dark .key-box,
 .dark .key-box {
-
     background:
         var(--input-bg, #292b2f);
 
     border-color:
         var(--border-color, #41444a);
 }
-
 
 body.dark #refresh-models,
 body.dark #test-connection,
 .dark #refresh-models,
 .dark #test-connection {
-
     background:
         var(--input-bg, #292b2f);
 
@@ -1341,10 +1186,8 @@ body.dark #test-connection,
         var(--border-color, #41444a);
 }
 
-
 body.dark #provider-info,
 .dark #provider-info {
-
     background:
         var(--info-bg, #292b2f);
 
@@ -1355,10 +1198,8 @@ body.dark #provider-info,
         var(--muted-text, #aeb4bd);
 }
 
-
 body.dark #save-settings,
 .dark #save-settings {
-
     background:
         #f1f3f4;
 
@@ -1396,7 +1237,6 @@ body.dark #save-settings,
 
 .chat-history-item:hover {
     background: #f3f3f3;
-
     color: #111;
 }
 
@@ -1426,6 +1266,7 @@ body.dark #save-settings,
     color: #111;
 }
 
+
 /* =========================================================
    CHAT LIST SCROLL
    ========================================================= */
@@ -1438,9 +1279,6 @@ body.dark #save-settings,
 
     padding: 2px 2px 8px 0;
 }
-
-
-/* شريط تمرير قائمة المحادثات */
 
 #chat-list::-webkit-scrollbar {
     width: 6px;
@@ -1459,6 +1297,7 @@ body.dark #save-settings,
     background: #aaa;
 }
 
+
 /* =========================================================
    CHAT OPTIONS MENU
    ========================================================= */
@@ -1475,7 +1314,8 @@ body.dark #save-settings,
 
     border-radius: 8px;
 
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 5px 15px rgba(0, 0, 0, 0.15);
 
     width: 130px;
 
@@ -1511,7 +1351,8 @@ body.dark #save-settings,
 
     border-radius: 10px;
 
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 5px 20px rgba(0, 0, 0, 0.15);
 
     z-index: 90000;
 
@@ -1534,7 +1375,7 @@ body.dark #save-settings,
 
 
 /* =========================================================
-   CHAT OPTIONS MENU
+   CHAT OPTIONS MENU - DYNAMIC
    ========================================================= */
 
 .chat-options-menu {
@@ -1551,7 +1392,8 @@ body.dark #save-settings,
 
     border-radius: 10px;
 
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.15);
 
     display: none;
 
@@ -1616,13 +1458,13 @@ body.dark #save-settings,
 .delete-confirm {
     position: fixed;
 
-    top: 0;
-    left: 0;
+    inset: 0;
 
     width: 100%;
     height: 100%;
 
-    background: rgba(0, 0, 0, 0.4);
+    background:
+        rgba(0, 0, 0, 0.4);
 
     display: flex;
 
@@ -1635,19 +1477,25 @@ body.dark #save-settings,
 .delete-confirm .confirm-dialog {
     position: relative;
 
+    width: 320px;
+
+    max-width: calc(100vw - 30px);
+    max-height: calc(100vh - 30px);
+
     background: #ffffff;
 
     color: #222;
-
-    width: 320px;
 
     padding: 20px;
 
     border-radius: 12px;
 
-    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    box-shadow:
+        0 5px 30px rgba(0, 0, 0, 0.3);
 
     text-align: center;
+
+    overflow-y: auto;
 
     z-index: 1000000;
 }
@@ -1701,9 +1549,12 @@ body.dark #save-settings,
 
     border-radius: 12px;
 
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+    box-shadow:
+        0 5px 25px rgba(0, 0, 0, 0.2);
 
     z-index: 40000;
+
+    overflow: visible;
 }
 
 #chat-popup.open {
@@ -1753,9 +1604,11 @@ body.dark #save-settings,
     background: #ffffff;
 
     border: 1px solid #e2e2e2;
+
     border-radius: 14px;
 
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 8px 25px rgba(0, 0, 0, 0.15);
 
     padding: 12px;
 
@@ -1782,6 +1635,7 @@ body.dark #save-settings,
     padding: 9px 12px;
 
     border: 1px solid #d8d8d8;
+
     border-radius: 10px;
 
     outline: none;
@@ -1795,8 +1649,8 @@ body.dark #save-settings,
     text-align: right;
 
     transition:
-        border-color .2s ease,
-        box-shadow .2s ease;
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 #search-input:focus {
@@ -1820,6 +1674,24 @@ body.dark #save-settings,
     overflow-x: hidden;
 
     direction: rtl;
+}
+
+#search-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+#search-results::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#search-results::-webkit-scrollbar-thumb {
+    background: #c8c8c8;
+
+    border-radius: 10px;
+}
+
+#search-results::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
 }
 
 
@@ -1846,8 +1718,8 @@ body.dark #save-settings,
     text-align: right;
 
     transition:
-        background .15s ease,
-        color .15s ease;
+        background 0.15s ease,
+        color 0.15s ease;
 }
 
 .search-result-item:hover {
@@ -1855,27 +1727,6 @@ body.dark #save-settings,
     color: #111;
 }
 
-
-/* =========================================================
-   SEARCH SCROLLBAR
-   ========================================================= */
-
-#search-results::-webkit-scrollbar {
-    width: 6px;
-}
-
-#search-results::-webkit-scrollbar-thumb {
-    background: #c8c8c8;
-    border-radius: 10px;
-}
-
-#search-results::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
-}
-
-#search-results::-webkit-scrollbar-track {
-    background: transparent;
-}
 
 /* =========================================================
    PROJECTS POPUP
@@ -1898,13 +1749,11 @@ body.dark #save-settings,
 
     padding: 8px;
 
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.15);
 
     z-index: 1000;
 
-    /* مهم:
-       لا نجعل نافذة المشاريع نفسها تقص
-       القوائم المنبثقة بداخلها */
     overflow: visible;
 }
 
@@ -1954,7 +1803,6 @@ body.dark #save-settings,
     display: flex;
 
     align-items: center;
-
     justify-content: space-between;
 
     padding: 10px;
@@ -1986,8 +1834,8 @@ body.dark #save-settings,
     color: #111;
 }
 
+
 /* =========================================================
-  /* =========================================================
    PROJECT OPTIONS MENU
    ========================================================= */
 
@@ -2005,7 +1853,8 @@ body.dark #save-settings,
 
     border-radius: 10px;
 
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.15);
 
     display: none;
 
@@ -2047,42 +1896,6 @@ body.dark #save-settings,
     color: #444;
 
     cursor: pointer;
-}
-
-.rename-project:hover,
-.delete-project:hover {
-    background: #f3f3f3;
-}
-
-.project-options-menu div {
-    padding: 10px 12px;
-
-    cursor: pointer;
-
-    font-size: 13px;
-
-    color: #444;
-}
-
-.project-options-menu div:hover {
-    background: #f3f3f3;
-}
-
-.rename-project,
-.delete-project {
-    display: flex;
-
-    align-items: center;
-
-    gap: 8px;
-
-    padding: 10px 12px;
-
-    font-size: 13px;
-
-    color: #444;
-
-    cursor: pointer;
 
     position: relative;
 
@@ -2095,9 +1908,7 @@ body.dark #save-settings,
 }
 
 
-```css
 /* =========================================================
-   /* =========================================================
    NEW PROJECT BOX
    يبقى ثابتًا داخل نافذة المشاريع ولا يتحرك مع المشاريع
    ========================================================= */
@@ -2121,11 +1932,13 @@ body.dark #save-settings,
     background: #ffffff;
 
     border: 1px solid #ddd;
+
     border-radius: 12px;
 
     padding: 15px;
 
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
+    box-shadow:
+        0 8px 25px rgba(0, 0, 0, 0.18);
 }
 
 
@@ -2175,16 +1988,10 @@ body.dark #save-settings,
     font-size: 13px;
 }
 
-
-/* حفظ */
-
 .project-create-box .save-project {
     background: #222222;
     color: #ffffff;
 }
-
-
-/* إلغاء */
 
 .project-create-box .cancel-project {
     background: #eeeeee;
@@ -2193,14 +2000,9 @@ body.dark #save-settings,
     margin-right: 6px;
 }
 
-
-/* تأثير بسيط */
-
 .project-create-box button:hover {
     opacity: 0.9;
 }
-```
-
 
 
 /* =========================================================
@@ -2208,28 +2010,31 @@ body.dark #save-settings,
    ========================================================= */
 
 .project-delete-confirm {
-    position: fixed;
+    position: fixed !important;
 
-    top: 0;
-    left: 0;
+    inset: 0 !important;
 
     width: 100%;
     height: 100%;
 
-    background: rgba(0, 0, 0, 0.4);
+    background:
+        rgba(0, 0, 0, 0.4);
 
     display: flex;
 
     align-items: center;
     justify-content: center;
 
-    z-index: 999999;
+    z-index: 999999 !important;
 }
 
 .project-delete-confirm .confirm-dialog {
     position: relative;
 
     width: 320px;
+
+    max-width: calc(100vw - 30px);
+    max-height: calc(100vh - 30px);
 
     background: #ffffff;
 
@@ -2239,9 +2044,12 @@ body.dark #save-settings,
 
     border-radius: 12px;
 
-    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    box-shadow:
+        0 5px 30px rgba(0, 0, 0, 0.3);
 
     text-align: center;
+
+    overflow-y: auto;
 
     z-index: 1000000;
 }
@@ -2290,11 +2098,15 @@ body.dark #save-settings,
 
 
 /* =========================================================
-   SCROLLBAR
+   GLOBAL SCROLLBAR
    ========================================================= */
 
 ::-webkit-scrollbar {
     width: 7px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -2307,185 +2119,102 @@ body.dark #save-settings,
     background: #aaa;
 }
 
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-```
+
 /* =========================================================
-   FIX: MENUS NEAR BOTTOM OF SCREEN
+   MENUS NEAR BOTTOM OF SCREEN
    ========================================================= */
 
 /* منع قص القوائم المنبثقة داخل العناصر أو النوافذ */
+
 .projects-popup,
 .chat-popup {
     overflow: visible;
 }
 
-/* قائمة خيارات المشروع/المحادثة */
+
+/* =========================================================
+   DYNAMIC MENUS - BOTTOM FIX
+   ========================================================= */
+
 .project-options-menu,
 .chat-options-menu {
     max-height: calc(100vh - 20px);
 }
 
-/*
-   عند وضع القائمة في أسفل العنصر:
-   استخدم هذا الكلاس من JavaScript
-   لتظهر القائمة إلى الأعلى بدلًا من الأسفل.
-*/
 .project-options-menu.open-up,
 .chat-options-menu.open-up {
     top: auto;
     bottom: 5px;
 }
 
-/* نافذة إعادة التسمية */
+
+/* =========================================================
+   RENAME DIALOG
+   ========================================================= */
+
 .rename-dialog {
     max-height: calc(100vh - 30px);
+
     overflow-y: auto;
 }
 
-/* نافذة التأكيد تبقى فوق كل شيء */
+
+/* =========================================================
+   CONFIRMATION WINDOWS
+   ========================================================= */
+
 .delete-confirm,
 .project-delete-confirm {
     position: fixed !important;
+
     inset: 0 !important;
 
     display: flex;
+
     align-items: center;
     justify-content: center;
 
     z-index: 999999 !important;
 }
 
-/* محتوى نافذة التأكيد لا يخرج من الشاشة */
 .delete-confirm .confirm-dialog,
 .project-delete-confirm .confirm-dialog {
     max-width: calc(100vw - 30px);
+
     max-height: calc(100vh - 30px);
+
     overflow-y: auto;
 }
 
-.new-chat-icon {
-    display: inline-block;
-    transform: scaleX(-1);
-}
 
+/* =========================================================
+   NEW CHAT ICONS
+   ========================================================= */
+
+.new-chat-icon,
 .new-chat-pencil {
     display: inline-block;
+
     transform: scaleX(-1);
 }
 
-/* =========================================
-   Sidebar Section Arrow
-========================================= */
 
-.section-arrow {
-    display: inline-flex !important;
-
-    width: 18px;
-    height: 18px;
-
-    align-items: center;
-    justify-content: center;
-
-    font-size: 20px;
-    line-height: 18px;
-
-    color: #666;
-
-    flex-shrink: 0;
-
-    visibility: visible !important;
-    opacity: 1 !important;
-
-    transition: transform 0.2s ease;
-}
-
-
-/* عند فتح القائمة */
-
-.expand-section.open .section-arrow {
-    transform: rotate(90deg);
-}
-
-/* =========================================
-   أقسام القائمة الداخلية
-   ========================================= */
-
-.section-title,
-.expand-item {
-    position: relative;
-
-    display: flex;
-    align-items: center;
-
-    gap: 6px;
-}
-
-
-
-/* =========================================
-   سهم الفتح والانكماش
-   ========================================= */
-
-.section-arrow {
-    display: inline-block;
-
-    font-size: 18px;
-    line-height: 1;
-
-    opacity: 0.8;
-
-    transition: transform 0.2s ease;
-
-    flex-shrink: 0;
-}
-
-
-
-/* =========================================
-   عند فتح القسم
-   ========================================= */
-
-.section-title.open .section-arrow,
-.expand-item.open .section-arrow {
-    transform: rotate(90deg);
-}
-
-
-
-/* =========================================
-   محتوى الأقسام
-   ========================================= */
-
-.section-content {
-    display: none;
-}
-
-
-
-/* =========================================
-   عند فتح القسم
-   ========================================= */
-
-.section-content.open {
-    display: block;
-}
-
-/* =========================================
-   تنسيق أسماء المشاريع مثل المحادثات
-========================================= */
+/* =========================================================
+   EXPANDED PROJECT ITEMS
+   ========================================================= */
 
 .expanded-project-item {
     display: flex;
     align-items: center;
 
     padding: 8px 12px;
+
     margin: 4px 8px;
 
     border-radius: 8px;
 
     font-size: 13px;
+
     color: #555;
 
     cursor: pointer;
@@ -2493,14 +2222,18 @@ body.dark #save-settings,
 
 .expanded-project-item:hover {
     background: #f3f3f3;
+
     color: #111;
 }
 
 .expanded-project-item span {
     overflow: hidden;
+
     white-space: nowrap;
+
     text-overflow: ellipsis;
 }
+
 
 /* =========================================================
    NEW CHAT LIST
@@ -2510,12 +2243,10 @@ body.dark #save-settings,
 
 #new-chat-list {
     width: 100%;
+
     padding: 0;
     margin: 0;
 }
-
-
-/* نفس تنسيق عناصر المشاريع والمحادثات */
 
 #new-chat-list .expanded-project-item,
 #new-chat-list .new-chat-item {
@@ -2523,11 +2254,13 @@ body.dark #save-settings,
     align-items: center;
 
     padding: 8px 12px;
+
     margin: 4px 8px;
 
     border-radius: 8px;
 
     font-size: 13px;
+
     color: #555;
 
     cursor: pointer;
@@ -2537,17 +2270,12 @@ body.dark #save-settings,
     overflow: hidden;
 }
 
-
-/* نفس تأثير المرور بالماوس */
-
 #new-chat-list .expanded-project-item:hover,
 #new-chat-list .new-chat-item:hover {
     background: #f3f3f3;
+
     color: #111;
 }
-
-
-/* نفس طريقة عرض النص */
 
 #new-chat-list .expanded-project-item span,
 #new-chat-list .new-chat-item span {
