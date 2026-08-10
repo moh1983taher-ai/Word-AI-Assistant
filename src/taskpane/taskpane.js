@@ -37,6 +37,20 @@ const sidebarToggleBtn =
     document.getElementById("sidebar-toggle-btn");
 
 
+// ======================================
+// Initial Sidebar State
+// إبقاء القائمة الجانبية مغلقة عند التشغيل
+// ======================================
+
+if (expandedSidebar && sidebarToggleBtn) {
+
+    expandedSidebar.classList.remove("open");
+
+    sidebarToggleBtn.innerHTML = "☰";
+    sidebarToggleBtn.title = "إظهار القائمة";
+
+}
+
 const input =
     document.getElementById("user-input");
 
@@ -1129,50 +1143,32 @@ if (newProjectBtn) {
 
 // ======================================
 // Expanded Sidebar
+// القائمة الجانبية المنبثقة
 // ======================================
 
-if (sidebarToggleBtn) {
+if (sidebarToggleBtn && expandedSidebar) {
 
-    sidebarToggleBtn.onclick =
-        function (e) {
+    sidebarToggleBtn.onclick = function (e) {
 
-            e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
 
+        // فتح / إغلاق القائمة
+        expandedSidebar.classList.toggle("open");
 
-            if (!expandedSidebar)
-                return;
+        // تحديث شكل الزر
+        if (expandedSidebar.classList.contains("open")) {
 
+            sidebarToggleBtn.innerHTML = "×";
+            sidebarToggleBtn.title = "إخفاء القائمة";
 
-            expandedSidebar.classList.toggle(
-                "open"
-            );
+        } else {
 
+            sidebarToggleBtn.innerHTML = "☰";
+            sidebarToggleBtn.title = "إظهار القائمة";
 
-            if (
-                expandedSidebar.classList.contains(
-                    "open"
-                )
-            ) {
-
-                sidebarToggleBtn.innerHTML =
-                    "×";
-
-                sidebarToggleBtn.title =
-                    "إخفاء القائمة";
-
-            }
-            else {
-
-                sidebarToggleBtn.innerHTML =
-                    "☰";
-
-                sidebarToggleBtn.title =
-                    "إظهار القائمة";
-
-            }
-
-        };
-
+        }
+    };
 }
 
 
@@ -4578,35 +4574,64 @@ renderRecentChats();
 
 renderChat();
 
-loadSettings();
+// ======================================
+// Sidebar Pin State
+// تثبيت / إلغاء تثبيت القائمة الجانبية
+// ======================================
 
-});
+const sidebar =
+    document.querySelector(".sidebar");
 
-const sidebar = document.querySelector(".sidebar");
-const pinSidebar = document.getElementById("pin-sidebar");
+const pinSidebar =
+    document.getElementById("pin-sidebar");
 
 if (pinSidebar && sidebar) {
 
     let sidebarPinned =
         localStorage.getItem("sidebarPinned") === "true";
 
+    // استعادة الحالة المحفوظة
     if (sidebarPinned) {
+
         sidebar.classList.add("pinned");
         pinSidebar.classList.add("pinned");
+
     }
 
-    pinSidebar.addEventListener("click", function (e) {
+    // زر التثبيت
+    pinSidebar.addEventListener(
+        "click",
+        function (e) {
 
-        e.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
 
-        sidebarPinned = !sidebarPinned;
+            sidebarPinned =
+                !sidebarPinned;
 
-        sidebar.classList.toggle("pinned", sidebarPinned);
-        pinSidebar.classList.toggle("pinned", sidebarPinned);
+            sidebar.classList.toggle(
+                "pinned",
+                sidebarPinned
+            );
 
-        localStorage.setItem(
-            "sidebarPinned",
-            sidebarPinned ? "true" : "false"
-        );
-    });
+            pinSidebar.classList.toggle(
+                "pinned",
+                sidebarPinned
+            );
+
+            localStorage.setItem(
+                "sidebarPinned",
+                sidebarPinned
+                    ? "true"
+                    : "false"
+            );
+
+        }
+    );
+
 }
+
+
+loadSettings();
+
+});
