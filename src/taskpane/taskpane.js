@@ -1241,12 +1241,8 @@ function renderExpandedProjects() {
 
 
 // ======================================
-// Sidebar Chat List
-// ======================================
-
-// ======================================
-// عرض آخر 8 محادثات فقط
-// بدون حذف أو إعادة تسمية
+// Sidebar — Recent Chats under New Chat
+// يعرض آخر 8 محادثات فقط للعرض السريع
 // ======================================
 
 function renderSidebarChats() {
@@ -1256,15 +1252,15 @@ function renderSidebarChats() {
             "new-chat-list"
         );
 
-        if (!list)
+    if (!list)
         return;
 
-            list.innerHTML = "";
+    list.innerHTML = "";
 
     // لا توجد محادثات
-        if (chats.length === 0) {
+    if (chats.length === 0) {
 
-            list.innerHTML = `
+        list.innerHTML = `
             <div class="empty-chat">
                 لا توجد محادثات
             </div>
@@ -1279,42 +1275,37 @@ function renderSidebarChats() {
         .forEach(function (chat) {
 
             const item =
-                document.createElement(
-                    "div"
-                );
+                document.createElement("div");
 
             item.className =
                 "recent-chat-item";
 
             item.innerHTML = `
-                ◯
                 <span>
-                    ${chat.title}
+                    ◯ ${chat.title}
                 </span>
             `;
 
-            // فتح المحادثة عند الضغط
+            // فتح المحادثة عند الضغط عليها
             item.onclick =
                 function (e) {
 
                     e.stopPropagation();
 
-                    currentChat =
-                        chat;
+                    currentChat = chat;
 
                     renderChat();
 
-                    // إذا كانت القائمة الجانبية الموسعة مفتوحة
+                    // إغلاق الشريط الموسع إن كان مفتوحًا
                     if (expandedSidebar) {
 
                         expandedSidebar
                             .classList
-                            .remove(
-                                "open"
-                            );
+                            .remove("open");
 
                     }
 
+                    // إعادة أيقونة زر الشريط
                     if (sidebarToggleBtn) {
 
                         sidebarToggleBtn.innerHTML =
@@ -1327,9 +1318,7 @@ function renderSidebarChats() {
 
                 };
 
-            list.appendChild(
-                item
-            );
+            list.appendChild(item);
 
         });
 }
@@ -3504,8 +3493,7 @@ function renderChatList() {
 
 
     chats
-        .slice(0, 8)
-        .forEach(function (chat) {
+    .forEach(function (chat) {
 
             const item =
                 document.createElement(
