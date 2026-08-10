@@ -1242,7 +1242,7 @@ function renderExpandedProjects() {
 
 // ======================================
 // Sidebar — Recent Chats under New Chat
-// يعرض آخر 8 محادثات فقط للعرض السريع
+// نفس آخر 8 محادثات التي يعرضها نظام المحادثات
 // ======================================
 
 function renderSidebarChats() {
@@ -1257,7 +1257,7 @@ function renderSidebarChats() {
 
     list.innerHTML = "";
 
-    // لا توجد محادثات
+    // نفس منطق آخر 8 محادثات
     if (chats.length === 0) {
 
         list.innerHTML = `
@@ -1269,7 +1269,6 @@ function renderSidebarChats() {
         return;
     }
 
-    // عرض آخر 8 محادثات فقط
     chats
         .slice(0, 8)
         .forEach(function (chat) {
@@ -1281,38 +1280,45 @@ function renderSidebarChats() {
                 "recent-chat-item";
 
             item.innerHTML = `
+                ◯
                 <span>
-                    ◯ ${chat.title}
+                    ${chat.title}
                 </span>
             `;
 
-            // فتح المحادثة عند الضغط عليها
+            // فتح المحادثة عند الضغط
             item.onclick =
                 function (e) {
 
                     e.stopPropagation();
 
-                    currentChat = chat;
+                    currentChat =
+                        chat;
 
                     renderChat();
 
-                    // إغلاق الشريط الموسع إن كان مفتوحًا
-                    if (expandedSidebar) {
+                    // إغلاق القائمة المنسدلة إن كانت مفتوحة
+                    if (projectsPopup) {
 
-                        expandedSidebar
+                        projectsPopup
                             .classList
                             .remove("open");
 
                     }
 
-                    // إعادة أيقونة زر الشريط
-                    if (sidebarToggleBtn) {
+                    if (chatPopup) {
 
-                        sidebarToggleBtn.innerHTML =
-                            "☰";
+                        chatPopup
+                            .classList
+                            .remove("open");
 
-                        sidebarToggleBtn.title =
-                            "إظهار القائمة";
+                    }
+
+                    if (searchPopup) {
+
+                        searchPopup
+                            .classList
+                            .remove("open");
 
                     }
 
