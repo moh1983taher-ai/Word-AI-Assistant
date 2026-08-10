@@ -1371,6 +1371,24 @@ function createNewChat() {
     };
 
 
+    // إضافة المحادثة الجديدة مباشرة إلى القائمة
+    chats.unshift(
+        currentChat
+    );
+
+
+    saveChats();
+
+
+    // تحديث جميع قوائم المحادثات
+    renderChatList();
+
+    renderSidebarChats();
+
+    renderRecentChats();
+
+
+    // تنظيف مربع الإدخال
     if (input) {
 
         input.value =
@@ -1382,6 +1400,7 @@ function createNewChat() {
     }
 
 
+    // عرض شاشة المحادثة الجديدة
     if (chatArea) {
 
         chatArea.innerHTML = `
@@ -4383,21 +4402,22 @@ async function sendMessage() {
     }
 
 
-    if (currentChat.isTemporary) {
+        if (currentChat.isTemporary) {
 
-    currentChat.isTemporary = false;
+    currentChat.isTemporary =
+        false;
 
     currentChat.title =
         text.substring(0, 30);
 
-    chats.unshift(currentChat);
-
     saveChats();
 
-    // إظهار المحادثة الجديدة فورًا في القائمة الجانبية
     renderChatList();
+
     renderSidebarChats();
+
     renderRecentChats();
+
 }
 
 
