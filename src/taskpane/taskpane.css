@@ -71,12 +71,16 @@ body {
     background: transparent;
 
     color: #555;
+
     font-size: 16px;
 
     cursor: pointer;
+
     border-radius: 8px;
 
-    transition: 0.2s ease;
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
 }
 
 .side-icon:hover {
@@ -87,10 +91,6 @@ body {
 #search-btn {
     font-size: 24px;
     line-height: 1;
-    transform: scaleX(-1);
-}
-
-#search-btn:hover {
     transform: scaleX(-1);
 }
 
@@ -116,7 +116,7 @@ body {
 
     transform: translateX(-250px);
 
-    transition: 0.25s ease;
+    transition: transform 0.25s ease;
 
     z-index: 90;
 
@@ -155,10 +155,15 @@ body {
 
 
 /* =========================================================
-   4. LEVEL 1
+   4. THREE-LEVEL TYPOGRAPHY
+   ========================================================= */
+
+/*
+   المستوى الأول
+   ----------------
    العنوان الرئيسي:
    أدوات الباحث
-   ========================================================= */
+*/
 
 .expand-header {
     height: 55px;
@@ -171,25 +176,24 @@ body {
     font-size: 15px;
     font-weight: 700;
 
-    color: #333;
+    color: #222;
 
     border-bottom: 1px solid #eee;
 }
 
 
-/* =========================================================
-   5. LEVEL 2
-   عناوين الأقسام:
-   محادثة جديدة / المحادثات / المشاريع / المستندات / المراجع
-   ========================================================= */
-
 /*
-   هذه القاعدة موحدة لجميع عناوين الأقسام.
-   لا نستخدم قاعدة مختلفة لكل قسم.
+   المستوى الثاني
+   ----------------
+   عناوين الأقسام:
+   محادثة جديدة
+   المحادثات
+   المشاريع
+   المستندات
+   المراجع
 */
 
-.expand-section-header,
-.section-title {
+.expand-section-header {
     width: 100%;
     min-height: 40px;
 
@@ -207,36 +211,44 @@ body {
 
     background: transparent;
 
+    user-select: none;
+
     font-size: 14px;
     font-weight: 700;
-
-    user-select: none;
 
     transition:
         background 0.2s ease,
         color 0.2s ease;
 }
 
-.expand-section-header:hover,
-.section-title:hover {
+.expand-section-header:hover {
     background: #f3f3f3;
     color: #111;
 }
 
 
-/* =========================================================
-   عنوان القسم + الأيقونة
-   ========================================================= */
+/*
+   الأيقونة + اسم القسم
+*/
 
-.expand-section-title,
-.section-title {
+.expand-section-title {
     display: flex;
     align-items: center;
 
     gap: 9px;
 
     min-width: 0;
+
+    flex: 1;
+
+    font-size: 14px;
+    font-weight: 700;
 }
+
+
+/*
+   أيقونة القسم
+*/
 
 .section-icon {
     width: 20px;
@@ -254,9 +266,9 @@ body {
 }
 
 
-/* =========================================================
-   سهم الأقسام
-   ========================================================= */
+/*
+   السهم
+*/
 
 .section-arrow {
     width: 18px;
@@ -284,42 +296,128 @@ body {
     transition: transform 0.2s ease;
 }
 
-.expand-section.open .section-arrow,
-.section-title.open .section-arrow,
-.expand-item.open .section-arrow {
+.expand-section.open .section-arrow {
     transform: rotate(90deg);
 }
 
 
-/* =========================================================
-   6. LEVEL 3
-   العناصر التي تظهر تحت عناوين الأقسام
-   ========================================================= */
-
 /*
-   المستوى الثالث:
-   نفس الحجم تقريبًا للمستوى الثاني،
-   ولكن بدون Bold.
+   المستوى الثالث
+   ----------------
+   العناصر التي تظهر تحت المستوى الثاني.
+   
+   أصغر بصريًا + غير عريض + داخلة إلى اليمين
+   حتى يظهر بوضوح أنها فرع من القسم.
 */
 
-.expand-item,
-.expanded-project-item,
-.chat-history-item,
+.expand-section-content {
+    display: none;
+
+    width: 100%;
+
+    padding: 2px 0 5px 14px;
+
+    box-sizing: border-box;
+}
+
+.expand-section.open .expand-section-content {
+    display: block;
+}
+
+
+/* =========================================================
+   المستوى الثالث - العناصر العامة
+   ========================================================= */
+
+.expand-item {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+
+    width: calc(100% - 10px);
+
+    padding: 7px 10px;
+
+    margin: 2px 0;
+
+    border-radius: 7px;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #555;
+
+    cursor: pointer;
+
+    box-sizing: border-box;
+
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.expand-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+
+/*
+   أي عناصر فرعية أخرى تستخدم section-content
+*/
+
+.section-content {
+    display: none;
+
+    padding-left: 14px;
+}
+
+.section-content.open {
+    display: block;
+}
+
+.section-title,
+.expand-item {
+    position: relative;
+}
+
+
+/* =========================================================
+   5. NEW CHAT LIST
+   المستوى الثالث تحت "محادثة جديدة"
+   ========================================================= */
+
+#new-chat-list {
+    width: 100%;
+
+    padding: 2px 0 5px 14px;
+    margin: 0;
+
+    box-sizing: border-box;
+}
+
+
+/*
+   توحيد عناصر المستوى الثالث
+*/
+
 #new-chat-list .expanded-project-item,
 #new-chat-list .new-chat-item {
     display: flex;
     align-items: center;
 
-    padding: 8px 12px;
+    width: calc(100% - 10px);
 
-    margin: 4px 8px;
+    padding: 7px 10px;
+    margin: 2px 0;
 
-    border-radius: 8px;
+    border-radius: 7px;
 
     font-size: 13px;
     font-weight: 400;
-
-    line-height: 1.45;
 
     color: #555;
 
@@ -329,26 +427,17 @@ body {
 
     overflow: hidden;
 
-    position: relative;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
 }
 
-.expand-item:hover,
-.expanded-project-item:hover,
-.chat-history-item:hover,
 #new-chat-list .expanded-project-item:hover,
 #new-chat-list .new-chat-item:hover {
     background: #f3f3f3;
     color: #111;
 }
 
-
-/* =========================================================
-   المستوى الثالث - النص
-   ========================================================= */
-
-.expand-item span,
-.expanded-project-item span,
-.chat-history-item .chat-title,
 #new-chat-list .expanded-project-item span,
 #new-chat-list .new-chat-item span {
     overflow: hidden;
@@ -359,317 +448,12 @@ body {
 
     font-size: 13px;
     font-weight: 400;
-
-    line-height: 1.45;
 }
 
 
 /* =========================================================
-   7. SECTIONS
-   ========================================================= */
-
-.expand-section {
-    width: 100%;
-    margin: 0;
-    padding: 0;
-}
-
-.expand-section-content {
-    display: none;
-
-    width: 100%;
-
-    box-sizing: border-box;
-
-    padding: 0;
-}
-
-.expand-section.open .expand-section-content {
-    display: block;
-}
-
-.section-content {
-    display: none;
-}
-
-.section-content.open {
-    display: block;
-}
-
-
-/* =========================================================
-   8. MAIN
-   ========================================================= */
-
-.main {
-    height: 100vh;
-
-    margin-left: 52px;
-
-    display: flex;
-    flex-direction: column;
-}
-
-#document-title {
-    height: 45px;
-
-    border-bottom: 1px solid #eee;
-
-    display: flex;
-    align-items: center;
-
-    padding: 0 18px;
-
-    font-size: 13px;
-
-    color: #666;
-}
-
-
-/* =========================================================
-   9. CHAT AREA
-   ========================================================= */
-
-#chat-area {
-    flex: 1;
-
-    overflow-y: auto;
-
-    padding: 25px;
-}
-
-.welcome {
-    height: 100%;
-
-    display: flex;
-    flex-direction: column;
-
-    align-items: center;
-    justify-content: center;
-
-    text-align: center;
-
-    color: #666;
-}
-
-.ai-symbol {
-    font-size: 55px;
-
-    color: #444;
-
-    margin-bottom: 15px;
-}
-
-.welcome h2 {
-    font-size: 22px;
-
-    color: #222;
-
-    margin-bottom: 10px;
-}
-
-.welcome p {
-    font-size: 14px;
-}
-
-
-/* =========================================================
-   10. MESSAGES
-   ========================================================= */
-
-.message {
-    max-width: 80%;
-
-    padding: 12px 15px;
-
-    margin-bottom: 12px;
-
-    border-radius: 14px;
-
-    line-height: 1.6;
-
-    font-size: 14px;
-}
-
-.user-message {
-    background: #222;
-
-    color: #ffffff;
-
-    margin-left: auto;
-}
-
-.ai-message {
-    background: #f2f2f2;
-
-    color: #222;
-
-    margin-right: auto;
-}
-
-
-/* =========================================================
-   11. INPUT AREA
-   ========================================================= */
-
-.input-area {
-    min-height: 68px;
-    height: 68px;
-
-    border-top: 1px solid #eee;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    padding: 5px 10px 13px;
-}
-
-
-/* =========================================================
-   MESSAGE BOX
-   ========================================================= */
-
-.message-box {
-    width: calc(100% - 4px);
-    max-width: none;
-
-    height: 46px;
-    min-height: 46px;
-
-    display: flex;
-    align-items: center;
-
-    background: #ffffff;
-
-    border: 1px solid #d9d9d9;
-
-    border-radius: 23px;
-
-    padding: 2px 2px 2px 14px;
-
-    margin: 0 2px;
-
-    box-sizing: border-box;
-
-    box-shadow:
-        0 1px 3px rgba(0, 0, 0, 0.05);
-
-    transition:
-        border-color .2s ease,
-        box-shadow .2s ease,
-        height .15s ease;
-}
-
-.message-box:focus-within {
-    border-color: #b5b5b5;
-
-    box-shadow:
-        0 1px 5px rgba(0, 0, 0, 0.08);
-}
-
-
-/* =========================================================
-   12. TEXTAREA
-   ========================================================= */
-
-#user-input {
-    flex: 1;
-
-    width: 100%;
-
-    height: 38px;
-    min-height: 38px;
-    max-height: 140px;
-
-    resize: none;
-
-    border: none;
-    outline: none;
-
-    background: transparent;
-
-    padding: 8px 5px;
-
-    box-sizing: border-box;
-
-    font-size: 14px;
-    line-height: 1.45;
-
-    overflow-y: auto;
-}
-
-#user-input::placeholder {
-    color: #999;
-}
-
-
-/* =========================================================
-   13. SEND BUTTON
-   ========================================================= */
-
-#send-btn {
-    flex: 0 0 38px;
-
-    width: 38px;
-    height: 38px;
-
-    min-width: 38px;
-    min-height: 38px;
-
-    margin-left: auto;
-    margin-right: 0;
-
-    padding: 0;
-
-    border: none;
-
-    border-radius: 50%;
-
-    background: #222;
-
-    color: #fff;
-
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
-
-    cursor: pointer;
-
-    box-sizing: border-box;
-
-    transition:
-        background .2s ease,
-        transform .15s ease;
-}
-
-#send-btn:hover {
-    background: #111;
-    transform: scale(1.03);
-}
-
-#send-btn:active {
-    transform: scale(.94);
-}
-
-#send-btn svg {
-    width: 19px;
-    height: 19px;
-
-    fill: none;
-
-    stroke: currentColor;
-
-    stroke-width: 2.5;
-
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-
-/* =========================================================
-   14. CHAT LIST
+   6. CHAT LIST
+   المستوى الثالث تحت "المحادثات"
    ========================================================= */
 
 #chat-list {
@@ -678,8 +462,75 @@ body {
     overflow-y: auto;
     overflow-x: hidden;
 
-    padding: 2px 2px 8px 0;
+    padding: 2px 2px 8px 14px;
 }
+
+.chat-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    width: calc(100% - 10px);
+
+    padding: 7px 10px;
+
+    margin: 2px 0;
+
+    border-radius: 7px;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    cursor: pointer;
+
+    color: #555;
+
+    position: relative;
+
+    box-sizing: border-box;
+
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.chat-history-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+.chat-title {
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+
+    flex: 1;
+
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.chat-menu {
+    border: none;
+    background: none;
+
+    font-size: 18px;
+
+    cursor: pointer;
+
+    color: #777;
+}
+
+.chat-menu:hover {
+    color: #111;
+}
+
+
+/* =========================================================
+   CHAT LIST SCROLLBAR
+   ========================================================= */
 
 #chat-list::-webkit-scrollbar {
     width: 6px;
@@ -700,415 +551,24 @@ body {
 
 
 /* =========================================================
-   15. CHAT HISTORY
+   7. PROJECTS
    ========================================================= */
 
-.chat-title {
-    flex: 1;
-
-    overflow: hidden;
-
-    white-space: nowrap;
-
-    text-overflow: ellipsis;
-
-    font-size: 13px;
-    font-weight: 400;
-}
-
-.chat-menu {
-    border: none;
-
-    background: none;
-
-    font-size: 18px;
-
-    cursor: pointer;
-
-    color: #777;
-}
-
-.chat-menu:hover {
-    color: #111;
-}
-
-
-/* =========================================================
-   16. CHAT OPTIONS
-   ========================================================= */
-
-.chat-options,
-.chat-options-menu {
-    position: absolute;
-
-    background: #ffffff;
-
-    border: 1px solid #ddd;
-
-    border-radius: 10px;
-
-    box-shadow:
-        0 4px 15px rgba(0, 0, 0, 0.15);
-
-    z-index: 50000;
-
-    overflow: hidden;
-}
-
-.chat-options {
-    right: 10px;
-    top: 35px;
-
-    width: 130px;
-}
-
-.chat-options-menu {
-    right: 35px;
-    top: 5px;
-
-    width: 140px;
-
-    display: none;
-}
-
-.chat-options-menu.open {
-    display: block;
-}
-
-.chat-option,
-.chat-options-menu div {
-    padding: 10px 12px;
-
-    font-size: 13px;
-    font-weight: 400;
-
-    color: #444;
-
-    cursor: pointer;
-}
-
-.chat-option:hover,
-.chat-options-menu div:hover {
-    background: #f3f3f3;
-}
-
-
-/* =========================================================
-   17. CHAT ACTION MENU
-   ========================================================= */
-
-.chat-action-menu {
-    position: fixed;
-
-    right: 70px;
-    top: 200px;
-
-    width: 150px;
-
-    background: #ffffff;
-
-    border: 1px solid #ddd;
-
-    border-radius: 10px;
-
-    box-shadow:
-        0 5px 20px rgba(0, 0, 0, 0.15);
-
-    z-index: 90000;
-
-    overflow: hidden;
-}
-
-.chat-action-menu div {
-    padding: 12px;
-
-    cursor: pointer;
-
-    font-size: 13px;
-}
-
-.chat-action-menu div:hover {
-    background: #f5f5f5;
-}
-
-
-/* =========================================================
-   18. CHAT RENAME / DELETE
-   ========================================================= */
-
-.rename-chat,
-.delete-chat {
-    padding: 10px 12px;
-
-    font-size: 13px;
-    font-weight: 400;
-
-    color: #444;
-
-    cursor: pointer;
-
-    display: flex;
-
-    align-items: center;
-
-    gap: 8px;
-
-    position: relative;
-
-    z-index: 100000;
-}
-
-.rename-chat:hover,
-.delete-chat:hover {
-    background: #f3f3f3;
-}
-
-
-/* =========================================================
-   19. CHAT POPUP
-   مستقلة عن صندوق المراسلة
-   ========================================================= */
-
-#chat-popup {
-    display: none;
-
-    position: fixed;
-
-    top: 60px;
-    left: 70px;
-
-    width: 235px;
-
-    max-width: calc(100vw - 90px);
-
-    max-height: calc(100vh - 80px);
-
-    background: #ffffff;
-
-    border-radius: 12px;
-
-    box-shadow:
-        0 5px 25px rgba(0, 0, 0, 0.2);
-
-    z-index: 40000;
-
-    overflow: visible;
-}
-
-#chat-popup.open {
-    display: block;
-}
-
-.chat-popup-header {
-    padding: 12px;
-
-    font-size: 14px;
-    font-weight: 700;
-
-    border-bottom: 1px solid #eee;
-}
-
-.recent-chat-item {
-    padding: 9px 12px;
-
-    font-size: 13px;
-    font-weight: 400;
-
-    cursor: pointer;
-
-    border-bottom: none;
-
-    border-radius: 7px;
-
-    margin: 2px 6px;
-}
-
-.recent-chat-item:hover {
-    background: #f5f5f5;
-}
-
-.empty-chat {
-    padding: 15px;
-
-    font-size: 13px;
-
-    color: #777;
-}
-
-
-/* =========================================================
-   20. CHAT POPUP - BOTTOM PROTECTION
-   ========================================================= */
-
-.chat-options-menu.open-up {
-    top: auto;
-    bottom: 5px;
-}
-
-.chat-options {
-    max-height: calc(100vh - 20px);
-}
-
-
-/* =========================================================
-   21. SEARCH POPUP
-   نفس موقع وحجم النوافذ الجانبية الأخرى
-   ========================================================= */
-
-.search-popup {
-    position: fixed;
-
-    top: 60px;
-    left: 70px;
-
-    width: 235px;
-
-    max-width: calc(100vw - 90px);
-
-    max-height: calc(100vh - 80px);
-
-    background: #ffffff;
-
-    border: 1px solid #e2e2e2;
-
-    border-radius: 12px;
-
-    box-shadow:
-        0 5px 25px rgba(0, 0, 0, 0.15);
-
-    padding: 8px;
-
-    display: none;
-
-    z-index: 5000;
-
-    overflow: visible;
-}
-
-.search-popup.open {
-    display: block;
-}
-
-
-/* =========================================================
-   SEARCH INPUT
-   ========================================================= */
-
-#search-input {
-    width: 100%;
-    height: 40px;
-
-    box-sizing: border-box;
-
-    padding: 8px 11px;
-
-    border: 1px solid #d8d8d8;
-
-    border-radius: 9px;
-
-    outline: none;
-
-    background: #ffffff;
-
-    color: #222;
-
-    font-size: 13px;
-
-    direction: rtl;
-    text-align: right;
-
-    transition:
-        border-color .2s ease,
-        box-shadow .2s ease;
-}
-
-#search-input:focus {
-    border-color: #999;
-
-    box-shadow:
-        0 0 0 2px rgba(0, 0, 0, 0.04);
-}
-
-
-/* =========================================================
-   SEARCH RESULTS
-   ========================================================= */
-
-#search-results {
-    margin-top: 8px;
-
-    max-height: calc(100vh - 145px);
-
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    direction: rtl;
-}
-
-.search-result-item {
-    padding: 8px 10px;
-
-    margin-bottom: 2px;
-
-    border-radius: 8px;
-
-    cursor: pointer;
-
-    font-size: 13px;
-    font-weight: 400;
-
-    line-height: 1.45;
-
-    color: #444;
-
-    direction: rtl;
-    text-align: right;
-
-    transition:
-        background .15s ease,
-        color .15s ease;
-}
-
-.search-result-item:hover {
-    background: #f3f3f3;
-    color: #111;
-}
-
-#search-results::-webkit-scrollbar {
-    width: 6px;
-}
-
-#search-results::-webkit-scrollbar-thumb {
-    background: #c8c8c8;
-    border-radius: 10px;
-}
-
-#search-results::-webkit-scrollbar-thumb:hover {
-    background: #aaa;
-}
-
-#search-results::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-
-/* =========================================================
-   22. PROJECTS POPUP
-   ========================================================= */
+/*
+   نافذة المشاريع:
+   تبقى نافذة مستقلة ولا تقص القوائم المنبثقة.
+*/
 
 .projects-popup {
     display: none;
 
-    position: fixed;
+    position: absolute;
 
     top: 60px;
     left: 70px;
 
-    width: 235px;
-
+    width: 260px;
     max-width: calc(100vw - 90px);
-
-    max-height: calc(100vh - 80px);
 
     background: #ffffff;
 
@@ -1116,8 +576,7 @@ body {
 
     padding: 8px;
 
-    box-shadow:
-        0 5px 25px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 
     z-index: 1000;
 
@@ -1130,44 +589,153 @@ body {
 
 
 /* =========================================================
-   PROJECTS LIST
+   PROJECTS HEADER
    ========================================================= */
 
-#projects-list,
-#expanded-projects-list {
-    max-height: calc(100vh - 145px);
-
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    padding: 2px 2px 8px 0;
-}
-
-
-/* =========================================================
-   PROJECT HEADER
-   ========================================================= */
+/*
+   عنوان المشاريع في النافذة المنبثقة.
+   زر + يكون في نفس السطر مع العنوان.
+*/
 
 .projects-header {
-    padding: 9px 10px;
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    min-height: 40px;
+
+    padding: 5px 8px;
 
     font-size: 14px;
     font-weight: 700;
+
+    color: #333;
 }
 
-.projects-header span,
-.project-item span {
+.projects-header span {
     display: flex;
 
     align-items: center;
 
     gap: 8px;
+
+    font-size: 14px;
+    font-weight: 700;
+}
+
+
+/*
+   زر إضافة مشروع
+   إذا كان موجودًا بهذا الـID أو الـclass
+   سيظهر في مكانه الطبيعي بجوار العنوان.
+*/
+
+#add-project,
+.add-project,
+.project-add-btn {
+    width: 30px;
+    height: 30px;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border: none;
+
+    border-radius: 7px;
+
+    background: transparent;
+
+    color: #555;
+
+    font-size: 20px;
+    font-weight: 400;
+
+    cursor: pointer;
+
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+#add-project:hover,
+.add-project:hover,
+.project-add-btn:hover {
+    background: #f3f3f3;
+    color: #111;
 }
 
 
 /* =========================================================
-   PROJECT ITEMS
+   PROJECTS LIST
    ========================================================= */
+
+#projects-list {
+    max-height: calc(100vh - 145px);
+
+    overflow-y: auto;
+    overflow-x: visible;
+
+    padding: 2px 2px 8px 0;
+}
+
+#expanded-projects-list {
+    padding-left: 14px;
+}
+
+
+/*
+   أسماء المشاريع داخل القائمة الجانبية
+   مستوى ثالث: أصغر وغير عريض.
+*/
+
+.expanded-project-item {
+    display: flex;
+    align-items: center;
+
+    width: calc(100% - 10px);
+
+    padding: 7px 10px;
+
+    margin: 2px 0;
+
+    border-radius: 7px;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #555;
+
+    cursor: pointer;
+
+    box-sizing: border-box;
+
+    overflow: hidden;
+
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.expanded-project-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+.expanded-project-item span {
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+
+    font-size: 13px;
+    font-weight: 400;
+}
 
 .project-item {
     display: flex;
@@ -1175,9 +743,7 @@ body {
     align-items: center;
     justify-content: space-between;
 
-    padding: 8px 10px;
-
-    margin: 2px 0;
+    padding: 10px;
 
     cursor: pointer;
 
@@ -1187,12 +753,31 @@ body {
 
     font-size: 13px;
     font-weight: 400;
-
-    color: #555;
 }
 
 .project-item:hover {
     background: #f4f4f4;
+}
+
+.project-item span {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.folder-icon {
+    display: inline-flex;
+
+    align-items: center;
+
+    margin-left: 6px;
+
+    color: #555;
 }
 
 .project-menu {
@@ -1211,19 +796,9 @@ body {
     color: #111;
 }
 
-.folder-icon {
-    display: inline-flex;
-
-    align-items: center;
-
-    margin-left: 6px;
-
-    color: #555;
-}
-
 
 /* =========================================================
-   PROJECT OPTIONS MENU
+   8. PROJECT OPTIONS MENU
    ========================================================= */
 
 .project-options-menu {
@@ -1234,14 +809,15 @@ body {
 
     width: 140px;
 
+    max-height: calc(100vh - 20px);
+
     background: #ffffff;
 
     border: 1px solid #ddd;
 
     border-radius: 10px;
 
-    box-shadow:
-        0 4px 15px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
 
     display: none;
 
@@ -1259,19 +835,17 @@ body {
     bottom: 5px;
 }
 
-.project-options-menu div {
+.project-options-menu div,
+.rename-project,
+.delete-project {
     padding: 10px 12px;
-
-    cursor: pointer;
 
     font-size: 13px;
     font-weight: 400;
 
     color: #444;
-}
 
-.project-options-menu div:hover {
-    background: #f3f3f3;
+    cursor: pointer;
 }
 
 .rename-project,
@@ -1282,20 +856,12 @@ body {
 
     gap: 8px;
 
-    padding: 10px 12px;
-
-    font-size: 13px;
-    font-weight: 400;
-
-    color: #444;
-
-    cursor: pointer;
-
     position: relative;
 
     z-index: 100000;
 }
 
+.project-options-menu div:hover,
 .rename-project:hover,
 .delete-project:hover {
     background: #f3f3f3;
@@ -1303,7 +869,7 @@ body {
 
 
 /* =========================================================
-   23. NEW PROJECT BOX
+   9. NEW PROJECT BOX
    ========================================================= */
 
 .project-create-box {
@@ -1330,15 +896,12 @@ body {
 
     padding: 15px;
 
-    box-shadow:
-        0 8px 25px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
 }
 
 .project-create-box input {
     width: 100%;
     height: 40px;
-
-    box-sizing: border-box;
 
     padding: 10px;
 
@@ -1389,59 +952,184 @@ body {
 
 
 /* =========================================================
-   24. NEW CHAT LIST
+   10. CHAT OPTIONS MENUS
    ========================================================= */
 
-#new-chat-list {
-    width: 100%;
+.chat-options-menu {
+    position: absolute;
 
-    padding: 0;
-    margin: 0;
-}
+    right: 35px;
+    top: 5px;
 
+    width: 140px;
 
-/*
-   عناصر المستوى الثالث داخل محادثة جديدة
-   تستخدم نفس قاعدة المستوى الثالث.
-*/
+    max-height: calc(100vh - 20px);
 
-#new-chat-list .expanded-project-item,
-#new-chat-list .new-chat-item {
-    padding: 8px 12px;
+    background: #ffffff;
 
-    margin: 4px 8px;
+    border: 1px solid #ddd;
 
-    font-size: 13px;
-    font-weight: 400;
-}
+    border-radius: 10px;
 
-#new-chat-list .expanded-project-item span,
-#new-chat-list .new-chat-item span {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+
+    display: none;
+
+    z-index: 50000;
+
     overflow: hidden;
+}
 
-    white-space: nowrap;
+.chat-options-menu.open {
+    display: block;
+}
 
-    text-overflow: ellipsis;
+.chat-options-menu.open-up {
+    top: auto;
+    bottom: 5px;
+}
+
+.chat-options-menu div,
+.rename-chat,
+.delete-chat {
+    padding: 10px 12px;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #444;
+
+    cursor: pointer;
+}
+
+.rename-chat,
+.delete-chat {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    position: relative;
+
+    z-index: 100000;
+}
+
+.chat-options-menu div:hover,
+.rename-chat:hover,
+.delete-chat:hover {
+    background: #f3f3f3;
+}
+
+
+/* =========================================================
+   11. CHAT POPUP
+   نافذة مستقلة عن صندوق المراسلة
+   ========================================================= */
+
+#chat-popup {
+    display: none;
+
+    position: fixed;
+
+    top: 60px;
+    left: 70px;
+
+    width: 260px;
+    max-width: calc(100vw - 90px);
+
+    max-height: calc(100vh - 80px);
+
+    background: #ffffff;
+
+    border-radius: 12px;
+
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+
+    z-index: 40000;
+
+    overflow: hidden;
+}
+
+#chat-popup.open {
+    display: block;
+}
+
+.chat-popup-header {
+    padding: 12px;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    border-bottom: 1px solid #eee;
+}
+
+.recent-chat-item {
+    padding: 10px 12px;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    cursor: pointer;
+
+    border: none;
+}
+
+.recent-chat-item:hover {
+    background: #f5f5f5;
+}
+
+.empty-chat {
+    padding: 15px;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #777;
+}
+
+
+/* =========================================================
+   12. CHAT ACTION MENU
+   ========================================================= */
+
+.chat-action-menu {
+    position: fixed;
+
+    right: 70px;
+    top: 200px;
+
+    width: 150px;
+
+    background: #ffffff;
+
+    border: 1px solid #ddd;
+
+    border-radius: 10px;
+
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+
+    z-index: 90000;
+
+    overflow: hidden;
+}
+
+.chat-action-menu div {
+    padding: 12px;
+
+    cursor: pointer;
 
     font-size: 13px;
     font-weight: 400;
 }
 
-
-/* =========================================================
-   25. NEW CHAT ICONS
-   ========================================================= */
-
-.new-chat-icon,
-.new-chat-pencil {
-    display: inline-block;
-
-    transform: scaleX(-1);
+.chat-action-menu div:hover {
+    background: #f5f5f5;
 }
 
 
 /* =========================================================
-   26. CHAT DELETE CONFIRMATION
+   13. DELETE CONFIRMATION
    ========================================================= */
 
 .delete-confirm,
@@ -1468,12 +1156,8 @@ body {
     position: relative;
 
     width: 320px;
-
     max-width: calc(100vw - 30px);
-
     max-height: calc(100vh - 30px);
-
-    overflow-y: auto;
 
     background: #ffffff;
 
@@ -1483,10 +1167,11 @@ body {
 
     border-radius: 12px;
 
-    box-shadow:
-        0 5px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
 
     text-align: center;
+
+    overflow-y: auto;
 
     z-index: 1000000;
 }
@@ -1539,18 +1224,428 @@ body {
 
 
 /* =========================================================
-   27. RENAME DIALOG
+   14. SEARCH POPUP
+   نفس نمط ومكان النوافذ المنبثقة الأخرى
    ========================================================= */
 
-.rename-dialog {
-    max-height: calc(100vh - 30px);
+.search-popup {
+    position: fixed;
 
-    overflow-y: auto;
+    top: 60px;
+    left: 70px;
+
+    width: 260px;
+    max-width: calc(100vw - 90px);
+
+    max-height: calc(100vh - 80px);
+
+    background: #ffffff;
+
+    border: 1px solid #e2e2e2;
+
+    border-radius: 12px;
+
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+
+    padding: 10px;
+
+    display: none;
+
+    z-index: 5000;
+
+    overflow: hidden;
+}
+
+.search-popup.open {
+    display: block;
 }
 
 
 /* =========================================================
-   28. GLOBAL SCROLLBAR
+   SEARCH INPUT
+   ========================================================= */
+
+#search-input {
+    width: 100%;
+    height: 40px;
+
+    padding: 9px 12px;
+
+    border: 1px solid #d8d8d8;
+
+    border-radius: 9px;
+
+    outline: none;
+
+    background: #ffffff;
+    color: #222;
+
+    font-size: 13px;
+
+    direction: rtl;
+    text-align: right;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+#search-input:focus {
+    border-color: #999;
+
+    box-shadow:
+        0 0 0 2px rgba(0, 0, 0, 0.04);
+}
+
+
+/* =========================================================
+   SEARCH RESULTS
+   ========================================================= */
+
+#search-results {
+    margin-top: 8px;
+
+    max-height: calc(100vh - 145px);
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    direction: rtl;
+}
+
+.search-result-item {
+    padding: 8px 10px;
+
+    margin-bottom: 2px;
+
+    border-radius: 7px;
+
+    cursor: pointer;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    line-height: 1.5;
+
+    color: #444;
+
+    direction: rtl;
+    text-align: right;
+
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.search-result-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+#search-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+#search-results::-webkit-scrollbar-thumb {
+    background: #c8c8c8;
+    border-radius: 10px;
+}
+
+#search-results::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+}
+
+#search-results::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+
+/* =========================================================
+   15. MAIN
+   ========================================================= */
+
+.main {
+    height: 100vh;
+
+    margin-left: 52px;
+
+    display: flex;
+    flex-direction: column;
+}
+
+#document-title {
+    height: 45px;
+
+    border-bottom: 1px solid #eee;
+
+    display: flex;
+    align-items: center;
+
+    padding: 0 18px;
+
+    font-size: 13px;
+
+    color: #666;
+}
+
+
+/* =========================================================
+   16. CHAT AREA
+   ========================================================= */
+
+#chat-area {
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding: 25px;
+}
+
+.welcome {
+    height: 100%;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+
+    color: #666;
+}
+
+.ai-symbol {
+    font-size: 55px;
+
+    color: #444;
+
+    margin-bottom: 15px;
+}
+
+.welcome h2 {
+    font-size: 22px;
+
+    color: #222;
+
+    margin-bottom: 10px;
+}
+
+.welcome p {
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   17. MESSAGES
+   ========================================================= */
+
+.message {
+    max-width: 80%;
+
+    padding: 12px 15px;
+
+    margin-bottom: 12px;
+
+    border-radius: 14px;
+
+    line-height: 1.6;
+
+    font-size: 14px;
+}
+
+.user-message {
+    background: #222;
+
+    color: #ffffff;
+
+    margin-left: auto;
+}
+
+.ai-message {
+    background: #f2f2f2;
+
+    color: #222;
+
+    margin-right: auto;
+}
+
+
+/* =========================================================
+   18. INPUT AREA
+   ========================================================= */
+
+.input-area {
+    min-height: 68px;
+    height: 68px;
+
+    border-top: 1px solid #eee;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 5px 10px 13px;
+}
+
+
+/* =========================================================
+   MESSAGE BOX
+   ========================================================= */
+
+.message-box {
+    width: calc(100% - 4px);
+    max-width: none;
+
+    height: 46px;
+    min-height: 46px;
+
+    display: flex;
+    align-items: center;
+
+    background: #ffffff;
+
+    border: 1px solid #d9d9d9;
+
+    border-radius: 23px;
+
+    padding: 2px 2px 2px 14px;
+
+    margin: 0 2px;
+
+    box-sizing: border-box;
+
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.05);
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        height 0.15s ease;
+}
+
+.message-box:focus-within {
+    border-color: #b5b5b5;
+
+    box-shadow:
+        0 1px 5px rgba(0, 0, 0, 0.08);
+}
+
+
+/* =========================================================
+   TEXTAREA
+   ========================================================= */
+
+#user-input {
+    flex: 1;
+
+    width: 100%;
+
+    height: 38px;
+    min-height: 38px;
+    max-height: 140px;
+
+    resize: none;
+
+    border: none;
+    outline: none;
+
+    background: transparent;
+
+    padding: 8px 5px;
+
+    box-sizing: border-box;
+
+    font-size: 14px;
+    line-height: 1.45;
+
+    overflow-y: auto;
+}
+
+#user-input::placeholder {
+    color: #999;
+}
+
+
+/* =========================================================
+   SEND BUTTON
+   ========================================================= */
+
+#send-btn {
+    flex: 0 0 38px;
+
+    width: 38px;
+    height: 38px;
+
+    min-width: 38px;
+    min-height: 38px;
+
+    margin-left: auto;
+    margin-right: 0;
+
+    padding: 0;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background: #222;
+
+    color: #fff;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+
+    box-sizing: border-box;
+
+    transition:
+        background 0.2s ease,
+        transform 0.15s ease;
+}
+
+#send-btn:hover {
+    background: #111;
+    transform: scale(1.03);
+}
+
+#send-btn:active {
+    transform: scale(0.94);
+}
+
+#send-btn svg {
+    width: 19px;
+    height: 19px;
+
+    fill: none;
+
+    stroke: currentColor;
+
+    stroke-width: 2.5;
+
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+
+/* =========================================================
+   19. CHAT ICONS
+   ========================================================= */
+
+.new-chat-icon,
+.new-chat-pencil {
+    display: inline-block;
+
+    transform: scaleX(-1);
+}
+
+
+/* =========================================================
+   20. GLOBAL SCROLLBAR
    ========================================================= */
 
 ::-webkit-scrollbar {
@@ -1573,7 +1668,7 @@ body {
 
 
 /* =========================================================
-   29. AI SETTINGS WINDOW
+   21. AI SETTINGS WINDOW
    ========================================================= */
 
 #settings-window {
@@ -1604,7 +1699,6 @@ body {
     z-index: 10000;
 
     opacity: 0;
-
     visibility: hidden;
 
     pointer-events: none;
@@ -1622,8 +1716,7 @@ body {
 
     pointer-events: auto;
 
-    transform:
-        translate(-50%, -50%);
+    transform: translate(-50%, -50%);
 }
 
 
@@ -1641,18 +1734,15 @@ body {
 
     padding: 0 18px;
 
-    background:
-        var(--panel-header-bg, #f7f8fa);
+    background: var(--panel-header-bg, #f7f8fa);
 
     border-bottom:
         1px solid var(--border-color, #e2e5e9);
 
     font-size: 16px;
-
     font-weight: 700;
 
-    color:
-        var(--text-color, #202124);
+    color: var(--text-color, #202124);
 
     direction: rtl;
 }
@@ -1677,11 +1767,9 @@ body {
 
     background: transparent;
 
-    color:
-        var(--muted-text, #6b7280);
+    color: var(--muted-text, #6b7280);
 
     font-size: 23px;
-
     line-height: 1;
 
     cursor: pointer;
@@ -1697,11 +1785,9 @@ body {
 }
 
 #close-settings:hover {
-    background:
-        rgba(0, 0, 0, 0.07);
+    background: rgba(0, 0, 0, 0.07);
 
-    color:
-        var(--text-color, #202124);
+    color: var(--text-color, #202124);
 }
 
 
@@ -1712,15 +1798,12 @@ body {
 #settings-window > label {
     display: block;
 
-    margin:
-        17px 20px 7px;
+    margin: 17px 20px 7px;
 
     font-size: 13px;
-
     font-weight: 600;
 
-    color:
-        var(--text-color, #30343b);
+    color: var(--text-color, #30343b);
 
     text-align: right;
 
@@ -1735,27 +1818,22 @@ body {
 #provider-select {
     display: block;
 
-    width:
-        calc(100% - 40px);
+    width: calc(100% - 40px);
 
     height: 42px;
 
-    margin:
-        0 20px;
+    margin: 0 20px;
 
-    padding:
-        0 12px;
+    padding: 0 12px;
 
     border:
         1px solid var(--border-color, #d9dde3);
 
     border-radius: 9px;
 
-    background:
-        var(--input-bg, #ffffff);
+    background: var(--input-bg, #ffffff);
 
-    color:
-        var(--text-color, #202124);
+    color: var(--text-color, #202124);
 
     font-size: 14px;
 
@@ -1787,21 +1865,18 @@ body {
 
     align-items: center;
 
-    width:
-        calc(100% - 40px);
+    width: calc(100% - 40px);
 
     height: 42px;
 
-    margin:
-        0 20px;
+    margin: 0 20px;
 
     border:
         1px solid var(--border-color, #d9dde3);
 
     border-radius: 9px;
 
-    background:
-        var(--input-bg, #ffffff);
+    background: var(--input-bg, #ffffff);
 
     overflow: hidden;
 
@@ -1825,27 +1900,22 @@ body {
     height: 100%;
 
     border: none;
-
     outline: none;
 
     background: transparent;
 
-    padding:
-        0 12px;
+    padding: 0 12px;
 
-    color:
-        var(--text-color, #202124);
+    color: var(--text-color, #202124);
 
     font-size: 13px;
 
     direction: ltr;
-
     text-align: left;
 }
 
 #api-key::placeholder {
-    color:
-        var(--muted-text, #9aa0a6);
+    color: var(--muted-text, #9aa0a6);
 }
 
 #show-key {
@@ -1863,8 +1933,7 @@ body {
 
     font-size: 16px;
 
-    color:
-        var(--muted-text, #6b7280);
+    color: var(--muted-text, #6b7280);
 
     display: flex;
 
@@ -1873,8 +1942,7 @@ body {
 }
 
 #show-key:hover {
-    background:
-        rgba(0, 0, 0, 0.045);
+    background: rgba(0, 0, 0, 0.045);
 }
 
 
@@ -1889,13 +1957,11 @@ body {
 
     gap: 8px;
 
-    width:
-        calc(100% - 40px);
+    width: calc(100% - 40px);
 
     height: 42px;
 
-    margin:
-        0 20px;
+    margin: 0 20px;
 }
 
 #model-select {
@@ -1905,19 +1971,16 @@ body {
 
     height: 42px;
 
-    padding:
-        0 10px;
+    padding: 0 10px;
 
     border:
         1px solid var(--border-color, #d9dde3);
 
     border-radius: 9px;
 
-    background:
-        var(--input-bg, #ffffff);
+    background: var(--input-bg, #ffffff);
 
-    color:
-        var(--text-color, #202124);
+    color: var(--text-color, #202124);
 
     font-size: 13px;
 
@@ -1946,11 +2009,9 @@ body {
 
     border-radius: 9px;
 
-    background:
-        var(--input-bg, #ffffff);
+    background: var(--input-bg, #ffffff);
 
-    color:
-        var(--text-color, #50555c);
+    color: var(--text-color, #50555c);
 
     font-size: 19px;
 
@@ -1968,16 +2029,13 @@ body {
 }
 
 #refresh-models:hover {
-    background:
-        var(--hover-bg, #f3f4f6);
+    background: var(--hover-bg, #f3f4f6);
 
-    border-color:
-        #c5cad1;
+    border-color: #c5cad1;
 }
 
 #refresh-models:active {
-    transform:
-        rotate(-25deg);
+    transform: rotate(-25deg);
 }
 
 #refresh-models:disabled {
@@ -1994,22 +2052,18 @@ body {
    ========================================================= */
 
 #provider-info {
-    margin:
-        16px 20px 0;
+    margin: 16px 20px 0;
 
-    padding:
-        11px 12px;
+    padding: 11px 12px;
 
     border-radius: 9px;
 
-    background:
-        var(--info-bg, #f5f7fa);
+    background: var(--info-bg, #f5f7fa);
 
     border:
         1px solid var(--border-color, #e5e7eb);
 
-    color:
-        var(--muted-text, #6b7280);
+    color: var(--muted-text, #6b7280);
 
     font-size: 12px;
 
@@ -2030,8 +2084,7 @@ body {
 
     gap: 9px;
 
-    margin:
-        18px 20px 0;
+    margin: 18px 20px 0;
 }
 
 .settings-buttons button {
@@ -2042,7 +2095,6 @@ body {
     border-radius: 9px;
 
     font-size: 13px;
-
     font-weight: 600;
 
     cursor: pointer;
@@ -2057,40 +2109,31 @@ body {
     border:
         1px solid var(--border-color, #d9dde3);
 
-    background:
-        var(--input-bg, #ffffff);
+    background: var(--input-bg, #ffffff);
 
-    color:
-        var(--text-color, #30343b);
+    color: var(--text-color, #30343b);
 }
 
 #test-connection:hover {
-    background:
-        var(--hover-bg, #f3f4f6);
+    background: var(--hover-bg, #f3f4f6);
 }
 
 #save-settings {
-    border:
-        1px solid #30343b;
+    border: 1px solid #30343b;
 
-    background:
-        #30343b;
+    background: #30343b;
 
-    color:
-        #ffffff;
+    color: #ffffff;
 }
 
 #save-settings:hover {
-    background:
-        #202124;
+    background: #202124;
 
-    border-color:
-        #202124;
+    border-color: #202124;
 }
 
 .settings-buttons button:active {
-    transform:
-        translateY(1px);
+    transform: translateY(1px);
 }
 
 .settings-buttons button:disabled {
@@ -2107,8 +2150,7 @@ body {
 #settings-status {
     min-height: 20px;
 
-    margin:
-        12px 20px 18px;
+    margin: 12px 20px 18px;
 
     font-size: 12px;
 
@@ -2118,22 +2160,19 @@ body {
 
     direction: rtl;
 
-    color:
-        var(--muted-text, #6b7280);
+    color: var(--muted-text, #6b7280);
 }
 
 
 /* =========================================================
-   30. DARK MODE
+   22. DARK MODE - SETTINGS
    ========================================================= */
 
 body.dark #settings-window,
 .dark #settings-window {
-    background:
-        var(--panel-bg, #202124);
+    background: var(--panel-bg, #202124);
 
-    border-color:
-        var(--border-color, #3a3d42);
+    border-color: var(--border-color, #3a3d42);
 
     box-shadow:
         0 18px 50px rgba(0, 0, 0, 0.45);
@@ -2141,14 +2180,11 @@ body.dark #settings-window,
 
 body.dark #settings-header,
 .dark #settings-header {
-    background:
-        var(--panel-header-bg, #292b2f);
+    background: var(--panel-header-bg, #292b2f);
 
-    border-bottom-color:
-        var(--border-color, #3a3d42);
+    border-bottom-color: var(--border-color, #3a3d42);
 
-    color:
-        var(--text-color, #f1f3f4);
+    color: var(--text-color, #f1f3f4);
 }
 
 body.dark #provider-select,
@@ -2157,59 +2193,110 @@ body.dark #model-select,
 .dark #provider-select,
 .dark #api-key,
 .dark #model-select {
-    background:
-        var(--input-bg, #292b2f);
+    background: var(--input-bg, #292b2f);
 
-    color:
-        var(--text-color, #f1f3f4);
+    color: var(--text-color, #f1f3f4);
 
-    border-color:
-        var(--border-color, #41444a);
+    border-color: var(--border-color, #41444a);
 }
 
 body.dark .key-box,
 .dark .key-box {
-    background:
-        var(--input-bg, #292b2f);
+    background: var(--input-bg, #292b2f);
 
-    border-color:
-        var(--border-color, #41444a);
+    border-color: var(--border-color, #41444a);
 }
 
 body.dark #refresh-models,
 body.dark #test-connection,
 .dark #refresh-models,
 .dark #test-connection {
-    background:
-        var(--input-bg, #292b2f);
+    background: var(--input-bg, #292b2f);
 
-    color:
-        var(--text-color, #f1f3f4);
+    color: var(--text-color, #f1f3f4);
 
-    border-color:
-        var(--border-color, #41444a);
+    border-color: var(--border-color, #41444a);
 }
 
 body.dark #provider-info,
 .dark #provider-info {
-    background:
-        var(--info-bg, #292b2f);
+    background: var(--info-bg, #292b2f);
 
-    border-color:
-        var(--border-color, #41444a);
+    border-color: var(--border-color, #41444a);
 
-    color:
-        var(--muted-text, #aeb4bd);
+    color: var(--muted-text, #aeb4bd);
 }
 
 body.dark #save-settings,
 .dark #save-settings {
-    background:
-        #f1f3f4;
+    background: #f1f3f4;
 
-    color:
-        #202124;
+    color: #202124;
 
-    border-color:
-        #f1f3f4;
+    border-color: #f1f3f4;
 }
+
+
+/* =========================================================
+   23. SAFETY FOR POPUPS NEAR BOTTOM
+   ========================================================= */
+
+.projects-popup,
+.chat-popup {
+    overflow: visible;
+}
+
+.rename-dialog {
+    max-height: calc(100vh - 30px);
+
+    overflow-y: auto;
+}
+
+
+/* =========================================================
+   24. POPUP OPEN-UP BEHAVIOR
+   ========================================================= */
+
+.project-options-menu.open-up,
+.chat-options-menu.open-up {
+    top: auto;
+
+    bottom: 5px;
+}
+
+
+/* =========================================================
+   25. POPUP FONT UNIFICATION
+   ========================================================= */
+
+/*
+   جميع النصوص داخل النوافذ المنبثقة الجانبية
+   تستخدم نفس التدرج:
+   العنوان = 14px عريض
+   المحتوى = 13px عادي
+*/
+
+.projects-popup,
+.chat-popup,
+.search-popup {
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.projects-popup .popup-title,
+.chat-popup .popup-title,
+.search-popup .popup-title {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.projects-popup .popup-item,
+.chat-popup .popup-item,
+.search-popup .popup-item {
+    font-size: 13px;
+    font-weight: 400;
+}
+
+
+/* =========================================================
+   END
+   ========================================================= */
