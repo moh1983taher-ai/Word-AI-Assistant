@@ -2294,6 +2294,188 @@ body.dark #save-settings,
     font-weight: 400;
 }
 
+/* =========================================================
+   الباحث - تنسيق القائمة الجانبية فقط
+   لا يحذف أو يغيّر أي عنصر أو وظيفة
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   المستوى الأول
+   أدوات الباحث
+   --------------------------------------------------------- */
+
+#expanded-sidebar .expand-header {
+    font-size: 15px;
+    font-weight: 700;
+    color: #222;
+}
+
+/* ---------------------------------------------------------
+   المستوى الثاني
+   عناوين الأقسام:
+   محادثة جديدة
+   المحادثات
+   المشاريع
+   المستندات
+   المراجع
+   --------------------------------------------------------- */
+
+#expanded-sidebar .expand-section-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: #444;
+
+    min-height: 40px;
+
+    padding: 7px 10px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    box-sizing: border-box;
+}
+
+/* اسم القسم نفسه */
+
+#expanded-sidebar .expand-section-header > span:not(.section-arrow) {
+    font-size: 14px;
+    font-weight: 700;
+    color: #444;
+}
+
+/* ---------------------------------------------------------
+   أيقونة/سهم القسم
+   --------------------------------------------------------- */
+
+#expanded-sidebar .section-arrow {
+    font-size: 20px;
+    font-weight: 400;
+
+    width: 18px;
+    min-width: 18px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    color: #666;
+}
+
+/* ---------------------------------------------------------
+   المستوى الثالث
+   القوائم الموجودة تحت عناوين الأقسام
+   --------------------------------------------------------- */
+
+#expanded-sidebar #new-chat-list,
+#expanded-sidebar #chat-list,
+#expanded-sidebar #expanded-projects-list {
+    padding-left: 14px;
+    box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------
+   عناصر محادثة جديدة
+   --------------------------------------------------------- */
+
+#expanded-sidebar #new-chat-list .new-chat-item,
+#expanded-sidebar #new-chat-list .expanded-project-item {
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #555;
+
+    padding: 7px 10px;
+    margin: 2px 0;
+
+    border-radius: 7px;
+
+    box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------
+   عناصر المحادثات
+   --------------------------------------------------------- */
+
+#expanded-sidebar #chat-list .chat-history-item {
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #555;
+
+    padding: 7px 10px;
+    margin: 2px 0;
+
+    border-radius: 7px;
+
+    box-sizing: border-box;
+}
+
+/* اسم المحادثة */
+
+#expanded-sidebar #chat-list .chat-title {
+    font-size: 13px;
+    font-weight: 400;
+    color: #555;
+}
+
+/* ---------------------------------------------------------
+   عناصر المشاريع
+   --------------------------------------------------------- */
+
+#expanded-sidebar #expanded-projects-list .expanded-project-item {
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #555;
+
+    padding: 7px 10px;
+    margin: 2px 0;
+
+    border-radius: 7px;
+
+    box-sizing: border-box;
+}
+
+/* اسم المشروع */
+
+#expanded-sidebar #expanded-projects-list .expanded-project-item span {
+    font-size: 13px;
+    font-weight: 400;
+}
+
+/* ---------------------------------------------------------
+   المستندات والمراجع
+   إذا أضيفت عناصر لاحقًا ستأخذ مستوى العناصر الثالث
+   --------------------------------------------------------- */
+
+#expanded-sidebar .expand-section-content {
+    padding-left: 14px;
+    box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------
+   Hover
+   نحافظ على شكل القائمة الحالي
+   --------------------------------------------------------- */
+
+#expanded-sidebar .expand-section-header:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+#expanded-sidebar #new-chat-list .new-chat-item:hover,
+#expanded-sidebar #new-chat-list .expanded-project-item:hover,
+#expanded-sidebar #chat-list .chat-history-item:hover,
+#expanded-sidebar #expanded-projects-list .expanded-project-item:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+/* =========================================================
+   END - تنسيق قائمة أدوات الباحث فقط
+   ========================================================= */
+
 
 /* =========================================================
 END
