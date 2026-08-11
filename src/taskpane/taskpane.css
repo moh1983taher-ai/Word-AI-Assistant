@@ -2464,19 +2464,23 @@ body.dark #save-settings,
 }
 
 /* =========================================================
-   تدرج العناصر الفرعية داخل الأقسام
-   ========================================================= */
+تدرج العناصر الفرعية داخل القسم
+العناصر الفرعية تدخل للداخل تحت عنوان القسم
+========================================================= */
 
-#expanded-sidebar .section-content {
-    padding-right: 18px !important;
-    padding-left: 0 !important;
+#expanded-sidebar .expand-section-content {
+    width: calc(100% - 28px) !important;
+    margin-right: 28px !important;
+    padding: 2px 0 5px 0 !important;
     box-sizing: border-box;
 }
 
-#expanded-sidebar .section-content .new-chat-item,
-#expanded-sidebar .section-content .expanded-project-item,
-#expanded-sidebar .section-content .chat-history-item {
-    margin-right: 8px;
+#expanded-sidebar .expand-section-content .expand-item,
+#expanded-sidebar .expand-section-content .new-chat-item,
+#expanded-sidebar .expand-section-content .expanded-project-item,
+#expanded-sidebar .expand-section-content .chat-history-item {
+    width: 100% !important;
+    box-sizing: border-box;
 }
 
 #expanded-sidebar .expand-section-header:hover {
