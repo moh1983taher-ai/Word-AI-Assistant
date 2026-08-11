@@ -147,13 +147,15 @@ const projectIcon = `
         height="16"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="currentColor"
-        stroke-width="1.5"
+        stroke="#000000"
+        stroke-width="1"
         stroke-linecap="round"
         stroke-linejoin="round"
         aria-hidden="true">
 
-        <!-- ضع هنا SVG الجديد من التصميم -->
+        <path
+            d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+        </path>
 
     </svg>
 `;
@@ -166,13 +168,15 @@ const chatIcon = `
         height="16"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="currentColor"
-        stroke-width="1.5"
+        stroke="#000000"
+        stroke-width="1"
         stroke-linecap="round"
         stroke-linejoin="round"
         aria-hidden="true">
 
-        <!-- ضع هنا SVG أيقونة المحادثات الجديدة من التصميم -->
+        <path
+            d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z">
+        </path>
 
     </svg>
 `;
@@ -373,8 +377,8 @@ projects.forEach(function (project) {
     item.innerHTML = `
 
         <span class="project-title">
-        ${projectIcon}
-        ${project.name}
+            ${projectIcon}
+            ${project.name}
         </span>
 
         <button
@@ -3561,32 +3565,29 @@ chats
 
 
         item.innerHTML = `
+    <span class="chat-title">
+        ${chatIcon}
+        ${chat.title}
+    </span>
 
-            ${chatIcon}
+    <button
+        class="chat-menu"
+        type="button">
+        ⋮
+    </button>
 
-        <span>
-            ${chat.title}
-        </span>
+    <div class="chat-options-menu">
 
-               <button
-                class="chat-menu"
-                type="button">
-                ⋮
-            </button>
+        <div class="rename-chat">
+            ✏ إعادة تسمية
+        </div>
 
-            <div class="chat-options-menu">
+        <div class="delete-chat">
+            🗑 حذف
+        </div>
 
-                <div class="rename-chat">
-                    ✏ إعادة تسمية
-                </div>
-
-                <div class="delete-chat">
-                    🗑 حذف
-                </div>
-
-            </div>
-
-        `;
+    </div>
+`;
 
 
         const title =
@@ -4143,12 +4144,12 @@ chats
 
             div.innerHTML = `
 
-                ◯
-                <span>
-                    ${chat.title}
-                </span>
+    <span class="chat-title">
+        ${chatIcon}
+        ${chat.title}
+    </span>
 
-            `;
+`;
 
 
             div.onclick =
@@ -4353,9 +4354,12 @@ searchInput.oninput =
                         "search-result-item";
 
 
-                    item.innerHTML =
-                        "◯ " +
-                        chat.title;
+                    item.innerHTML = `
+                    <span class="chat-title">
+                        ${chatIcon}
+                        ${chat.title}
+                    </span>
+                    `;
 
 
                     item.onclick =
