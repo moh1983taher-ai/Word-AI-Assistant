@@ -1877,19 +1877,25 @@ body {
 
     white-space: nowrap;
 }
- #settings-header span svg {
-    width: 16px;
-    height: 16px;
+/* =========================================================
+   أيقونة الإعدادات داخل رأس نافذة الإعدادات
+   ========================================================= */
 
+#settings-header > span > svg {
+    width: 16px !important;
+    height: 16px !important;
+
+    display: block !important;
     flex-shrink: 0;
-    display: block;
 
-    fill: none;
-    stroke: #222;
-    stroke-width: 1;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    fill: none !important;
+    stroke: #000000 !important;
+
+    stroke-width: 1 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
 }
+
 
 #close-settings {
     width: 32px;
