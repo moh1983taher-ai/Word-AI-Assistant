@@ -1606,35 +1606,60 @@ body {
 17. MESSAGES
 ========================================================= */
 
-.message {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
+/* =========================================================
+   MESSAGE BUBBLES
+   الفقاعات تأخذ مساحة المحتوى بدل عرض المحادثة كاملًا
+   ========================================================= */
 
-    padding: 12px 15px;
+.message {
+    width: auto;
+    max-width: 92%;
+
+    padding: 12px 16px;
     margin-bottom: 12px;
 
     border-radius: 14px;
 
-    line-height: 1.6;
+    line-height: 1.65;
     font-size: 14px;
-}
 
-.user-message {
-    background: #222;
-    color: #ffffff;
-
-    margin-left: auto;
-}
-
-.ai-message {
-    line-height: 1.8;
-    text-align: right;
-    direction: rtl;
+    box-sizing: border-box;
 
     word-wrap: break-word;
     overflow-wrap: anywhere;
 }
+
+.user-message {
+    width: fit-content;
+    max-width: 75%;
+
+    margin-left: auto;
+    margin-right: 0;
+
+    background: #222;
+    color: #fff;
+
+    text-align: right;
+    direction: rtl;
+}
+
+.ai-message {
+    width: fit-content;
+    max-width: 92%;
+
+    margin-left: 0;
+    margin-right: auto;
+
+    background: #f5f5f5;
+    color: #222;
+
+    text-align: right;
+    direction: rtl;
+
+    line-height: 1.8;
+}
+
+
 
 /* ======================================
    تنسيق ردود الذكاء الاصطناعي
