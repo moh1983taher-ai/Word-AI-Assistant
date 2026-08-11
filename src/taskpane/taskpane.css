@@ -2494,7 +2494,8 @@ body.dark #save-settings,
     inset: 0;
 
     width: 100vw;
-    height: 100vh;
+    height: calc(100vh - 45px);
+top: 45px;
 
     background: #ffffff;
 
