@@ -1968,8 +1968,8 @@ body {
 
 
 /* =========================================================
-   18. INPUT AREA
-   ========================================================= */
+18. INPUT AREA
+========================================================= */
 
 .input-area {
     min-height: 68px;
@@ -1978,14 +1978,23 @@ body {
     border-top: 1px solid #eee;
 
     display: flex;
-
     align-items: center;
     justify-content: center;
 
     padding: 5px 10px 13px;
+
+    box-sizing: border-box;
 }
 
+
+/* =========================================================
+MESSAGE BOX
+مربع الكتابة
+========================================================= */
+
 .message-box {
+    position: relative;
+
     width: calc(100% - 4px);
     max-width: none;
 
@@ -2003,7 +2012,8 @@ body {
 
     direction: rtl;
 
-    padding: 2px 2px 2px 14px;
+    /* مساحة داخلية مناسبة للزر */
+    padding: 2px 45px 2px 14px;
 
     margin: 0 2px;
 
@@ -2018,6 +2028,7 @@ body {
         height 0.15s ease;
 }
 
+
 .message-box:focus-within {
     border-color: #b5b5b5;
 
@@ -2025,9 +2036,12 @@ body {
         0 1px 5px rgba(0, 0, 0, 0.08);
 }
 
-#user-input {
-    flex: 1;
 
+/* =========================================================
+USER INPUT
+========================================================= */
+
+#user-input {
     width: 100%;
 
     height: 38px;
@@ -2054,12 +2068,27 @@ body {
     text-align: right;
 }
 
+
 #user-input::placeholder {
     color: #999;
 }
 
+
+/* =========================================================
+SEND BUTTON
+زر الإرسال داخل أقصى يمين مربع الكتابة
+========================================================= */
+
 #send-btn {
-    flex: 0 0 38px;
+    position: absolute;
+
+    /* ملاصق للحافة اليمنى */
+    right: 3px;
+
+    /* في منتصف ارتفاع مربع الكتابة */
+    top: 50%;
+
+    transform: translateY(-50%);
 
     width: 38px;
     height: 38px;
@@ -2068,7 +2097,6 @@ body {
     min-height: 38px;
 
     margin: 0;
-
     padding: 0;
 
     border: none;
@@ -2080,7 +2108,6 @@ body {
     color: #fff;
 
     display: flex;
-
     align-items: center;
     justify-content: center;
 
@@ -2088,26 +2115,47 @@ body {
 
     box-sizing: border-box;
 
-    flex-shrink: 0;
+    z-index: 2;
 
     transition:
         background 0.2s ease,
         transform 0.15s ease;
 }
 
+
+/* =========================================================
+SEND BUTTON HOVER
+========================================================= */
+
 #send-btn:hover {
     background: #111;
 
-    transform: scale(1.03);
+    transform:
+        translateY(-50%)
+        scale(1.03);
 }
 
+
+/* =========================================================
+SEND BUTTON ACTIVE
+========================================================= */
+
 #send-btn:active {
-    transform: scale(0.94);
+    transform:
+        translateY(-50%)
+        scale(0.94);
 }
+
+
+/* =========================================================
+SEND ICON
+========================================================= */
 
 #send-btn svg {
     width: 19px;
     height: 19px;
+
+    display: block;
 
     fill: none;
 
@@ -2117,6 +2165,20 @@ body {
 
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+
+/* =========================================================
+18-A
+عند تثبيت الشريط الجانبي
+========================================================= */
+
+body.sidebar-is-pinned .input-area {
+    width: 100%;
+}
+
+body.sidebar-is-pinned .message-box {
+    width: calc(100% - 4px);
 }
 
 
