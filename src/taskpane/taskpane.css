@@ -1557,10 +1557,14 @@ body {
 
 #chat-area {
     flex: 1;
+    width: 100%;
+    min-width: 0;
 
     overflow-y: auto;
+    overflow-x: hidden;
 
-    padding: 25px;
+    padding: 25px 5%;
+    box-sizing: border-box;
 }
 
 .welcome {
@@ -1599,29 +1603,37 @@ body {
 
 
 /* =========================================================
-   17. MESSAGES
-   ========================================================= */
+17. MESSAGES
+========================================================= */
 
 .message {
-    max-width: 80%;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 
     padding: 12px 15px;
-
     margin-bottom: 12px;
 
     border-radius: 14px;
 
     line-height: 1.6;
-
     font-size: 14px;
 }
 
 .user-message {
     background: #222;
-
     color: #ffffff;
 
     margin-left: auto;
+}
+
+.ai-message {
+    line-height: 1.8;
+    text-align: right;
+    direction: rtl;
+
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 
 /* ======================================
