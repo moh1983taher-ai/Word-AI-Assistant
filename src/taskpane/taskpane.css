@@ -254,6 +254,12 @@ body {
     transform: rotate(-45deg);
 }
 
+#pin-sidebar svg {
+    color: #555 !important;
+    fill: #555 !important;
+    stroke: #555 !important;
+}
+
 
 /* =========================================================
    الشريط المثبت
