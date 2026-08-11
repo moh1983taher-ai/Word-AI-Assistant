@@ -254,9 +254,10 @@ body {
     transform: rotate(-45deg);
 }
 
-#pin-sidebar svg {
+#pin-sidebar svg,
+#pin-sidebar svg * {
     color: #222 !important;
-    fill: none !important;
+    fill: #222 !important;
     stroke: #222 !important;
 }
 
