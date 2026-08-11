@@ -2940,304 +2940,354 @@ testConnection.onclick =
 
 // =====================================================
 // AI REQUEST
+// إرسال المحادثة كاملة مع الرسالة الجديدة
 // =====================================================
 
 async function askAI(text) {
 
+    const data =
+        getSavedSettings();
 
-const data =
-    getSavedSettings();
+    const selectedProvider =
+        (
+            data.provider ||
+            "openrouter"
+        ).toLowerCase();
+
+    const key =
+        data.key ||
+        "";
+
+    const model =
+        data.model ||
+        "";
 
 
-const selectedProvider =
-    (
-        data.provider ||
+    if (!key.trim()) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
+        );
+
+    }
+
+
+    if (!model.trim()) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
+        );
+
+    }
+
+
+    // =================================================
+    // بناء سياق المحادثة
+    // =================================================
+
+    const conversationMessages = [];
+
+
+    if (
+        currentChat &&
+        Array.isArray(currentChat.messages)
+    ) {
+
+        currentChat.messages.forEach(
+            function (msg) {
+
+                if (
+                    !msg ||
+                    !msg.text
+                ) {
+
+                    return;
+
+                }
+
+
+                conversationMessages.push({
+
+                    role:
+                        msg.role === "ai"
+                            ? "assistant"
+                            : "user",
+
+                    content:
+                        String(msg.text)
+
+                });
+
+            }
+        );
+
+    }
+
+
+    // =================================================
+    // إضافة السؤال الجديد
+    // =================================================
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        content:
+            text
+
+    });
+
+
+    // ==================================
+    // OpenRouter
+    // ==================================
+
+    if (
+        selectedProvider ===
         "openrouter"
-    ).toLowerCase();
+    ) {
+
+        const response =
+            await fetch(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json",
+
+                        "Authorization":
+                            "Bearer " +
+                            key
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                model,
+
+                            messages:
+                                conversationMessages
+
+                        })
+
+                }
+            );
 
 
-const key =
-    data.key ||
-    "";
+        const result =
+            await readJSON(
+                response
+            );
 
 
-const model =
-    data.model ||
-    "";
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ OpenRouter."
+                )
+            );
+
+        }
 
 
-if (!key.trim()) {
+        return extractOpenAIStyleAnswer(
+            result,
+            "OpenRouter"
+        );
+
+    }
+
+
+    // ==================================
+    // OpenAI
+    // ==================================
+
+    if (
+        selectedProvider ===
+        "openai"
+    ) {
+
+        const response =
+            await fetch(
+                "https://api.openai.com/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json",
+
+                        "Authorization":
+                            "Bearer " +
+                            key
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                model,
+
+                            messages:
+                                conversationMessages
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ OpenAI."
+                )
+            );
+
+        }
+
+
+        return extractOpenAIStyleAnswer(
+            result,
+            "OpenAI"
+        );
+
+    }
+
+
+    // ==================================
+    // Gemini
+    // ==================================
+
+    if (
+        selectedProvider ===
+        "gemini"
+    ) {
+
+        const cleanModel =
+            normalizeGeminiModel(
+                model
+            );
+
+
+        const url =
+            "https://generativelanguage.googleapis.com/v1beta/models/" +
+            encodeURIComponent(
+                cleanModel
+            ) +
+            ":generateContent?key=" +
+            encodeURIComponent(
+                key
+            );
+
+
+        // Gemini يستخدم contents بدل messages
+        const contents =
+            conversationMessages.map(
+                function (msg) {
+
+                    return {
+
+                        role:
+                            msg.role === "assistant"
+                                ? "model"
+                                : "user",
+
+                        parts: [
+
+                            {
+
+                                text:
+                                    msg.content
+
+                            }
+
+                        ]
+
+                    };
+
+                }
+            );
+
+
+        const response =
+            await fetch(
+                url,
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            contents:
+                                contents
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ Gemini."
+                )
+            );
+
+        }
+
+
+        return extractGeminiAnswer(
+            result
+        );
+
+    }
+
 
     throw new Error(
-        "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
+        "مزود الذكاء الاصطناعي غير معروف: " +
+        selectedProvider
     );
-
-}
-
-
-if (!model.trim()) {
-
-    throw new Error(
-        "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
-    );
-
-}
-
-
-// ==================================
-// OpenRouter
-// ==================================
-
-if (
-    selectedProvider ===
-    "openrouter"
-) {
-
-    const response =
-        await fetch(
-            "https://openrouter.ai/api/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        key,
-
-                    
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            model,
-
-                        messages: [
-
-                            {
-
-                                role:
-                                    "user",
-
-                                content:
-                                    text
-
-                            }
-
-                        ]
-
-                    })
-
-            }
-        );
-
-
-    const result =
-        await readJSON(response);
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenRouter."
-            )
-        );
-
-    }
-
-
-    return extractOpenAIStyleAnswer(
-        result,
-        "OpenRouter"
-    );
-
-}
-
-
-// ==================================
-// OpenAI
-// ==================================
-
-if (
-    selectedProvider ===
-    "openai"
-) {
-
-    const response =
-        await fetch(
-            "https://api.openai.com/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            model,
-
-                        messages: [
-
-                            {
-
-                                role:
-                                    "user",
-
-                                content:
-                                    text
-
-                            }
-
-                        ]
-
-                    })
-
-            }
-        );
-
-
-    const result =
-        await readJSON(response);
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenAI."
-            )
-        );
-
-    }
-
-
-    return extractOpenAIStyleAnswer(
-        result,
-        "OpenAI"
-    );
-
-}
-
-
-// ==================================
-// Gemini
-// ==================================
-
-if (
-    selectedProvider ===
-    "gemini"
-) {
-
-    const cleanModel =
-        normalizeGeminiModel(
-            model
-        );
-
-
-    const url =
-        "https://generativelanguage.googleapis.com/v1beta/models/" +
-        encodeURIComponent(cleanModel) +
-        ":generateContent?key=" +
-        encodeURIComponent(key);
-
-
-    const response =
-        await fetch(
-            url,
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json"
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        contents: [
-
-                            {
-
-                                role:
-                                    "user",
-
-                                parts: [
-
-                                    {
-
-                                        text:
-                                            text
-
-                                    }
-
-                                ]
-
-                            }
-
-                        ]
-
-                    })
-
-            }
-        );
-
-
-    const result =
-        await readJSON(response);
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Gemini."
-            )
-        );
-
-    }
-
-
-    return extractGeminiAnswer(
-        result
-    );
-
-}
-
-
-throw new Error(
-    "مزود الذكاء الاصطناعي غير معروف: " +
-    selectedProvider
-);
-
 
 }
 
@@ -4412,134 +4462,99 @@ searchInput.oninput =
 
 async function sendMessage() {
 
-
-if (!input)
-    return;
-
-
-const text =
-    input.value.trim();
+    if (!input)
+        return;
 
 
-if (text === "")
-    return;
+    const text =
+        input.value.trim();
 
 
-if (!currentChat) {
-
-    currentChat = {
-
-        id:
-            Date.now(),
-
-        title:
-            text.substring(0, 30),
-
-        messages:
-            [],
-
-        isTemporary:
-            true
-
-    };
-
-}
+    if (text === "")
+        return;
 
 
-    if (currentChat.isTemporary) {
+    // =================================================
+    // إذا لم توجد محادثة حالية
+    // ننشئ محادثة مؤقتة
+    // =================================================
 
-currentChat.isTemporary =
-    false;
+    if (!currentChat) {
 
-currentChat.title =
-    text.substring(0, 30);
+        currentChat = {
 
-saveChats();
+            id:
+                Date.now(),
 
-renderChatList();
+            title:
+                text.substring(0, 30),
 
-renderSidebarChats();
+            messages:
+                [],
 
-renderRecentChats();
+            isTemporary:
+                true
 
+        };
 
-}
-
-
-currentChat.messages.push({
-
-    role:
-        "user",
-
-    text:
-        text
-
-});
+    }
 
 
-saveChats();
+    // =================================================
+    // تحويل المحادثة المؤقتة إلى محادثة حقيقية
+    // عند إرسال أول رسالة
+    // =================================================
+
+    if (
+        currentChat.isTemporary
+    ) {
+
+        currentChat.isTemporary =
+            false;
 
 
-renderChat();
-
-renderChatList();
-
-renderSidebarChats();
+        currentChat.title =
+            text.substring(0, 30);
 
 
-input.value =
-    "";
-
-input.style.height =
-    "auto";
-
-
-const loading =
-    document.createElement(
-        "div"
-    );
+        // إضافة المحادثة إلى القائمة
+        chats.unshift(
+            currentChat
+        );
 
 
-loading.className =
-    "message ai-message";
+        saveChats();
 
 
-loading.innerHTML =
-    "⏳ جاري التفكير...";
+        renderChatList();
+
+        renderSidebarChats();
+
+        renderRecentChats();
+
+    }
 
 
-if (chatArea) {
-
-    chatArea.appendChild(
-        loading
-    );
-
-}
-
-
-try {
-
-    const answer =
-        await askAI(text);
-
-
-    loading.remove();
-
+    // =================================================
+    // إضافة رسالة المستخدم إلى المحادثة
+    // =================================================
 
     currentChat.messages.push({
 
         role:
-            "ai",
+            "user",
 
         text:
-            answer
+            text
 
     });
 
 
+    // حفظ المحادثة فورًا
     saveChats();
 
 
+    // تحديث الواجهات
     renderChat();
 
     renderChatList();
@@ -4548,41 +4563,133 @@ try {
 
     renderRecentChats();
 
-}
 
-catch (error) {
+    // =================================================
+    // تنظيف مربع الإدخال
+    // =================================================
 
-    loading.remove();
+    input.value =
+        "";
 
-
-    currentChat.messages.push({
-
-        role:
-            "ai",
-
-        text:
-            "خطأ: " +
-            (
-                error.message ||
-                "حدث خطأ غير معروف"
-            )
-
-    });
+    input.style.height =
+        "auto";
 
 
-    saveChats();
+    // =================================================
+    // رسالة الانتظار
+    // =================================================
+
+    const loading =
+        document.createElement(
+            "div"
+        );
 
 
-    renderChat();
+    loading.className =
+        "message ai-message";
 
-    renderChatList();
 
-    renderSidebarChats();
+    loading.innerHTML =
+        "⏳ جاري التفكير...";
 
-    renderRecentChats();
 
-}
+    if (chatArea) {
 
+        chatArea.appendChild(
+            loading
+        );
+
+
+        chatArea.scrollTop =
+            chatArea.scrollHeight;
+
+    }
+
+
+    // =================================================
+    // إرسال المحادثة إلى الذكاء الاصطناعي
+    // =================================================
+
+    try {
+
+        const answer =
+            await askAI(
+                text
+            );
+
+
+        // إزالة رسالة الانتظار
+        loading.remove();
+
+
+        // =================================================
+        // إضافة رد الذكاء الاصطناعي إلى نفس المحادثة
+        // =================================================
+
+        currentChat.messages.push({
+
+            role:
+                "ai",
+
+            text:
+                answer
+
+        });
+
+
+        // حفظ الرد
+        saveChats();
+
+
+        // تحديث الواجهة
+        renderChat();
+
+        renderChatList();
+
+        renderSidebarChats();
+
+        renderRecentChats();
+
+    }
+
+    catch (error) {
+
+        // إزالة رسالة الانتظار
+        loading.remove();
+
+
+        // =================================================
+        // حفظ الخطأ داخل نفس المحادثة
+        // =================================================
+
+        currentChat.messages.push({
+
+            role:
+                "ai",
+
+            text:
+                "خطأ: " +
+                (
+                    error.message ||
+                    "حدث خطأ غير معروف"
+                )
+
+        });
+
+
+        saveChats();
+
+
+        // تحديث الواجهة
+        renderChat();
+
+        renderChatList();
+
+        renderSidebarChats();
+
+        renderRecentChats();
+
+    }
 
 }
 
