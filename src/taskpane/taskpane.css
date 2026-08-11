@@ -141,7 +141,8 @@ body {
 
 
 /* =========================================================
-   أيقونات الشريط
+   حجم أيقونات الشريط
+   التصميم الداخلي لـ SVG لا يتغير
    ========================================================= */
 
 .side-icon {
@@ -151,22 +152,25 @@ body {
     border: none;
     background: transparent;
 
-    color: #555;
+    padding: 0;
+    margin: 0;
 
-    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     cursor: pointer;
-
     border-radius: 8px;
 
-    transition:
-        background 0.2s ease,
-        color 0.2s ease;
+    box-sizing: border-box;
 }
 
-.side-icon:hover {
-    background: #f1f1f1;
-    color: #111;
+/* حجم موحد لكل SVG */
+.side-icon svg {
+    width: 22px;
+    height: 22px;
+
+    flex-shrink: 0;
 }
 
 
@@ -224,50 +228,36 @@ body {
    ========================================================= */
 
 #pin-sidebar {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
+
+    padding: 0;
+    margin: 0;
 
     border: none;
     background: transparent;
-
-    color: #222;
-
-    font-size: 14px;
-
-    cursor: pointer;
-    border-radius: 7px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    transition:
-        background 0.2s ease,
-        color 0.2s ease,
-        transform 0.2s ease;
+    cursor: pointer;
+    border-radius: 8px;
+
+    box-sizing: border-box;
+
+    transition: background 0.2s ease;
 }
 
-/* الدبوس عند التثبيت */
-#pin-sidebar.pinned {
-    color: #222;
-    background: transparent;
-
-    transform: rotate(-45deg);
-}
-
-/* الدبوس المفرغ */
 #pin-sidebar svg {
-    width: 16px;
-    height: 16px;
+    width: 22px;
+    height: 22px;
 
-    display: block;
+    flex-shrink: 0;
+}
 
-    fill: none !important;
-    stroke: currentColor !important;
-
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+#pin-sidebar:hover {
+    background: #f1f1f1;
 }
 
 
