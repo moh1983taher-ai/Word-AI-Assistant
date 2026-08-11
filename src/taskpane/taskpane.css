@@ -2492,14 +2492,12 @@ body.dark #save-settings,
     position: fixed !important;
 
     left: 52px !important;
-    right: 0 !important;
+    top: 35px !important;
     bottom: 0 !important;
-
-    margin-top: 25px !important;
-    height: calc(100vh - 25px) !important;
+    right: 0 !important;
 
     width: auto !important;
-    height: calc(100vh - 70px) !important;
+    height: auto !important;
 
     background: #ffffff;
 
