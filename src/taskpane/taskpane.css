@@ -224,19 +224,18 @@ body {
    ========================================================= */
 
 #pin-sidebar {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
 
     border: none;
     background: transparent;
 
-    color: #777;
+    color: inherit;
 
-    font-size: 17px;
+    font-size: 14px;
 
     cursor: pointer;
-
-    border-radius: 8px;
+    border-radius: 7px;
 
     display: flex;
     align-items: center;
@@ -248,16 +247,10 @@ body {
         transform 0.2s ease;
 }
 
-#pin-sidebar:hover {
-    background: #f1f1f1;
-    color: #111;
-}
-
+/* الدبوس بدون أي لون عند التثبيت */
 #pin-sidebar.pinned {
-    color: #222;
-
-    background: #f1f1f1;
-
+    color: inherit;
+    background: transparent;
     transform: rotate(-45deg);
 }
 
