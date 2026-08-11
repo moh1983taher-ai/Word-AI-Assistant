@@ -4809,34 +4809,42 @@ loadSettings();
 
 });
 
+
 const sidebar = document.querySelector(".sidebar");
 const pinSidebar = document.getElementById("pin-sidebar");
 
 if (pinSidebar && sidebar) {
 
+    let sidebarPinned =
+        localStorage.getItem("sidebarPinned") === "true";
 
-let sidebarPinned =
-    localStorage.getItem("sidebarPinned") === "true";
+    if (sidebarPinned) {
+        sidebar.classList.add("pinned");
+        pinSidebar.classList.add("pinned");
 
-if (sidebarPinned) {
-    sidebar.classList.add("pinned");
-    pinSidebar.classList.add("pinned");
-}
+        // ربط تثبيت الشريط بمساحة الشات
+        document.body.classList.add("sidebar-is-pinned");
+    }
 
-pinSidebar.addEventListener("click", function (e) {
+    pinSidebar.addEventListener("click", function (e) {
 
-    e.stopPropagation();
+        e.stopPropagation();
 
-    sidebarPinned = !sidebarPinned;
+        sidebarPinned = !sidebarPinned;
 
-    sidebar.classList.toggle("pinned", sidebarPinned);
-    pinSidebar.classList.toggle("pinned", sidebarPinned);
+        sidebar.classList.toggle("pinned", sidebarPinned);
+        pinSidebar.classList.toggle("pinned", sidebarPinned);
 
-    localStorage.setItem(
-        "sidebarPinned",
-        sidebarPinned ? "true" : "false"
-    );
-});
+        // تمديد/انكماش مساحة الشات مع التثبيت
+        document.body.classList.toggle(
+            "sidebar-is-pinned",
+            sidebarPinned
+        );
 
+        localStorage.setItem(
+            "sidebarPinned",
+            sidebarPinned ? "true" : "false"
+        );
+    });
 
 }
