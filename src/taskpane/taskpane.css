@@ -2492,12 +2492,16 @@ body.dark #save-settings,
     position: fixed !important;
 
     left: 52px !important;
+    right: 0 !important;
+
     top: 50px !important;
     bottom: 0 !important;
-    right: 0 !important;
 
     width: auto !important;
     height: auto !important;
+
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
 
     background: #ffffff;
 
@@ -2514,6 +2518,9 @@ body.dark #save-settings,
 
     overflow-y: auto;
     overflow-x: hidden;
+
+    scrollbar-width: thin;
+    scrollbar-color: #c7c7c7 transparent;
 }
 
 #expanded-sidebar.open {
