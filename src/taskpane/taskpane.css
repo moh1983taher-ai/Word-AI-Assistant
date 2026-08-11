@@ -2463,10 +2463,20 @@ body.dark #save-settings,
     font-weight: 400;
 }
 
-#expanded-sidebar .expand-section-content {
-    padding-left: 14px;
+/* =========================================================
+   تدرج العناصر الفرعية داخل الأقسام
+   ========================================================= */
 
+#expanded-sidebar .section-content {
+    padding-right: 18px !important;
+    padding-left: 0 !important;
     box-sizing: border-box;
+}
+
+#expanded-sidebar .section-content .new-chat-item,
+#expanded-sidebar .section-content .expanded-project-item,
+#expanded-sidebar .section-content .chat-history-item {
+    margin-right: 8px;
 }
 
 #expanded-sidebar .expand-section-header:hover {
