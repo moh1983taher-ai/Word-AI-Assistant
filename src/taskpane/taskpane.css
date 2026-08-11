@@ -1630,17 +1630,23 @@ body {
 }
 
 .user-message {
-    width: fit-content;
-    max-width: 75%;
+    background: #222;
+    color: #ffffff;
 
     margin-left: auto;
     margin-right: 0;
 
-    background: #222;
-    color: #fff;
+    /* توسيع فقاعة المستخدم */
+    width: fit-content;
+    max-width: 85%;
+    min-width: 120px;
 
     text-align: right;
     direction: rtl;
+
+    box-sizing: border-box;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
 }
 
 .ai-message {
@@ -1767,35 +1773,175 @@ body {
 
 .ai-message table {
     width: 100%;
-    margin: 16px 0;
-    border-collapse: collapse;
+    max-width: 100%;
+
+    margin: 18px 0;
+
+    border-collapse: separate;
+    border-spacing: 0;
+
     direction: rtl;
     text-align: right;
+
     font-size: 13px;
+    line-height: 1.6;
+
+    table-layout: auto;
+
+    background: #ffffff;
+
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+
+    overflow: hidden;
 }
 
-.ai-message th,
-.ai-message td {
-    padding: 8px 10px;
-    border: 1px solid #d6d6d6;
-    vertical-align: top;
-}
+/* ======================================
+   رأس الجدول
+   ====================================== */
 
 .ai-message th {
+    padding: 11px 13px;
+
+    background: #f7f7f7;
+
+    color: #222;
+
     font-weight: 600;
-    background: #f3f3f3;
+    font-size: 13px;
+
+    text-align: right;
+    vertical-align: middle;
+
+    white-space: nowrap;
+
+    border-bottom: 1px solid #dedede;
 }
 
-.ai-message tr:nth-child(even) {
+/* ======================================
+   خلايا الجدول
+   ====================================== */
+
+.ai-message td {
+    padding: 10px 13px;
+
+    color: #444;
+
+    font-weight: 400;
+
+    text-align: right;
+    vertical-align: top;
+
+    white-space: normal;
+
+    word-break: normal;
+    overflow-wrap: break-word;
+
+    border-bottom: 1px solid #eeeeee;
+}
+
+/* ======================================
+   إزالة الحد من آخر صف
+   ====================================== */
+
+.ai-message tr:last-child td {
+    border-bottom: none;
+}
+
+/* ======================================
+   الخطوط الرأسية الخفيفة
+   ====================================== */
+
+.ai-message th + th,
+.ai-message td + td {
+    border-right: 1px solid #eeeeee;
+}
+
+/* ======================================
+   الصفوف المتناوبة
+   ====================================== */
+
+.ai-message tr:nth-child(even) td {
     background: #fafafa;
 }
 
-/* حتى لا تكسر الجداول مساحة الشات */
+/* ======================================
+   تأثير المرور
+   ====================================== */
+
+.ai-message tbody tr:hover td {
+    background: #f5f5f5;
+}
+
+/* ======================================
+   أول وآخر خلية في الرأس
+   ====================================== */
+
+.ai-message thead th:first-child {
+    border-top-right-radius: 10px;
+}
+
+.ai-message thead th:last-child {
+    border-top-left-radius: 10px;
+}
+
+/* ======================================
+   النص الطويل داخل الخلايا
+   ====================================== */
+
+.ai-message td p {
+    margin: 0;
+}
+
+.ai-message th p {
+    margin: 0;
+}
+
+/* ======================================
+   الروابط داخل الجدول
+   ====================================== */
+
+.ai-message table a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+/* ======================================
+   الجداول العريضة جدًا
+   ====================================== */
+
 .ai-message table {
-    display: block;
+    min-width: 100%;
+}
+
+/* ======================================
+   تمرير أفقي عند الحاجة
+   ====================================== */
+
+.ai-message {
     overflow-x: auto;
 }
 
+/* ======================================
+   شريط التمرير الأفقي
+   ====================================== */
+
+.ai-message::-webkit-scrollbar {
+    height: 6px;
+}
+
+.ai-message::-webkit-scrollbar-thumb {
+    background: #c8c8c8;
+    border-radius: 10px;
+}
+
+.ai-message::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+}
+
+.ai-message::-webkit-scrollbar-track {
+    background: transparent;
+}
 /* الروابط */
 .ai-message a {
     text-decoration: underline;
