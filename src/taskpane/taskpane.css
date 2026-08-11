@@ -538,16 +538,17 @@ body {
 .section-content {
     display: none;
 
-    padding-left: 14px;
+    width: calc(100% - 28px) !important;
+
+    margin-right: 28px !important;
+
+    padding: 2px 0 5px 0 !important;
+
+    box-sizing: border-box;
 }
 
 .section-content.open {
     display: block;
-}
-
-.section-title,
-.expand-item {
-    position: relative;
 }
 
 
@@ -2463,25 +2464,7 @@ body.dark #save-settings,
     font-weight: 400;
 }
 
-/* =========================================================
-   إزاحة العناصر الفرعية فقط
-   لا تؤثر على فتح وإغلاق الأقسام
-   ========================================================= */
 
-#expanded-sidebar .expand-section-content {
-    width: 100% !important;
-    padding: 2px 0 5px 0 !important;
-    box-sizing: border-box;
-}
-
-#expanded-sidebar .expand-section-content > .expand-item,
-#expanded-sidebar .expand-section-content > .new-chat-item,
-#expanded-sidebar .expand-section-content > .expanded-project-item,
-#expanded-sidebar .expand-section-content > .chat-history-item {
-    width: calc(100% - 35px) !important;
-    margin-right: 35px !important;
-    box-sizing: border-box;
-}
 /* =========================================================
    EXPANDED SIDEBAR
    نافذة مستقلة عن الشريط الجانبي
