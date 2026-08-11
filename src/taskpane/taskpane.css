@@ -2464,42 +2464,23 @@ body.dark #save-settings,
 }
 
 /* =========================================================
-تدرج العناصر الفرعية داخل القسم
-العناصر الفرعية تدخل للداخل تحت عنوان القسم
-========================================================= */
+   إزاحة العناصر الفرعية فقط
+   لا تؤثر على فتح وإغلاق الأقسام
+   ========================================================= */
 
 #expanded-sidebar .expand-section-content {
-    width: calc(100% - 28px) !important;
-    margin-right: 28px !important;
+    width: 100% !important;
     padding: 2px 0 5px 0 !important;
     box-sizing: border-box;
 }
 
-#expanded-sidebar .expand-section-content .expand-item,
-#expanded-sidebar .expand-section-content .new-chat-item,
-#expanded-sidebar .expand-section-content .expanded-project-item,
-#expanded-sidebar .expand-section-content .chat-history-item {
-    width: 100% !important;
+#expanded-sidebar .expand-section-content > .expand-item,
+#expanded-sidebar .expand-section-content > .new-chat-item,
+#expanded-sidebar .expand-section-content > .expanded-project-item,
+#expanded-sidebar .expand-section-content > .chat-history-item {
+    width: calc(100% - 35px) !important;
+    margin-right: 35px !important;
     box-sizing: border-box;
-}
-
-#expanded-sidebar .expand-section-header:hover {
-    background: #f3f3f3;
-
-    color: #111;
-}
-
-#expanded-sidebar #new-chat-list .new-chat-item:hover,
-#expanded-sidebar #new-chat-list .expanded-project-item:hover,
-#expanded-sidebar #chat-list .chat-history-item:hover,
-#expanded-sidebar #expanded-projects-list .expanded-project-item:hover {
-    background: #f3f3f3;
-
-    color: #111;
-}
-
-#expanded-sidebar .section-toggle {
-    font-weight: 700;
 }
 /* =========================================================
    EXPANDED SIDEBAR
