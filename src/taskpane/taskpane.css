@@ -255,9 +255,9 @@ body {
 }
 
 #pin-sidebar svg {
-    color: #555 !important;
-    fill: #555 !important;
-    stroke: #555 !important;
+    color: #222 !important;
+    fill: none !important;
+    stroke: #222 !important;
 }
 
 
