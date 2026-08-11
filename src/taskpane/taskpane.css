@@ -278,71 +278,6 @@ body {
 
 
 /* =========================================================
-   3. EXPANDED SIDEBAR
-   القائمة الجانبية الموسعة
-
-   تعامل معها كنافذة منبثقة مستقلة.
-
-   لا تعتبر جزءًا من .sidebar.
-
-   لا تعتمد على:
-   - hover
-   - pinned
-   - ظهور الشريط
-   - اختفاء الشريط
-
-   الحالة الافتراضية:
-   مخفية.
-
-   الحالة الوحيدة للظهور:
-   #expanded-sidebar.open
-
-   ========================================================= */
-
-#expanded-sidebar {
-    position: fixed;
-
-    /*
-       النافذة مستقلة عن الشريط.
-       لا نستخدم left: 52px.
-       لا نستخدم margin-left: 52px.
-    */
-    left: 0;
-    top: 0;
-    bottom: 0;
-
-    width: 240px;
-
-    background: #ffffff;
-
-    border-right: 1px solid #ddd;
-
-    box-shadow:
-        5px 0 18px rgba(0, 0, 0, 0.08);
-
-    /*
-       مخفية افتراضيًا.
-    */
-    transform: translateX(-100%);
-
-    transition:
-        transform 0.25s ease;
-
-    /*
-       أقل من الشريط حتى لا تتداخل معه كجزء منه،
-       لكنها فوق المحتوى الرئيسي.
-    */
-    z-index: 90;
-
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    scrollbar-width: thin;
-    scrollbar-color: #c7c7c7 transparent;
-}
-
-
-/* =========================================================
    فتح القائمة
 
    هذه هي القاعدة الوحيدة المسؤولة عن ظهورها.
@@ -2590,6 +2525,10 @@ body.dark #save-settings,
 
     scrollbar-width: thin;
     scrollbar-color: #c7c7c7 transparent;
+}
+
+#expanded-sidebar.open {
+    transform: translateX(0);
 }
 
 /* =========================================================
