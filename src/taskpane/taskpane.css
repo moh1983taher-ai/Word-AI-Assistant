@@ -706,6 +706,10 @@ body {
 }
 
 .chat-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+
     overflow: hidden;
 
     white-space: nowrap;
@@ -716,6 +720,14 @@ body {
 
     font-size: 13px;
     font-weight: 400;
+}
+
+.chat-title svg {
+    width: 16px;
+    height: 16px;
+
+    flex-shrink: 0;
+    display: block;
 }
 
 .chat-menu {
@@ -2525,7 +2537,13 @@ body.dark #save-settings,
     font-weight: 400;
 }
 
+#expanded-sidebar .chat-history-item svg {
+    width: 16px;
+    height: 16px;
 
+    flex-shrink: 0;
+    display: block;
+}
 /* =========================================================
    EXPANDED SIDEBAR
    نافذة مستقلة عن الشريط الجانبي

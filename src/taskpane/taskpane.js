@@ -136,16 +136,56 @@ projects = [];
 
 let currentProject = null;
 
+
+// ======================================
+// Project Icon
+// ======================================
+
+const projectIcon = `
+    <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true">
+
+        <!-- ضع هنا SVG الجديد من التصميم -->
+
+    </svg>
+`;
+// ======================================
+// ايقونة محادثات
+// ======================================
+const chatIcon = `
+    <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true">
+
+        <!-- ضع هنا SVG أيقونة المحادثات الجديدة من التصميم -->
+
+    </svg>
+`;
+
 function saveProjects() {
 
-
-localStorage.setItem(
-    "WORD_AI_PROJECTS",
-    JSON.stringify(projects)
-);
-
+    localStorage.setItem(
+        "WORD_AI_PROJECTS",
+        JSON.stringify(projects)
+    );
 
 }
+
 
 // ======================================
 // Chat System
@@ -333,7 +373,8 @@ projects.forEach(function (project) {
     item.innerHTML = `
 
         <span class="project-title">
-            ▣ ${project.name}
+        ${projectIcon}
+        ${project.name}
         </span>
 
         <button
@@ -1200,7 +1241,8 @@ projects.forEach(
         item.innerHTML = `
 
             <span>
-                ▣ ${project.name}
+            ${projectIcon}
+            ${project.name}
             </span>
 
         `;
@@ -1269,10 +1311,10 @@ chats
             "recent-chat-item";
 
         item.innerHTML = `
-            ◯
-            <span>
-                ${chat.title}
-            </span>
+        <span class="chat-title">
+            ${chatIcon}
+            ${chat.title}
+        </span>
         `;
 
         // فتح المحادثة عند الضغط
@@ -3520,11 +3562,13 @@ chats
 
         item.innerHTML = `
 
-            <span class="chat-title">
-                ◯ ${chat.title}
-            </span>
+            ${chatIcon}
 
-            <button
+        <span>
+            ${chat.title}
+        </span>
+
+               <button
                 class="chat-menu"
                 type="button">
                 ⋮
