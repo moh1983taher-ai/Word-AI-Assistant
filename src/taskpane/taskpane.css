@@ -2484,36 +2484,45 @@ body.dark #save-settings,
 
 
 /* =========================================================
-   27. FINAL ISOLATION
-   القائمة المنبثقة نافذة مستقلة وتأخذ الشاشة كاملة
+   EXPANDED SIDEBAR
+   نافذة مستقلة عن الشريط الجانبي
    ========================================================= */
 
 #expanded-sidebar {
     position: fixed !important;
 
+    /* تبدأ بعد الشريط الحقيقي مباشرة */
     left: 52px !important;
     right: 0 !important;
 
+    /* الموضع العمودي */
     top: 47px !important;
     bottom: 0 !important;
 
+    /* العرض يُحسب تلقائيًا من 52px إلى نهاية الشاشة */
     width: auto !important;
+
+    /* الارتفاع يُحسب من top إلى bottom */
     height: auto !important;
 
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
+    margin: 0 !important;
+    padding: 0;
 
     background: #ffffff;
 
     border: 1px solid #ddd;
     border-left: none;
 
-    box-shadow: 5px 0 18px rgba(0, 0, 0, 0.08);
+    box-shadow:
+        5px 0 18px rgba(0, 0, 0, 0.08);
 
+    /* مخفية */
     transform: translateX(calc(-100% - 52px)) !important;
 
-    transition: transform 0.25s ease;
+    transition:
+        transform 0.25s ease;
 
+    /* أسفل الشريط الجانبي */
     z-index: 90 !important;
 
     overflow-y: auto;
@@ -2523,8 +2532,35 @@ body.dark #save-settings,
     scrollbar-color: #c7c7c7 transparent;
 }
 
+
+/* =========================================================
+   فتح القائمة
+   ========================================================= */
+
 #expanded-sidebar.open {
     transform: translateX(0) !important;
+}
+
+
+/* =========================================================
+   شريط التمرير
+   ========================================================= */
+
+#expanded-sidebar::-webkit-scrollbar {
+    width: 7px;
+}
+
+#expanded-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#expanded-sidebar::-webkit-scrollbar-thumb {
+    background: #c7c7c7;
+    border-radius: 10px;
+}
+
+#expanded-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #999;
 }
 /* =========================================================
    END
