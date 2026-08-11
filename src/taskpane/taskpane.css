@@ -230,7 +230,7 @@ body {
     border: none;
     background: transparent;
 
-    color: inherit;
+    color: #222;
 
     font-size: 14px;
 
@@ -247,18 +247,27 @@ body {
         transform 0.2s ease;
 }
 
-/* الدبوس بدون أي لون عند التثبيت */
+/* الدبوس عند التثبيت */
 #pin-sidebar.pinned {
-    color: inherit;
+    color: #222;
     background: transparent;
+
     transform: rotate(-45deg);
 }
 
-#pin-sidebar svg,
-#pin-sidebar svg * {
-    color: #222 !important;
-    fill: #222 !important;
-    stroke: #222 !important;
+/* الدبوس المفرغ */
+#pin-sidebar svg {
+    width: 16px;
+    height: 16px;
+
+    display: block;
+
+    fill: none !important;
+    stroke: currentColor !important;
+
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 
