@@ -2484,7 +2484,9 @@ body.dark #save-settings,
     color: #111;
 }
 
-
+#expanded-sidebar .section-toggle {
+    font-weight: 700;
+}
 /* =========================================================
    EXPANDED SIDEBAR
    نافذة مستقلة عن الشريط الجانبي
@@ -2564,6 +2566,9 @@ body.dark #save-settings,
 #expanded-sidebar::-webkit-scrollbar-thumb:hover {
     background: #999;
 }
+
+
+
 /* =========================================================
    END
    ========================================================= */
