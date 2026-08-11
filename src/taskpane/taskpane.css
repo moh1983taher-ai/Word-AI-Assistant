@@ -231,33 +231,33 @@ body {
     width: 34px;
     height: 34px;
 
+    border: none;
+    background: transparent;
+
     padding: 0;
     margin: 0;
 
-    border: none;
-    background: transparent;
+    cursor: pointer;
+    border-radius: 8px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    cursor: pointer;
-    border-radius: 8px;
-
     box-sizing: border-box;
+}
 
-    transition: background 0.2s ease;
+#pin-sidebar.pinned {
+    background: transparent;
+    transform: rotate(-45deg);
 }
 
 #pin-sidebar svg {
     width: 22px;
     height: 22px;
 
+    display: block;
     flex-shrink: 0;
-}
-
-#pin-sidebar:hover {
-    background: #f1f1f1;
 }
 
 
