@@ -2567,7 +2567,21 @@ body.dark #save-settings,
     background: #999;
 }
 
+/* =========================================================
+   عناوين الأقسام الرئيسية في القائمة المنبثقة
+   يؤثر على العنوان فقط ولا يؤثر على الفروع الداخلية
+   ========================================================= */
 
+#expanded-sidebar .section-toggle {
+    font-family: "Segoe UI", Arial, sans-serif !important;
+    font-weight: 700 !important;
+}
+
+/* النص داخل العنوان */
+#expanded-sidebar .section-toggle > span:not(.section-arrow) {
+    font-family: "Segoe UI", Arial, sans-serif !important;
+    font-weight: 700 !important;
+}
 
 /* =========================================================
    END
