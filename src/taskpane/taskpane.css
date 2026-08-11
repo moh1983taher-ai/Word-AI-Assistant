@@ -2001,6 +2001,8 @@ body {
 
     border-radius: 23px;
 
+    direction: rtl;
+
     padding: 2px 2px 2px 14px;
 
     margin: 0 2px;
@@ -2047,6 +2049,9 @@ body {
     line-height: 1.45;
 
     overflow-y: auto;
+
+    direction: rtl;
+    text-align: right;
 }
 
 #user-input::placeholder {
@@ -2062,8 +2067,7 @@ body {
     min-width: 38px;
     min-height: 38px;
 
-    margin-left: auto;
-    margin-right: 0;
+    margin: 0;
 
     padding: 0;
 
@@ -2083,6 +2087,8 @@ body {
     cursor: pointer;
 
     box-sizing: border-box;
+
+    flex-shrink: 0;
 
     transition:
         background 0.2s ease,
