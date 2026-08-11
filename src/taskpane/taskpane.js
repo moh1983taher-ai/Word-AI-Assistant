@@ -3484,7 +3484,32 @@ throw new Error(
 // باقي النظام — كما هو
 // =====================================================
 // =====================================================
+function formatAIMessage(text) {
 
+    if (!text)
+        return "";
+
+    try {
+
+        return marked.parse(text, {
+            breaks: true,
+            gfm: true
+        });
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Markdown formatting error:",
+            error
+        );
+
+        return String(text)
+            .replace(/\n/g, "<br>");
+
+    }
+}
 // ======================================
 // Render Chat
 // ======================================
@@ -3545,15 +3570,20 @@ currentChat.messages.forEach(
             );
 
 
-        div.textContent =
-            msg.text || "";
+        if (msg.role === "user") {
 
+    div.textContent =
+        msg.text || "";
 
-        div.innerHTML =
-            div.innerHTML.replace(
-                /\n/g,
-                "<br>"
-            );
+}
+else {
+
+    div.innerHTML =
+        formatAIMessage(
+            msg.text || ""
+        );
+
+}
 
 
         chatArea.appendChild(

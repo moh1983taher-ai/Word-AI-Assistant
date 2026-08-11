@@ -1624,12 +1624,163 @@ body {
     margin-left: auto;
 }
 
+/* ======================================
+   تنسيق ردود الذكاء الاصطناعي
+   ====================================== */
+
 .ai-message {
-    background: #f2f2f2;
+    line-height: 1.8;
+    text-align: right;
+    direction: rtl;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+}
 
-    color: #222;
+/* العناوين */
+.ai-message h1,
+.ai-message h2,
+.ai-message h3,
+.ai-message h4 {
+    margin-top: 18px;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
 
-    margin-right: auto;
+.ai-message h1 {
+    font-size: 21px;
+}
+
+.ai-message h2 {
+    font-size: 18px;
+}
+
+.ai-message h3 {
+    font-size: 16px;
+}
+
+.ai-message h4 {
+    font-size: 15px;
+}
+
+/* الفقرات */
+.ai-message p {
+    margin: 8px 0;
+}
+
+/* القوائم */
+.ai-message ul,
+.ai-message ol {
+    margin: 8px 0;
+    padding-right: 28px;
+}
+
+.ai-message li {
+    margin: 4px 0;
+}
+
+/* النص العريض */
+.ai-message strong {
+    font-weight: 700;
+}
+
+/* النص المائل */
+.ai-message em {
+    font-style: italic;
+}
+
+/* الاقتباسات */
+.ai-message blockquote {
+    margin: 12px 0;
+    padding: 8px 14px;
+    border-right: 3px solid #999;
+    background: rgba(0, 0, 0, 0.04);
+}
+
+/* الكود داخل السطر */
+.ai-message code {
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.08);
+    direction: ltr;
+    unicode-bidi: embed;
+    font-family: Consolas, "Courier New", monospace;
+}
+
+/* كتلة الكود */
+.ai-message pre {
+    margin: 12px 0;
+    padding: 12px;
+    overflow-x: auto;
+    border-radius: 8px;
+    background: #f5f5f5;
+    direction: ltr;
+    text-align: left;
+    white-space: pre-wrap;
+}
+
+.ai-message pre code {
+    padding: 0;
+    background: transparent;
+    direction: ltr;
+}
+
+/* ======================================
+   الجداول
+   ====================================== */
+
+.ai-message table {
+    width: 100%;
+    margin: 16px 0;
+    border-collapse: collapse;
+    direction: rtl;
+    text-align: right;
+    font-size: 13px;
+}
+
+.ai-message th,
+.ai-message td {
+    padding: 8px 10px;
+    border: 1px solid #d6d6d6;
+    vertical-align: top;
+}
+
+.ai-message th {
+    font-weight: 600;
+    background: #f3f3f3;
+}
+
+.ai-message tr:nth-child(even) {
+    background: #fafafa;
+}
+
+/* حتى لا تكسر الجداول مساحة الشات */
+.ai-message table {
+    display: block;
+    overflow-x: auto;
+}
+
+/* الروابط */
+.ai-message a {
+    text-decoration: underline;
+}
+
+/* الخط الفاصل */
+.ai-message hr {
+    margin: 18px 0;
+    border: 0;
+    border-top: 1px solid #ddd;
+}
+
+/* الصور إن ظهرت في Markdown */
+.ai-message img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+
+/* منع خروج العناصر من مساحة الرسالة */
+.ai-message * {
+    max-width: 100%;
 }
 
 
