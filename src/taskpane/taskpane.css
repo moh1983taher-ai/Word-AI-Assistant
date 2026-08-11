@@ -2563,13 +2563,34 @@ body.dark #save-settings,
    ========================================================= */
 
 #expanded-sidebar {
+    position: fixed;
+
+    left: 0;
+    top: 0;
+
+    width: 240px;
+    height: 100vh;
+
+    background: #ffffff;
+
+    border-right: 1px solid #ddd;
+
+    box-shadow:
+        5px 0 18px rgba(0, 0, 0, 0.08);
+
     transform: translateX(-100%);
-}
 
-#expanded-sidebar.open {
-    transform: translateX(0);
-}
+    transition:
+        transform 0.25s ease;
 
+    z-index: 1000;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    scrollbar-width: thin;
+    scrollbar-color: #c7c7c7 transparent;
+}
 
 /* =========================================================
    END
