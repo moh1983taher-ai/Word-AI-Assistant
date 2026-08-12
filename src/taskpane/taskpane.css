@@ -2953,25 +2953,27 @@ body.dark #save-settings,
     display: block;
 }
 /* =========================================================
-   EXPANDED SIDEBAR
-   نافذة مستقلة عن الشريط الجانبي
-   ========================================================= */
+EXPANDED SIDEBAR
+القائمة الموسعة تغطي الشريط تقريبًا
+وتترك مساحة صغيرة لزر الدعم
+========================================================= */
 
 #expanded-sidebar {
     position: fixed !important;
 
-    /* تبدأ بعد الشريط الحقيقي مباشرة */
-    left: 52px !important;
-    right: 0 !important;
+    /* تبدأ من أقصى اليسار */
+    left: 0 !important;
+
+    /* مساحة صغيرة في الطرف الآخر لزر الدعم */
+    right: 44px !important;
 
     /* الموضع العمودي */
     top: 45px !important;
     bottom: 0 !important;
 
-    /* العرض يُحسب تلقائيًا من 52px إلى نهاية الشاشة */
+    /* العرض يحسب تلقائيًا */
     width: auto !important;
 
-    /* الارتفاع يُحسب من top إلى bottom */
     height: auto !important;
 
     margin: 0 !important;
@@ -2983,16 +2985,18 @@ body.dark #save-settings,
     border-left: none;
 
     box-shadow:
-        5px 0 18px rgba(0, 0, 0, 0.08);
+        0 5px 18px rgba(0, 0, 0, 0.10);
 
-    /* مخفية */
-    transform: translateX(calc(-100% - 52px)) !important;
+    /* مخفية خارج الشاشة */
+    transform: translateX(-100%) !important;
 
     transition:
         transform 0.25s ease;
 
-    /* أسفل الشريط الجانبي */
-    z-index: 90 !important;
+    /*
+       فوق الشريط الجانبي
+    */
+    z-index: 2100 !important;
 
     overflow-y: auto;
     overflow-x: hidden;
@@ -3000,7 +3004,6 @@ body.dark #save-settings,
     scrollbar-width: thin;
     scrollbar-color: #c7c7c7 transparent;
 }
-
 
 /* =========================================================
    فتح القائمة
