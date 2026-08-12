@@ -33,6 +33,28 @@ document.getElementById("expanded-sidebar");
 const sidebarToggleBtn =
 document.getElementById("sidebar-toggle-btn");
 
+const expandedSidebarToggleSlot =
+document.getElementById(
+    "expanded-sidebar-toggle-slot"
+);
+
+const sidebarTogglePlaceholder =
+    document.createComment(
+        "sidebar-toggle-placeholder"
+    );
+
+if (
+    sidebarToggleBtn &&
+    sidebarToggleBtn.parentNode
+) {
+
+    sidebarToggleBtn.parentNode.insertBefore(
+        sidebarTogglePlaceholder,
+        sidebarToggleBtn
+    );
+
+}
+
 const input =
 document.getElementById("user-input");
 
@@ -1188,11 +1210,26 @@ sidebarToggleBtn.onclick = function (e) {
     e.preventDefault();
     e.stopPropagation();
 
-    // فتح / إغلاق القائمة
-    expandedSidebar.classList.toggle("open");
+    if (
+        !expandedSidebar ||
+        !sidebarToggleBtn ||
+        !expandedSidebarToggleSlot
+    ) {
+        return;
+    }
 
-    // تحديث حالة الزر فقط
-    if (expandedSidebar.classList.contains("open")) {
+
+    const isOpening =
+        !expandedSidebar.classList.contains("open");
+
+
+    /* =================================================
+       فتح القائمة
+       ================================================= */
+
+    if (isOpening) {
+
+        expandedSidebar.classList.add("open");
 
         sidebarToggleBtn.title =
             "إخفاء القائمة";
@@ -1201,7 +1238,22 @@ sidebarToggleBtn.onclick = function (e) {
             "sidebar-open"
         );
 
-    } else {
+
+        /* نقل نفس الزر إلى رأس القائمة */
+        expandedSidebarToggleSlot.appendChild(
+            sidebarToggleBtn
+        );
+
+    }
+
+
+    /* =================================================
+       إغلاق القائمة
+       ================================================= */
+
+    else {
+
+        expandedSidebar.classList.remove("open");
 
         sidebarToggleBtn.title =
             "إظهار القائمة";
@@ -1209,6 +1261,19 @@ sidebarToggleBtn.onclick = function (e) {
         sidebarToggleBtn.classList.remove(
             "sidebar-open"
         );
+
+
+        /* إعادة نفس الزر إلى مكانه الأصلي */
+        if (
+            sidebarTogglePlaceholder.parentNode
+        ) {
+
+            sidebarTogglePlaceholder.parentNode.insertBefore(
+                sidebarToggleBtn,
+                sidebarTogglePlaceholder.nextSibling
+            );
+
+        }
 
     }
 
