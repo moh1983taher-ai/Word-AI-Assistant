@@ -67,15 +67,11 @@ body {
 }
 
 /* =========================================================
-   إيقاف حساسية الشريط عند فتح القائمة الموسعة
+   تعطيل حساسية الشريط المصغر أثناء فتح القائمة الموسعة
    ========================================================= */
 
-body.expanded-sidebar-open .sidebar:hover {
-    transform: translateX(0) !important;
-}
-
-body.expanded-sidebar-open .sidebar-hover-zone:hover + .sidebar {
-    transform: translateX(0) !important;
+body.expanded-sidebar-open .sidebar {
+    pointer-events: none !important;
 }
 
 /* =========================================================
