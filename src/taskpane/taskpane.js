@@ -1218,18 +1218,21 @@ sidebarToggleBtn.onclick = function (e) {
         return;
     }
 
-
     const isOpening =
         !expandedSidebar.classList.contains("open");
 
 
-    /* =================================================
+    /* =========================================
        فتح القائمة
-       ================================================= */
+       ========================================= */
 
     if (isOpening) {
 
         expandedSidebar.classList.add("open");
+
+        document.body.classList.add(
+            "expanded-sidebar-open"
+        );
 
         sidebarToggleBtn.title =
             "إخفاء القائمة";
@@ -1238,8 +1241,7 @@ sidebarToggleBtn.onclick = function (e) {
             "sidebar-open"
         );
 
-
-        /* نقل نفس الزر إلى رأس القائمة */
+        /* نقل نفس الزر إلى داخل القائمة */
         expandedSidebarToggleSlot.appendChild(
             sidebarToggleBtn
         );
@@ -1247,13 +1249,17 @@ sidebarToggleBtn.onclick = function (e) {
     }
 
 
-    /* =================================================
+    /* =========================================
        إغلاق القائمة
-       ================================================= */
+       ========================================= */
 
     else {
 
         expandedSidebar.classList.remove("open");
+
+        document.body.classList.remove(
+            "expanded-sidebar-open"
+        );
 
         sidebarToggleBtn.title =
             "إظهار القائمة";
@@ -1262,8 +1268,7 @@ sidebarToggleBtn.onclick = function (e) {
             "sidebar-open"
         );
 
-
-        /* إعادة نفس الزر إلى مكانه الأصلي */
+        /* إعادة الزر إلى مكانه الأصلي */
         if (
             sidebarTogglePlaceholder.parentNode
         ) {
@@ -1278,7 +1283,6 @@ sidebarToggleBtn.onclick = function (e) {
     }
 
 };
-
 
 }
 

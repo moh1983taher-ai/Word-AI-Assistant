@@ -1529,6 +1529,8 @@ body {
 
     display: flex;
     flex-direction: column;
+
+    transition: margin-left 0.25s ease;
 }
 
 /* =========================================================
@@ -2955,23 +2957,18 @@ body.dark #save-settings,
 
 /* =========================================================
    EXPANDED SIDEBAR
-   نافذة القائمة الجانبية الموسعة
+   لا تظهر إلا عند الضغط على زر القائمة
    ========================================================= */
 
 #expanded-sidebar {
     position: fixed !important;
 
-    /* نقص بسيط جدًا من الجهة اليسرى */
     left: 5px !important;
-
-    /* تمتد حتى نهاية الشاشة من اليمين */
     right: 0 !important;
 
-    /* كامل ارتفاع الشاشة */
     top: 0 !important;
     bottom: 0 !important;
 
-    /* العرض يحسب تلقائيًا */
     width: auto !important;
     height: auto !important;
 
@@ -2986,9 +2983,7 @@ body.dark #save-settings,
     box-shadow:
         0 5px 18px rgba(0, 0, 0, 0.10);
 
-    /*
-       مخفية بالكامل عند تشغيل الأداة
-    */
+    /* مخفية بالكامل عند التشغيل */
     transform: translate3d(-110%, 0, 0) !important;
 
     opacity: 0 !important;
@@ -3000,9 +2995,6 @@ body.dark #save-settings,
         opacity 0.18s ease,
         visibility 0.25s ease;
 
-    /*
-       أعلى من الشريط الجانبي
-    */
     z-index: 2100 !important;
 
     overflow-y: auto;
@@ -3014,7 +3006,7 @@ body.dark #save-settings,
 
 
 /* =========================================================
-   فتح القائمة
+   عند فتح القائمة
    ========================================================= */
 
 #expanded-sidebar.open {
@@ -3071,11 +3063,12 @@ body.dark #save-settings,
     transition: margin-left 0.25s ease;
 }
 
-/* عند تثبيت الشريط:
-   نترك مساحة 52px للشريط حتى لا يغطي الدردشة */
-body.sidebar-is-pinned .main {
+/* عند تثبيت الشريط والقائمة مغلقة */
+body.sidebar-is-pinned:not(.expanded-sidebar-open) .main {
     margin-left: 52px;
 }
+
+
 
 /* =========================================================
    الحفاظ على زر الإرسال داخل المساحة المتاحة
