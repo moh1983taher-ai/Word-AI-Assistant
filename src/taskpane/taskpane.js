@@ -18,6 +18,353 @@ document.getElementById("projects-popup");
 const projectsList =
 document.getElementById("projects-list");
 
+const documentsList =
+document.getElementById("documents-list");
+
+const addDocumentBtn =
+document.getElementById("add-document-btn");
+
+// ======================================
+// Add Document Button
+// ======================================
+
+if (addDocumentBtn) {
+
+    addDocumentBtn.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            // يجب اختيار مشروع أولًا
+            if (!currentProject) {
+
+                alert(
+                    "يرجى اختيار مشروع أولًا."
+                );
+
+                return;
+            }
+
+
+            // منع إنشاء أكثر من نافذة
+            const oldBox =
+                document.querySelector(
+                    ".document-create-box"
+                );
+
+
+            if (oldBox) {
+
+                oldBox.remove();
+
+            }
+
+
+            // إنشاء صندوق الإضافة
+            const box =
+                document.createElement(
+                    "div"
+                );
+
+
+            box.className =
+                "document-create-box";
+
+
+            box.innerHTML = `
+
+                <input
+                    type="text"
+                    class="new-document-name"
+                    placeholder="اسم المستند">
+
+                <button
+                    type="button"
+                    class="save-document">
+
+                    إضافة
+
+                </button>
+
+                <button
+                    type="button"
+                    class="cancel-document">
+
+                    إلغاء
+
+                </button>
+
+            `;
+
+
+            document.body.appendChild(
+                box
+            );
+
+
+            // الموضع
+            const rect =
+                addDocumentBtn.getBoundingClientRect();
+
+
+            const boxWidth =
+                240;
+
+            const boxHeight =
+                120;
+
+            const margin =
+                10;
+
+
+            let left =
+                rect.left;
+
+            let top =
+                rect.bottom + 8;
+
+
+            if (
+                left + boxWidth >
+                window.innerWidth - margin
+            ) {
+
+                left =
+                    window.innerWidth -
+                    boxWidth -
+                    margin;
+
+            }
+
+
+            if (
+                left < margin
+            ) {
+
+                left =
+                    margin;
+
+            }
+
+
+            if (
+                top + boxHeight >
+                window.innerHeight - margin
+            ) {
+
+                top =
+                    rect.top -
+                    boxHeight -
+                    8;
+
+            }
+
+
+            box.style.position =
+                "fixed";
+
+            box.style.left =
+                left + "px";
+
+            box.style.top =
+                top + "px";
+
+            box.style.width =
+                boxWidth + "px";
+
+            box.style.zIndex =
+                "999999";
+
+
+            // حقل الاسم
+            const nameInput =
+                box.querySelector(
+                    ".new-document-name"
+                );
+
+
+            if (nameInput) {
+
+                nameInput.focus();
+
+            }
+
+
+            // زر الحفظ
+            const saveButton =
+                box.querySelector(
+                    ".save-document"
+                );
+
+
+            if (saveButton) {
+
+                saveButton.onclick =
+                    function () {
+
+                        const name =
+                            nameInput
+                                ? nameInput.value.trim()
+                                : "";
+
+
+                        if (!name) {
+
+                            return;
+
+                        }
+
+
+                        const projectDocuments =
+                            getProjectDocuments(
+                                currentProject.id
+                            );
+
+
+                        const nextOrder =
+                            projectDocuments.length + 1;
+
+
+                        const documentItem =
+                            createDocument(
+                                name,
+                                currentProject.id,
+                                nextOrder
+                            );
+
+
+                        attachDocumentToProject(
+                            currentProject,
+                            documentItem
+                        );
+
+
+                        renderDocuments();
+
+
+                        box.remove();
+
+                    };
+
+            }
+
+
+            // زر الإلغاء
+            const cancelButton =
+                box.querySelector(
+                    ".cancel-document"
+                );
+
+
+            if (cancelButton) {
+
+                cancelButton.onclick =
+                    function () {
+
+                        box.remove();
+
+                    };
+
+            }
+
+
+            // منع إغلاق الصندوق بسبب الأحداث الخارجية
+            box.onclick =
+                function (event) {
+
+                    event.stopPropagation();
+
+                };
+
+        };
+
+}
+// ======================================
+// Render Project Documents
+// ======================================
+
+function renderDocuments() {
+
+    if (!documentsList)
+        return;
+
+
+    documentsList.innerHTML = "";
+
+
+    // لا يوجد مشروع محدد
+    if (!currentProject) {
+
+        documentsList.innerHTML = `
+            <div class="empty-document">
+                اختر مشروعًا لعرض مستنداته
+            </div>
+        `;
+
+        return;
+    }
+
+
+    const projectDocuments =
+        getProjectDocuments(
+            currentProject.id
+        );
+
+
+    // لا توجد مستندات
+    if (
+        projectDocuments.length === 0
+    ) {
+
+        documentsList.innerHTML = `
+            <div class="empty-document">
+                لا توجد مستندات
+            </div>
+        `;
+
+        return;
+    }
+
+
+    // عرض المستندات
+    projectDocuments.forEach(
+        function (documentItem) {
+
+            const item =
+                document.createElement("div");
+
+
+            item.className =
+                "document-item";
+
+
+            item.innerHTML = `
+                <span class="document-title">
+                    ${documentItem.name}
+                </span>
+
+                <button
+                    class="document-menu"
+                    type="button"
+                    title="خيارات المستند">
+
+                    ⋮
+
+                </button>
+            `;
+
+
+            documentsList.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
+
 const newProjectBtn =
 document.getElementById("new-project-btn");
 
@@ -130,6 +477,8 @@ document.getElementById("search-results");
 const searchBtn =
 document.getElementById("search-btn");
 
+
+
 // ======================================
 // Projects System
 // ======================================
@@ -138,27 +487,280 @@ let projects = [];
 
 try {
 
-
-projects =
-    JSON.parse(
-        localStorage.getItem(
-            "WORD_AI_PROJECTS"
-        )
-    ) || [];
-
+    projects =
+        JSON.parse(
+            localStorage.getItem(
+                "WORD_AI_PROJECTS"
+            )
+        ) || [];
 
 }
 catch (e) {
 
-
-projects = [];
-
+    projects = [];
 
 }
+
+
+/* ======================================
+   ضمان البنية الجديدة للمشاريع
+   ====================================== */
+
+projects =
+    projects
+        .filter(function (project) {
+
+            return (
+                project &&
+                typeof project === "object"
+            );
+
+        })
+        .map(function (project) {
+
+            const now =
+                new Date().toISOString();
+
+            return {
+
+                id:
+                    project.id ||
+                    Date.now(),
+
+                name:
+                    project.name ||
+                    "مشروع جديد",
+
+                createdAt:
+                    project.createdAt ||
+                    now,
+
+                updatedAt:
+                    project.updatedAt ||
+                    now,
+
+                documents:
+                    Array.isArray(
+                        project.documents
+                    )
+                        ? project.documents
+                        : [],
+
+                references:
+                    Array.isArray(
+                        project.references
+                    )
+                        ? project.references
+                        : [],
+
+                chatIds:
+                    Array.isArray(
+                        project.chatIds
+                    )
+                        ? project.chatIds
+                        : [],
+
+                settings:
+                    project.settings &&
+                    typeof project.settings === "object"
+                        ? project.settings
+                        : {
+                            citationStyle: "",
+                            notes: ""
+                        }
+
+            };
+
+        });
+
 
 let currentProject = null;
 
 
+// ======================================
+// Documents System
+// ======================================
+
+let documents = [];
+
+try {
+
+    documents =
+        JSON.parse(
+            localStorage.getItem(
+                "WORD_AI_DOCUMENTS"
+            )
+        ) || [];
+
+}
+catch (e) {
+
+    documents = [];
+
+}
+
+
+// ======================================
+// Save Documents
+// ======================================
+
+function saveDocuments() {
+
+    localStorage.setItem(
+        "WORD_AI_DOCUMENTS",
+        JSON.stringify(documents)
+    );
+
+}
+
+
+// ======================================
+// Create Document
+// ======================================
+
+function createDocument(
+    name,
+    projectId,
+    order
+) {
+
+    const now =
+        new Date().toISOString();
+
+    const documentItem = {
+
+        id:
+            Date.now(),
+
+        projectId:
+            projectId,
+
+        name:
+            name ||
+            "مستند جديد",
+
+        order:
+            typeof order === "number"
+                ? order
+                : 0,
+
+        type:
+            "word",
+
+        createdAt:
+            now,
+
+        updatedAt:
+            now
+
+    };
+
+    documents.push(
+        documentItem
+    );
+
+    saveDocuments();
+
+    return documentItem;
+
+}
+
+
+// ======================================
+// Get Project Documents
+// ======================================
+
+function getProjectDocuments(
+    projectId
+) {
+
+    if (!projectId)
+        return [];
+
+    return documents
+        .filter(function (documentItem) {
+
+            return (
+                documentItem &&
+                documentItem.projectId ===
+                    projectId
+            );
+
+        })
+        .sort(function (a, b) {
+
+            return (
+                a.order -
+                b.order
+            );
+
+        });
+
+}
+
+
+// ======================================
+// Update Document Timestamp
+// ======================================
+
+function touchDocument(
+    documentItem
+) {
+
+    if (!documentItem)
+        return;
+
+    documentItem.updatedAt =
+        new Date().toISOString();
+
+}
+
+
+// ======================================
+// Attach Document To Project
+// ======================================
+
+function attachDocumentToProject(
+    project,
+    documentItem
+) {
+
+    if (
+        !project ||
+        !documentItem
+    ) {
+        return;
+    }
+
+    if (
+        !Array.isArray(
+            project.documents
+        )
+    ) {
+
+        project.documents =
+            [];
+
+    }
+
+    if (
+        !project.documents.includes(
+            documentItem.id
+        )
+    ) {
+
+        project.documents.push(
+            documentItem.id
+        );
+
+        project.updatedAt =
+            new Date().toISOString();
+
+        saveProjects();
+
+    }
+
+}
 // ======================================
 // Project Icon
 // ======================================
@@ -212,6 +814,29 @@ function saveProjects() {
 
 }
 
+// ======================================
+// Set Active Project
+// ======================================
+
+function setCurrentProject(project) {
+
+    if (!project) {
+
+        currentProject = null;
+
+        renderDocuments();
+
+        return;
+    }
+
+
+    currentProject =
+        project;
+
+
+    renderDocuments();
+
+}
 
 // ======================================
 // Chat System
@@ -424,12 +1049,14 @@ projects.forEach(function (project) {
     `;
 
 
-    item.onclick =
-        function () {
+        item.onclick =
+        function (e) {
 
-            currentProject =
-                project;
+            e.stopPropagation();
 
+            setCurrentProject(
+                project
+            );
 
             if (projectsPopup) {
 
@@ -1137,18 +1764,49 @@ newProjectBtn.onclick =
 
                     if (name !== "") {
 
-                        projects.unshift({
+                        const now =
+    new Date().toISOString();
 
-                            id:
-                                Date.now(),
 
-                            name:
-                                name,
+                const newProject = {
 
-                            chats:
-                                []
+                    id:
+                        Date.now(),
 
-                        });
+                    name:
+                        name,
+
+                    createdAt:
+                        now,
+
+                    updatedAt:
+                        now,
+
+                    documents:
+                        [],
+
+                    references:
+                        [],
+
+                    chatIds:
+                        [],
+
+                    settings: {
+
+                        citationStyle:
+                            "",
+
+                        notes:
+                            ""
+
+                    }
+
+                };
+
+
+                projects.unshift(
+                    newProject
+                );
 
 
                         saveProjects();
@@ -1330,16 +1988,16 @@ projects.forEach(
         `;
 
 
-        item.onclick =
-            function (e) {
+            item.onclick =
+        function (e) {
 
-                e.stopPropagation();
+            e.stopPropagation();
 
+            setCurrentProject(
+                project
+            );
 
-                currentProject =
-                    project;
-
-            };
+        };
 
 
         list.appendChild(
@@ -1465,7 +2123,12 @@ currentChat = {
         [],
 
     isTemporary:
-        true
+        true,
+
+    projectId:
+        currentProject
+            ? currentProject.id
+            : null
 
 };
 
@@ -4613,7 +5276,10 @@ async function sendMessage() {
 
         currentChat.isTemporary =
             false;
-
+        currentChat.projectId =
+            currentProject
+                ? currentProject.id
+                : null;
         currentChat.title =
             text.substring(0, 30);
 
@@ -4637,7 +5303,42 @@ async function sendMessage() {
             );
 
         }
+        if (
+            currentProject &&
+            currentChat.projectId ===
+                currentProject.id
+        ) {
 
+            if (
+                !Array.isArray(
+                    currentProject.chatIds
+                )
+            ) {
+
+                currentProject.chatIds =
+                    [];
+
+            }
+
+
+            if (
+                !currentProject.chatIds.includes(
+                    currentChat.id
+                )
+            ) {
+
+                currentProject.chatIds.push(
+                    currentChat.id
+                );
+
+                currentProject.updatedAt =
+                    new Date().toISOString();
+
+                saveProjects();
+
+            }
+
+        }
 
         // حفظ المحادثة مباشرة
         saveChats();
@@ -4874,6 +5575,8 @@ initializeSidebarSections();
 renderProjects();
 
 renderExpandedProjects();
+
+renderDocuments();
 
 renderChatList();
 
