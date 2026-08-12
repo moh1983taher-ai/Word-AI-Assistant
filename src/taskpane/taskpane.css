@@ -3083,5 +3083,48 @@ body.sidebar-is-pinned #expanded-sidebar {
 }
 
 /* =========================================================
+   زر القائمة داخل رأس القائمة الموسعة
+   ========================================================= */
+
+#expanded-sidebar .expand-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* مكان زر القائمة داخل الرأس */
+#expanded-sidebar-toggle-slot {
+    width: 34px;
+    height: 34px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+}
+
+/* عندما ينتقل الزر إلى القائمة */
+#expanded-sidebar-toggle-slot #sidebar-toggle-btn {
+    display: flex;
+}
+
+/* حالة فتح القائمة */
+#sidebar-toggle-btn.sidebar-open {
+    background: transparent;
+}
+
+/* حركة بسيطة للأيقونة */
+#sidebar-toggle-btn {
+    transition:
+        transform 0.22s ease,
+        background 0.18s ease;
+}
+
+#sidebar-toggle-btn.sidebar-open svg {
+    transform: rotate(180deg);
+}
+
+/* =========================================================
    END
    ========================================================= */

@@ -1191,18 +1191,27 @@ sidebarToggleBtn.onclick = function (e) {
     // فتح / إغلاق القائمة
     expandedSidebar.classList.toggle("open");
 
-    // تحديث شكل الزر
+    // تحديث حالة الزر فقط
     if (expandedSidebar.classList.contains("open")) {
 
-        sidebarToggleBtn.innerHTML = "×";
-        sidebarToggleBtn.title = "إخفاء القائمة";
+        sidebarToggleBtn.title =
+            "إخفاء القائمة";
+
+        sidebarToggleBtn.classList.add(
+            "sidebar-open"
+        );
 
     } else {
 
-        sidebarToggleBtn.innerHTML = "☰";
-        sidebarToggleBtn.title = "إظهار القائمة";
+        sidebarToggleBtn.title =
+            "إظهار القائمة";
+
+        sidebarToggleBtn.classList.remove(
+            "sidebar-open"
+        );
 
     }
+
 };
 
 
