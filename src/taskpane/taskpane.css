@@ -2952,32 +2952,31 @@ body.dark #save-settings,
     flex-shrink: 0;
     display: block;
 }
+
 /* =========================================================
-EXPANDED SIDEBAR
-القائمة الموسعة تغطي الشريط تقريبًا
-وتترك مساحة صغيرة لزر الدعم
-========================================================= */
+   EXPANDED SIDEBAR
+   نافذة القائمة الجانبية الموسعة
+   ========================================================= */
 
 #expanded-sidebar {
     position: fixed !important;
 
-    /* تبدأ من أقصى اليسار */
-    left: 0 !important;
+    /* نقص بسيط جدًا من الجهة اليسرى */
+    left: 5px !important;
 
-    /* مساحة صغيرة في الطرف الآخر لزر الدعم */
-    right: 44px !important;
+    /* تمتد حتى نهاية الشاشة من اليمين */
+    right: 0 !important;
 
-    /* الموضع العمودي */
-    top: 45px !important;
+    /* كامل ارتفاع الشاشة */
+    top: 0 !important;
     bottom: 0 !important;
 
     /* العرض يحسب تلقائيًا */
     width: auto !important;
-
     height: auto !important;
 
     margin: 0 !important;
-    padding: 0;
+    padding: 0 !important;
 
     background: #ffffff;
 
@@ -2987,14 +2986,22 @@ EXPANDED SIDEBAR
     box-shadow:
         0 5px 18px rgba(0, 0, 0, 0.10);
 
-    /* مخفية خارج الشاشة */
-    transform: translateX(-100%) !important;
+    /*
+       مخفية بالكامل عند تشغيل الأداة
+    */
+    transform: translate3d(-110%, 0, 0) !important;
+
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 
     transition:
-        transform 0.25s ease;
+        transform 0.25s ease,
+        opacity 0.18s ease,
+        visibility 0.25s ease;
 
     /*
-       فوق الشريط الجانبي
+       أعلى من الشريط الجانبي
     */
     z-index: 2100 !important;
 
@@ -3005,12 +3012,17 @@ EXPANDED SIDEBAR
     scrollbar-color: #c7c7c7 transparent;
 }
 
+
 /* =========================================================
    فتح القائمة
    ========================================================= */
 
 #expanded-sidebar.open {
-    transform: translateX(0) !important;
+    transform: translate3d(0, 0, 0) !important;
+
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
 }
 
 
