@@ -3101,10 +3101,11 @@ body.sidebar-is-pinned .message-box {
 }
 
 /* =========================================================
-   لا نغيّر موضع القائمة المنبثقة
+   موضع القائمة عند تثبيت الشريط
+   يعمل فقط عندما تكون القائمة الموسعة مغلقة
    ========================================================= */
 
-body.sidebar-is-pinned #expanded-sidebar {
+body.sidebar-is-pinned:not(.expanded-sidebar-open) #expanded-sidebar {
     left: 52px !important;
 }
 
