@@ -66,6 +66,17 @@ body {
         box-shadow 0.22s ease;
 }
 
+/* =========================================================
+   إيقاف حساسية الشريط عند فتح القائمة الموسعة
+   ========================================================= */
+
+body.expanded-sidebar-open .sidebar:hover {
+    transform: translateX(0) !important;
+}
+
+body.expanded-sidebar-open .sidebar-hover-zone:hover + .sidebar {
+    transform: translateX(0) !important;
+}
 
 /* =========================================================
    منطقة حساسة على حافة الشاشة
