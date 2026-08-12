@@ -2981,8 +2981,8 @@ body.dark #save-settings,
 #expanded-sidebar {
     position: fixed !important;
 
-    left: 5px !important;
-    right: 0 !important;
+    left: 0 !important;
+    right: 5px !important;
 
     top: 0 !important;
     bottom: 0 !important;
