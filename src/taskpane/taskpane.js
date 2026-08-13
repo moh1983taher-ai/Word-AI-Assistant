@@ -123,7 +123,11 @@ function renderDocuments() {
             ) {
 
                 status.textContent =
-                    "✓ مفهرس";
+                    "✓ مفهرس · " +
+                    documentItem.indexTokenCount +
+                    " كلمة · " +
+                    documentItem.indexUniqueTerms +
+                    " فريدة";
 
             }
             else if (
@@ -1066,20 +1070,22 @@ try {
             .map(function (documentItem) {
 
                 if (
-                    !documentItem.readStatus
+                    typeof documentItem.indexTokenCount !==
+                    "number"
                 ) {
 
-                    documentItem.readStatus =
-                        "new";
+                    documentItem.indexTokenCount =
+                        0;
 
                 }
 
                 if (
-                    !documentItem.indexStatus
+                    typeof documentItem.indexUniqueTerms !==
+                    "number"
                 ) {
 
-                    documentItem.indexStatus =
-                        "new";
+                    documentItem.indexUniqueTerms =
+                        0;
 
                 }
 
@@ -1771,6 +1777,155 @@ async function getDocumentIndex(
     );
 
 }
+
+// ======================================
+// Search Indexed Document
+// ======================================
+
+async function searchIndexedDocument(
+    documentId,
+    query
+) {
+
+    const searchTerm =
+        normalizeSearchText(
+            query
+        );
+
+
+    if (!searchTerm) {
+
+        return {
+
+            query:
+                "",
+
+            count:
+                0,
+
+            results:
+                []
+
+        };
+
+    }
+
+
+    const indexData =
+        await getDocumentIndex(
+            documentId
+        );
+
+
+    if (!indexData) {
+
+        throw new Error(
+            "لا يوجد فهرس لهذا المستند."
+        );
+
+    }
+
+
+    const textData =
+        await getDocumentText(
+            documentId
+        );
+
+
+    if (!textData) {
+
+        throw new Error(
+            "لا يوجد نص مفهرس لهذا المستند."
+        );
+
+    }
+
+
+    const originalText =
+        String(
+            textData.text || ""
+        );
+
+
+    const normalizedText =
+        normalizeSearchText(
+            originalText
+        );
+
+
+    const results = [];
+
+
+    let position =
+        normalizedText.indexOf(
+            searchTerm
+        );
+
+
+    while (
+        position !== -1
+    ) {
+
+        const start =
+            Math.max(
+                0,
+                position - 80
+            );
+
+
+        const end =
+            Math.min(
+                normalizedText.length,
+                position +
+                searchTerm.length +
+                120
+            );
+
+
+        results.push({
+
+            position:
+                position,
+
+            context:
+                normalizedText.substring(
+                    start,
+                    end
+                )
+
+        });
+
+
+        position =
+            normalizedText.indexOf(
+                searchTerm,
+                position +
+                searchTerm.length
+            );
+
+    }
+
+
+    return {
+
+        query:
+            searchTerm,
+
+        count:
+            results.length,
+
+        results:
+            results,
+
+        indexTokenCount:
+            indexData.tokenCount,
+
+        indexUniqueTerms:
+            indexData.uniqueTerms
+
+    };
+
+}
 // ======================================
 // Delete Working Word File
 // ======================================
@@ -2275,12 +2430,29 @@ async function readCurrentWordDocument(
                     text
                 );
 
-
             await saveDocumentIndex(
                 documentItem.id,
                 indexData
             );
 
+
+            // ==================================
+            // حفظ إحصاءات الفهرس مع المستند
+            // ==================================
+
+            documentItem.indexTokenCount =
+                indexData.tokenCount;
+
+            documentItem.indexUniqueTerms =
+                indexData.uniqueTerms;
+
+            documentItem.indexUpdatedAt =
+                indexData.updatedAt;
+
+
+            // ==================================
+            // تثبيت حالة الفهرسة
+            // ==================================
 
             updateDocumentIndexStatus(
                 documentItem,
