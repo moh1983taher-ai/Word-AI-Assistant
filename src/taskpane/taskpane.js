@@ -1637,11 +1637,14 @@ function setCurrentDocument(documentItem) {
 
     }
 
-    readCurrentWordDocument()
+
+    readCurrentWordDocument(
+        documentItem
+    )
     .then(function (text) {
 
         console.log(
-            "محتوى مستند Word الحالي:",
+            "محتوى نسخة العمل:",
             text
         );
 
@@ -1649,53 +1652,101 @@ function setCurrentDocument(documentItem) {
     .catch(function (error) {
 
         console.error(
-            "تعذر قراءة مستند Word:",
+            "تعذر قراءة نسخة العمل:",
             error
         );
 
     });
+
 
     // إعادة رسم القائمة لإظهار المستند النشط
     renderDocuments();
 
 }
 // ======================================
-// Read Active Word Document
+// Read Current Working Document
 // ======================================
 
-async function readCurrentWordDocument() {
+async function readCurrentWordDocument(
+    documentItem
+) {
 
-    try {
+    if (!documentItem) {
 
-        const result =
-            await Word.run(async function (context) {
+        throw new Error(
+            "لم يتم تحديد المستند."
+        );
+
+    }
+
+
+    if (
+        !Office.context.requirements.isSetSupported(
+            "WordApiHiddenDocument",
+            "1.3"
+        )
+    ) {
+
+        throw new Error(
+            "إصدار Word الحالي لا يدعم قراءة نسخة العمل."
+        );
+
+    }
+
+
+    const file =
+        await getWorkingWordFile(
+            documentItem.storageId
+        );
+
+
+    if (!file) {
+
+        throw new Error(
+            "لم يتم العثور على نسخة العمل."
+        );
+
+    }
+
+
+    const base64 =
+        await fileToBase64(
+            file
+        );
+
+
+    const text =
+        await Word.run(
+            async function (context) {
+
+                const workingDocument =
+                    context.application.createDocument(
+                        base64
+                    );
+
 
                 const body =
-                    context.document.body;
+                    workingDocument.body;
 
-                const text =
-                    body.getText();
+
+                body.load(
+                    "text"
+                );
+
 
                 await context.sync();
 
-                return text.value || "";
 
-            });
+                return (
+                    body.text ||
+                    ""
+                );
 
-        return result;
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "فشل قراءة مستند Word:",
-            error
+            }
         );
 
-        throw error;
 
-    }
+    return text;
 
 }
 // ======================================
