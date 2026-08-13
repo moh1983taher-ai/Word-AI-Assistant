@@ -1125,9 +1125,65 @@ function setCurrentDocument(documentItem) {
 
     }
 
+    readCurrentWordDocument()
+    .then(function (text) {
+
+        console.log(
+            "محتوى مستند Word الحالي:",
+            text
+        );
+
+    })
+    .catch(function (error) {
+
+        console.error(
+            "تعذر قراءة مستند Word:",
+            error
+        );
+
+    });
 
     // إعادة رسم القائمة لإظهار المستند النشط
     renderDocuments();
+
+}
+// ======================================
+// Read Active Word Document
+// ======================================
+
+async function readCurrentWordDocument() {
+
+    try {
+
+        const result =
+            await Word.run(async function (context) {
+
+                const body =
+                    context.document.body;
+
+                const text =
+                    body.getText();
+
+                await context.sync();
+
+                return text.value || "";
+
+            });
+
+        return result;
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "فشل قراءة مستند Word:",
+            error
+        );
+
+        throw error;
+
+    }
 
 }
 // ======================================
