@@ -3581,6 +3581,20 @@ body.sidebar-is-pinned .message-box {
 .cancel-document-delete:hover {
     background: #e2e2e2;
 }
+
+.document-title {
+    cursor: pointer;
+}
+
+.document-title:hover {
+    text-decoration: underline;
+}
+
+.document-item.active-document {
+    background: #eeeeee !important;
+    color: #111 !important;
+    border: 1px solid #dddddd;
+}
 /* =========================================================
    END
    ========================================================= */
