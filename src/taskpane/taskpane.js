@@ -816,7 +816,7 @@ if (addDocumentBtn) {
                         event.preventDefault();
                         event.stopPropagation();
 
-                        saveNewDocument();
+                        alert("تم الضغط على زر إضافة");
 
                     };
 
