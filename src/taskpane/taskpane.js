@@ -1580,7 +1580,239 @@ function normalizeSearchText(text) {
 }
 
 // ======================================
+// Arabic Search Stem / Concept Key
+// تطبيع صرفي خفيف وآمن للبحث
+// ======================================
+
+function normalizeArabicSearchWord(word) {
+
+    let w =
+        normalizeSearchText(
+            word
+        );
+
+    if (!w)
+        return "";
+
+    // إزالة الرموز غير الحرفية/الرقمية
+    w =
+        w.replace(
+            /[^\p{L}\p{N}]+/gu,
+            ""
+        );
+
+    if (!w)
+        return "";
+
+    // ----------------------------------
+    // كلمات نريد عدم اختصارها
+    // ----------------------------------
+
+    const protectedWords = new Set([
+        "الله",
+        "القران",
+        "اسلام",
+        "اسلامي",
+        "اسلامية"
+    ]);
+
+    if (
+        protectedWords.has(w)
+    ) {
+
+        return w;
+
+    }
+
+    // ==================================
+    // البادئات العربية الشائعة
+    // ==================================
+
+    const prefixes = [
+        "وال",
+        "بال",
+        "كال",
+        "فال",
+        "لل",
+        "ول",
+        "بل",
+        "فل",
+        "كل",
+        "ال"
+    ];
+
+    for (
+        let i = 0;
+        i < prefixes.length;
+        i++
+    ) {
+
+        const prefix =
+            prefixes[i];
+
+        if (
+            w.startsWith(prefix) &&
+            w.length >
+                prefix.length + 2
+        ) {
+
+            w =
+                w.substring(
+                    prefix.length
+                );
+
+            break;
+
+        }
+
+    }
+
+    // ==================================
+    // سوابق أخرى تظهر كثيرًا في البحث
+    // ==================================
+
+    const prefixes2 = [
+        "س"
+    ];
+
+    for (
+        let i = 0;
+        i < prefixes2.length;
+        i++
+    ) {
+
+        const prefix =
+            prefixes2[i];
+
+        if (
+            w.startsWith(prefix) &&
+            w.length >
+                prefix.length + 3
+        ) {
+
+            w =
+                w.substring(
+                    prefix.length
+                );
+
+            break;
+
+        }
+
+    }
+
+    // ==================================
+    // لواحق الجمع والتأنيث والنسبة
+    // ==================================
+
+    const suffixes = [
+        "يات",
+        "ات",
+        "ان",
+        "ين",
+        "ون",
+        "هما",
+        "هم",
+        "هن",
+        "ها",
+        "ية",
+        "ي",
+        "ة",
+        "ه",
+        "ك",
+        "كم",
+        "كن"
+    ];
+
+    for (
+        let i = 0;
+        i < suffixes.length;
+        i++
+    ) {
+
+        const suffix =
+            suffixes[i];
+
+        if (
+            w.endsWith(suffix) &&
+            w.length >
+                suffix.length + 2
+        ) {
+
+            w =
+                w.substring(
+                    0,
+                    w.length -
+                    suffix.length
+                );
+
+            break;
+
+        }
+
+    }
+
+    // ==================================
+    // إزالة الألف النهائية الشائعة
+    // مثل: استصلاحا ← استصلاح
+    // ==================================
+
+    if (
+        w.length > 4 &&
+        w.endsWith("ا")
+    ) {
+
+        w =
+            w.substring(
+                0,
+                w.length - 1
+            );
+
+    }
+
+    return w;
+}
+
+
+// ======================================
+// بناء مفاتيح البحث للكلمة
+// ======================================
+
+function getSearchKeysForWord(word) {
+
+    const surface =
+        normalizeSearchText(
+            word
+        );
+
+    const stem =
+        normalizeArabicSearchWord(
+            word
+        );
+
+    const keys = [];
+
+    if (surface)
+        keys.push(surface);
+
+    if (
+        stem &&
+        stem !== surface
+    ) {
+
+        keys.push(
+            stem
+        );
+
+    }
+
+    return keys;
+}
+
+
+// ======================================
 // Tokenize Document Text
+// مع إنشاء مفتاح بحث اشتقاقي
 // ======================================
 
 function tokenizeDocumentText(text) {
@@ -1590,12 +1822,10 @@ function tokenizeDocumentText(text) {
             text
         );
 
-
     const matches =
         normalized.match(
             /[\p{L}\p{N}]+/gu
         );
-
 
     return (
         matches || []
@@ -1604,6 +1834,7 @@ function tokenizeDocumentText(text) {
 }
 // ======================================
 // Build Document Index
+// الفهرسة الذكية مع التطبيع الاشتقاقي
 // ======================================
 
 function buildDocumentIndex(
@@ -1616,43 +1847,54 @@ function buildDocumentIndex(
             text
         );
 
-
     const terms = {};
-
 
     tokens.forEach(
         function (token, index) {
 
-            if (!terms[token]) {
+            const searchKeys =
+                getSearchKeysForWord(
+                    token
+                );
 
-                terms[token] = {
+            searchKeys.forEach(
+                function (key) {
 
-                    count:
-                        0,
+                    if (!key)
+                        return;
 
-                    positions:
-                        []
+                    if (!terms[key]) {
 
-                };
+                        terms[key] = {
 
-            }
+                            count:
+                                0,
 
+                            positions:
+                                []
 
-            terms[token].count += 1;
+                        };
 
+                    }
 
-            terms[token].positions.push(
-                index
+                    terms[key].count += 1;
+
+                    terms[key].positions.push(
+                        index
+                    );
+
+                }
             );
 
         }
     );
 
-
     return {
 
         documentId:
-            String(documentId),
+            String(
+                documentId
+            ),
 
         tokenCount:
             tokens.length,
@@ -2448,6 +2690,7 @@ async function testCurrentDocumentIndex() {
 }
 // ======================================
 // Search Indexed Document
+// البحث من خلال الفهرس الذكي
 // ======================================
 
 async function searchIndexedDocument(
@@ -2459,7 +2702,6 @@ async function searchIndexedDocument(
         normalizeSearchText(
             query
         );
-
 
     if (!searchTerm) {
 
@@ -2478,6 +2720,224 @@ async function searchIndexedDocument(
 
     }
 
+    // ==================================
+    // المفتاح الاشتقاقي للاستعلام
+    // ==================================
+
+    const searchStem =
+        normalizeArabicSearchWord(
+            searchTerm
+        );
+
+    // ==================================
+    // استرجاع الفهرس
+    // ==================================
+
+    const indexData =
+        await getDocumentIndex(
+            documentId
+        );
+
+    if (!indexData) {
+
+        throw new Error(
+            "لا يوجد فهرس لهذا المستند."
+        );
+
+    }
+
+    // ==================================
+    // التحقق من وجود المصطلح
+    // ==================================
+
+    const indexedTerm =
+        indexData.terms
+            ? indexData.terms[
+                searchTerm
+              ]
+            : null;
+
+    const indexedStem =
+        indexData.terms
+            ? indexData.terms[
+                searchStem
+              ]
+            : null;
+
+    if (
+        !indexedTerm &&
+        !indexedStem
+    ) {
+
+        return {
+
+            query:
+                searchTerm,
+
+            count:
+                0,
+
+            results:
+                [],
+
+            indexTokenCount:
+                indexData.tokenCount,
+
+            indexUniqueTerms:
+                indexData.uniqueTerms
+
+        };
+
+    }
+
+    // ==================================
+    // استرجاع النص
+    // ==================================
+
+    const textData =
+        await getDocumentText(
+            documentId
+        );
+
+    if (!textData) {
+
+        throw new Error(
+            "لا يوجد نص مفهرس لهذا المستند."
+        );
+
+    }
+
+    const originalText =
+        String(
+            textData.text ||
+            ""
+        );
+
+    const normalizedText =
+        normalizeSearchText(
+            originalText
+        );
+
+    // ==================================
+    // البحث عن الصيغة الأصلية
+    // ==================================
+
+    const results = [];
+
+    let position =
+        normalizedText.indexOf(
+            searchTerm
+        );
+
+    while (
+        position !== -1
+    ) {
+
+        const start =
+            Math.max(
+                0,
+                position - 100
+            );
+
+        const end =
+            Math.min(
+                normalizedText.length,
+                position +
+                searchTerm.length +
+                160
+            );
+
+        results.push({
+
+            matchType:
+                "exact",
+
+            position:
+                position,
+
+            context:
+                normalizedText.substring(
+                    start,
+                    end
+                )
+
+        });
+
+        position =
+            normalizedText.indexOf(
+                searchTerm,
+                position +
+                searchTerm.length
+            );
+
+    }
+
+    // ==================================
+    // إذا لم توجد مطابقة حرفية
+    // نعتبر وجود المفتاح الاشتقاقي دليلًا
+    // ==================================
+
+    if (
+        results.length === 0 &&
+        indexedStem
+    ) {
+
+        results.push({
+
+            matchType:
+                "stemmed",
+
+            position:
+                -1,
+
+            context:
+                "وُجدت صيغ مرتبطة بالمصطلح في الفهرس.",
+
+            matchedStem:
+                searchStem,
+
+            occurrences:
+                indexedStem.count
+
+        });
+
+    }
+
+    return {
+
+        query:
+            searchTerm,
+
+        searchStem:
+            searchStem,
+
+        count:
+            results.length,
+
+        results:
+            results,
+
+        indexTokenCount:
+            indexData.tokenCount,
+
+        indexUniqueTerms:
+            indexData.uniqueTerms,
+
+        indexedOccurrences:
+            indexedStem
+                ? indexedStem.count
+                : indexedTerm
+                    ? indexedTerm.count
+                    : 0
+
+    };
+
+}
+
+
+    // ==================================
+    // استرجاع الفهرس
+    // ==================================
 
     const indexData =
         await getDocumentIndex(
@@ -2493,6 +2953,10 @@ async function searchIndexedDocument(
 
     }
 
+
+    // ==================================
+    // استرجاع النص
+    // ==================================
 
     const textData =
         await getDocumentText(
@@ -2515,64 +2979,434 @@ async function searchIndexedDocument(
         );
 
 
-    const normalizedText =
-        normalizeSearchText(
-            originalText
+    // ==================================
+    // استرجاع بنية المستند
+    // ==================================
+
+    const structureData =
+        await getDocumentStructure(
+            documentId
         );
 
 
-    const results = [];
+    if (!structureData) {
+
+        throw new Error(
+            "لا توجد بنية محفوظة لهذا المستند."
+        );
+
+    }
 
 
-    let position =
-        normalizedText.indexOf(
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
+
+
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+            : [];
+
+
+    // ==================================
+    // تقسيم السؤال إلى كلمات
+    // ==================================
+
+    const queryTokens =
+        tokenizeDocumentText(
             searchTerm
         );
 
 
-    while (
-        position !== -1
+    if (
+        queryTokens.length === 0
     ) {
 
-        const start =
-            Math.max(
-                0,
-                position - 80
-            );
+        return {
 
-
-        const end =
-            Math.min(
-                normalizedText.length,
-                position +
-                searchTerm.length +
-                120
-            );
-
-
-        results.push({
-
-            position:
-                position,
-
-            context:
-                normalizedText.substring(
-                    start,
-                    end
-                )
-
-        });
-
-
-        position =
-            normalizedText.indexOf(
+            query:
                 searchTerm,
-                position +
-                searchTerm.length
-            );
+
+            count:
+                0,
+
+            results:
+                [],
+
+            indexTokenCount:
+                indexData.tokenCount,
+
+            indexUniqueTerms:
+                indexData.uniqueTerms
+
+        };
 
     }
 
+
+    // ==================================
+    // تحديد الكلمات الموجودة في الفهرس
+    // ==================================
+
+    const indexedTerms =
+        indexData.terms || {};
+
+
+    const matchedTerms =
+        queryTokens.filter(
+            function (token) {
+
+                return Boolean(
+                    indexedTerms[token]
+                );
+
+            }
+        );
+
+
+    // ==================================
+    // لا توجد كلمات مطابقة
+    // ==================================
+
+    if (
+        matchedTerms.length === 0
+    ) {
+
+        return {
+
+            query:
+                searchTerm,
+
+            count:
+                0,
+
+            results:
+                [],
+
+            indexTokenCount:
+                indexData.tokenCount,
+
+            indexUniqueTerms:
+                indexData.uniqueTerms,
+
+            matchedTerms:
+                []
+
+        };
+
+    }
+
+
+    // ==================================
+    // تحويل الكلمات إلى مجموعة
+    // ==================================
+
+    const matchedTokenSet =
+        new Set(
+            matchedTerms
+        );
+
+
+    // ==================================
+    // تحليل الفقرات
+    // ==================================
+
+    const results = [];
+
+
+    paragraphs.forEach(
+        function (paragraph) {
+
+            if (
+                !paragraph ||
+                !paragraph.text
+            ) {
+
+                return;
+
+            }
+
+
+            const originalParagraphText =
+                String(
+                    paragraph.text
+                );
+
+
+            const normalizedParagraphText =
+                normalizeSearchText(
+                    originalParagraphText
+                );
+
+
+            const paragraphTokens =
+                tokenizeDocumentText(
+                    normalizedParagraphText
+                );
+
+
+            if (
+                paragraphTokens.length === 0
+            ) {
+
+                return;
+
+            }
+
+
+            // ==================================
+            // حساب الكلمات المطابقة
+            // ==================================
+
+            let matchedCount =
+                0;
+
+
+            const paragraphTokenSet =
+                new Set(
+                    paragraphTokens
+                );
+
+
+            matchedTokenSet.forEach(
+                function (token) {
+
+                    if (
+                        paragraphTokenSet.has(
+                            token
+                        )
+                    ) {
+
+                        matchedCount += 1;
+
+                    }
+
+                }
+            );
+
+
+            // ==================================
+            // لا توجد مطابقة داخل الفقرة
+            // ==================================
+
+            if (
+                matchedCount === 0
+            ) {
+
+                return;
+
+            }
+
+
+            // ==================================
+            // حساب درجة المطابقة
+            // ==================================
+
+            let score =
+                matchedCount /
+                matchedTerms.length;
+
+
+            // ==================================
+            // مكافأة إذا وجدت العبارة كاملة
+            // ==================================
+
+            if (
+                normalizedParagraphText.includes(
+                    searchTerm
+                )
+            ) {
+
+                score += 2;
+
+            }
+
+
+            // ==================================
+            // البحث عن العنوان الأقرب
+            // ==================================
+
+            let nearestHeading =
+                null;
+
+
+            headings.forEach(
+                function (heading) {
+
+                    if (
+                        heading &&
+                        heading.index <
+                        paragraph.index
+                    ) {
+
+                        if (
+                            !nearestHeading ||
+                            heading.index >
+                            nearestHeading.index
+                        ) {
+
+                            nearestHeading =
+                                heading;
+
+                        }
+
+                    }
+
+                }
+            );
+
+
+            // ==================================
+            // استخراج مقتطف من النص الأصلي
+            // ==================================
+
+            const searchPosition =
+                normalizedParagraphText.indexOf(
+                    matchedTerms[0]
+                );
+
+
+            let context =
+                originalParagraphText;
+
+
+            if (
+                searchPosition !== -1
+            ) {
+
+                const start =
+                    Math.max(
+                        0,
+                        searchPosition - 100
+                    );
+
+
+                const end =
+                    Math.min(
+                        originalParagraphText.length,
+                        searchPosition +
+                        260
+                    );
+
+
+                context =
+                    originalParagraphText.substring(
+                        start,
+                        end
+                    );
+
+            }
+            else {
+
+                context =
+                    originalParagraphText.substring(
+                        0,
+                        360
+                    );
+
+            }
+
+
+            // ==================================
+            // إضافة النتيجة
+            // ==================================
+
+            results.push({
+
+                paragraphIndex:
+                    paragraph.index,
+
+                paragraphId:
+                    paragraph.id,
+
+                text:
+                    originalParagraphText,
+
+                context:
+                    context,
+
+                heading:
+                    nearestHeading
+                        ? nearestHeading.text
+                        : "",
+
+                headingLevel:
+                    nearestHeading
+                        ? nearestHeading.style
+                        : "",
+
+                matchedTerms:
+                    matchedTerms,
+
+                matchedCount:
+                    matchedCount,
+
+                totalQueryTerms:
+                    matchedTerms.length,
+
+                score:
+                    score
+
+            });
+
+        }
+    );
+
+
+    // ==================================
+    // ترتيب النتائج
+    // ==================================
+
+    results.sort(
+        function (a, b) {
+
+            // الأعلى درجة أولًا
+            if (
+                b.score !==
+                a.score
+            ) {
+
+                return (
+                    b.score -
+                    a.score
+                );
+
+            }
+
+
+            // ثم الأكثر كلمات مطابقة
+            if (
+                b.matchedCount !==
+                a.matchedCount
+            ) {
+
+                return (
+                    b.matchedCount -
+                    a.matchedCount
+                );
+
+            }
+
+
+            // ثم حسب ترتيب المستند
+            return (
+                a.paragraphIndex -
+                b.paragraphIndex
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // إرجاع النتيجة
+    // ==================================
 
     return {
 
@@ -2584,6 +3418,12 @@ async function searchIndexedDocument(
 
         results:
             results,
+
+        matchedTerms:
+            matchedTerms,
+
+        totalQueryTerms:
+            queryTokens.length,
 
         indexTokenCount:
             indexData.tokenCount,
