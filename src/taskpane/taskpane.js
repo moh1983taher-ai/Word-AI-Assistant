@@ -10,20 +10,24 @@ Office.onReady(function () {
 // ======================================
 
 const projectsBtn =
-document.getElementById("projects-btn");
+    document.getElementById("projects-btn");
 
 const projectsPopup =
-document.getElementById("projects-popup");
+    document.getElementById("projects-popup");
 
 const projectsList =
-document.getElementById("projects-list");
+    document.getElementById("projects-list");
 
 const documentsList =
-document.getElementById("documents-list");
+    document.getElementById("documents-list");
 
 const addDocumentBtn =
-document.getElementById("add-document-btn");
+    document.getElementById("add-document-btn");
 
+const wordDocumentPicker =
+    document.getElementById(
+        "word-document-picker"
+    );
 
 // ======================================
 // Render Project Documents
@@ -1006,13 +1010,291 @@ function saveDocuments() {
 
 }
 
+// ======================================
+// Working Documents Storage
+// IndexedDB
+// ======================================
 
+const DOCUMENT_DB_NAME =
+    "WORD_AI_DOCUMENT_STORAGE";
+
+const DOCUMENT_DB_VERSION =
+    1;
+
+const DOCUMENT_STORE_NAME =
+    "files";
+
+
+// ======================================
+// Open Documents Database
+// ======================================
+
+function openDocumentDatabase() {
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const request =
+                indexedDB.open(
+                    DOCUMENT_DB_NAME,
+                    DOCUMENT_DB_VERSION
+                );
+
+
+            request.onupgradeneeded =
+                function () {
+
+                    const db =
+                        request.result;
+
+
+                    if (
+                        !db.objectStoreNames
+                            .contains(
+                                DOCUMENT_STORE_NAME
+                            )
+                    ) {
+
+                        db.createObjectStore(
+                            DOCUMENT_STORE_NAME
+                        );
+
+                    }
+
+                };
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Save Working Word File
+// ======================================
+
+async function saveWorkingWordFile(
+    fileId,
+    file
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_STORE_NAME,
+                    "readwrite"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_STORE_NAME
+                );
+
+
+            const request =
+                store.put(
+                    file,
+                    fileId
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        fileId
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Get Working Word File
+// ======================================
+
+async function getWorkingWordFile(
+    fileId
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_STORE_NAME,
+                    "readonly"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_STORE_NAME
+                );
+
+
+            const request =
+                store.get(
+                    fileId
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result ||
+                        null
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Delete Working Word File
+// ======================================
+
+async function deleteWorkingWordFile(
+    fileId
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_STORE_NAME,
+                    "readwrite"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_STORE_NAME
+                );
+
+
+            const request =
+                store.delete(
+                    fileId
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve();
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
 // ======================================
 // Create Document
 // ======================================
 
 function createDocument(
-    name,
+    file,
     projectId,
     order
 ) {
@@ -1020,17 +1302,34 @@ function createDocument(
     const now =
         new Date().toISOString();
 
+
+    const documentId =
+        Date.now();
+
+
     const documentItem = {
 
         id:
-            Date.now(),
+            documentId,
 
         projectId:
             projectId,
 
         name:
-            name ||
-            "مستند جديد",
+            file.name.replace(
+                /\.docx$/i,
+                ""
+            ),
+
+        fileName:
+            file.name,
+
+        fileType:
+            file.type ||
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+        storageId:
+            String(documentId),
 
         order:
             typeof order === "number"
@@ -1048,11 +1347,14 @@ function createDocument(
 
     };
 
+
     documents.push(
         documentItem
     );
 
+
     saveDocuments();
+
 
     return documentItem;
 
@@ -1276,187 +1578,98 @@ function setCurrentProject(project) {
 
 // ======================================
 // Add Document Button
+// Choose Real DOCX File
 // ======================================
 
-if (addDocumentBtn) {
+if (
+    addDocumentBtn &&
+    wordDocumentPicker
+) {
 
-    addDocumentBtn.onclick = function (e) {
+    addDocumentBtn.onclick =
+        function (e) {
 
-        e.preventDefault();
-        e.stopPropagation();
-
-        // يجب وجود مشروع حالي
-        if (!currentProject) {
-
-            console.warn(
-                "لا يوجد مشروع محدد لإضافة المستند."
-            );
-
-            if (documentsList) {
-
-                documentsList.innerHTML = `
-                    <div class="empty-document">
-                        اختر مشروعًا أولًا لإضافة مستند
-                    </div>
-                `;
-
-            }
-
-            return;
-        }
+            e.preventDefault();
+            e.stopPropagation();
 
 
-        // إزالة أي صندوق سابق
-        const oldBox =
-            document.querySelector(
-                ".document-create-box"
-            );
+            if (!currentProject) {
 
-        if (oldBox) {
-            oldBox.remove();
-        }
+                if (documentsList) {
 
+                    documentsList.innerHTML = `
+                        <div class="empty-document">
+                            اختر مشروعًا أولًا لإضافة مستند
+                        </div>
+                    `;
 
-        // إنشاء صندوق الإضافة
-        const box =
-            document.createElement("div");
-
-        box.className =
-            "document-create-box";
-
-        box.innerHTML = `
-            <input
-                type="text"
-                class="new-document-name"
-                placeholder="اسم المستند"
-                autocomplete="off">
-
-            <div class="document-create-buttons">
-
-                <button
-                    type="button"
-                    class="save-document">
-                    إضافة
-                </button>
-
-                <button
-                    type="button"
-                    class="cancel-document">
-                    إلغاء
-                </button>
-
-            </div>
-        `;
-
-
-        document.body.appendChild(box);
-
-
-        // تحديد الموضع
-        const rect =
-            addDocumentBtn.getBoundingClientRect();
-
-        const boxWidth = 240;
-        const boxHeight = 105;
-        const margin = 10;
-
-        let left =
-            rect.left;
-
-        let top =
-            rect.bottom + 8;
-
-
-        if (
-            left + boxWidth >
-            window.innerWidth - margin
-        ) {
-
-            left =
-                window.innerWidth -
-                boxWidth -
-                margin;
-
-        }
-
-
-        if (left < margin) {
-            left = margin;
-        }
-
-
-        if (
-            top + boxHeight >
-            window.innerHeight - margin
-        ) {
-
-            top =
-                rect.top -
-                boxHeight -
-                8;
-
-        }
-
-
-        box.style.position = "fixed";
-        box.style.left = left + "px";
-        box.style.top = top + "px";
-        box.style.width = boxWidth + "px";
-        box.style.zIndex = "999999";
-
-
-        const nameInput =
-            box.querySelector(
-                ".new-document-name"
-            );
-
-        const saveButton =
-            box.querySelector(
-                ".save-document"
-            );
-
-        const cancelButton =
-            box.querySelector(
-                ".cancel-document"
-            );
-
-
-        if (nameInput) {
-            nameInput.focus();
-        }
-
-
-        // ======================================
-        // تنفيذ الحفظ الفعلي
-        // ======================================
-
-        function saveNewDocument() {
-
-            const name =
-                nameInput
-                    ? nameInput.value.trim()
-                    : "";
-
-
-            if (!name) {
-
-                if (nameInput) {
-                    nameInput.focus();
                 }
 
                 return;
+
             }
 
 
+            // فتح نافذة اختيار الملف
+            wordDocumentPicker.value =
+                "";
+
+
+            wordDocumentPicker.click();
+
+        };
+
+
+    // ==================================
+    // عند اختيار الملف
+    // ==================================
+
+    wordDocumentPicker.onchange =
+        async function () {
+
             try {
 
-                const projectId =
-                    currentProject.id;
+                const file =
+                    wordDocumentPicker.files &&
+                    wordDocumentPicker.files[0];
 
+
+                if (!file)
+                    return;
+
+
+                // نقبل DOCX فقط
+                const isDocx =
+                    /\.docx$/i.test(
+                        file.name
+                    );
+
+
+                if (!isDocx) {
+
+                    console.warn(
+                        "الملف المختار ليس DOCX."
+                    );
+
+                    return;
+
+                }
+
+
+                if (!currentProject) {
+
+                    return;
+
+                }
+
+
+                // ==========================
+                // تحديد الترتيب
+                // ==========================
 
                 const projectDocuments =
                     getProjectDocuments(
-                        projectId
+                        currentProject.id
                     );
 
 
@@ -1464,34 +1677,31 @@ if (addDocumentBtn) {
                     projectDocuments.length + 1;
 
 
+                // ==========================
+                // إنشاء سجل المستند
+                // ==========================
+
                 const documentItem =
                     createDocument(
-                        name,
-                        projectId,
+                        file,
+                        currentProject.id,
                         nextOrder
                     );
 
 
-                if (!documentItem) {
+                // ==========================
+                // حفظ نسخة الملف
+                // ==========================
 
-                    throw new Error(
-                        "تعذر إنشاء سجل المستند."
-                    );
-
-                }
-
-
-                /*
-                   createDocument()
-                   يحفظ المستند أصلًا في
-                   WORD_AI_DOCUMENTS
-                */
+                await saveWorkingWordFile(
+                    documentItem.storageId,
+                    file
+                );
 
 
-                /*
-                   ربطه بالمشروع
-                   حتى تبقى بنية المشروع مكتملة
-                */
+                // ==========================
+                // ربط المستند بالمشروع
+                // ==========================
 
                 attachDocumentToProject(
                     currentProject,
@@ -1499,23 +1709,34 @@ if (addDocumentBtn) {
                 );
 
 
-                /*
-                   إعادة عرض المستندات
-                */
+                // ==========================
+                // جعله المستند النشط
+                // ==========================
+
+                setCurrentDocument(
+                    documentItem
+                );
+
+
+                // ==========================
+                // إعادة العرض
+                // ==========================
 
                 renderDocuments();
 
 
-                /*
-                   إغلاق الصندوق
-                */
-
-                box.remove();
-
-
                 console.log(
-                    "تم إنشاء المستند:",
-                    documentItem
+                    "تم استيراد مستند Word:",
+                    {
+                        name:
+                            documentItem.name,
+
+                        fileName:
+                            documentItem.fileName,
+
+                        storageId:
+                            documentItem.storageId
+                    }
                 );
 
             }
@@ -1523,16 +1744,15 @@ if (addDocumentBtn) {
             catch (error) {
 
                 console.error(
-                    "خطأ أثناء إنشاء المستند:",
+                    "فشل استيراد مستند Word:",
                     error
                 );
-
 
                 if (documentsList) {
 
                     documentsList.innerHTML = `
                         <div class="empty-document">
-                            تعذر إضافة المستند
+                            تعذر استيراد المستند
                         </div>
                     `;
 
@@ -1540,82 +1760,7 @@ if (addDocumentBtn) {
 
             }
 
-        }
-
-
-        // ======================================
-        // زر إضافة
-        // ======================================
-
-        if (saveButton) {
-
-            saveButton.onclick =
-                function (event) {
-
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    saveNewDocument();
-
-                };
-
-        }
-
-
-        // ======================================
-        // زر إلغاء
-        // ======================================
-
-        if (cancelButton) {
-
-            cancelButton.onclick =
-                function (event) {
-
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    box.remove();
-
-                };
-
-        }
-
-
-        // ======================================
-        // لوحة المفاتيح
-        // ======================================
-
-        if (nameInput) {
-
-            nameInput.onkeydown =
-                function (event) {
-
-                    if (
-                        event.key === "Enter"
-                    ) {
-
-                        event.preventDefault();
-
-                        saveNewDocument();
-
-                    }
-
-
-                    if (
-                        event.key === "Escape"
-                    ) {
-
-                        event.preventDefault();
-
-                        box.remove();
-
-                    }
-
-                };
-
-        }
-
-    };
+        };
 
 }
 // ======================================
