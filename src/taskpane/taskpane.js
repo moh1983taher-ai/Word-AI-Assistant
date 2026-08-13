@@ -110,15 +110,58 @@ function renderDocuments() {
 
             title.textContent =
                 documentItem.name;
+            
             title.onclick =
-                function (e) {
+                async function (e) {
 
                     e.preventDefault();
                     e.stopPropagation();
 
+
                     setCurrentDocument(
                         documentItem
                     );
+
+
+                    try {
+
+                        await openWorkingDocument(
+                            documentItem
+                        );
+
+                    }
+
+                    catch (error) {
+
+                        console.error(
+                            "فشل فتح نسخة العمل:",
+                            error
+                        );
+
+                        if (documentsList) {
+
+                            const message =
+                                document.createElement(
+                                    "div"
+                                );
+
+                            message.className =
+                                "empty-document";
+
+                            message.textContent =
+                                "تعذر فتح نسخة العمل: " +
+                                (
+                                    error.message ||
+                                    "خطأ غير معروف"
+                                );
+
+                            documentsList.prepend(
+                                message
+                            );
+
+                        }
+
+                    }
 
                 };
 
@@ -1284,6 +1327,134 @@ async function deleteWorkingWordFile(
                     db.close();
 
                 };
+
+        }
+    );
+
+}
+// ======================================
+// Convert Blob/File to Base64
+// ======================================
+
+function fileToBase64(file) {
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const reader =
+                new FileReader();
+
+            reader.onload =
+                function () {
+
+                    const result =
+                        String(
+                            reader.result || ""
+                        );
+
+                    const commaIndex =
+                        result.indexOf(",");
+
+                    if (
+                        commaIndex === -1
+                    ) {
+
+                        reject(
+                            new Error(
+                                "تعذر تحويل ملف Word إلى Base64."
+                            )
+                        );
+
+                        return;
+                    }
+
+                    resolve(
+                        result.substring(
+                            commaIndex + 1
+                        )
+                    );
+
+                };
+
+            reader.onerror =
+                function () {
+
+                    reject(
+                        reader.error ||
+                        new Error(
+                            "فشل قراءة ملف Word."
+                        )
+                    );
+
+                };
+
+            reader.readAsDataURL(file);
+
+        }
+    );
+
+}
+// ======================================
+// Open Working Word Document
+// ======================================
+
+async function openWorkingDocument(
+    documentItem
+) {
+
+    if (!documentItem) {
+
+        throw new Error(
+            "لم يتم تحديد مستند."
+        );
+
+    }
+
+    if (
+        !Office.context.requirements.isSetSupported(
+            "WordApiHiddenDocument",
+            "1.3"
+        )
+    ) {
+
+        throw new Error(
+            "إصدار Word الحالي لا يدعم فتح نسخة العمل بهذه الطريقة."
+        );
+
+    }
+
+    const file =
+        await getWorkingWordFile(
+            documentItem.storageId
+        );
+
+    if (!file) {
+
+        throw new Error(
+            "لم يتم العثور على نسخة العمل المخزنة."
+        );
+
+    }
+
+    const base64 =
+        await fileToBase64(
+            file
+        );
+
+    await Word.run(
+        async function (context) {
+
+            const workingDocument =
+                context.application.createDocument(
+                    base64
+                );
+
+            await context.sync();
+
+            console.log(
+                "تم إنشاء مستند العمل من النسخة المخزنة.",
+                workingDocument
+            );
 
         }
     );
