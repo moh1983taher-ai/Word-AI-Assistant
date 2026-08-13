@@ -110,7 +110,49 @@ function renderDocuments() {
 
             title.textContent =
                 documentItem.name;
-            
+            const status =
+                document.createElement("span");
+
+            status.className =
+                "document-index-status";
+
+
+            if (
+                documentItem.indexStatus ===
+                "new"
+            ) {
+
+                status.textContent =
+                    "جديد";
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "indexing"
+            ) {
+
+                status.textContent =
+                    "جارٍ الفهرسة...";
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "indexed"
+            ) {
+
+                status.textContent =
+                    "✓ مفهرس";
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "error"
+            ) {
+
+                status.textContent =
+                    "⚠ فشل الفهرسة";
+
+            }
             title.onclick =
                 async function (e) {
 
@@ -784,6 +826,10 @@ if (deleteButton) {
             );
 
             item.appendChild(
+                status
+            );
+
+            item.appendChild(
                 menuButton
             );
 
@@ -1062,7 +1108,7 @@ const DOCUMENT_DB_NAME =
     "WORD_AI_DOCUMENT_STORAGE";
 
 const DOCUMENT_DB_VERSION =
-    1;
+    2;
 
 const DOCUMENT_STORE_NAME =
     "files";
