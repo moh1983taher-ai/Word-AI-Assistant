@@ -2366,7 +2366,7 @@ async function getDocumentIndex(
 
 }
 // ======================================
-// Test Document Index
+// Test Document Index مؤقتة
 // ======================================
 
 async function testCurrentDocumentIndex() {
@@ -3091,6 +3091,36 @@ async function readCurrentWordDocument(
                 indexData
             );
             
+            const savedIndex =
+                await getDocumentIndex(
+                    documentItem.id
+                );
+
+
+            console.log(
+                "الفهرس المسترجع من IndexedDB:",
+                savedIndex
+            );
+            
+            console.log(
+                "اختبار الفهرس الحقيقي:",
+                {
+                    documentId:
+                        documentItem.id,
+
+                    tokenCount:
+                        indexData.tokenCount,
+
+                    uniqueTerms:
+                        indexData.uniqueTerms,
+
+                    firstTerms:
+                        Object.keys(
+                            indexData.terms || {}
+                        ).slice(0, 20)
+                }
+            );
+
             const structureData =
                 await buildDocumentStructure(
                     documentItem
