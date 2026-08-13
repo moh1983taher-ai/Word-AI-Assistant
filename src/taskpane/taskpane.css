@@ -3599,6 +3599,32 @@ body.sidebar-is-pinned .message-box {
     box-shadow:
         inset 3px 0 0 #222222;
 }
+
+/* =========================================================
+   DOCUMENT INDEX STATUS
+   ========================================================= */
+
+.document-index-status {
+    flex-shrink: 0;
+
+    margin-right: 8px;
+
+    font-size: 10px;
+
+    color: #888;
+
+    white-space: nowrap;
+
+    direction: rtl;
+}
+
+.document-item {
+    gap: 6px;
+}
+
+.document-index-status {
+    opacity: 0.85;
+}
 /* =========================================================
    END
    ========================================================= */

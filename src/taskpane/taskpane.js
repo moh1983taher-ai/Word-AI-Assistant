@@ -1707,6 +1707,9 @@ function createDocument(
 
         type:
             "word",
+        
+        indexStatus:
+            "new",
 
         createdAt:
             now,
@@ -1729,7 +1732,30 @@ function createDocument(
 
 }
 
+// ======================================
+// Update Document Index Status
+// ======================================
 
+function updateDocumentIndexStatus(
+    documentItem,
+    status
+) {
+
+    if (!documentItem)
+        return;
+
+
+    documentItem.indexStatus =
+        status;
+
+
+    documentItem.updatedAt =
+        new Date().toISOString();
+
+
+    saveDocuments();
+
+}
 // ======================================
 // Get Project Documents
 // ======================================
@@ -1839,79 +1865,107 @@ async function readCurrentWordDocument(
     }
 
 
-    if (
-        !Office.context.requirements.isSetSupported(
-            "WordApiHiddenDocument",
-            "1.3"
-        )
-    ) {
-
-        throw new Error(
-            "إصدار Word الحالي لا يدعم قراءة نسخة العمل."
-        );
-
-    }
-
-
-    const file =
-        await getWorkingWordFile(
-            documentItem.storageId
-        );
-
-
-    if (!file) {
-
-        throw new Error(
-            "لم يتم العثور على نسخة العمل."
-        );
-
-    }
-
-
-    const base64 =
-        await fileToBase64(
-            file
-        );
-
-
-    const text =
-        await Word.run(
-            async function (context) {
-
-                const workingDocument =
-                    context.application.createDocument(
-                        base64
-                    );
-
-
-                const body =
-                    workingDocument.body;
-
-
-                body.load(
-                    "text"
-                );
-
-
-                await context.sync();
-
-
-                return (
-                    body.text ||
-                    ""
-                );
-
-            }
-        );
-
-
-    await saveDocumentText(
-        documentItem.id,
-        text
+    updateDocumentIndexStatus(
+        documentItem,
+        "indexing"
     );
 
 
-    return text;return text;
+    try {
+
+        if (
+            !Office.context.requirements.isSetSupported(
+                "WordApiHiddenDocument",
+                "1.3"
+            )
+        ) {
+
+            throw new Error(
+                "إصدار Word الحالي لا يدعم قراءة نسخة العمل."
+            );
+
+        }
+
+
+        const file =
+            await getWorkingWordFile(
+                documentItem.storageId
+            );
+
+
+        if (!file) {
+
+            throw new Error(
+                "لم يتم العثور على نسخة العمل."
+            );
+
+        }
+
+
+        const base64 =
+            await fileToBase64(
+                file
+            );
+
+
+        const text =
+            await Word.run(
+                async function (context) {
+
+                    const workingDocument =
+                        context.application.createDocument(
+                            base64
+                        );
+
+
+                    const body =
+                        workingDocument.body;
+
+
+                    body.load(
+                        "text"
+                    );
+
+
+                    await context.sync();
+
+
+                    return (
+                        body.text ||
+                        ""
+                    );
+
+                }
+            );
+
+
+        await saveDocumentText(
+            documentItem.id,
+            text
+        );
+
+
+        updateDocumentIndexStatus(
+            documentItem,
+            "indexed"
+        );
+
+
+        return text;
+
+    }
+
+    catch (error) {
+
+        updateDocumentIndexStatus(
+            documentItem,
+            "error"
+        );
+
+
+        throw error;
+
+    }
 
 }
 // ======================================
