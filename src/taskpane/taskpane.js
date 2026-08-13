@@ -1108,8 +1108,9 @@ function setCurrentDocument(documentItem) {
 
         }
 
-        return;
+        renderDocuments();
 
+        return;
     }
 
 
@@ -1123,6 +1124,10 @@ function setCurrentDocument(documentItem) {
             documentItem.name;
 
     }
+
+
+    // إعادة رسم القائمة لإظهار المستند النشط
+    renderDocuments();
 
 }
 // ======================================

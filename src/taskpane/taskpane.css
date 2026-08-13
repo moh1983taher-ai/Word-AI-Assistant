@@ -3592,8 +3592,12 @@ body.sidebar-is-pinned .message-box {
 
 .document-item.active-document {
     background: #eeeeee !important;
-    color: #111 !important;
-    border: 1px solid #dddddd;
+    color: #111111 !important;
+
+    border: 1px solid #d8d8d8;
+
+    box-shadow:
+        inset 3px 0 0 #222222;
 }
 /* =========================================================
    END
