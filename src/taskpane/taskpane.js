@@ -1728,7 +1728,7 @@ async function buildDocumentStructure(
                 [
                     "items/text",
                     "items/styleBuiltIn",
-                    "items/uniqueLocalId"
+                    "items/tableNestingLevel"
                 ]
             );
 
@@ -1766,8 +1766,7 @@ async function buildDocumentStructure(
                                 index,
 
                             id:
-                                paragraph.uniqueLocalId ||
-                                String(index),
+                                String(index),  
 
                             text:
                                 text,
