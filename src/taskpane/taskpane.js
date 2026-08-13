@@ -37,14 +37,7 @@ function renderDocuments() {
 
     documentsList.innerHTML = "";
 
-    if (addDocumentBtn) {
-
-        addDocumentBtn.style.display =
-            currentProject
-                ? "flex"
-                : "none";
-
-    }
+    
     // لا يوجد مشروع محدد
     if (!currentProject) {
 
