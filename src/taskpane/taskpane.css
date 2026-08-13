@@ -3601,10 +3601,10 @@ body.sidebar-is-pinned .message-box {
 }
 
 /* =========================================================
-   DOCUMENT INDEX STATUS
+   DOCUMENT READ STATUS
    ========================================================= */
 
-.document-index-status {
+.document-read-status {
     flex-shrink: 0;
 
     margin-right: 8px;
@@ -3616,13 +3616,7 @@ body.sidebar-is-pinned .message-box {
     white-space: nowrap;
 
     direction: rtl;
-}
 
-.document-item {
-    gap: 6px;
-}
-
-.document-index-status {
     opacity: 0.85;
 }
 /* =========================================================

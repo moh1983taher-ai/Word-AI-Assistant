@@ -114,11 +114,11 @@ function renderDocuments() {
                 document.createElement("span");
 
             status.className =
-                "document-index-status";
+                "document-read-status";
 
 
             if (
-                documentItem.indexStatus ===
+                documentItem.readStatus ===
                 "new"
             ) {
 
@@ -127,30 +127,30 @@ function renderDocuments() {
 
             }
             else if (
-                documentItem.indexStatus ===
-                "indexing"
+                documentItem.readStatus ===
+                "reading"
             ) {
 
                 status.textContent =
-                    "جارٍ الفهرسة...";
+                    "جارٍ القراءة...";
 
             }
             else if (
-                documentItem.indexStatus ===
-                "indexed"
+                documentItem.readStatus ===
+                "read"
             ) {
 
                 status.textContent =
-                    "✓ مفهرس";
+                    "✓ تمت القراءة";
 
             }
             else if (
-                documentItem.indexStatus ===
+                documentItem.readStatus ===
                 "error"
             ) {
 
                 status.textContent =
-                    "⚠ فشل الفهرسة";
+                    "⚠ فشل القراءة";
 
             }
             title.onclick =
@@ -1754,7 +1754,7 @@ function createDocument(
         type:
             "word",
         
-        indexStatus:
+        readStatus:
             "new",
 
         createdAt:
@@ -1779,10 +1779,10 @@ function createDocument(
 }
 
 // ======================================
-// Update Document Index Status
+// Update Document Read Status
 // ======================================
 
-function updateDocumentIndexStatus(
+function updateDocumentReadStatus(
     documentItem,
     status
 ) {
@@ -1790,14 +1790,11 @@ function updateDocumentIndexStatus(
     if (!documentItem)
         return;
 
-
-    documentItem.indexStatus =
+    documentItem.readStatus =
         status;
-
 
     documentItem.updatedAt =
         new Date().toISOString();
-
 
     saveDocuments();
 
@@ -1911,9 +1908,9 @@ async function readCurrentWordDocument(
     }
 
 
-    updateDocumentIndexStatus(
+    updateDocumentReadStatus(
         documentItem,
-        "indexing"
+        "reading"
     );
 
 
@@ -1991,9 +1988,9 @@ async function readCurrentWordDocument(
         );
 
 
-        updateDocumentIndexStatus(
+        updateDocumentReadStatus(
             documentItem,
-            "indexed"
+            "read"
         );
 
 
@@ -2003,7 +2000,7 @@ async function readCurrentWordDocument(
 
     catch (error) {
 
-        updateDocumentIndexStatus(
+        updateDocumentReadStatus(
             documentItem,
             "error"
         );
