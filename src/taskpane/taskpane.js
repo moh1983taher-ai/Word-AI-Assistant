@@ -751,24 +751,49 @@ if (addDocumentBtn) {
                     projectDocuments.length + 1;
 
 
-                const documentItem =
-                    createDocument(
-                        name,
-                        currentProject.id,
-                        nextOrder
+                try {
+
+                    const documentItem =
+                        createDocument(
+                            name,
+                            currentProject.id,
+                            nextOrder
+                        );
+
+
+                    if (!documentItem) {
+
+                        throw new Error(
+                            "تعذر إنشاء المستند."
+                        );
+
+                    }
+
+
+                    renderDocuments();
+
+
+                    box.remove();
+
+
+                }
+                catch (error) {
+
+                    console.error(
+                        "فشل حفظ المستند:",
+                        error
                     );
 
 
-                attachDocumentToProject(
-                    currentProject,
-                    documentItem
-                );
+                    alert(
+                        "حدث خطأ أثناء حفظ المستند:\n" +
+                        (
+                            error.message ||
+                            "خطأ غير معروف"
+                        )
+                    );
 
-
-                renderDocuments();
-
-
-                box.remove();
+                }
 
             }
 

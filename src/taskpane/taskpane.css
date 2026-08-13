@@ -3210,6 +3210,12 @@ body.sidebar-is-pinned .message-box {
 }
 
 .document-create-box button {
+    position: relative;
+
+    z-index: 2;
+
+    pointer-events: auto;
+
     padding: 7px 14px;
 
     border: none;
