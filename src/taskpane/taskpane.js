@@ -154,56 +154,14 @@ function renderDocuments() {
 
             }
             title.onclick =
-                async function (e) {
+                function (e) {
 
                     e.preventDefault();
                     e.stopPropagation();
 
-
                     setCurrentDocument(
                         documentItem
                     );
-
-
-                    try {
-
-                        await openWorkingDocument(
-                            documentItem
-                        );
-
-                    }
-
-                    catch (error) {
-
-                        console.error(
-                            "فشل فتح نسخة العمل:",
-                            error
-                        );
-
-                        if (documentsList) {
-
-                            const message =
-                                document.createElement(
-                                    "div"
-                                );
-
-                            message.className =
-                                "empty-document";
-
-                            message.textContent =
-                                "تعذر فتح نسخة العمل: " +
-                                (
-                                    error.message ||
-                                    "خطأ غير معروف"
-                                );
-
-                            documentsList.prepend(
-                                message
-                            );
-
-                        }
-
-                    }
 
                 };
 
@@ -1078,6 +1036,33 @@ try {
             )
         ) || [];
 
+
+    documents =
+        documents
+            .filter(function (documentItem) {
+
+                return (
+                    documentItem &&
+                    typeof documentItem ===
+                        "object"
+                );
+
+            })
+            .map(function (documentItem) {
+
+                if (
+                    !documentItem.readStatus
+                ) {
+
+                    documentItem.readStatus =
+                        "new";
+
+                }
+
+                return documentItem;
+
+            });
+
 }
 catch (e) {
 
@@ -1098,6 +1083,8 @@ function saveDocuments() {
     );
 
 }
+
+saveDocuments();
 
 // ======================================
 // Working Documents Storage
@@ -1599,111 +1586,7 @@ function fileToBase64(file) {
     );
 
 }
-// ======================================
-// Read Working Word Document
-// ======================================
 
-async function openWorkingDocument(
-    documentItem
-) {
-
-    if (!documentItem) {
-
-        throw new Error(
-            "لم يتم تحديد مستند."
-        );
-
-    }
-
-
-    if (
-        !Office.context.requirements.isSetSupported(
-            "WordApiHiddenDocument",
-            "1.3"
-        )
-    ) {
-
-        throw new Error(
-            "إصدار Word الحالي لا يدعم معالجة نسخة العمل."
-        );
-
-    }
-
-
-    // ==================================
-    // استرجاع نسخة العمل
-    // ==================================
-
-    const file =
-        await getWorkingWordFile(
-            documentItem.storageId
-        );
-
-
-    if (!file) {
-
-        throw new Error(
-            "لم يتم العثور على نسخة العمل المخزنة."
-        );
-
-    }
-
-
-    // ==================================
-    // تحويل ملف DOCX إلى Base64
-    // ==================================
-
-    const base64 =
-        await fileToBase64(
-            file
-        );
-
-
-    // ==================================
-    // إنشاء وثيقة Word من نسخة العمل
-    // ==================================
-
-    const text =
-        await Word.run(
-            async function (context) {
-
-                const workingDocument =
-                    context.application.createDocument(
-                        base64
-                    );
-
-
-                // تحميل النص الحقيقي
-                workingDocument.body.load(
-                    "text"
-                );
-
-
-                await context.sync();
-
-
-                return (
-                    workingDocument.body.text ||
-                    ""
-                );
-
-            }
-        );
-
-
-    // ==================================
-    // عرض النتيجة للاختبار
-    // ==================================
-
-    console.log(
-        "محتوى نسخة العمل:",
-        text
-    );
-
-
-    return text;
-
-}
 // ======================================
 // Create Document
 // ======================================
@@ -1790,11 +1673,25 @@ function updateDocumentReadStatus(
     if (!documentItem)
         return;
 
+
     documentItem.readStatus =
         status;
 
+
     documentItem.updatedAt =
         new Date().toISOString();
+
+
+    if (
+        status ===
+        "read"
+    ) {
+
+        documentItem.readAt =
+            new Date().toISOString();
+
+    }
+
 
     saveDocuments();
 
@@ -1866,6 +1763,27 @@ function setCurrentDocument(documentItem) {
     }
 
 
+    // ==================================
+    // القراءة تكون مرة واحدة فقط
+    // ==================================
+
+    if (
+        documentItem.readStatus ===
+        "read"
+    ) {
+
+        // المستند مقروء مسبقًا
+        renderDocuments();
+
+        return;
+
+    }
+
+
+    // ==================================
+    // المستند يحتاج إلى قراءة
+    // ==================================
+
     readCurrentWordDocument(
         documentItem
     )
@@ -1876,6 +1794,8 @@ function setCurrentDocument(documentItem) {
             text
         );
 
+        renderDocuments();
+
     })
     .catch(function (error) {
 
@@ -1884,10 +1804,12 @@ function setCurrentDocument(documentItem) {
             error
         );
 
+        renderDocuments();
+
     });
 
 
-    // إعادة رسم القائمة لإظهار المستند النشط
+    // إظهار "جارٍ القراءة..." فورًا
     renderDocuments();
 
 }
@@ -2339,29 +2261,6 @@ function saveProjects() {
 
 }
 
-// ======================================
-// Set Active Project
-// ======================================
-
-function setCurrentProject(project) {
-
-    if (!project) {
-
-        currentProject = null;
-
-        renderDocuments();
-
-        return;
-    }
-
-
-    currentProject =
-        project;
-
-
-    renderDocuments();
-
-}
 
 // ======================================
 // Chat System
