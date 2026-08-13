@@ -1581,37 +1581,34 @@ function normalizeSearchText(text) {
 
 // ======================================
 // Arabic Search Stem / Concept Key
-// تطبيع صرفي خفيف ومحافظ وسريع
+// تطبيع صرفي خفيف ومحافظ
 // ======================================
 
 function normalizeArabicSearchWord(word) {
 
     let w =
-        normalizeSearchText(word);
+        normalizeSearchText(
+            word
+        );
 
     if (!w)
         return "";
 
     // إزالة الرموز غير الحرفية/الرقمية
-    w = w.replace(
-        /[^\p{L}\p{N}]+/gu,
-        ""
-    );
+    w =
+        w.replace(
+            /[^\p{L}\p{N}]+/gu,
+            ""
+        );
 
     if (!w)
         return "";
 
-    // ----------------------------------
-    // الكلمات القصيرة لا تمس
-    // ----------------------------------
-
+    // الكلمات القصيرة لا تُختصر مطلقًا
     if (w.length <= 3)
         return w;
 
-    // ----------------------------------
-    // كلمات محمية
-    // ----------------------------------
-
+    // كلمات لا نريد المساس بها
     const protectedWords = new Set([
         "الله",
         "القران",
@@ -1623,9 +1620,11 @@ function normalizeArabicSearchWord(word) {
     if (protectedWords.has(w))
         return w;
 
+    const original = w;
+
     // ==================================
-    // حذف سابقة واحدة فقط
-    // مع شرط بقاء 3 أحرف على الأقل
+    // السوابق
+    // لا نحذف السابقة إلا إذا بقيت 3 أحرف فأكثر
     // ==================================
 
     const prefixes = [
@@ -1640,7 +1639,9 @@ function normalizeArabicSearchWord(word) {
         "ال"
     ];
 
-    for (const prefix of prefixes) {
+    for (let i = 0; i < prefixes.length; i++) {
+
+        const prefix = prefixes[i];
 
         if (
             w.startsWith(prefix) &&
@@ -1648,15 +1649,33 @@ function normalizeArabicSearchWord(word) {
         ) {
 
             w =
-                w.substring(prefix.length);
+                w.substring(
+                    prefix.length
+                );
 
             break;
         }
     }
 
     // ==================================
-    // حذف لاحقة واحدة فقط
-    // مع شرط بقاء 3 أحرف على الأقل
+    // حرف المضارعة "س"
+    // لا يحذف إلا إذا بقيت 3 أحرف فأكثر
+    // ==================================
+
+    if (
+        w.length > 4 &&
+        w.startsWith("س") &&
+        w.length - 1 >= 3
+    ) {
+
+        w =
+            w.substring(1);
+
+    }
+
+    // ==================================
+    // اللواحق
+    // لا نحذف اللاحقة إلا إذا بقيت 3 أحرف فأكثر
     // ==================================
 
     const suffixes = [
@@ -1678,7 +1697,9 @@ function normalizeArabicSearchWord(word) {
         "كن"
     ];
 
-    for (const suffix of suffixes) {
+    for (let i = 0; i < suffixes.length; i++) {
+
+        const suffix = suffixes[i];
 
         if (
             w.endsWith(suffix) &&
@@ -1696,12 +1717,15 @@ function normalizeArabicSearchWord(word) {
     }
 
     // ==================================
-    // إزالة ألف نهائية فقط إذا بقي ≥ 3
+    // الألف النهائية
+    // فقط إذا بقيت 3 أحرف فأكثر
     // ==================================
 
     if (
-        w.length > 3 &&
-        w.endsWith("ا")
+        w !== original &&
+        w.length > 4 &&
+        w.endsWith("ا") &&
+        w.length - 1 >= 3
     ) {
 
         w =
@@ -1712,7 +1736,12 @@ function normalizeArabicSearchWord(word) {
 
     }
 
+    // لا نسمح أبدًا بنتيجة أقل من 3 أحرف
+    if (w.length < 3)
+        return original;
+
     return w;
+
 }
 
 
