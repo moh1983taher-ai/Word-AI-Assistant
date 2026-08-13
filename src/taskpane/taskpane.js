@@ -1395,7 +1395,7 @@ function fileToBase64(file) {
 
 }
 // ======================================
-// Open Working Word Document
+// Read Working Word Document
 // ======================================
 
 async function openWorkingDocument(
@@ -1410,6 +1410,7 @@ async function openWorkingDocument(
 
     }
 
+
     if (
         !Office.context.requirements.isSetSupported(
             "WordApiHiddenDocument",
@@ -1418,15 +1419,21 @@ async function openWorkingDocument(
     ) {
 
         throw new Error(
-            "إصدار Word الحالي لا يدعم فتح نسخة العمل بهذه الطريقة."
+            "إصدار Word الحالي لا يدعم معالجة نسخة العمل."
         );
 
     }
+
+
+    // ==================================
+    // استرجاع نسخة العمل
+    // ==================================
 
     const file =
         await getWorkingWordFile(
             documentItem.storageId
         );
+
 
     if (!file) {
 
@@ -1436,28 +1443,60 @@ async function openWorkingDocument(
 
     }
 
+
+    // ==================================
+    // تحويل ملف DOCX إلى Base64
+    // ==================================
+
     const base64 =
         await fileToBase64(
             file
         );
 
-    await Word.run(
-        async function (context) {
 
-            const workingDocument =
-                context.application.createDocument(
-                    base64
+    // ==================================
+    // إنشاء وثيقة Word من نسخة العمل
+    // ==================================
+
+    const text =
+        await Word.run(
+            async function (context) {
+
+                const workingDocument =
+                    context.application.createDocument(
+                        base64
+                    );
+
+
+                // تحميل النص الحقيقي
+                workingDocument.body.load(
+                    "text"
                 );
 
-            await context.sync();
 
-            console.log(
-                "تم إنشاء مستند العمل من النسخة المخزنة.",
-                workingDocument
-            );
+                await context.sync();
 
-        }
+
+                return (
+                    workingDocument.body.text ||
+                    ""
+                );
+
+            }
+        );
+
+
+    // ==================================
+    // عرض النتيجة للاختبار
+    // ==================================
+
+    console.log(
+        "محتوى نسخة العمل:",
+        text
     );
+
+
+    return text;
 
 }
 // ======================================
