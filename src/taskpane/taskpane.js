@@ -2365,7 +2365,75 @@ async function getDocumentIndex(
     );
 
 }
+// ======================================
+// Test Document Index
+// ======================================
 
+async function testCurrentDocumentIndex() {
+
+    if (!currentDocument) {
+
+        console.warn(
+            "لا يوجد مستند نشط."
+        );
+
+        return;
+
+    }
+
+    try {
+
+        const index =
+            await getDocumentIndex(
+                currentDocument.id
+            );
+
+        console.log(
+            "الفهرس الحقيقي للمستند:",
+            index
+        );
+
+        if (!index) {
+
+            console.warn(
+                "لا يوجد فهرس محفوظ لهذا المستند."
+            );
+
+            return;
+
+        }
+
+        console.log(
+            "عدد الكلمات:",
+            index.tokenCount
+        );
+
+        console.log(
+            "عدد الكلمات الفريدة:",
+            index.uniqueTerms
+        );
+
+        console.log(
+            "الكلمات المفهرسة:",
+            Object.keys(
+                index.terms || {}
+            ).slice(
+                0,
+                20
+            )
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "فشل اختبار الفهرس:",
+            error
+        );
+
+    }
+
+}
 // ======================================
 // Search Indexed Document
 // ======================================
