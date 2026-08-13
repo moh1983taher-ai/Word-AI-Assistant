@@ -2730,7 +2730,7 @@ async function testCurrentDocumentIndex() {
 
 // ======================================
 // Search Indexed Document
-// البحث الذكي المحافظ
+// البحث الذكي المحافظ عالي الدقة
 // ======================================
 
 async function searchIndexedDocument(
@@ -2751,14 +2751,11 @@ async function searchIndexedDocument(
 
         return {
 
-            query:
-                "",
+            query: "",
 
-            count:
-                0,
+            count: 0,
 
-            results:
-                []
+            results: []
 
         };
 
@@ -2785,70 +2782,127 @@ async function searchIndexedDocument(
         indexData.terms || {};
 
     // ==================================
-    // مفاتيح الاستعلام
+    // تقسيم الاستعلام إلى كلمات
     // ==================================
 
-    const queryTokens =
+    const rawQueryTokens =
         tokenizeDocumentText(
             searchTerm
         );
 
-    const queryKeys =
-        [];
+    if (
+        rawQueryTokens.length === 0
+    ) {
 
-    queryTokens.forEach(
-        function (
-            token
-        ) {
+        return {
 
-            const keys =
-                getSearchKeysForWord(
-                    token
-                );
+            query:
+                searchTerm,
 
-            keys.forEach(
-                function (
-                    key
-                ) {
+            count:
+                0,
 
-                    if (
-                        key &&
-                        !queryKeys.includes(
-                            key
+            results:
+                [],
+
+            matchedTerms:
+                [],
+
+            totalQueryTerms:
+                0,
+
+            indexTokenCount:
+                indexData.tokenCount,
+
+            indexUniqueTerms:
+                indexData.uniqueTerms
+
+        };
+
+    }
+
+    // ==================================
+    // إزالة التكرار من كلمات الاستعلام
+    // ==================================
+
+    const queryTokens =
+        Array.from(
+            new Set(
+                rawQueryTokens
+            )
+        );
+
+    // ==================================
+    // بناء مواصفات كلمات الاستعلام
+    // أصلية + مفتاح محافظ
+    // ==================================
+
+    const querySpecs =
+        queryTokens.map(
+            function (token) {
+
+                const surface =
+                    normalizeSearchText(
+                        token
+                    );
+
+                const stem =
+                    normalizeArabicSearchWord(
+                        token
+                    );
+
+                return {
+
+                    surface:
+                        surface,
+
+                    stem:
+                        stem,
+
+                    hasSurfaceIndex:
+                        Boolean(
+                            surface &&
+                            indexedTerms[
+                                surface
+                            ]
+                        ),
+
+                    hasStemIndex:
+                        Boolean(
+                            stem &&
+                            indexedTerms[
+                                stem
+                            ]
                         )
-                    ) {
 
-                        queryKeys.push(
-                            key
-                        );
+                };
 
-                    }
-
-                }
-            );
-
-        }
-    );
+            }
+        );
 
     // ==================================
-    // تحديد المفاتيح الموجودة في الفهرس
+    // تحديد الكلمات التي لها وجود فعلي
+    // في الفهرس
     // ==================================
 
-    const matchedTerms =
-        queryKeys.filter(
-            function (
-                key
-            ) {
+    const matchedSpecs =
+        querySpecs.filter(
+            function (spec) {
 
-                return Boolean(
-                    indexedTerms[key]
+                return (
+                    spec.hasSurfaceIndex ||
+                    spec.hasStemIndex
                 );
 
             }
         );
 
+    // ==================================
+    // لا توجد أي كلمة مناسبة
+    // ==================================
+
     if (
-        matchedTerms.length === 0
+        matchedSpecs.length === 0
     ) {
 
         return {
@@ -2897,8 +2951,7 @@ async function searchIndexedDocument(
 
     const originalText =
         String(
-            textData.text ||
-            ""
+            textData.text || ""
         );
 
     // ==================================
@@ -2933,13 +2986,367 @@ async function searchIndexedDocument(
             : [];
 
     // ==================================
-    // مجموعة المفاتيح المطلوبة
+    // بناء حدود الفقرات على مستوى
+    // مواضع الكلمات في الفهرس
     // ==================================
 
-    const matchedKeySet =
-        new Set(
-            matchedTerms
-        );
+    const paragraphRanges =
+        [];
+
+    let tokenCursor =
+        0;
+
+    paragraphs.forEach(
+        function (paragraph) {
+
+            if (
+                !paragraph ||
+                !paragraph.text
+            ) {
+
+                paragraphRanges.push({
+
+                    index:
+                        paragraph
+                            ? paragraph.index
+                            : paragraphRanges.length,
+
+                    start:
+                        tokenCursor,
+
+                    end:
+                        tokenCursor,
+
+                    tokenCount:
+                        0,
+
+                    paragraph:
+                        paragraph
+
+                });
+
+                return;
+
+            }
+
+            const paragraphText =
+                String(
+                    paragraph.text
+                );
+
+            const paragraphTokenCount =
+                tokenizeDocumentText(
+                    paragraphText
+                ).length;
+
+            const start =
+                tokenCursor;
+
+            const end =
+                start +
+                paragraphTokenCount;
+
+            paragraphRanges.push({
+
+                index:
+                    paragraph.index,
+
+                start:
+                    start,
+
+                end:
+                    end,
+
+                tokenCount:
+                    paragraphTokenCount,
+
+                paragraph:
+                    paragraph
+
+            });
+
+            tokenCursor =
+                end;
+
+        }
+    );
+
+    // ==================================
+    // تحديد الفقرة من موضع الكلمة
+    // باستخدام بحث ثنائي
+    // ==================================
+
+    function findParagraphRange(
+        tokenPosition
+    ) {
+
+        let low = 0;
+
+        let high =
+            paragraphRanges.length - 1;
+
+        while (
+            low <= high
+        ) {
+
+            const middle =
+                Math.floor(
+                    (
+                        low +
+                        high
+                    ) / 2
+                );
+
+            const range =
+                paragraphRanges[
+                    middle
+                ];
+
+            if (
+                tokenPosition <
+                range.start
+            ) {
+
+                high =
+                    middle - 1;
+
+            }
+            else if (
+                tokenPosition >=
+                range.end
+            ) {
+
+                low =
+                    middle + 1;
+
+            }
+            else {
+
+                return range;
+
+            }
+
+        }
+
+        return null;
+
+    }
+
+    // ==================================
+    // المرشحون
+    // كل فقرة تحتوي على كلمات لها
+    // وجود في الفهرس
+    // ==================================
+
+    const candidateMap =
+        new Map();
+
+    const matchedTermsSet =
+        new Set();
+
+    // ==================================
+    // جلب مواضع كل مفتاح مطابق
+    // من الفهرس بدل فحص الوثيقة كلها
+    // ==================================
+
+    matchedSpecs.forEach(
+        function (spec) {
+
+            const keys =
+                [];
+
+            if (
+                spec.surface &&
+                spec.hasSurfaceIndex
+            ) {
+
+                keys.push({
+
+                    key:
+                        spec.surface,
+
+                    type:
+                        "exact"
+
+                });
+
+                matchedTermsSet.add(
+                    spec.surface
+                );
+
+            }
+
+            if (
+                spec.stem &&
+                spec.hasStemIndex &&
+                spec.stem !==
+                    spec.surface
+            ) {
+
+                keys.push({
+
+                    key:
+                        spec.stem,
+
+                    type:
+                        "stem"
+
+                });
+
+                matchedTermsSet.add(
+                    spec.stem
+                );
+
+            }
+
+            keys.forEach(
+                function (entry) {
+
+                    const termData =
+                        indexedTerms[
+                            entry.key
+                        ];
+
+                    if (
+                        !termData ||
+                        !Array.isArray(
+                            termData.positions
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+                    termData.positions.forEach(
+                        function (
+                            tokenPosition
+                        ) {
+
+                            const range =
+                                findParagraphRange(
+                                    tokenPosition
+                                );
+
+                            if (!range)
+                                return;
+
+                            const paragraphIndex =
+                                range.index;
+
+                            if (
+                                !candidateMap.has(
+                                    paragraphIndex
+                                )
+                            ) {
+
+                                candidateMap.set(
+                                    paragraphIndex,
+                                    {
+
+                                        exactKeys:
+                                            new Set(),
+
+                                        stemKeys:
+                                            new Set(),
+
+                                        positions:
+                                            [],
+
+                                        range:
+                                            range
+
+                                    }
+                                );
+
+                            }
+
+                            const candidate =
+                                candidateMap.get(
+                                    paragraphIndex
+                                );
+
+                            if (
+                                entry.type ===
+                                "exact"
+                            ) {
+
+                                candidate.exactKeys.add(
+                                    entry.key
+                                );
+
+                            }
+                            else {
+
+                                candidate.stemKeys.add(
+                                    entry.key
+                                );
+
+                            }
+
+                            candidate.positions.push({
+
+                                position:
+                                    tokenPosition,
+
+                                key:
+                                    entry.key,
+
+                                type:
+                                    entry.type
+
+                            });
+
+                        }
+                    );
+
+                }
+            );
+
+        }
+    );
+
+    // ==================================
+    // إذا تعذر ربط مواضع الفهرس
+    // بالفقرات، نعيد مسارًا احتياطيًا
+    // محافظًا بدل فقد النتائج
+    // ==================================
+
+    if (
+        candidateMap.size === 0
+    ) {
+
+        return {
+
+            query:
+                searchTerm,
+
+            count:
+                0,
+
+            results:
+                [],
+
+            matchedTerms:
+                Array.from(
+                    matchedTermsSet
+                ),
+
+            totalQueryTerms:
+                queryTokens.length,
+
+            indexTokenCount:
+                indexData.tokenCount,
+
+            indexUniqueTerms:
+                indexData.uniqueTerms,
+
+            indexedOccurrences:
+                0
+
+        };
+
+    }
 
     // ==================================
     // النتائج
@@ -2948,10 +3355,17 @@ async function searchIndexedDocument(
     const results =
         [];
 
-    paragraphs.forEach(
+    // ==================================
+    // معالجة الفقرات المرشحة فقط
+    // ==================================
+
+    candidateMap.forEach(
         function (
-            paragraph
+            candidate
         ) {
+
+            const paragraph =
+                candidate.range.paragraph;
 
             if (
                 !paragraph ||
@@ -2972,80 +3386,19 @@ async function searchIndexedDocument(
                     originalParagraphText
                 );
 
-            const paragraphTokens =
-                tokenizeDocumentText(
-                    normalizedParagraphText
-                );
-
-            if (
-                paragraphTokens.length === 0
-            ) {
-
-                return;
-
-            }
-
             // ==================================
-            // مفاتيح الفقرة
+            // عدد المطابقات الفعلية
             // ==================================
 
-            const paragraphKeys =
-                new Set();
+            const exactCount =
+                candidate.exactKeys.size;
 
-            paragraphTokens.forEach(
-                function (
-                    token
-                ) {
+            const stemCount =
+                candidate.stemKeys.size;
 
-                    const keys =
-                        getSearchKeysForWord(
-                            token
-                        );
-
-                    keys.forEach(
-                        function (
-                            key
-                        ) {
-
-                            if (key) {
-
-                                paragraphKeys.add(
-                                    key
-                                );
-
-                            }
-
-                        }
-                    );
-
-                }
-            );
-
-            // ==================================
-            // حساب المطابقة
-            // ==================================
-
-            let matchedCount =
-                0;
-
-            matchedKeySet.forEach(
-                function (
-                    key
-                ) {
-
-                    if (
-                        paragraphKeys.has(
-                            key
-                        )
-                    ) {
-
-                        matchedCount +=
-                            1;
-
-                    }
-
-                }
-            );
+            const matchedCount =
+                exactCount +
+                stemCount;
 
             if (
                 matchedCount === 0
@@ -3056,55 +3409,81 @@ async function searchIndexedDocument(
             }
 
             // ==================================
-            // درجة المطابقة الأساسية
+            // درجة المطابقة
+            // الحرفي أعلى من الاشتقاقي
             // ==================================
 
-            let score =
+            let score = 0;
+
+            score +=
+                exactCount *
+                1.0;
+
+            score +=
+                stemCount *
+                0.65;
+
+            // ==================================
+            // نسبة تغطية كلمات السؤال
+            // ==================================
+
+            const coverage =
                 matchedCount /
-                matchedTerms.length;
+                queryTokens.length;
+
+            score +=
+                coverage *
+                2.0;
 
             // ==================================
             // مكافأة العبارة الكاملة
             // ==================================
 
-            if (
+            const hasExactPhrase =
                 normalizedParagraphText.includes(
                     searchTerm
-                )
+                );
+
+            if (
+                hasExactPhrase
             ) {
 
-                score +=
-                    3;
+                score += 4;
 
             }
 
             // ==================================
-            // مكافأة المطابقة الحرفية للكلمات
+            // تحديد نوع المطابقة
             // ==================================
 
-            queryTokens.forEach(
-                function (
-                    token
-                ) {
+            let matchType =
+                "related";
 
-                    if (
-                        normalizedParagraphText
-                            .split(/\s+/)
-                            .includes(
-                                token
-                            )
-                    ) {
+            if (
+                hasExactPhrase
+            ) {
 
-                        score +=
-                            0.15;
+                matchType =
+                    "exact";
 
-                    }
+            }
+            else if (
+                exactCount > 0
+            ) {
 
-                }
-            );
+                matchType =
+                    "exact";
+
+            }
+            else {
+
+                matchType =
+                    "stemmed";
+
+            }
 
             // ==================================
-            // العنوان الأقرب
+            // العثور على العنوان الأقرب
             // ==================================
 
             let nearestHeading =
@@ -3138,60 +3517,7 @@ async function searchIndexedDocument(
             );
 
             // ==================================
-            // تحديد نوع المطابقة
-            // ==================================
-
-            let matchType =
-                "related";
-
-            if (
-                normalizedParagraphText.includes(
-                    searchTerm
-                )
-            ) {
-
-                matchType =
-                    "exact";
-
-            }
-            else {
-
-                let hasConceptMatch =
-                    false;
-
-                queryKeys.forEach(
-                    function (
-                        key
-                    ) {
-
-                        if (
-                            key !== searchTerm &&
-                            paragraphKeys.has(
-                                key
-                            )
-                        ) {
-
-                            hasConceptMatch =
-                                true;
-
-                        }
-
-                    }
-                );
-
-                if (
-                    hasConceptMatch
-                ) {
-
-                    matchType =
-                        "related";
-
-                }
-
-            }
-
-            // ==================================
-            // تحديد موضع مناسب للمقتطف
+            // تحديد موضع المقتطف
             // ==================================
 
             let searchPosition =
@@ -3199,31 +3525,24 @@ async function searchIndexedDocument(
                     searchTerm
                 );
 
+            // إذا لم توجد العبارة الكاملة:
+            // ابحث عن كلمة حرفية من السؤال
             if (
                 searchPosition === -1
             ) {
 
                 for (
                     let i = 0;
-                    i < queryKeys.length;
+                    i < queryTokens.length;
                     i++
                 ) {
 
-                    const key =
-                        queryKeys[i];
-
-                    if (
-                        key ===
-                        searchTerm
-                    ) {
-
-                        continue;
-
-                    }
+                    const token =
+                        queryTokens[i];
 
                     const position =
                         normalizedParagraphText.indexOf(
-                            key
+                            token
                         );
 
                     if (
@@ -3242,7 +3561,8 @@ async function searchIndexedDocument(
             }
 
             // ==================================
-            // استخراج المقتطف
+            // إذا لم توجد المطابقة الحرفية:
+            // نستخدم بداية الفقرة كمقتطف
             // ==================================
 
             let context =
@@ -3282,6 +3602,10 @@ async function searchIndexedDocument(
 
             }
 
+            // ==================================
+            // إضافة النتيجة
+            // ==================================
+
             results.push({
 
                 paragraphIndex:
@@ -3307,10 +3631,23 @@ async function searchIndexedDocument(
                         : "",
 
                 matchedTerms:
-                    matchedTerms,
+                    Array.from(
+                        new Set(
+                            [
+                                ...candidate.exactKeys,
+                                ...candidate.stemKeys
+                            ]
+                        )
+                    ),
 
                 matchedCount:
                     matchedCount,
+
+                exactMatchCount:
+                    exactCount,
+
+                stemmedMatchCount:
+                    stemCount,
 
                 totalQueryTerms:
                     queryTokens.length,
@@ -3336,6 +3673,7 @@ async function searchIndexedDocument(
             b
         ) {
 
+            // الدرجة أولًا
             if (
                 b.score !==
                 a.score
@@ -3348,6 +3686,20 @@ async function searchIndexedDocument(
 
             }
 
+            // ثم عدد المطابقات الحرفية
+            if (
+                b.exactMatchCount !==
+                a.exactMatchCount
+            ) {
+
+                return (
+                    b.exactMatchCount -
+                    a.exactMatchCount
+                );
+
+            }
+
+            // ثم العدد الكلي للمطابقات
             if (
                 b.matchedCount !==
                 a.matchedCount
@@ -3360,6 +3712,7 @@ async function searchIndexedDocument(
 
             }
 
+            // ثم ترتيب الفقرة
             return (
                 a.paragraphIndex -
                 b.paragraphIndex
@@ -3370,28 +3723,46 @@ async function searchIndexedDocument(
 
     // ==================================
     // عدد مرات ظهور المفاتيح المطابقة
+    // من دون مضاعفة surface + stem
     // ==================================
 
-    let indexedOccurrences =
-        0;
+    const uniquePositions =
+        new Set();
 
-    matchedTerms.forEach(
+    matchedTermsSet.forEach(
         function (
             key
         ) {
 
             const item =
-                indexedTerms[key];
+                indexedTerms[
+                    key
+                ];
 
-            if (item) {
+            if (
+                !item ||
+                !Array.isArray(
+                    item.positions
+                )
+            ) {
 
-                indexedOccurrences +=
-                    Number(
-                        item.count ||
-                        0
-                    );
+                return;
 
             }
+
+            item.positions.forEach(
+                function (
+                    position
+                ) {
+
+                    uniquePositions.add(
+                        String(
+                            position
+                        )
+                    );
+
+                }
+            );
 
         }
     );
@@ -3412,7 +3783,9 @@ async function searchIndexedDocument(
             results,
 
         matchedTerms:
-            matchedTerms,
+            Array.from(
+                matchedTermsSet
+            ),
 
         totalQueryTerms:
             queryTokens.length,
@@ -3424,7 +3797,7 @@ async function searchIndexedDocument(
             indexData.uniqueTerms,
 
         indexedOccurrences:
-            indexedOccurrences
+            uniquePositions.size
 
     };
 
