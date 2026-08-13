@@ -1766,14 +1766,18 @@ async function buildDocumentStructure(
                                 index,
 
                             id:
-                                String(index),  
+                                String(index),
 
                             text:
                                 text,
 
                             style:
                                 paragraph.styleBuiltIn ||
-                                ""
+                                "",
+
+                            tableNestingLevel:
+                                paragraph.tableNestingLevel ||
+                                0
 
                         };
 
