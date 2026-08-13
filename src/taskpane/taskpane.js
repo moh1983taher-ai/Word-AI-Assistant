@@ -37,7 +37,14 @@ function renderDocuments() {
 
     documentsList.innerHTML = "";
 
+    if (addDocumentBtn) {
 
+        addDocumentBtn.style.display =
+            currentProject
+                ? "flex"
+                : "none";
+
+    }
     // لا يوجد مشروع محدد
     if (!currentProject) {
 
@@ -537,213 +544,183 @@ function setCurrentProject(project) {
 
 if (addDocumentBtn) {
 
-    addDocumentBtn.onclick =
-        function (e) {
+    addDocumentBtn.onclick = function (e) {
 
-            e.preventDefault();
-            e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
 
+        // يجب وجود مشروع حالي
+        if (!currentProject) {
 
-            // ==================================
-            // يجب اختيار مشروع أولًا
-            // ==================================
+            console.warn(
+                "لا يوجد مشروع محدد لإضافة المستند."
+            );
 
-            if (!currentProject) {
+            if (documentsList) {
 
-                alert(
-                    "يرجى اختيار مشروع أولًا."
-                );
-
-                return;
-
-            }
-
-
-            // ==================================
-            // حذف صندوق سابق
-            // ==================================
-
-            const oldBox =
-                document.querySelector(
-                    ".document-create-box"
-                );
-
-
-            if (oldBox) {
-
-                oldBox.remove();
+                documentsList.innerHTML = `
+                    <div class="empty-document">
+                        اختر مشروعًا أولًا لإضافة مستند
+                    </div>
+                `;
 
             }
 
-
-            // ==================================
-            // إنشاء صندوق الإضافة
-            // ==================================
-
-            const box =
-                document.createElement(
-                    "div"
-                );
+            return;
+        }
 
 
-            box.className =
-                "document-create-box";
+        // إزالة أي صندوق سابق
+        const oldBox =
+            document.querySelector(
+                ".document-create-box"
+            );
+
+        if (oldBox) {
+            oldBox.remove();
+        }
 
 
-            box.innerHTML = `
+        // إنشاء صندوق الإضافة
+        const box =
+            document.createElement("div");
 
-                <input
-                    type="text"
-                    class="new-document-name"
-                    placeholder="اسم المستند"
-                    autocomplete="off">
+        box.className =
+            "document-create-box";
 
-                <div class="document-create-buttons">
+        box.innerHTML = `
+            <input
+                type="text"
+                class="new-document-name"
+                placeholder="اسم المستند"
+                autocomplete="off">
 
-                    <button
-                        type="button"
-                        class="save-document">
-                        إضافة
-                    </button>
+            <div class="document-create-buttons">
 
-                    <button
-                        type="button"
-                        class="cancel-document">
-                        إلغاء
-                    </button>
+                <button
+                    type="button"
+                    class="save-document">
+                    إضافة
+                </button>
 
-                </div>
+                <button
+                    type="button"
+                    class="cancel-document">
+                    إلغاء
+                </button>
 
-            `;
+            </div>
+        `;
 
 
-            document.body.appendChild(
-                box
+        document.body.appendChild(box);
+
+
+        // تحديد الموضع
+        const rect =
+            addDocumentBtn.getBoundingClientRect();
+
+        const boxWidth = 240;
+        const boxHeight = 105;
+        const margin = 10;
+
+        let left =
+            rect.left;
+
+        let top =
+            rect.bottom + 8;
+
+
+        if (
+            left + boxWidth >
+            window.innerWidth - margin
+        ) {
+
+            left =
+                window.innerWidth -
+                boxWidth -
+                margin;
+
+        }
+
+
+        if (left < margin) {
+            left = margin;
+        }
+
+
+        if (
+            top + boxHeight >
+            window.innerHeight - margin
+        ) {
+
+            top =
+                rect.top -
+                boxHeight -
+                8;
+
+        }
+
+
+        box.style.position = "fixed";
+        box.style.left = left + "px";
+        box.style.top = top + "px";
+        box.style.width = boxWidth + "px";
+        box.style.zIndex = "999999";
+
+
+        const nameInput =
+            box.querySelector(
+                ".new-document-name"
+            );
+
+        const saveButton =
+            box.querySelector(
+                ".save-document"
+            );
+
+        const cancelButton =
+            box.querySelector(
+                ".cancel-document"
             );
 
 
-            // ==================================
-            // تحديد موضع الصندوق
-            // ==================================
-
-            const rect =
-                addDocumentBtn.getBoundingClientRect();
+        if (nameInput) {
+            nameInput.focus();
+        }
 
 
-            const boxWidth =
-                240;
+        // ======================================
+        // تنفيذ الحفظ الفعلي
+        // ======================================
 
-            const boxHeight =
-                105;
+        function saveNewDocument() {
 
-            const margin =
-                10;
-
-
-            let left =
-                rect.left;
-
-            let top =
-                rect.bottom + 8;
+            const name =
+                nameInput
+                    ? nameInput.value.trim()
+                    : "";
 
 
-            if (
-                left + boxWidth >
-                window.innerWidth - margin
-            ) {
+            if (!name) {
 
-                left =
-                    window.innerWidth -
-                    boxWidth -
-                    margin;
-
-            }
-
-
-            if (
-                left < margin
-            ) {
-
-                left =
-                    margin;
-
-            }
-
-
-            if (
-                top + boxHeight >
-                window.innerHeight - margin
-            ) {
-
-                top =
-                    rect.top -
-                    boxHeight -
-                    8;
-
-            }
-
-
-            box.style.position =
-                "fixed";
-
-            box.style.left =
-                left + "px";
-
-            box.style.top =
-                top + "px";
-
-            box.style.width =
-                boxWidth + "px";
-
-            box.style.zIndex =
-                "999999";
-
-
-            // ==================================
-            // حقل الاسم
-            // ==================================
-
-            const nameInput =
-                box.querySelector(
-                    ".new-document-name"
-                );
-
-
-            if (nameInput) {
-
-                nameInput.focus();
-
-            }
-
-
-            // ==================================
-            // حفظ المستند
-            // ==================================
-
-            function saveNewDocument() {
-
-                const name =
-                    nameInput
-                        ? nameInput.value.trim()
-                        : "";
-
-
-                if (!name) {
-
-                    if (nameInput) {
-
-                        nameInput.focus();
-
-                    }
-
-                    return;
-
+                if (nameInput) {
+                    nameInput.focus();
                 }
+
+                return;
+            }
+
+
+            try {
+
+                const projectId =
+                    currentProject.id;
 
 
                 const projectDocuments =
                     getProjectDocuments(
-                        currentProject.id
+                        projectId
                     );
 
 
@@ -751,149 +728,158 @@ if (addDocumentBtn) {
                     projectDocuments.length + 1;
 
 
-                try {
-
-                    const documentItem =
-                        createDocument(
-                            name,
-                            currentProject.id,
-                            nextOrder
-                        );
+                const documentItem =
+                    createDocument(
+                        name,
+                        projectId,
+                        nextOrder
+                    );
 
 
-                    if (!documentItem) {
+                if (!documentItem) {
 
-                        throw new Error(
-                            "تعذر إنشاء المستند."
-                        );
+                    throw new Error(
+                        "تعذر إنشاء سجل المستند."
+                    );
+
+                }
+
+
+                /*
+                   createDocument()
+                   يحفظ المستند أصلًا في
+                   WORD_AI_DOCUMENTS
+                */
+
+
+                /*
+                   ربطه بالمشروع
+                   حتى تبقى بنية المشروع مكتملة
+                */
+
+                attachDocumentToProject(
+                    currentProject,
+                    documentItem
+                );
+
+
+                /*
+                   إعادة عرض المستندات
+                */
+
+                renderDocuments();
+
+
+                /*
+                   إغلاق الصندوق
+                */
+
+                box.remove();
+
+
+                console.log(
+                    "تم إنشاء المستند:",
+                    documentItem
+                );
+
+            }
+
+            catch (error) {
+
+                console.error(
+                    "خطأ أثناء إنشاء المستند:",
+                    error
+                );
+
+
+                if (documentsList) {
+
+                    documentsList.innerHTML = `
+                        <div class="empty-document">
+                            تعذر إضافة المستند
+                        </div>
+                    `;
+
+                }
+
+            }
+
+        }
+
+
+        // ======================================
+        // زر إضافة
+        // ======================================
+
+        if (saveButton) {
+
+            saveButton.onclick =
+                function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    saveNewDocument();
+
+                };
+
+        }
+
+
+        // ======================================
+        // زر إلغاء
+        // ======================================
+
+        if (cancelButton) {
+
+            cancelButton.onclick =
+                function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    box.remove();
+
+                };
+
+        }
+
+
+        // ======================================
+        // لوحة المفاتيح
+        // ======================================
+
+        if (nameInput) {
+
+            nameInput.onkeydown =
+                function (event) {
+
+                    if (
+                        event.key === "Enter"
+                    ) {
+
+                        event.preventDefault();
+
+                        saveNewDocument();
 
                     }
 
 
-                    renderDocuments();
-
-
-                    box.remove();
-
-
-                }
-                catch (error) {
-
-                    console.error(
-                        "فشل حفظ المستند:",
-                        error
-                    );
-
-
-                    alert(
-                        "حدث خطأ أثناء حفظ المستند:\n" +
-                        (
-                            error.message ||
-                            "خطأ غير معروف"
-                        )
-                    );
-
-                }
-
-            }
-
-
-            // ==================================
-            // زر الإضافة
-            // ==================================
-
-            const saveButton =
-                box.querySelector(".save-document");
-
-            if (saveButton) {
-
-                saveButton.onclick =
-                    function (event) {
+                    if (
+                        event.key === "Escape"
+                    ) {
 
                         event.preventDefault();
-                        event.stopPropagation();
-
-                        console.log(
-                            "تم الضغط على زر إضافة المستند"
-                        );
-
-                    };
-
-            }
-
-
-            // ==================================
-            // زر الإلغاء
-            // ==================================
-
-            const cancelButton =
-                box.querySelector(
-                    ".cancel-document"
-                );
-
-
-            if (cancelButton) {
-
-                cancelButton.onclick =
-                    function (event) {
-
-                        event.preventDefault();
-                        event.stopPropagation();
 
                         box.remove();
 
-                    };
-
-            }
-
-
-            // ==================================
-            // لوحة المفاتيح
-            // Enter = إضافة
-            // Escape = إلغاء
-            // ==================================
-
-            if (nameInput) {
-
-                nameInput.onkeydown =
-                    function (event) {
-
-                        if (
-                            event.key ===
-                            "Enter"
-                        ) {
-
-                            event.preventDefault();
-
-                            saveNewDocument();
-
-                        }
-
-
-                        if (
-                            event.key ===
-                            "Escape"
-                        ) {
-
-                            event.preventDefault();
-
-                            box.remove();
-
-                        }
-
-                    };
-
-            }
-
-
-            box.onclick =
-                function (event) {
-
-                    event.stopPropagation();
+                    }
 
                 };
 
-        };
+        }
+
+    };
 
 }
 // ======================================
