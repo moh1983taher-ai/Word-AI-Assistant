@@ -802,25 +802,26 @@ if (addDocumentBtn) {
             // زر الإضافة
             // ==================================
 
-            const saveButton =
-                box.querySelector(
-                    ".save-document"
-                );
+            document.addEventListener(
+                "pointerdown",
+                function (event) {
 
+                    const saveButton =
+                        event.target.closest(
+                            ".document-create-box .save-document"
+                        );
 
-            if (saveButton) {
+                    if (!saveButton)
+                        return;
 
-                saveButton.onclick =
-                    function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
 
-                        event.preventDefault();
-                        event.stopPropagation();
+                    alert("تم التقاط الضغط على زر إضافة");
 
-                        alert("تم الضغط على زر إضافة");
-
-                    };
-
-            }
+                },
+                true
+            );
 
 
             // ==================================

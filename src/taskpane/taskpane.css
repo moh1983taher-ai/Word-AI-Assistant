@@ -3243,6 +3243,24 @@ body.sidebar-is-pinned .message-box {
     opacity: 0.9;
 }
 
+.document-create-box {
+    position: fixed !important;
+    z-index: 9999999 !important;
+    pointer-events: auto !important;
+}
+
+.document-create-box .document-create-buttons {
+    position: relative !important;
+    z-index: 10000000 !important;
+    pointer-events: auto !important;
+}
+
+.document-create-box .save-document,
+.document-create-box .cancel-document {
+    position: relative !important;
+    z-index: 10000001 !important;
+    pointer-events: auto !important;
+}
 
 /* =========================================================
    DOCUMENTS LIST
