@@ -1581,7 +1581,7 @@ function normalizeSearchText(text) {
 
 // ======================================
 // Arabic Search Stem / Concept Key
-// تطبيع صرفي خفيف وآمن للبحث
+// تطبيع عربي محافظ وآمن للبحث
 // ======================================
 
 function normalizeArabicSearchWord(word) {
@@ -1604,17 +1604,18 @@ function normalizeArabicSearchWord(word) {
     if (!w)
         return "";
 
-    // ----------------------------------
-    // كلمات نريد عدم اختصارها
-    // ----------------------------------
+    // ==================================
+    // كلمات لا نريد العبث بها
+    // ==================================
 
-    const protectedWords = new Set([
-        "الله",
-        "القران",
-        "اسلام",
-        "اسلامي",
-        "اسلامية"
-    ]);
+    const protectedWords =
+        new Set([
+            "الله",
+            "القران",
+            "اسلام",
+            "اسلامي",
+            "اسلامية"
+        ]);
 
     if (
         protectedWords.has(w)
@@ -1625,7 +1626,8 @@ function normalizeArabicSearchWord(word) {
     }
 
     // ==================================
-    // البادئات العربية الشائعة
+    // إزالة اللواصق في بداية الكلمة فقط
+    // دون الاقتراب من أصل الكلمة
     // ==================================
 
     const prefixes = [
@@ -1637,7 +1639,6 @@ function normalizeArabicSearchWord(word) {
         "ول",
         "بل",
         "فل",
-        "كل",
         "ال"
     ];
 
@@ -1649,40 +1650,6 @@ function normalizeArabicSearchWord(word) {
 
         const prefix =
             prefixes[i];
-
-        if (
-            w.startsWith(prefix) &&
-            w.length >
-                prefix.length + 2
-        ) {
-
-            w =
-                w.substring(
-                    prefix.length
-                );
-
-            break;
-
-        }
-
-    }
-
-    // ==================================
-    // سوابق أخرى تظهر كثيرًا في البحث
-    // ==================================
-
-    const prefixes2 = [
-        "س"
-    ];
-
-    for (
-        let i = 0;
-        i < prefixes2.length;
-        i++
-    ) {
-
-        const prefix =
-            prefixes2[i];
 
         if (
             w.startsWith(prefix) &&
@@ -1702,26 +1669,47 @@ function normalizeArabicSearchWord(word) {
     }
 
     // ==================================
-    // لواحق الجمع والتأنيث والنسبة
+    // معالجة "بـ / كـ / فـ / وـ"
+    // إذا لم تكن جزءًا من الكلمة
+    // ==================================
+
+    if (
+        w.length > 4 &&
+        (
+            w.startsWith("و") ||
+            w.startsWith("ب") ||
+            w.startsWith("ك") ||
+            w.startsWith("ف")
+        )
+    ) {
+
+        const candidate =
+            w.substring(1);
+
+        if (
+            candidate.length >= 4
+        ) {
+
+            w =
+                candidate;
+
+        }
+
+    }
+
+    // ==================================
+    // لواحق آمنة نسبيًا
+    // لا نحذف إلا اللاحقة الظاهرة بوضوح
     // ==================================
 
     const suffixes = [
-        "يات",
-        "ات",
-        "ان",
-        "ين",
-        "ون",
         "هما",
         "هم",
         "هن",
         "ها",
-        "ية",
-        "ي",
-        "ة",
-        "ه",
-        "ك",
         "كم",
-        "كن"
+        "كن",
+        "كما"
     ];
 
     for (
@@ -1736,7 +1724,7 @@ function normalizeArabicSearchWord(word) {
         if (
             w.endsWith(suffix) &&
             w.length >
-                suffix.length + 2
+                suffix.length + 3
         ) {
 
             w =
@@ -1752,30 +1740,14 @@ function normalizeArabicSearchWord(word) {
 
     }
 
-    // ==================================
-    // إزالة الألف النهائية الشائعة
-    // مثل: استصلاحا ← استصلاح
-    // ==================================
-
-    if (
-        w.length > 4 &&
-        w.endsWith("ا")
-    ) {
-
-        w =
-            w.substring(
-                0,
-                w.length - 1
-            );
-
-    }
-
     return w;
+
 }
 
 
 // ======================================
 // بناء مفاتيح البحث للكلمة
+// مفتاح أصلي + مفتاح محافظ
 // ======================================
 
 function getSearchKeysForWord(word) {
@@ -1792,8 +1764,13 @@ function getSearchKeysForWord(word) {
 
     const keys = [];
 
-    if (surface)
-        keys.push(surface);
+    if (surface) {
+
+        keys.push(
+            surface
+        );
+
+    }
 
     if (
         stem &&
@@ -1807,12 +1784,12 @@ function getSearchKeysForWord(word) {
     }
 
     return keys;
+
 }
 
 
 // ======================================
 // Tokenize Document Text
-// مع إنشاء مفتاح بحث اشتقاقي
 // ======================================
 
 function tokenizeDocumentText(text) {
@@ -1832,9 +1809,11 @@ function tokenizeDocumentText(text) {
     );
 
 }
+
+
 // ======================================
 // Build Document Index
-// الفهرسة الذكية مع التطبيع الاشتقاقي
+// فهرسة الكلمة الأصلية والمفتاح المحافظ
 // ======================================
 
 function buildDocumentIndex(
@@ -1863,7 +1842,9 @@ function buildDocumentIndex(
                     if (!key)
                         return;
 
-                    if (!terms[key]) {
+                    if (
+                        !terms[key]
+                    ) {
 
                         terms[key] = {
 
@@ -1877,7 +1858,8 @@ function buildDocumentIndex(
 
                     }
 
-                    terms[key].count += 1;
+                    terms[key].count +=
+                        1;
 
                     terms[key].positions.push(
                         index
