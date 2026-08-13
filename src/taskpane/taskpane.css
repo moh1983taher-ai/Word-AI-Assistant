@@ -3469,6 +3469,118 @@ body.sidebar-is-pinned .message-box {
 
     text-align: right;
 }
+
+/* =========================================================
+   DOCUMENT DELETE CONFIRMATION
+   ========================================================= */
+
+.document-delete-confirm {
+    position: fixed;
+
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0, 0, 0, 0.28);
+
+    z-index: 9999999;
+
+    direction: rtl;
+}
+
+.document-delete-dialog {
+    width: 300px;
+    max-width: calc(100% - 30px);
+
+    padding: 20px;
+
+    background: #ffffff;
+
+    border:
+        1px solid #dddddd;
+
+    border-radius: 12px;
+
+    box-shadow:
+        0 10px 35px rgba(0, 0, 0, 0.20);
+
+    text-align: center;
+
+    box-sizing: border-box;
+}
+
+.document-delete-message {
+    font-size: 14px;
+
+    color: #333;
+
+    margin-bottom: 9px;
+}
+
+.document-delete-name {
+    font-size: 14px;
+    font-weight: 700;
+
+    color: #222;
+
+    margin-bottom: 18px;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+}
+
+.document-delete-buttons {
+    display: flex;
+
+    justify-content: center;
+
+    gap: 8px;
+}
+
+.document-delete-buttons button {
+    min-width: 80px;
+
+    height: 36px;
+
+    padding: 0 14px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+.confirm-document-delete {
+    background: #d93025;
+
+    color: #ffffff;
+}
+
+.confirm-document-delete:hover {
+    background: #b42318;
+}
+
+.cancel-document-delete {
+    background: #eeeeee;
+
+    color: #333333;
+}
+
+.cancel-document-delete:hover {
+    background: #e2e2e2;
+}
 /* =========================================================
    END
    ========================================================= */

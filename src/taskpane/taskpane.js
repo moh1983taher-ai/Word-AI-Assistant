@@ -484,41 +484,102 @@ function renderDocuments() {
             }
 
 
+// ==================================
+// حذف المستند
+// ==================================
+
+const deleteButton =
+    options.querySelector(
+        ".delete-document"
+    );
+
+if (deleteButton) {
+
+    deleteButton.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            options.classList.remove(
+                "open"
+            );
+
+
+            // منع وجود أكثر من نافذة تأكيد
+            const oldConfirm =
+                document.querySelector(
+                    ".document-delete-confirm"
+                );
+
+            if (oldConfirm) {
+                oldConfirm.remove();
+            }
+
+
             // ==================================
-            // حذف المستند
+            // نافذة التأكيد
             // ==================================
 
-            const deleteButton =
-                options.querySelector(
-                    ".delete-document"
+            const confirmBox =
+                document.createElement(
+                    "div"
+                );
+
+            confirmBox.className =
+                "document-delete-confirm";
+
+
+            confirmBox.innerHTML = `
+                <div class="document-delete-dialog">
+
+                    <div class="document-delete-message">
+                        هل تريد حذف المستند؟
+                    </div>
+
+                    <div class="document-delete-name">
+                        ${documentItem.name}
+                    </div>
+
+                    <div class="document-delete-buttons">
+
+                        <button
+                            type="button"
+                            class="confirm-document-delete">
+                            حذف
+                        </button>
+
+                        <button
+                            type="button"
+                            class="cancel-document-delete">
+                            إلغاء
+                        </button>
+
+                    </div>
+
+                </div>
+            `;
+
+
+            document.body.appendChild(
+                confirmBox
+            );
+
+
+            // ==================================
+            // تأكيد الحذف
+            // ==================================
+
+            const confirmDelete =
+                confirmBox.querySelector(
+                    ".confirm-document-delete"
                 );
 
 
-            if (deleteButton) {
+            if (confirmDelete) {
 
-                deleteButton.onclick =
-                    function (e) {
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-
-                        options.classList.remove(
-                            "open"
-                        );
-
-
-                        const confirmed =
-                            window.confirm(
-                                "هل تريد حذف المستند:\n" +
-                                documentItem.name +
-                                " ؟"
-                            );
-
-
-                        if (!confirmed)
-                            return;
-
+                confirmDelete.onclick =
+                    function () {
 
                         // حذف المستند من التخزين
                         documents =
@@ -534,7 +595,7 @@ function renderDocuments() {
                             );
 
 
-                        // حذفه أيضًا من قائمة المشروع
+                        // حذف معرف المستند من المشروع
                         if (
                             currentProject &&
                             Array.isArray(
@@ -564,34 +625,88 @@ function renderDocuments() {
                         }
 
 
-                        saveDocuments();
-
-
                         // إعادة ترتيب المستندات المتبقية
-                        const remainingDocuments =
+                        const remaining =
                             getProjectDocuments(
                                 currentProject.id
                             );
 
 
-                        remainingDocuments.forEach(
-                            function (doc, newIndex) {
+                        remaining.forEach(
+                            function (
+                                doc,
+                                newIndex
+                            ) {
 
                                 doc.order =
                                     newIndex + 1;
+
+                                doc.updatedAt =
+                                    new Date().toISOString();
 
                             }
                         );
 
 
+                        // حفظ المستندات
                         saveDocuments();
 
 
+                        // إغلاق نافذة التأكيد
+                        confirmBox.remove();
+
+
+                        // إعادة العرض
                         renderDocuments();
 
                     };
 
             }
+
+
+            // ==================================
+            // إلغاء
+            // ==================================
+
+            const cancelDelete =
+                confirmBox.querySelector(
+                    ".cancel-document-delete"
+                );
+
+
+            if (cancelDelete) {
+
+                cancelDelete.onclick =
+                    function () {
+
+                        confirmBox.remove();
+
+                    };
+
+            }
+
+
+            // ==================================
+            // النقر خارج نافذة الحوار = إلغاء
+            // ==================================
+
+            confirmBox.onclick =
+                function (event) {
+
+                    if (
+                        event.target ===
+                        confirmBox
+                    ) {
+
+                        confirmBox.remove();
+
+                    }
+
+                };
+
+        };
+
+}
 
 
             // ==================================
