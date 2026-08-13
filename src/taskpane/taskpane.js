@@ -1580,8 +1580,8 @@ function normalizeSearchText(text) {
 }
 
 // ======================================
-// Arabic Search Stem / Concept Key
-// تطبيع صرفي خفيف ومحافظ
+// Arabic Search / Concept Keys
+// تطبيع عربي محافظ للبحث
 // ======================================
 
 function normalizeArabicSearchWord(word) {
@@ -1604,27 +1604,36 @@ function normalizeArabicSearchWord(word) {
     if (!w)
         return "";
 
-    // الكلمات القصيرة لا تُختصر مطلقًا
+    // لا نعبث بالكلمات القصيرة
     if (w.length <= 3)
         return w;
 
-    // كلمات لا نريد المساس بها
-    const protectedWords = new Set([
-        "الله",
-        "القران",
-        "اسلام",
-        "اسلامي",
-        "اسلامية"
-    ]);
+    // كلمات محفوظة
+    const protectedWords =
+        new Set([
+            "الله",
+            "القران",
+            "اسلام",
+            "اسلامي",
+            "اسلامية"
+        ]);
 
-    if (protectedWords.has(w))
+    if (
+        protectedWords.has(
+            w
+        )
+    ) {
+
         return w;
 
-    const original = w;
+    }
+
+    const original =
+        w;
 
     // ==================================
-    // السوابق
-    // لا نحذف السابقة إلا إذا بقيت 3 أحرف فأكثر
+    // إزالة سوابق عربية واضحة فقط
+    // مع بقاء 3 أحرف على الأقل
     // ==================================
 
     const prefixes = [
@@ -1639,13 +1648,22 @@ function normalizeArabicSearchWord(word) {
         "ال"
     ];
 
-    for (let i = 0; i < prefixes.length; i++) {
+    for (
+        let i = 0;
+        i < prefixes.length;
+        i++
+    ) {
 
-        const prefix = prefixes[i];
+        const prefix =
+            prefixes[i];
+
+        const remainingLength =
+            w.length -
+            prefix.length;
 
         if (
             w.startsWith(prefix) &&
-            w.length - prefix.length >= 3
+            remainingLength >= 3
         ) {
 
             w =
@@ -1654,78 +1672,124 @@ function normalizeArabicSearchWord(word) {
                 );
 
             break;
+
         }
-    }
-
-    // ==================================
-    // حرف المضارعة "س"
-    // لا يحذف إلا إذا بقيت 3 أحرف فأكثر
-    // ==================================
-
-    if (
-        w.length > 4 &&
-        w.startsWith("س") &&
-        w.length - 1 >= 3
-    ) {
-
-        w =
-            w.substring(1);
 
     }
 
     // ==================================
-    // اللواحق
-    // لا نحذف اللاحقة إلا إذا بقيت 3 أحرف فأكثر
+    // لواحق آمنة نسبيًا فقط
+    // لا نحذف أي لاحقة إذا أدى الحذف
+    // إلى كلمة أقل من 4 أحرف
     // ==================================
 
     const suffixes = [
-        "يات",
-        "ات",
-        "ان",
-        "ين",
-        "ون",
         "هما",
         "هم",
         "هن",
         "ها",
-        "ية",
-        "ي",
-        "ة",
-        "ه",
-        "ك",
         "كم",
-        "كن"
+        "كن",
+        "ك",
+        "ه"
     ];
 
-    for (let i = 0; i < suffixes.length; i++) {
+    for (
+        let i = 0;
+        i < suffixes.length;
+        i++
+    ) {
 
-        const suffix = suffixes[i];
+        const suffix =
+            suffixes[i];
+
+        const remainingLength =
+            w.length -
+            suffix.length;
 
         if (
             w.endsWith(suffix) &&
-            w.length - suffix.length >= 3
+            remainingLength >= 4
         ) {
 
             w =
                 w.substring(
                     0,
-                    w.length - suffix.length
+                    remainingLength
                 );
 
             break;
+
         }
+
+    }
+
+    // ==================================
+    // لواحق جمع/نسبة محددة
+    // بشروط أشد حتى لا نشوه الكلمات
+    // ==================================
+
+    const derivationalSuffixes = [
+        "يات",
+        "ات",
+        "ون",
+        "ين",
+        "ان",
+        "ية",
+        "ي",
+        "ة"
+    ];
+
+    for (
+        let i = 0;
+        i < derivationalSuffixes.length;
+        i++
+    ) {
+
+        const suffix =
+            derivationalSuffixes[i];
+
+        const remainingLength =
+            w.length -
+            suffix.length;
+
+        if (
+            w.endsWith(suffix) &&
+            remainingLength >= 4
+        ) {
+
+            const candidate =
+                w.substring(
+                    0,
+                    remainingLength
+                );
+
+            // لا نقبل نتيجة شديدة القصر
+            if (
+                candidate.length >= 4
+            ) {
+
+                w =
+                    candidate;
+
+                break;
+
+            }
+
+        }
+
     }
 
     // ==================================
     // الألف النهائية
-    // فقط إذا بقيت 3 أحرف فأكثر
+    // فقط في الكلمات الأطول
     // ==================================
 
     if (
         w !== original &&
         w.length > 4 &&
         w.endsWith("ا") &&
-        w.length - 1 >= 3
+        w.length - 1 >= 4
     ) {
 
         w =
@@ -1736,9 +1800,17 @@ function normalizeArabicSearchWord(word) {
 
     }
 
-    // لا نسمح أبدًا بنتيجة أقل من 3 أحرف
-    if (w.length < 3)
+    // ==================================
+    // حماية نهائية
+    // ==================================
+
+    if (
+        w.length < 3
+    ) {
+
         return original;
+
+    }
 
     return w;
 
@@ -1747,17 +1819,19 @@ function normalizeArabicSearchWord(word) {
 
 // ======================================
 // بناء مفاتيح البحث للكلمة
-// مفتاح أصلي + مفتاح محافظ
+// الكلمة الأصلية + المفتاح المحافظ
 // ======================================
 
-function getSearchKeysForWord(word) {
+function getSearchKeysForWord(
+    word
+) {
 
     const surface =
         normalizeSearchText(
             word
         );
 
-    const stem =
+    const concept =
         normalizeArabicSearchWord(
             word
         );
@@ -1773,12 +1847,12 @@ function getSearchKeysForWord(word) {
     }
 
     if (
-        stem &&
-        stem !== surface
+        concept &&
+        concept !== surface
     ) {
 
         keys.push(
-            stem
+            concept
         );
 
     }
@@ -1792,7 +1866,9 @@ function getSearchKeysForWord(word) {
 // Tokenize Document Text
 // ======================================
 
-function tokenizeDocumentText(text) {
+function tokenizeDocumentText(
+    text
+) {
 
     const normalized =
         normalizeSearchText(
@@ -1813,7 +1889,7 @@ function tokenizeDocumentText(text) {
 
 // ======================================
 // Build Document Index
-// فهرسة الكلمة الأصلية والمفتاح المحافظ
+// فهرسة محافظة
 // ======================================
 
 function buildDocumentIndex(
@@ -1826,10 +1902,14 @@ function buildDocumentIndex(
             text
         );
 
-    const terms = {};
+    const terms =
+        {};
 
     tokens.forEach(
-        function (token, index) {
+        function (
+            token,
+            index
+        ) {
 
             const searchKeys =
                 getSearchKeysForWord(
@@ -1837,7 +1917,9 @@ function buildDocumentIndex(
                 );
 
             searchKeys.forEach(
-                function (key) {
+                function (
+                    key
+                ) {
 
                     if (!key)
                         return;
@@ -1895,6 +1977,8 @@ function buildDocumentIndex(
     };
 
 }
+
+
 // ======================================
 // Build Document Structure
 // ======================================
@@ -1911,12 +1995,10 @@ async function buildDocumentStructure(
 
     }
 
-
     const file =
         await getWorkingWordFile(
             documentItem.storageId
         );
-
 
     if (!file) {
 
@@ -1926,15 +2008,15 @@ async function buildDocumentStructure(
 
     }
 
-
     const base64 =
         await fileToBase64(
             file
         );
 
-
     return await Word.run(
-        async function (context) {
+        async function (
+            context
+        ) {
 
             if (
                 !Office.context.requirements.isSetSupported(
@@ -1949,16 +2031,13 @@ async function buildDocumentStructure(
 
             }
 
-
             const workingDocument =
                 context.application.createDocument(
                     base64
                 );
 
-
             const paragraphs =
                 workingDocument.body.paragraphs;
-
 
             paragraphs.load(
                 [
@@ -1968,10 +2047,8 @@ async function buildDocumentStructure(
                 ]
             );
 
-
             const tables =
                 workingDocument.body.tables;
-
 
             tables.load(
                 [
@@ -1981,13 +2058,14 @@ async function buildDocumentStructure(
                 ]
             );
 
-
             await context.sync();
-
 
             const paragraphItems =
                 paragraphs.items.map(
-                    function (paragraph, index) {
+                    function (
+                        paragraph,
+                        index
+                    ) {
 
                         const text =
                             String(
@@ -1995,14 +2073,15 @@ async function buildDocumentStructure(
                                 ""
                             ).trim();
 
-
                         return {
 
                             index:
                                 index,
 
                             id:
-                                String(index),
+                                String(
+                                    index
+                                ),
 
                             text:
                                 text,
@@ -2020,10 +2099,11 @@ async function buildDocumentStructure(
                     }
                 );
 
-
             const headings =
                 paragraphItems.filter(
-                    function (paragraph) {
+                    function (
+                        paragraph
+                    ) {
 
                         return (
                             paragraph.style &&
@@ -2035,10 +2115,12 @@ async function buildDocumentStructure(
                     }
                 );
 
-
             const tableItems =
                 tables.items.map(
-                    function (table, index) {
+                    function (
+                        table,
+                        index
+                    ) {
 
                         return {
 
@@ -2059,7 +2141,6 @@ async function buildDocumentStructure(
 
                     }
                 );
-
 
             return {
 
@@ -2095,6 +2176,8 @@ async function buildDocumentStructure(
     );
 
 }
+
+
 // ======================================
 // Save Document Structure
 // ======================================
@@ -2107,9 +2190,11 @@ async function saveDocumentStructure(
     const db =
         await openDocumentDatabase();
 
-
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const transaction =
                 db.transaction(
@@ -2117,19 +2202,18 @@ async function saveDocumentStructure(
                     "readwrite"
                 );
 
-
             const store =
                 transaction.objectStore(
                     DOCUMENT_STRUCTURE_STORE_NAME
                 );
 
-
             const request =
                 store.put(
                     structureData,
-                    String(documentId)
+                    String(
+                        documentId
+                    )
                 );
-
 
             request.onsuccess =
                 function () {
@@ -2140,7 +2224,6 @@ async function saveDocumentStructure(
 
                 };
 
-
             request.onerror =
                 function () {
 
@@ -2149,7 +2232,6 @@ async function saveDocumentStructure(
                     );
 
                 };
-
 
             transaction.oncomplete =
                 function () {
@@ -2162,6 +2244,8 @@ async function saveDocumentStructure(
     );
 
 }
+
+
 // ======================================
 // Get Document Structure
 // ======================================
@@ -2173,9 +2257,11 @@ async function getDocumentStructure(
     const db =
         await openDocumentDatabase();
 
-
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const transaction =
                 db.transaction(
@@ -2183,18 +2269,17 @@ async function getDocumentStructure(
                     "readonly"
                 );
 
-
             const store =
                 transaction.objectStore(
                     DOCUMENT_STRUCTURE_STORE_NAME
                 );
 
-
             const request =
                 store.get(
-                    String(documentId)
+                    String(
+                        documentId
+                    )
                 );
-
 
             request.onsuccess =
                 function () {
@@ -2206,7 +2291,6 @@ async function getDocumentStructure(
 
                 };
 
-
             request.onerror =
                 function () {
 
@@ -2215,7 +2299,6 @@ async function getDocumentStructure(
                     );
 
                 };
-
 
             transaction.oncomplete =
                 function () {
@@ -2228,6 +2311,8 @@ async function getDocumentStructure(
     );
 
 }
+
+
 // ======================================
 // Search Document Context
 // ======================================
@@ -2241,7 +2326,6 @@ async function searchDocumentContext(
         normalizeSearchText(
             query
         );
-
 
     if (!searchTerm) {
 
@@ -2260,16 +2344,10 @@ async function searchDocumentContext(
 
     }
 
-
-    // ==================================
-    // استرجاع النص
-    // ==================================
-
     const textData =
         await getDocumentText(
             documentId
         );
-
 
     if (!textData) {
 
@@ -2279,16 +2357,10 @@ async function searchDocumentContext(
 
     }
 
-
-    // ==================================
-    // استرجاع البنية
-    // ==================================
-
     const structureData =
         await getDocumentStructure(
             documentId
         );
-
 
     if (!structureData) {
 
@@ -2298,14 +2370,12 @@ async function searchDocumentContext(
 
     }
 
-
     const paragraphs =
         Array.isArray(
             structureData.paragraphs
         )
             ? structureData.paragraphs
             : [];
-
 
     const headings =
         Array.isArray(
@@ -2314,16 +2384,13 @@ async function searchDocumentContext(
             ? structureData.headings
             : [];
 
-
-    const results = [];
-
-
-    // ==================================
-    // البحث فقرة فقرة
-    // ==================================
+    const results =
+        [];
 
     paragraphs.forEach(
-        function (paragraph) {
+        function (
+            paragraph
+        ) {
 
             if (
                 !paragraph ||
@@ -2334,18 +2401,15 @@ async function searchDocumentContext(
 
             }
 
-
             const originalText =
                 String(
                     paragraph.text
                 );
 
-
             const normalizedParagraph =
                 normalizeSearchText(
                     originalText
                 );
-
 
             if (
                 !normalizedParagraph.includes(
@@ -2357,17 +2421,13 @@ async function searchDocumentContext(
 
             }
 
-
-            // ==================================
-            // العثور على العنوان الأقرب
-            // ==================================
-
             let nearestHeading =
                 null;
 
-
             headings.forEach(
-                function (heading) {
+                function (
+                    heading
+                ) {
 
                     if (
                         heading.index <
@@ -2390,23 +2450,16 @@ async function searchDocumentContext(
                 }
             );
 
-
-            // ==================================
-            // استخراج المقتطف
-            // ==================================
-
             const position =
                 normalizedParagraph.indexOf(
                     searchTerm
                 );
-
 
             const start =
                 Math.max(
                     0,
                     position - 100
                 );
-
 
             const end =
                 Math.min(
@@ -2416,13 +2469,11 @@ async function searchDocumentContext(
                     160
                 );
 
-
             const context =
                 normalizedParagraph.substring(
                     start,
                     end
                 );
-
 
             results.push({
 
@@ -2453,7 +2504,6 @@ async function searchDocumentContext(
         }
     );
 
-
     return {
 
         query:
@@ -2468,6 +2518,8 @@ async function searchDocumentContext(
     };
 
 }
+
+
 // ======================================
 // Save Document Index
 // ======================================
@@ -2480,9 +2532,11 @@ async function saveDocumentIndex(
     const db =
         await openDocumentDatabase();
 
-
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const transaction =
                 db.transaction(
@@ -2490,19 +2544,18 @@ async function saveDocumentIndex(
                     "readwrite"
                 );
 
-
             const store =
                 transaction.objectStore(
                     DOCUMENT_INDEX_STORE_NAME
                 );
 
-
             const request =
                 store.put(
                     indexData,
-                    String(documentId)
+                    String(
+                        documentId
+                    )
                 );
-
 
             request.onsuccess =
                 function () {
@@ -2513,7 +2566,6 @@ async function saveDocumentIndex(
 
                 };
 
-
             request.onerror =
                 function () {
 
@@ -2522,7 +2574,6 @@ async function saveDocumentIndex(
                     );
 
                 };
-
 
             transaction.oncomplete =
                 function () {
@@ -2535,6 +2586,8 @@ async function saveDocumentIndex(
     );
 
 }
+
+
 // ======================================
 // Get Document Index
 // ======================================
@@ -2546,9 +2599,11 @@ async function getDocumentIndex(
     const db =
         await openDocumentDatabase();
 
-
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const transaction =
                 db.transaction(
@@ -2556,18 +2611,17 @@ async function getDocumentIndex(
                     "readonly"
                 );
 
-
             const store =
                 transaction.objectStore(
                     DOCUMENT_INDEX_STORE_NAME
                 );
 
-
             const request =
                 store.get(
-                    String(documentId)
+                    String(
+                        documentId
+                    )
                 );
-
 
             request.onsuccess =
                 function () {
@@ -2579,7 +2633,6 @@ async function getDocumentIndex(
 
                 };
 
-
             request.onerror =
                 function () {
 
@@ -2588,7 +2641,6 @@ async function getDocumentIndex(
                     );
 
                 };
-
 
             transaction.oncomplete =
                 function () {
@@ -2601,8 +2653,10 @@ async function getDocumentIndex(
     );
 
 }
+
+
 // ======================================
-// Test Document Index مؤقتة
+// Test Document Index
 // ======================================
 
 async function testCurrentDocumentIndex() {
@@ -2660,7 +2714,9 @@ async function testCurrentDocumentIndex() {
         );
 
     }
-    catch (error) {
+    catch (
+        error
+    ) {
 
         console.error(
             "فشل اختبار الفهرس:",
@@ -2670,9 +2726,11 @@ async function testCurrentDocumentIndex() {
     }
 
 }
+
+
 // ======================================
 // Search Indexed Document
-// البحث من خلال الفهرس الذكي
+// البحث الذكي المحافظ
 // ======================================
 
 async function searchIndexedDocument(
@@ -2681,7 +2739,7 @@ async function searchIndexedDocument(
 ) {
 
     // ==================================
-    // تطبيع السؤال
+    // تطبيع الاستعلام
     // ==================================
 
     const searchTerm =
@@ -2706,17 +2764,6 @@ async function searchIndexedDocument(
 
     }
 
-
-    // ==================================
-    // المفتاح الاشتقاقي للاستعلام
-    // ==================================
-
-    const searchStem =
-        normalizeArabicSearchWord(
-            searchTerm
-        );
-
-
     // ==================================
     // استرجاع الفهرس
     // ==================================
@@ -2726,7 +2773,6 @@ async function searchIndexedDocument(
             documentId
         );
 
-
     if (!indexData) {
 
         throw new Error(
@@ -2735,153 +2781,11 @@ async function searchIndexedDocument(
 
     }
 
-
     const indexedTerms =
         indexData.terms || {};
 
-
     // ==================================
-    // تحديد المفاتيح المحتملة
-    // ==================================
-
-    const searchKeys = [];
-
-
-    if (searchTerm) {
-
-        searchKeys.push(
-            searchTerm
-        );
-
-    }
-
-
-    if (
-        searchStem &&
-        searchStem !== searchTerm
-    ) {
-
-        searchKeys.push(
-            searchStem
-        );
-
-    }
-
-
-    // ==================================
-    // تحديد المصطلحات الموجودة في الفهرس
-    // ==================================
-
-    const matchedKeys =
-        searchKeys.filter(
-            function (key) {
-
-                return Boolean(
-                    indexedTerms[key]
-                );
-
-            }
-        );
-
-
-    // ==================================
-    // لا توجد مطابقة في الفهرس
-    // ==================================
-
-    if (
-        matchedKeys.length === 0
-    ) {
-
-        return {
-
-            query:
-                searchTerm,
-
-            searchStem:
-                searchStem,
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                [],
-
-            indexTokenCount:
-                indexData.tokenCount,
-
-            indexUniqueTerms:
-                indexData.uniqueTerms
-
-        };
-
-    }
-
-
-    // ==================================
-    // استرجاع النص الأصلي
-    // ==================================
-
-    const textData =
-        await getDocumentText(
-            documentId
-        );
-
-
-    if (!textData) {
-
-        throw new Error(
-            "لا يوجد نص مفهرس لهذا المستند."
-        );
-
-    }
-
-
-    const originalText =
-        String(
-            textData.text || ""
-        );
-
-
-    // ==================================
-    // استرجاع بنية المستند
-    // ==================================
-
-    const structureData =
-        await getDocumentStructure(
-            documentId
-        );
-
-
-    if (!structureData) {
-
-        throw new Error(
-            "لا توجد بنية محفوظة لهذا المستند."
-        );
-
-    }
-
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-
-    const headings =
-        Array.isArray(
-            structureData.headings
-        )
-            ? structureData.headings
-            : [];
-
-
-    // ==================================
-    // تقسيم السؤال إلى كلمات
+    // مفاتيح الاستعلام
     // ==================================
 
     const queryTokens =
@@ -2889,26 +2793,23 @@ async function searchIndexedDocument(
             searchTerm
         );
 
-
-    // ==================================
-    // إنشاء مفاتيح البحث لكل كلمة في السؤال
-    // ==================================
-
     const queryKeys =
         [];
 
-
     queryTokens.forEach(
-        function (token) {
+        function (
+            token
+        ) {
 
             const keys =
                 getSearchKeysForWord(
                     token
                 );
 
-
             keys.forEach(
-                function (key) {
+                function (
+                    key
+                ) {
 
                     if (
                         key &&
@@ -2929,14 +2830,15 @@ async function searchIndexedDocument(
         }
     );
 
-
     // ==================================
-    // المفاتيح الموجودة فعليًا في الفهرس
+    // تحديد المفاتيح الموجودة في الفهرس
     // ==================================
 
     const matchedTerms =
         queryKeys.filter(
-            function (key) {
+            function (
+                key
+            ) {
 
                 return Boolean(
                     indexedTerms[key]
@@ -2944,11 +2846,6 @@ async function searchIndexedDocument(
 
             }
         );
-
-
-    // ==================================
-    // لا توجد كلمات من السؤال في الفهرس
-    // ==================================
 
     if (
         matchedTerms.length === 0
@@ -2958,9 +2855,6 @@ async function searchIndexedDocument(
 
             query:
                 searchTerm,
-
-            searchStem:
-                searchStem,
 
             count:
                 0,
@@ -2984,26 +2878,80 @@ async function searchIndexedDocument(
 
     }
 
+    // ==================================
+    // استرجاع النص
+    // ==================================
+
+    const textData =
+        await getDocumentText(
+            documentId
+        );
+
+    if (!textData) {
+
+        throw new Error(
+            "لا يوجد نص مفهرس لهذا المستند."
+        );
+
+    }
+
+    const originalText =
+        String(
+            textData.text ||
+            ""
+        );
 
     // ==================================
-    // تحويل الكلمات المطابقة إلى مجموعة
+    // استرجاع البنية
     // ==================================
 
-    const matchedTokenSet =
+    const structureData =
+        await getDocumentStructure(
+            documentId
+        );
+
+    if (!structureData) {
+
+        throw new Error(
+            "لا توجد بنية محفوظة لهذا المستند."
+        );
+
+    }
+
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
+
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+            : [];
+
+    // ==================================
+    // مجموعة المفاتيح المطلوبة
+    // ==================================
+
+    const matchedKeySet =
         new Set(
             matchedTerms
         );
 
-
     // ==================================
-    // تحليل الفقرات
+    // النتائج
     // ==================================
 
-    const results = [];
-
+    const results =
+        [];
 
     paragraphs.forEach(
-        function (paragraph) {
+        function (
+            paragraph
+        ) {
 
             if (
                 !paragraph ||
@@ -3014,28 +2962,20 @@ async function searchIndexedDocument(
 
             }
 
-
             const originalParagraphText =
                 String(
                     paragraph.text
                 );
-
 
             const normalizedParagraphText =
                 normalizeSearchText(
                     originalParagraphText
                 );
 
-
-            // ==================================
-            // الكلمات الأصلية في الفقرة
-            // ==================================
-
             const paragraphTokens =
                 tokenizeDocumentText(
                     normalizedParagraphText
                 );
-
 
             if (
                 paragraphTokens.length === 0
@@ -3045,7 +2985,6 @@ async function searchIndexedDocument(
 
             }
 
-
             // ==================================
             // مفاتيح الفقرة
             // ==================================
@@ -3053,18 +2992,20 @@ async function searchIndexedDocument(
             const paragraphKeys =
                 new Set();
 
-
             paragraphTokens.forEach(
-                function (token) {
+                function (
+                    token
+                ) {
 
                     const keys =
                         getSearchKeysForWord(
                             token
                         );
 
-
                     keys.forEach(
-                        function (key) {
+                        function (
+                            key
+                        ) {
 
                             if (key) {
 
@@ -3080,17 +3021,17 @@ async function searchIndexedDocument(
                 }
             );
 
-
             // ==================================
-            // حساب عدد المفاتيح المطابقة
+            // حساب المطابقة
             // ==================================
 
             let matchedCount =
                 0;
 
-
-            matchedTokenSet.forEach(
-                function (key) {
+            matchedKeySet.forEach(
+                function (
+                    key
+                ) {
 
                     if (
                         paragraphKeys.has(
@@ -3098,13 +3039,13 @@ async function searchIndexedDocument(
                         )
                     ) {
 
-                        matchedCount += 1;
+                        matchedCount +=
+                            1;
 
                     }
 
                 }
             );
-
 
             if (
                 matchedCount === 0
@@ -3114,18 +3055,16 @@ async function searchIndexedDocument(
 
             }
 
-
             // ==================================
-            // حساب درجة المطابقة
+            // درجة المطابقة الأساسية
             // ==================================
 
             let score =
                 matchedCount /
                 matchedTerms.length;
 
-
             // ==================================
-            // مكافأة للمطابقة الحرفية الكاملة
+            // مكافأة العبارة الكاملة
             // ==================================
 
             if (
@@ -3134,21 +3073,47 @@ async function searchIndexedDocument(
                 )
             ) {
 
-                score += 2;
+                score +=
+                    3;
 
             }
 
+            // ==================================
+            // مكافأة المطابقة الحرفية للكلمات
+            // ==================================
+
+            queryTokens.forEach(
+                function (
+                    token
+                ) {
+
+                    if (
+                        normalizedParagraphText
+                            .split(/\s+/)
+                            .includes(
+                                token
+                            )
+                    ) {
+
+                        score +=
+                            0.15;
+
+                    }
+
+                }
+            );
 
             // ==================================
-            // العثور على العنوان الأقرب
+            // العنوان الأقرب
             // ==================================
 
             let nearestHeading =
                 null;
 
-
             headings.forEach(
-                function (heading) {
+                function (
+                    heading
+                ) {
 
                     if (
                         heading &&
@@ -3172,9 +3137,61 @@ async function searchIndexedDocument(
                 }
             );
 
+            // ==================================
+            // تحديد نوع المطابقة
+            // ==================================
+
+            let matchType =
+                "related";
+
+            if (
+                normalizedParagraphText.includes(
+                    searchTerm
+                )
+            ) {
+
+                matchType =
+                    "exact";
+
+            }
+            else {
+
+                let hasConceptMatch =
+                    false;
+
+                queryKeys.forEach(
+                    function (
+                        key
+                    ) {
+
+                        if (
+                            key !== searchTerm &&
+                            paragraphKeys.has(
+                                key
+                            )
+                        ) {
+
+                            hasConceptMatch =
+                                true;
+
+                        }
+
+                    }
+                );
+
+                if (
+                    hasConceptMatch
+                ) {
+
+                    matchType =
+                        "related";
+
+                }
+
+            }
 
             // ==================================
-            // تحديد موضع العرض
+            // تحديد موضع مناسب للمقتطف
             // ==================================
 
             let searchPosition =
@@ -3182,21 +3199,47 @@ async function searchIndexedDocument(
                     searchTerm
                 );
 
-
-            // إذا لم توجد المطابقة الحرفية،
-            // نبحث عن الجذر الاشتقاقي
             if (
-                searchPosition === -1 &&
-                searchStem
+                searchPosition === -1
             ) {
 
-                searchPosition =
-                    normalizedParagraphText.indexOf(
-                        searchStem
-                    );
+                for (
+                    let i = 0;
+                    i < queryKeys.length;
+                    i++
+                ) {
+
+                    const key =
+                        queryKeys[i];
+
+                    if (
+                        key ===
+                        searchTerm
+                    ) {
+
+                        continue;
+
+                    }
+
+                    const position =
+                        normalizedParagraphText.indexOf(
+                            key
+                        );
+
+                    if (
+                        position !== -1
+                    ) {
+
+                        searchPosition =
+                            position;
+
+                        break;
+
+                    }
+
+                }
 
             }
-
 
             // ==================================
             // استخراج المقتطف
@@ -3205,7 +3248,6 @@ async function searchIndexedDocument(
             let context =
                 originalParagraphText;
 
-
             if (
                 searchPosition !== -1
             ) {
@@ -3213,17 +3255,15 @@ async function searchIndexedDocument(
                 const start =
                     Math.max(
                         0,
-                        searchPosition - 100
+                        searchPosition - 120
                     );
-
 
                 const end =
                     Math.min(
                         originalParagraphText.length,
                         searchPosition +
-                        260
+                        300
                     );
-
 
                 context =
                     originalParagraphText.substring(
@@ -3237,46 +3277,10 @@ async function searchIndexedDocument(
                 context =
                     originalParagraphText.substring(
                         0,
-                        360
+                        420
                     );
 
             }
-
-
-            // ==================================
-            // تحديد نوع المطابقة
-            // ==================================
-
-            let matchType =
-                "related";
-
-
-            if (
-                normalizedParagraphText.includes(
-                    searchTerm
-                )
-            ) {
-
-                matchType =
-                    "exact";
-
-            }
-            else if (
-                searchStem &&
-                paragraphKeys.has(
-                    searchStem
-                )
-            ) {
-
-                matchType =
-                    "stemmed";
-
-            }
-
-
-            // ==================================
-            // إضافة النتيجة
-            // ==================================
 
             results.push({
 
@@ -3322,15 +3326,16 @@ async function searchIndexedDocument(
         }
     );
 
-
     // ==================================
     // ترتيب النتائج
     // ==================================
 
     results.sort(
-        function (a, b) {
+        function (
+            a,
+            b
+        ) {
 
-            // الأعلى درجة أولًا
             if (
                 b.score !==
                 a.score
@@ -3343,8 +3348,6 @@ async function searchIndexedDocument(
 
             }
 
-
-            // ثم الأكثر كلمات مطابقة
             if (
                 b.matchedCount !==
                 a.matchedCount
@@ -3357,8 +3360,6 @@ async function searchIndexedDocument(
 
             }
 
-
-            // ثم حسب ترتيب المستند
             return (
                 a.paragraphIndex -
                 b.paragraphIndex
@@ -3367,25 +3368,26 @@ async function searchIndexedDocument(
         }
     );
 
-
     // ==================================
-    // حساب عدد مرات الظهور
+    // عدد مرات ظهور المفاتيح المطابقة
     // ==================================
 
     let indexedOccurrences =
         0;
 
-
     matchedTerms.forEach(
-        function (key) {
+        function (
+            key
+        ) {
 
-            if (
-                indexedTerms[key]
-            ) {
+            const item =
+                indexedTerms[key];
+
+            if (item) {
 
                 indexedOccurrences +=
                     Number(
-                        indexedTerms[key].count ||
+                        item.count ||
                         0
                     );
 
@@ -3394,18 +3396,14 @@ async function searchIndexedDocument(
         }
     );
 
-
     // ==================================
-    // إرجاع النتيجة
+    // النتيجة النهائية
     // ==================================
 
     return {
 
         query:
             searchTerm,
-
-        searchStem:
-            searchStem,
 
         count:
             results.length,
