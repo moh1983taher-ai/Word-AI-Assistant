@@ -84,7 +84,16 @@ function renderDocuments() {
             item.className =
                 "document-item";
 
+            if (
+                currentDocument &&
+                currentDocument.id === documentItem.id
+            ) {
 
+                item.classList.add(
+                    "active-document"
+                );
+
+            }
             // --------------------------------
             // عنوان المستند
             // --------------------------------
@@ -97,7 +106,17 @@ function renderDocuments() {
 
             title.textContent =
                 documentItem.name;
+            title.onclick =
+                function (e) {
 
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    setCurrentDocument(
+                        documentItem
+                    );
+
+                };
 
             // --------------------------------
             // زر الخيارات
@@ -781,6 +800,9 @@ document.getElementById("send-btn");
 const chatArea =
 document.getElementById("chat-area");
 
+const documentTitle =
+document.getElementById("document-title");
+
 // ======================================
 // AI Settings
 // ======================================
@@ -945,6 +967,7 @@ projects =
 
 
 let currentProject = null;
+let currentDocument = null;
 
 
 // ======================================
@@ -1068,7 +1091,40 @@ function getProjectDocuments(
 
 }
 
+// ======================================
+// Set Active Document
+// ======================================
 
+function setCurrentDocument(documentItem) {
+
+    if (!documentItem) {
+
+        currentDocument = null;
+
+        if (documentTitle) {
+
+            documentTitle.textContent =
+                "لا يوجد مستند مفتوح";
+
+        }
+
+        return;
+
+    }
+
+
+    currentDocument =
+        documentItem;
+
+
+    if (documentTitle) {
+
+        documentTitle.textContent =
+            documentItem.name;
+
+    }
+
+}
 // ======================================
 // Update Document Timestamp
 // ======================================
