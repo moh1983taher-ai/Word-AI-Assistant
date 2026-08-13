@@ -118,12 +118,30 @@ function renderDocuments() {
 
 
             if (
-                documentItem.readStatus ===
-                "new"
+                documentItem.indexStatus ===
+                "indexed"
             ) {
 
                 status.textContent =
-                    "جديد";
+                    "✓ مفهرس";
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "indexing"
+            ) {
+
+                status.textContent =
+                    "جارٍ الفهرسة...";
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "error"
+            ) {
+
+                status.textContent =
+                    "⚠ فشل الفهرسة";
 
             }
             else if (
@@ -144,13 +162,10 @@ function renderDocuments() {
                     "✓ تمت القراءة";
 
             }
-            else if (
-                documentItem.readStatus ===
-                "error"
-            ) {
+            else {
 
                 status.textContent =
-                    "⚠ فشل القراءة";
+                    "جديد";
 
             }
             title.onclick =
@@ -1059,6 +1074,15 @@ try {
 
                 }
 
+                if (
+                    !documentItem.indexStatus
+                ) {
+
+                    documentItem.indexStatus =
+                        "new";
+
+                }
+
                 return documentItem;
 
             });
@@ -1095,12 +1119,14 @@ const DOCUMENT_DB_NAME =
     "WORD_AI_DOCUMENT_STORAGE";
 
 const DOCUMENT_DB_VERSION =
-    2;
+    3;
 
 const DOCUMENT_STORE_NAME =
     "files";
 const DOCUMENT_TEXT_STORE_NAME =
     "texts";
+const DOCUMENT_INDEX_STORE_NAME =
+    "indexes";
 
 // ======================================
 // Open Documents Database
@@ -1134,6 +1160,20 @@ function openDocumentDatabase() {
 
                         db.createObjectStore(
                             DOCUMENT_STORE_NAME
+                        );
+
+                    }
+                    
+
+                    if (
+                        !db.objectStoreNames
+                            .contains(
+                                DOCUMENT_INDEX_STORE_NAME
+                            )
+                    ) {
+
+                        db.createObjectStore(
+                            DOCUMENT_INDEX_STORE_NAME
                         );
 
                     }
@@ -1461,6 +1501,276 @@ async function getDocumentText(
     );
 
 }
+
+// ======================================
+// Normalize Search Text
+// ======================================
+
+function normalizeSearchText(text) {
+
+    return String(
+        text || ""
+    )
+
+        // إزالة التشكيل
+        .replace(
+            /[\u064B-\u065F\u0670]/g,
+            ""
+        )
+
+        // إزالة التطويل
+        .replace(
+            /\u0640/g,
+            ""
+        )
+
+        // توحيد الهمزات
+        .replace(
+            /[أإآ]/g,
+            "ا"
+        )
+
+        // توحيد الياء والألف المقصورة
+        .replace(
+            /ى/g,
+            "ي"
+        )
+
+        // إزالة المسافات المتكررة
+        .replace(
+            /\s+/g,
+            " "
+        )
+
+        .trim()
+
+        .toLowerCase();
+
+}
+
+// ======================================
+// Tokenize Document Text
+// ======================================
+
+function tokenizeDocumentText(text) {
+
+    const normalized =
+        normalizeSearchText(
+            text
+        );
+
+
+    const matches =
+        normalized.match(
+            /[A-Za-z0-9\u0600-\u06FF\u0750-\u077F]+/g
+        );
+
+
+    return matches || [];
+
+}
+// ======================================
+// Build Document Index
+// ======================================
+
+function buildDocumentIndex(
+    documentId,
+    text
+) {
+
+    const tokens =
+        tokenizeDocumentText(
+            text
+        );
+
+
+    const terms = {};
+
+
+    tokens.forEach(
+        function (token, index) {
+
+            if (!terms[token]) {
+
+                terms[token] = {
+
+                    count:
+                        0,
+
+                    positions:
+                        []
+
+                };
+
+            }
+
+
+            terms[token].count += 1;
+
+
+            terms[token].positions.push(
+                index
+            );
+
+        }
+    );
+
+
+    return {
+
+        documentId:
+            String(documentId),
+
+        tokenCount:
+            tokens.length,
+
+        uniqueTerms:
+            Object.keys(
+                terms
+            ).length,
+
+        terms:
+            terms,
+
+        updatedAt:
+            new Date().toISOString()
+
+    };
+
+}
+// ======================================
+// Save Document Index
+// ======================================
+
+async function saveDocumentIndex(
+    documentId,
+    indexData
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_INDEX_STORE_NAME,
+                    "readwrite"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_INDEX_STORE_NAME
+                );
+
+
+            const request =
+                store.put(
+                    indexData,
+                    String(documentId)
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        indexData
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+// ======================================
+// Get Document Index
+// ======================================
+
+async function getDocumentIndex(
+    documentId
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_INDEX_STORE_NAME,
+                    "readonly"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_INDEX_STORE_NAME
+                );
+
+
+            const request =
+                store.get(
+                    String(documentId)
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result ||
+                        null
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
 // ======================================
 // Delete Working Word File
 // ======================================
@@ -1639,7 +1949,10 @@ function createDocument(
         
         readStatus:
             "new",
-
+        
+        indexStatus:
+        "new",
+        
         createdAt:
             now,
 
@@ -1691,6 +2004,30 @@ function updateDocumentReadStatus(
             new Date().toISOString();
 
     }
+
+
+    saveDocuments();
+
+}
+// ======================================
+// Update Document Index Status
+// ======================================
+
+function updateDocumentIndexStatus(
+    documentItem,
+    status
+) {
+
+    if (!documentItem)
+        return;
+
+
+    documentItem.indexStatus =
+        status;
+
+
+    documentItem.updatedAt =
+        new Date().toISOString();
 
 
     saveDocuments();
@@ -1910,10 +2247,59 @@ async function readCurrentWordDocument(
         );
 
 
+        // ======================================
+        // تمت القراءة
+        // ======================================
+
         updateDocumentReadStatus(
             documentItem,
             "read"
         );
+
+
+        // ======================================
+        // بدء الفهرسة
+        // ======================================
+
+        updateDocumentIndexStatus(
+            documentItem,
+            "indexing"
+        );
+
+
+        try {
+
+            const indexData =
+                buildDocumentIndex(
+                    documentItem.id,
+                    text
+                );
+
+
+            await saveDocumentIndex(
+                documentItem.id,
+                indexData
+            );
+
+
+            updateDocumentIndexStatus(
+                documentItem,
+                "indexed"
+            );
+
+
+        }
+        catch (indexError) {
+
+            updateDocumentIndexStatus(
+                documentItem,
+                "error"
+            );
+
+
+            throw indexError;
+
+        }
 
 
         return text;
