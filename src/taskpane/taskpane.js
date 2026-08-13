@@ -37,7 +37,7 @@ function renderDocuments() {
 
     documentsList.innerHTML = "";
 
-    
+
     // لا يوجد مشروع محدد
     if (!currentProject) {
 
@@ -58,9 +58,7 @@ function renderDocuments() {
 
 
     // لا توجد مستندات
-    if (
-        projectDocuments.length === 0
-    ) {
+    if (projectDocuments.length === 0) {
 
         documentsList.innerHTML = `
             <div class="empty-document">
@@ -72,9 +70,12 @@ function renderDocuments() {
     }
 
 
+    // ==================================
     // عرض المستندات
+    // ==================================
+
     projectDocuments.forEach(
-        function (documentItem) {
+        function (documentItem, index) {
 
             const item =
                 document.createElement("div");
@@ -84,20 +85,530 @@ function renderDocuments() {
                 "document-item";
 
 
-            item.innerHTML = `
-                <span class="document-title">
-                    ${documentItem.name}
-                </span>
+            // --------------------------------
+            // عنوان المستند
+            // --------------------------------
 
-                <button
-                    class="document-menu"
-                    type="button"
-                    title="خيارات المستند">
+            const title =
+                document.createElement("span");
 
-                    ⋮
+            title.className =
+                "document-title";
 
-                </button>
+            title.textContent =
+                documentItem.name;
+
+
+            // --------------------------------
+            // زر الخيارات
+            // --------------------------------
+
+            const menuButton =
+                document.createElement("button");
+
+            menuButton.className =
+                "document-menu";
+
+            menuButton.type =
+                "button";
+
+            menuButton.title =
+                "خيارات المستند";
+
+            menuButton.textContent =
+                "⋮";
+
+
+            // --------------------------------
+            // قائمة الخيارات
+            // --------------------------------
+
+            const options =
+                document.createElement("div");
+
+            options.className =
+                "document-options-menu";
+
+
+            options.innerHTML = `
+
+                <div class="rename-document">
+                    ✏ إعادة تسمية
+                </div>
+
+                <div class="move-document-up">
+                    ↑ نقل إلى أعلى
+                </div>
+
+                <div class="move-document-down">
+                    ↓ نقل إلى أسفل
+                </div>
+
+                <div class="delete-document">
+                    🗑 حذف
+                </div>
+
             `;
+
+
+            // ==================================
+            // ضبط ترتيب الخيارات
+            // ==================================
+
+            if (index === 0) {
+
+                const moveUp =
+                    options.querySelector(
+                        ".move-document-up"
+                    );
+
+                if (moveUp) {
+                    moveUp.style.display =
+                        "none";
+                }
+
+            }
+
+
+            if (
+                index ===
+                projectDocuments.length - 1
+            ) {
+
+                const moveDown =
+                    options.querySelector(
+                        ".move-document-down"
+                    );
+
+                if (moveDown) {
+                    moveDown.style.display =
+                        "none";
+                }
+
+            }
+
+
+            // ==================================
+            // فتح / إغلاق القائمة
+            // ==================================
+
+            menuButton.onclick =
+                function (e) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    document
+                        .querySelectorAll(
+                            ".document-options-menu.open"
+                        )
+                        .forEach(
+                            function (menu) {
+
+                                if (
+                                    menu !==
+                                    options
+                                ) {
+
+                                    menu.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+
+                            }
+                        );
+
+
+                    options.classList.toggle(
+                        "open"
+                    );
+
+                };
+
+
+            // ==================================
+            // إعادة التسمية
+            // ==================================
+
+            const renameButton =
+                options.querySelector(
+                    ".rename-document"
+                );
+
+
+            if (renameButton) {
+
+                renameButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        const oldName =
+                            documentItem.name;
+
+
+                        const inputRename =
+                            document.createElement(
+                                "input"
+                            );
+
+
+                        inputRename.className =
+                            "edit-document-title";
+
+
+                        inputRename.value =
+                            oldName;
+
+
+                        title.replaceWith(
+                            inputRename
+                        );
+
+
+                        inputRename.focus();
+
+
+                        inputRename.setSelectionRange(
+                            inputRename.value.length,
+                            inputRename.value.length
+                        );
+
+
+                        function finishRename(
+                            saveChange
+                        ) {
+
+                            const newName =
+                                inputRename.value.trim();
+
+
+                            if (
+                                saveChange &&
+                                newName !== ""
+                            ) {
+
+                                documentItem.name =
+                                    newName;
+
+                                documentItem.updatedAt =
+                                    new Date().toISOString();
+
+                                saveDocuments();
+
+                            }
+                            else {
+
+                                documentItem.name =
+                                    oldName;
+
+                            }
+
+
+                            renderDocuments();
+
+                        }
+
+
+                        inputRename.onkeydown =
+                            function (event) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    event.preventDefault();
+
+                                    finishRename(true);
+
+                                }
+
+
+                                if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    event.preventDefault();
+
+                                    finishRename(false);
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // ==================================
+            // نقل إلى أعلى
+            // ==================================
+
+            const moveUpButton =
+                options.querySelector(
+                    ".move-document-up"
+                );
+
+
+            if (moveUpButton) {
+
+                moveUpButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        if (index <= 0)
+                            return;
+
+
+                        const previousDocument =
+                            projectDocuments[
+                                index - 1
+                            ];
+
+
+                        const currentOrder =
+                            documentItem.order;
+
+
+                        documentItem.order =
+                            previousDocument.order;
+
+
+                        previousDocument.order =
+                            currentOrder;
+
+
+                        documentItem.updatedAt =
+                            new Date().toISOString();
+
+                        previousDocument.updatedAt =
+                            new Date().toISOString();
+
+
+                        saveDocuments();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // ==================================
+            // نقل إلى أسفل
+            // ==================================
+
+            const moveDownButton =
+                options.querySelector(
+                    ".move-document-down"
+                );
+
+
+            if (moveDownButton) {
+
+                moveDownButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        if (
+                            index >=
+                            projectDocuments.length - 1
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const nextDocument =
+                            projectDocuments[
+                                index + 1
+                            ];
+
+
+                        const currentOrder =
+                            documentItem.order;
+
+
+                        documentItem.order =
+                            nextDocument.order;
+
+
+                        nextDocument.order =
+                            currentOrder;
+
+
+                        documentItem.updatedAt =
+                            new Date().toISOString();
+
+                        nextDocument.updatedAt =
+                            new Date().toISOString();
+
+
+                        saveDocuments();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // ==================================
+            // حذف المستند
+            // ==================================
+
+            const deleteButton =
+                options.querySelector(
+                    ".delete-document"
+                );
+
+
+            if (deleteButton) {
+
+                deleteButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        const confirmed =
+                            window.confirm(
+                                "هل تريد حذف المستند:\n" +
+                                documentItem.name +
+                                " ؟"
+                            );
+
+
+                        if (!confirmed)
+                            return;
+
+
+                        // حذف المستند من التخزين
+                        documents =
+                            documents.filter(
+                                function (doc) {
+
+                                    return (
+                                        doc.id !==
+                                        documentItem.id
+                                    );
+
+                                }
+                            );
+
+
+                        // حذفه أيضًا من قائمة المشروع
+                        if (
+                            currentProject &&
+                            Array.isArray(
+                                currentProject.documents
+                            )
+                        ) {
+
+                            currentProject.documents =
+                                currentProject.documents.filter(
+                                    function (id) {
+
+                                        return (
+                                            id !==
+                                            documentItem.id
+                                        );
+
+                                    }
+                                );
+
+
+                            currentProject.updatedAt =
+                                new Date().toISOString();
+
+
+                            saveProjects();
+
+                        }
+
+
+                        saveDocuments();
+
+
+                        // إعادة ترتيب المستندات المتبقية
+                        const remainingDocuments =
+                            getProjectDocuments(
+                                currentProject.id
+                            );
+
+
+                        remainingDocuments.forEach(
+                            function (doc, newIndex) {
+
+                                doc.order =
+                                    newIndex + 1;
+
+                            }
+                        );
+
+
+                        saveDocuments();
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // ==================================
+            // إضافة العناصر
+            // ==================================
+
+            item.appendChild(
+                title
+            );
+
+            item.appendChild(
+                menuButton
+            );
+
+            item.appendChild(
+                options
+            );
 
 
             documentsList.appendChild(

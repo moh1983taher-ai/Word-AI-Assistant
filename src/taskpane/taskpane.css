@@ -3268,15 +3268,14 @@ body.sidebar-is-pinned .message-box {
 
 .documents-list {
     width: 100%;
-
     box-sizing: border-box;
 }
 
 .document-item {
+    position: relative;
+
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
 
     width: calc(100% - 10px);
@@ -3284,7 +3283,6 @@ body.sidebar-is-pinned .message-box {
     min-height: 36px;
 
     padding: 7px 10px;
-
     margin: 2px 0;
 
     border-radius: 7px;
@@ -3300,25 +3298,21 @@ body.sidebar-is-pinned .message-box {
 
 .document-item:hover {
     background: #f3f3f3;
-
     color: #111;
 }
 
 .document-title {
     min-width: 0;
-
     flex: 1;
 
     overflow: hidden;
 
     white-space: nowrap;
-
     text-overflow: ellipsis;
 }
 
 .document-menu {
     width: 28px;
-
     height: 28px;
 
     flex-shrink: 0;
@@ -3338,11 +3332,96 @@ body.sidebar-is-pinned .message-box {
 
 .document-menu:hover {
     background: #eaeaea;
-
     color: #111;
 }
 
 
+/* =========================================================
+   DOCUMENT OPTIONS MENU
+   ========================================================= */
+
+.document-options-menu {
+    position: absolute;
+
+    right: 35px;
+    top: 4px;
+
+    width: 150px;
+
+    background: #ffffff;
+
+    border: 1px solid #dddddd;
+
+    border-radius: 9px;
+
+    box-shadow:
+        0 5px 18px rgba(0, 0, 0, 0.15);
+
+    display: none;
+
+    z-index: 100000;
+
+    overflow: hidden;
+
+    direction: rtl;
+}
+
+.document-options-menu.open {
+    display: block;
+}
+
+.document-options-menu div {
+    padding: 9px 12px;
+
+    font-size: 12px;
+
+    color: #444;
+
+    cursor: pointer;
+
+    white-space: nowrap;
+}
+
+.document-options-menu div:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+
+/* =========================================================
+   DOCUMENT RENAME INPUT
+   ========================================================= */
+
+.edit-document-title {
+    flex: 1;
+
+    width: 100%;
+    min-width: 0;
+
+    height: 32px;
+
+    padding: 5px 8px;
+
+    border: 1px solid #bbb;
+
+    border-radius: 7px;
+
+    outline: none;
+
+    font-size: 13px;
+
+    direction: rtl;
+    text-align: right;
+
+    box-sizing: border-box;
+}
+
+.edit-document-title:focus {
+    border-color: #888;
+
+    box-shadow:
+        0 0 0 2px rgba(0, 0, 0, 0.05);
+}
 /* =========================================================
    ADD DOCUMENT BUTTON
    ========================================================= */
