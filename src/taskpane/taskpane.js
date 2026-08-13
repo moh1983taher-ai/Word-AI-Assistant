@@ -1066,7 +1066,8 @@ const DOCUMENT_DB_VERSION =
 
 const DOCUMENT_STORE_NAME =
     "files";
-
+const DOCUMENT_TEXT_STORE_NAME =
+    "texts";
 
 // ======================================
 // Open Documents Database
@@ -1100,6 +1101,19 @@ function openDocumentDatabase() {
 
                         db.createObjectStore(
                             DOCUMENT_STORE_NAME
+                        );
+
+                    }
+
+                    if (
+                        !db.objectStoreNames
+                            .contains(
+                                DOCUMENT_TEXT_STORE_NAME
+                            )
+                    ) {
+
+                        db.createObjectStore(
+                            DOCUMENT_TEXT_STORE_NAME
                         );
 
                     }
@@ -1268,7 +1282,152 @@ async function getWorkingWordFile(
 
 }
 
+// ======================================
+// Save Indexed Document Text
+// ======================================
 
+async function saveDocumentText(
+    documentId,
+    text
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_TEXT_STORE_NAME,
+                    "readwrite"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_TEXT_STORE_NAME
+                );
+
+
+            const record = {
+
+                documentId:
+                    String(documentId),
+
+                text:
+                    String(text || ""),
+
+                updatedAt:
+                    new Date().toISOString()
+
+            };
+
+
+            const request =
+                store.put(
+                    record,
+                    String(documentId)
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(record);
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+// ======================================
+// Get Indexed Document Text
+// ======================================
+
+async function getDocumentText(
+    documentId
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_TEXT_STORE_NAME,
+                    "readonly"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_TEXT_STORE_NAME
+                );
+
+
+            const request =
+                store.get(
+                    String(documentId)
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result ||
+                        null
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
 // ======================================
 // Delete Working Word File
 // ======================================
@@ -1746,7 +1905,13 @@ async function readCurrentWordDocument(
         );
 
 
-    return text;
+    await saveDocumentText(
+        documentItem.id,
+        text
+    );
+
+
+    return text;return text;
 
 }
 // ======================================
