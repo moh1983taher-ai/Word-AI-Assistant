@@ -1545,26 +1545,36 @@ function normalizeSearchText(text) {
             ""
         )
 
-        // توحيد الهمزات
+        // توحيد الألف
         .replace(
-            /[أإآ]/g,
+            /[أإآٱ]/g,
             "ا"
         )
 
-        // توحيد الياء والألف المقصورة
+        // توحيد الياء
         .replace(
             /ى/g,
             "ي"
         )
 
-        // إزالة المسافات المتكررة
+        // توحيد بعض أشكال الهمزة
+        .replace(
+            /ؤ/g,
+            "و"
+        )
+
+        .replace(
+            /ئ/g,
+            "ي"
+        )
+
+        // توحيد المسافات
         .replace(
             /\s+/g,
             " "
         )
 
         .trim()
-
         .toLowerCase();
 
 }
@@ -1583,11 +1593,13 @@ function tokenizeDocumentText(text) {
 
     const matches =
         normalized.match(
-            /[A-Za-z0-9\u0600-\u06FF\u0750-\u077F]+/g
+            /[\p{L}\p{N}]+/gu
         );
 
 
-    return matches || [];
+    return (
+        matches || []
+    );
 
 }
 // ======================================
@@ -3101,7 +3113,7 @@ async function readCurrentWordDocument(
                 "الفهرس المسترجع من IndexedDB:",
                 savedIndex
             );
-            
+
             console.log(
                 "اختبار الفهرس الحقيقي:",
                 {
