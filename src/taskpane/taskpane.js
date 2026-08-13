@@ -1581,53 +1581,51 @@ function normalizeSearchText(text) {
 
 // ======================================
 // Arabic Search Stem / Concept Key
-// تطبيع عربي محافظ وآمن للبحث
+// تطبيع صرفي خفيف ومحافظ وسريع
 // ======================================
 
 function normalizeArabicSearchWord(word) {
 
     let w =
-        normalizeSearchText(
-            word
-        );
+        normalizeSearchText(word);
 
     if (!w)
         return "";
 
     // إزالة الرموز غير الحرفية/الرقمية
-    w =
-        w.replace(
-            /[^\p{L}\p{N}]+/gu,
-            ""
-        );
+    w = w.replace(
+        /[^\p{L}\p{N}]+/gu,
+        ""
+    );
 
     if (!w)
         return "";
 
-    // ==================================
-    // كلمات لا نريد العبث بها
-    // ==================================
+    // ----------------------------------
+    // الكلمات القصيرة لا تمس
+    // ----------------------------------
 
-    const protectedWords =
-        new Set([
-            "الله",
-            "القران",
-            "اسلام",
-            "اسلامي",
-            "اسلامية"
-        ]);
-
-    if (
-        protectedWords.has(w)
-    ) {
-
+    if (w.length <= 3)
         return w;
 
-    }
+    // ----------------------------------
+    // كلمات محمية
+    // ----------------------------------
+
+    const protectedWords = new Set([
+        "الله",
+        "القران",
+        "اسلام",
+        "اسلامي",
+        "اسلامية"
+    ]);
+
+    if (protectedWords.has(w))
+        return w;
 
     // ==================================
-    // إزالة اللواصق في بداية الكلمة فقط
-    // دون الاقتراب من أصل الكلمة
+    // حذف سابقة واحدة فقط
+    // مع شرط بقاء 3 أحرف على الأقل
     // ==================================
 
     const prefixes = [
@@ -1642,106 +1640,79 @@ function normalizeArabicSearchWord(word) {
         "ال"
     ];
 
-    for (
-        let i = 0;
-        i < prefixes.length;
-        i++
-    ) {
-
-        const prefix =
-            prefixes[i];
+    for (const prefix of prefixes) {
 
         if (
             w.startsWith(prefix) &&
-            w.length >
-                prefix.length + 3
+            w.length - prefix.length >= 3
         ) {
 
             w =
-                w.substring(
-                    prefix.length
-                );
+                w.substring(prefix.length);
 
             break;
-
         }
-
     }
 
     // ==================================
-    // معالجة "بـ / كـ / فـ / وـ"
-    // إذا لم تكن جزءًا من الكلمة
-    // ==================================
-
-    if (
-        w.length > 4 &&
-        (
-            w.startsWith("و") ||
-            w.startsWith("ب") ||
-            w.startsWith("ك") ||
-            w.startsWith("ف")
-        )
-    ) {
-
-        const candidate =
-            w.substring(1);
-
-        if (
-            candidate.length >= 4
-        ) {
-
-            w =
-                candidate;
-
-        }
-
-    }
-
-    // ==================================
-    // لواحق آمنة نسبيًا
-    // لا نحذف إلا اللاحقة الظاهرة بوضوح
+    // حذف لاحقة واحدة فقط
+    // مع شرط بقاء 3 أحرف على الأقل
     // ==================================
 
     const suffixes = [
+        "يات",
+        "ات",
+        "ان",
+        "ين",
+        "ون",
         "هما",
         "هم",
         "هن",
         "ها",
+        "ية",
+        "ي",
+        "ة",
+        "ه",
+        "ك",
         "كم",
-        "كن",
-        "كما"
+        "كن"
     ];
 
-    for (
-        let i = 0;
-        i < suffixes.length;
-        i++
-    ) {
-
-        const suffix =
-            suffixes[i];
+    for (const suffix of suffixes) {
 
         if (
             w.endsWith(suffix) &&
-            w.length >
-                suffix.length + 3
+            w.length - suffix.length >= 3
         ) {
 
             w =
                 w.substring(
                     0,
-                    w.length -
-                    suffix.length
+                    w.length - suffix.length
                 );
 
             break;
-
         }
+    }
+
+    // ==================================
+    // إزالة ألف نهائية فقط إذا بقي ≥ 3
+    // ==================================
+
+    if (
+        w.length > 3 &&
+        w.endsWith("ا")
+    ) {
+
+        w =
+            w.substring(
+                0,
+                w.length - 1
+            );
 
     }
 
     return w;
-
 }
 
 
