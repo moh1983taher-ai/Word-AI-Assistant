@@ -1125,7 +1125,7 @@ const DOCUMENT_DB_NAME =
     "WORD_AI_DOCUMENT_STORAGE";
 
 const DOCUMENT_DB_VERSION =
-    3;
+    4;
 
 const DOCUMENT_STORE_NAME =
     "files";
@@ -1133,6 +1133,8 @@ const DOCUMENT_TEXT_STORE_NAME =
     "texts";
 const DOCUMENT_INDEX_STORE_NAME =
     "indexes";
+const DOCUMENT_STRUCTURE_STORE_NAME =
+    "structures";
 
 // ======================================
 // Open Documents Database
@@ -1193,6 +1195,19 @@ function openDocumentDatabase() {
 
                         db.createObjectStore(
                             DOCUMENT_TEXT_STORE_NAME
+                        );
+
+                    }
+
+                    if (
+                        !db.objectStoreNames
+                            .contains(
+                                DOCUMENT_STRUCTURE_STORE_NAME
+                            )
+                    ) {
+
+                        db.createObjectStore(
+                            DOCUMENT_STRUCTURE_STORE_NAME
                         );
 
                     }
@@ -1640,6 +1655,576 @@ function buildDocumentIndex(
 
         updatedAt:
             new Date().toISOString()
+
+    };
+
+}
+// ======================================
+// Build Document Structure
+// ======================================
+
+async function buildDocumentStructure(
+    documentItem
+) {
+
+    if (!documentItem) {
+
+        throw new Error(
+            "لم يتم تحديد المستند."
+        );
+
+    }
+
+
+    const file =
+        await getWorkingWordFile(
+            documentItem.storageId
+        );
+
+
+    if (!file) {
+
+        throw new Error(
+            "لم يتم العثور على نسخة العمل."
+        );
+
+    }
+
+
+    const base64 =
+        await fileToBase64(
+            file
+        );
+
+
+    return await Word.run(
+        async function (context) {
+
+            if (
+                !Office.context.requirements.isSetSupported(
+                    "WordApiHiddenDocument",
+                    "1.3"
+                )
+            ) {
+
+                throw new Error(
+                    "إصدار Word الحالي لا يدعم تحليل بنية المستند."
+                );
+
+            }
+
+
+            const workingDocument =
+                context.application.createDocument(
+                    base64
+                );
+
+
+            const paragraphs =
+                workingDocument.body.paragraphs;
+
+
+            paragraphs.load(
+                [
+                    "items/text",
+                    "items/styleBuiltIn",
+                    "items/uniqueLocalId"
+                ]
+            );
+
+
+            const tables =
+                workingDocument.body.tables;
+
+
+            tables.load(
+                [
+                    "items/rowCount",
+                    "items/columnCount",
+                    "items/styleBuiltIn"
+                ]
+            );
+
+
+            await context.sync();
+
+
+            const paragraphItems =
+                paragraphs.items.map(
+                    function (paragraph, index) {
+
+                        const text =
+                            String(
+                                paragraph.text ||
+                                ""
+                            ).trim();
+
+
+                        return {
+
+                            index:
+                                index,
+
+                            id:
+                                paragraph.uniqueLocalId ||
+                                String(index),
+
+                            text:
+                                text,
+
+                            style:
+                                paragraph.styleBuiltIn ||
+                                ""
+
+                        };
+
+                    }
+                );
+
+
+            const headings =
+                paragraphItems.filter(
+                    function (paragraph) {
+
+                        return (
+                            paragraph.style &&
+                            /^Heading[1-9]$/i.test(
+                                paragraph.style
+                            )
+                        );
+
+                    }
+                );
+
+
+            const tableItems =
+                tables.items.map(
+                    function (table, index) {
+
+                        return {
+
+                            index:
+                                index,
+
+                            rows:
+                                table.rowCount,
+
+                            columns:
+                                table.columnCount,
+
+                            style:
+                                table.styleBuiltIn ||
+                                ""
+
+                        };
+
+                    }
+                );
+
+
+            return {
+
+                documentId:
+                    String(
+                        documentItem.id
+                    ),
+
+                paragraphCount:
+                    paragraphItems.length,
+
+                headingCount:
+                    headings.length,
+
+                tableCount:
+                    tableItems.length,
+
+                paragraphs:
+                    paragraphItems,
+
+                headings:
+                    headings,
+
+                tables:
+                    tableItems,
+
+                updatedAt:
+                    new Date().toISOString()
+
+            };
+
+        }
+    );
+
+}
+// ======================================
+// Save Document Structure
+// ======================================
+
+async function saveDocumentStructure(
+    documentId,
+    structureData
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_STRUCTURE_STORE_NAME,
+                    "readwrite"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_STRUCTURE_STORE_NAME
+                );
+
+
+            const request =
+                store.put(
+                    structureData,
+                    String(documentId)
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        structureData
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+// ======================================
+// Get Document Structure
+// ======================================
+
+async function getDocumentStructure(
+    documentId
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (resolve, reject) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_STRUCTURE_STORE_NAME,
+                    "readonly"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_STRUCTURE_STORE_NAME
+                );
+
+
+            const request =
+                store.get(
+                    String(documentId)
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result ||
+                        null
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+// ======================================
+// Search Document Context
+// ======================================
+
+async function searchDocumentContext(
+    documentId,
+    query
+) {
+
+    const searchTerm =
+        normalizeSearchText(
+            query
+        );
+
+
+    if (!searchTerm) {
+
+        return {
+
+            query:
+                "",
+
+            count:
+                0,
+
+            results:
+                []
+
+        };
+
+    }
+
+
+    // ==================================
+    // استرجاع النص
+    // ==================================
+
+    const textData =
+        await getDocumentText(
+            documentId
+        );
+
+
+    if (!textData) {
+
+        throw new Error(
+            "لا يوجد نص محفوظ لهذا المستند."
+        );
+
+    }
+
+
+    // ==================================
+    // استرجاع البنية
+    // ==================================
+
+    const structureData =
+        await getDocumentStructure(
+            documentId
+        );
+
+
+    if (!structureData) {
+
+        throw new Error(
+            "لا توجد بنية محفوظة لهذا المستند."
+        );
+
+    }
+
+
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
+
+
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+            : [];
+
+
+    const results = [];
+
+
+    // ==================================
+    // البحث فقرة فقرة
+    // ==================================
+
+    paragraphs.forEach(
+        function (paragraph) {
+
+            if (
+                !paragraph ||
+                !paragraph.text
+            ) {
+
+                return;
+
+            }
+
+
+            const originalText =
+                String(
+                    paragraph.text
+                );
+
+
+            const normalizedParagraph =
+                normalizeSearchText(
+                    originalText
+                );
+
+
+            if (
+                !normalizedParagraph.includes(
+                    searchTerm
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            // ==================================
+            // العثور على العنوان الأقرب
+            // ==================================
+
+            let nearestHeading =
+                null;
+
+
+            headings.forEach(
+                function (heading) {
+
+                    if (
+                        heading.index <
+                        paragraph.index
+                    ) {
+
+                        if (
+                            !nearestHeading ||
+                            heading.index >
+                            nearestHeading.index
+                        ) {
+
+                            nearestHeading =
+                                heading;
+
+                        }
+
+                    }
+
+                }
+            );
+
+
+            // ==================================
+            // استخراج المقتطف
+            // ==================================
+
+            const position =
+                normalizedParagraph.indexOf(
+                    searchTerm
+                );
+
+
+            const start =
+                Math.max(
+                    0,
+                    position - 100
+                );
+
+
+            const end =
+                Math.min(
+                    normalizedParagraph.length,
+                    position +
+                    searchTerm.length +
+                    160
+                );
+
+
+            const context =
+                normalizedParagraph.substring(
+                    start,
+                    end
+                );
+
+
+            results.push({
+
+                paragraphIndex:
+                    paragraph.index,
+
+                paragraphId:
+                    paragraph.id,
+
+                text:
+                    originalText,
+
+                context:
+                    context,
+
+                heading:
+                    nearestHeading
+                        ? nearestHeading.text
+                        : "",
+
+                headingLevel:
+                    nearestHeading
+                        ? nearestHeading.style
+                        : ""
+
+            });
+
+        }
+    );
+
+
+    return {
+
+        query:
+            searchTerm,
+
+        count:
+            results.length,
+
+        results:
+            results
 
     };
 
@@ -2434,7 +3019,17 @@ async function readCurrentWordDocument(
                 documentItem.id,
                 indexData
             );
+            
+            const structureData =
+                await buildDocumentStructure(
+                    documentItem
+                );
 
+
+            await saveDocumentStructure(
+                documentItem.id,
+                structureData
+            );
 
             // ==================================
             // حفظ إحصاءات الفهرس مع المستند
