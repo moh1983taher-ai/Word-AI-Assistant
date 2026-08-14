@@ -2917,6 +2917,99 @@ async function readCurrentWordDocument(
             );
 
 
+        // ======================================
+        // اختبار بحث عائلة استصلاح
+        // ======================================
+
+        const testQueries = [
+            "استصلاح",
+            "الاستصلاح",
+            "بالاستصلاح",
+            "استصلاحيا"
+        ];
+
+        console.log(
+            "======================================"
+        );
+
+        console.log(
+            "اختبار البحث في عائلة استصلاح"
+        );
+
+        console.log(
+            "======================================"
+        );
+
+        for (
+            let i = 0;
+            i < testQueries.length;
+            i++
+        ) {
+
+            const testQuery =
+                testQueries[i];
+
+            try {
+
+                const testResult =
+                    await searchIndexedDocument(
+                        documentItem.id,
+                        testQuery
+                    );
+
+                console.log(
+                    "الاستعلام:",
+                    testQuery
+                );
+
+                console.log(
+                    "عدد النتائج:",
+                    testResult.count
+                );
+
+                console.log(
+                    "العائلات المطابقة:",
+                    testResult.matchedFamilies
+                );
+
+                console.log(
+                    "عدد الظهورات المفهرسة:",
+                    testResult.indexedOccurrences
+                );
+
+                console.log(
+                    "أول 3 نتائج:",
+                    testResult.results.slice(
+                        0,
+                        3
+                    )
+                );
+
+            }
+            catch (error) {
+
+                console.error(
+                    "فشل الاستعلام:",
+                    testQuery,
+                    error
+                );
+
+            }
+
+            console.log(
+                "--------------------------------------"
+            );
+
+        }
+
+        console.log(
+            "انتهى اختبار بحث عائلة استصلاح."
+        );
+
+        console.log(
+            "======================================"
+        );
+
         // ==================================
         // بناء بنية المستند
         // ==================================
