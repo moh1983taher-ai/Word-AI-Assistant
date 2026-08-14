@@ -3058,6 +3058,12 @@ async function readCurrentWordDocument(
             }
         );
 
+        // ==================================
+        // اختبار الفهرس بعد اكتمال الفهرسة
+        // ==================================
+
+        testCurrentDocumentIndex();
+
 
         return text;
 
@@ -10750,7 +10756,6 @@ loadSettings();
 // ======================================
 // End Office.onReady
 // ======================================
-testCurrentDocumentIndex();
 
 });
 
