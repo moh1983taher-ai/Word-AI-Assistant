@@ -10263,6 +10263,79 @@ async function testCurrentDocumentIndex() {
             index.families["استصلاح"]
         );
 
+        // ======================================
+        // اختبار البحث في عائلة استصلاح
+        // ======================================
+
+        const testQueries = [
+            "استصلاح",
+            "الاستصلاح",
+            "بالاستصلاح",
+            "استصلاحيا"
+        ];
+
+        console.log(
+            "======================================"
+        );
+
+        console.log(
+            "اختبار صيغ عائلة استصلاح"
+        );
+
+        console.log(
+            "======================================"
+        );
+
+        for (
+            let i = 0;
+            i < testQueries.length;
+            i++
+        ) {
+
+            const query =
+                testQueries[i];
+
+            try {
+
+                const result =
+                    await searchIndexedDocument(
+                        currentDocument.id,
+                        query
+                    );
+
+                console.log(
+                    "الاستعلام:",
+                    query
+                );
+
+                console.log(
+                    "العائلة المطابقة:",
+                    result.matchedFamilies
+                );
+
+                console.log(
+                    "عدد الفقرات:",
+                    result.count
+                );
+
+                console.log(
+                    "عدد الظهورات:",
+                    result.indexedOccurrences
+                );
+
+            }
+            catch (error) {
+
+                console.error(
+                    "فشل البحث عن:",
+                    query,
+                    error
+                );
+
+            }
+
+        }
+
 
     }
     catch (error) {
