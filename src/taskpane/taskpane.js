@@ -4158,6 +4158,7 @@ async function testIstislahFamily() {
     }
 
 }
+window.testIstislahFamily = testIstislahFamily;
 // ======================================
 // Delete Working Word File
 // ======================================
