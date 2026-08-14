@@ -1802,7 +1802,7 @@ function tokenizeDocumentText(text) {
 
 // ======================================
 // Build Document Index
-// بناء الفهرس الذكي + عائلات الكلمات
+// فهرسة الكلمات + بناء عائلات الكلمات
 // ======================================
 
 function buildDocumentIndex(
@@ -1815,13 +1815,142 @@ function buildDocumentIndex(
             text
         );
 
+    // ==================================
+    // الفهرس الحرفي
+    // ==================================
+
     const terms = {};
+
+    // ==================================
+    // فهرس العائلات
+    // ==================================
 
     const families = {};
 
+    // ==================================
+    // إضافة سجل إلى الفهرس الحرفي
+    // ==================================
+
+    function addTerm(
+        key,
+        tokenIndex
+    ) {
+
+        if (!key)
+            return;
+
+        if (
+            !terms[key]
+        ) {
+
+            terms[key] = {
+
+                count:
+                    0,
+
+                positions:
+                    []
+
+            };
+
+        }
+
+        terms[key].count +=
+            1;
+
+        terms[key].positions.push(
+            tokenIndex
+        );
+
+    }
 
     // ==================================
-    // فهرسة كل كلمة
+    // إضافة كلمة إلى العائلة
+    // ==================================
+
+    function addFamilyWord(
+        familyKey,
+        originalWord,
+        tokenIndex
+    ) {
+
+        if (!familyKey)
+            return;
+
+        if (
+            familyKey.length < 3
+        )
+            return;
+
+        if (
+            !families[familyKey]
+        ) {
+
+            families[familyKey] = {
+
+                count:
+                    0,
+
+                words:
+                    {},
+
+                positions:
+                    []
+
+            };
+
+        }
+
+        const family =
+            families[
+                familyKey
+            ];
+
+        // عدد مرات ظهور العائلة
+        family.count +=
+            1;
+
+        // حفظ اللفظ نفسه
+        if (
+            !family.words[
+                originalWord
+            ]
+        ) {
+
+            family.words[
+                originalWord
+            ] = {
+
+                count:
+                    0,
+
+                positions:
+                    []
+
+            };
+
+        }
+
+        family.words[
+            originalWord
+        ].count +=
+            1;
+
+        family.words[
+            originalWord
+        ].positions.push(
+            tokenIndex
+        );
+
+        // موقع الظهور
+        family.positions.push(
+            tokenIndex
+        );
+
+    }
+
+    // ==================================
+    // المرور على جميع الكلمات
     // ==================================
 
     tokens.forEach(
@@ -1830,190 +1959,66 @@ function buildDocumentIndex(
             index
         ) {
 
-            if (!token) {
-
+            if (!token)
                 return;
 
-            }
+            // ----------------------------------
+            // المفاتيح التقليدية
+            // ----------------------------------
 
-
-            // ==================================
-            // المفتاح الأصلي
-            // ==================================
-
-            const surface =
-                normalizeSearchText(
+            const searchKeys =
+                getSearchKeysForWord(
                     token
                 );
 
+            searchKeys.forEach(
+                function (
+                    key
+                ) {
 
-            if (!surface) {
+                    addTerm(
+                        key,
+                        index
+                    );
 
-                return;
-
-            }
-
-
-            // ==================================
-            // المفتاح العائلي
-            // ==================================
-
-            const familyKey =
-                normalizeArabicSearchWord(
-                    surface
-                );
-
-
-            // ==================================
-            // إنشاء سجل الكلمة الأصلية
-            // ==================================
-
-            if (
-                !terms[surface]
-            ) {
-
-                terms[surface] = {
-
-                    count:
-                        0,
-
-                    positions:
-                        []
-
-                };
-
-            }
-
-
-            terms[surface].count +=
-                1;
-
-
-            terms[surface].positions.push(
-                index
+                }
             );
 
+            // ----------------------------------
+            // مفتاح العائلة
+            // ----------------------------------
 
-            // ==================================
-            // إنشاء العائلة
-            // ==================================
+            const familyKey =
+                getArabicFamilyKey(
+                    token
+                );
 
             if (
                 familyKey
             ) {
 
-                if (
-                    !families[familyKey]
-                ) {
-
-                    families[familyKey] = {
-
-                        count:
-                            0,
-
-                        positions:
-                            [],
-
-                        words:
-                            {}
-
-                    };
-
-                }
-
-
-                // ==================================
-                // عدد مرات ظهور العائلة
-                // ==================================
-
-                families[familyKey].count +=
-                    1;
-
-
-                // ==================================
-                // مواضع العائلة
-                // ==================================
-
-                families[familyKey].positions.push(
+                addFamilyWord(
+                    familyKey,
+                    token,
                     index
                 );
 
-
-                // ==================================
-                // تسجيل الكلمة داخل العائلة
-                // ==================================
-
-                if (
-                    !families[familyKey].words[surface]
-                ) {
-
-                    families[familyKey].words[surface] = {
-
-                        count:
-                            0,
-
-                        positions:
-                            []
-
-                    };
-
-                }
-
-
-                families[familyKey]
-                    .words[surface]
-                    .count +=
-                        1;
-
-
-                families[familyKey]
-                    .words[surface]
-                    .positions
-                    .push(
-                        index
-                    );
-
             }
 
         }
     );
 
+    // ==================================
+    // عدد العائلات
+    // ==================================
+
+    const uniqueFamilies =
+        Object.keys(
+            families
+        ).length;
 
     // ==================================
-    // إزالة العائلات غير الصالحة
-    // ==================================
-
-    const validFamilies = {};
-
-
-    Object.keys(
-        families
-    ).forEach(
-        function (
-            familyKey
-        ) {
-
-            // لا نعتمد عائلة أقل من 3 أحرف
-            if (
-                familyKey &&
-                familyKey.length >= 3
-            ) {
-
-                validFamilies[
-                    familyKey
-                ] =
-                    families[
-                        familyKey
-                    ];
-
-            }
-
-        }
-    );
-
-
-    // ==================================
-    // النتيجة النهائية
+    // إرجاع الفهرس
     // ==================================
 
     return {
@@ -2023,31 +2028,23 @@ function buildDocumentIndex(
                 documentId
             ),
 
-        // عدد الكلمات الحقيقي
         tokenCount:
             tokens.length,
 
-        // عدد الكلمات الأصلية المختلفة
         uniqueTerms:
             Object.keys(
                 terms
             ).length,
 
-        // عدد العائلات
         uniqueFamilies:
-            Object.keys(
-                validFamilies
-            ).length,
+            uniqueFamilies,
 
-        // الفهرس الأصلي
         terms:
             terms,
 
-        // فهرس العائلات
         families:
-            validFamilies,
+            families,
 
-        // وقت التحديث
         updatedAt:
             new Date().toISOString()
 
@@ -2080,7 +2077,251 @@ function tokenizeDocumentText(
 
 }
 
+// ======================================
+// Arabic Family Key
+// مفتاح العائلة العربية
+// ======================================
 
+function getArabicFamilyKey(
+    word
+) {
+
+    let w =
+        normalizeSearchText(
+            word
+        );
+
+    if (!w)
+        return "";
+
+    // تنظيف الكلمة
+    w =
+        w.replace(
+            /[^\p{L}\p{N}]+/gu,
+            ""
+        );
+
+    if (!w)
+        return "";
+
+    // الكلمات القصيرة لا نشتق منها عائلة
+    if (
+        w.length < 3
+    ) {
+
+        return w;
+
+    }
+
+    // ==================================
+    // كلمات محمية
+    // ==================================
+
+    const protectedWords =
+        new Set([
+            "الله",
+            "القران",
+            "اسلام",
+            "اسلامي",
+            "اسلامية"
+        ]);
+
+    if (
+        protectedWords.has(
+            w
+        )
+    ) {
+
+        return w;
+
+    }
+
+    // ==================================
+    // إزالة السوابق
+    // ==================================
+
+    const prefixes = [
+
+        "وال",
+        "بال",
+        "كال",
+        "فال",
+        "لل",
+
+        "وا",
+        "با",
+        "كا",
+        "فا",
+        "ول",
+        "بل",
+        "فل",
+
+        "ال"
+
+    ];
+
+    let changed =
+        true;
+
+    while (
+        changed
+    ) {
+
+        changed =
+            false;
+
+        for (
+            let i = 0;
+            i < prefixes.length;
+            i++
+        ) {
+
+            const prefix =
+                prefixes[i];
+
+            if (
+                w.startsWith(
+                    prefix
+                ) &&
+                w.length -
+                    prefix.length >=
+                    3
+            ) {
+
+                w =
+                    w.substring(
+                        prefix.length
+                    );
+
+                changed =
+                    true;
+
+                break;
+
+            }
+
+        }
+
+    }
+
+    // ==================================
+    // إزالة لواحق شائعة
+    // ==================================
+
+    const suffixes = [
+
+        "يات",
+        "ات",
+        "ون",
+        "ين",
+        "ان",
+
+        "هما",
+        "هم",
+        "هن",
+        "ها",
+
+        "ية",
+        "ي",
+
+        "ة",
+
+        "ه",
+        "ك",
+        "كم",
+        "كن"
+
+    ];
+
+    changed =
+        true;
+
+    while (
+        changed
+    ) {
+
+        changed =
+            false;
+
+        for (
+            let i = 0;
+            i < suffixes.length;
+            i++
+        ) {
+
+            const suffix =
+                suffixes[i];
+
+            if (
+                w.endsWith(
+                    suffix
+                ) &&
+                w.length -
+                    suffix.length >=
+                    3
+            ) {
+
+                w =
+                    w.substring(
+                        0,
+                        w.length -
+                            suffix.length
+                    );
+
+                changed =
+                    true;
+
+                break;
+
+            }
+
+        }
+
+    }
+
+    // ==================================
+    // ألف التأنيث / الألف النهائية
+    // ==================================
+
+    if (
+        w.length > 3 &&
+        w.endsWith("ا")
+    ) {
+
+        const candidate =
+            w.substring(
+                0,
+                w.length - 1
+            );
+
+        if (
+            candidate.length >= 3
+        ) {
+
+            w =
+                candidate;
+
+        }
+
+    }
+
+    // ==================================
+    // حماية الحد الأدنى
+    // ==================================
+
+    if (
+        w.length < 3
+    ) {
+
+        return normalizeSearchText(
+            word
+        );
+
+    }
+
+    return w;
+
+}
 // ======================================
 // Build Document Index
 // فهرسة محافظة
