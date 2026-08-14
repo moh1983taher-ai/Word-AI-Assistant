@@ -10750,6 +10750,7 @@ loadSettings();
 // ======================================
 // End Office.onReady
 // ======================================
+testCurrentDocumentIndex();
 
 });
 
