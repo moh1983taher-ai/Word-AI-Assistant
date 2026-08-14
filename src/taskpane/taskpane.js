@@ -9245,252 +9245,316 @@ searchBtn.onclick =
 
 if (searchInput) {
 
+    searchInput.oninput =
+        async function () {
 
-searchInput.oninput =
-    function () {
+            const keyword =
+                searchInput.value
+                    .trim()
+                    .toLowerCase();
 
-        const keyword =
-            searchInput.value
-                .trim()
-                .toLowerCase();
 
-        // ======================================
-// اختبار مؤقت للفهرس من داخل البحث
-// الأمر التجريبي: #استصلاح
-// ======================================
+            // ======================================
+            // اختبار مؤقت لفهرس "استصلاح"
+            // الاستخدام: اكتب #استصلاح في مربع البحث
+            // ======================================
 
-if (
-    keyword === "#استصلاح"
-) {
+            if (keyword === "#استصلاح") {
 
-    console.clear();
-
-    console.log(
-        "======================================"
-    );
-
-    console.log(
-        "اختبار فهرس المستند: استصلاح"
-    );
-
-    console.log(
-        "======================================"
-    );
-
-    try {
-
-        if (!currentDocument) {
-
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
-
-            return;
-
-        }
-
-        if (
-            typeof getDocumentIndex !==
-            "function"
-        ) {
-
-            console.error(
-                "getDocumentIndex غير متاحة في هذا النطاق."
-            );
-
-            return;
-
-        }
-
-        const index =
-            await getDocumentIndex(
-                currentDocument.id
-            );
-
-        if (!index) {
-
-                    console.warn(
-                        "لا يوجد فهرس محفوظ للمستند الحالي."
-                    );
-
-                    return;
-
-                }
+                console.clear();
 
                 console.log(
-                    "المستند:",
-                    currentDocument
+                    "======================================"
                 );
 
                 console.log(
-                    "tokenCount:",
-                    index.tokenCount
-                );
-
-                console.log(
-                    "uniqueTerms:",
-                    index.uniqueTerms
-                );
-
-                console.log(
-                    "uniqueFamilies:",
-                    index.uniqueFamilies
-                );
-
-                const family =
-                    index.families &&
-                    index.families["استصلاح"];
-
-                if (!family) {
-
-                    console.warn(
-                        "لم توجد عائلة استصلاح."
-                    );
-
-                    console.log(
-                        "أقرب المفاتيح:",
-                        Object.keys(
-                            index.families || {}
-                        ).filter(
-                            function (key) {
-
-                                return key.includes(
-                                    "استصلاح"
-                                );
-
-                            }
-                        )
-                    );
-
-                    return;
-
-                }
-
-                console.log(
-                    "عائلة استصلاح:",
-                    family
-                );
-
-                console.log(
-                    "عدد أفراد العائلة:",
-                    family.count
-                );
-
-                console.log(
-                    "الألفاظ:",
-                    family.words ||
-                    family.terms ||
-                    family.members ||
-                    []
-                );
-
-                console.log(
-                    "المواضع:",
-                    family.positions ||
-                    []
+                    "اختبار فهرس المستند: استصلاح"
                 );
 
                 console.log(
                     "======================================"
                 );
 
-            }
-            catch (error) {
 
-                console.error(
-                    "فشل اختبار الفهرس:",
-                    error
-                );
+                try {
 
-            }
+                    // ----------------------------------
+                    // التحقق من وجود مستند حالي
+                    // ----------------------------------
 
-            return;
+                    if (!currentDocument) {
 
-        }
-        
+                        console.warn(
+                            "لا يوجد مستند نشط."
+                        );
 
-        if (!searchResults)
-            return;
+                        return;
 
-
-        searchResults.innerHTML =
-            "";
+                    }
 
 
-        if (keyword === "")
-            return;
+                    // ----------------------------------
+                    // التحقق من دالة الفهرس
+                    // ----------------------------------
+
+                    if (
+                        typeof getDocumentIndex !==
+                        "function"
+                    ) {
+
+                        console.error(
+                            "getDocumentIndex غير متاحة في هذا النطاق."
+                        );
+
+                        return;
+
+                    }
 
 
-        chats.forEach(
-            function (chat) {
+                    // ----------------------------------
+                    // استرجاع فهرس المستند
+                    // ----------------------------------
 
-                if (
-                    chat.title
-                        .toLowerCase()
-                        .includes(
-                            keyword
-                        )
-                ) {
-
-                    const item =
-                        document.createElement(
-                            "div"
+                    const index =
+                        await getDocumentIndex(
+                            currentDocument.id
                         );
 
 
-                    item.className =
-                        "search-result-item";
+                    if (!index) {
+
+                        console.warn(
+                            "لا يوجد فهرس محفوظ للمستند الحالي."
+                        );
+
+                        return;
+
+                    }
 
 
-                    item.innerHTML = `
-                    <span class="chat-title">
-                        ${chatIcon}
-                        ${chat.title}
-                    </span>
-                    `;
+                    // ----------------------------------
+                    // معلومات عامة
+                    // ----------------------------------
+
+                    console.log(
+                        "المستند:",
+                        currentDocument
+                    );
+
+                    console.log(
+                        "tokenCount:",
+                        index.tokenCount
+                    );
+
+                    console.log(
+                        "uniqueTerms:",
+                        index.uniqueTerms
+                    );
+
+                    console.log(
+                        "uniqueFamilies:",
+                        index.uniqueFamilies
+                    );
 
 
-                    item.onclick =
-                        function () {
+                    // ----------------------------------
+                    // عائلة استصلاح
+                    // ----------------------------------
 
-                            currentChat =
-                                chat;
+                    const family =
+                        index.families &&
+                        index.families["استصلاح"];
 
 
-                            renderChat();
+                    if (!family) {
+
+                        console.warn(
+                            "لم توجد عائلة استصلاح في الفهرس."
+                        );
 
 
-                            if (searchPopup) {
+                        const familyKeys =
+                            Object.keys(
+                                index.families || {}
+                            );
 
-                                searchPopup
-                                    .classList
-                                    .remove(
-                                        "open"
+
+                        console.log(
+                            "عدد مفاتيح العائلات:",
+                            familyKeys.length
+                        );
+
+
+                        console.log(
+                            "المفاتيح التي تحتوي على استصلاح:",
+                            familyKeys.filter(
+                                function (key) {
+
+                                    return key.includes(
+                                        "استصلاح"
                                     );
 
-                            }
+                                }
+                            )
+                        );
 
 
-                            searchInput.value =
-                                "";
+                        return;
 
-                            searchResults.innerHTML =
-                                "";
-
-                        };
+                    }
 
 
-                    searchResults.appendChild(
-                        item
+                    // ----------------------------------
+                    // عرض العائلة
+                    // ----------------------------------
+
+                    console.log(
+                        "عائلة استصلاح كاملة:",
+                        family
+                    );
+
+
+                    console.log(
+                        "عدد أفراد العائلة:",
+                        family.count
+                    );
+
+
+                    console.log(
+                        "أفراد العائلة:",
+                        family.words ||
+                        family.terms ||
+                        family.members ||
+                        []
+                    );
+
+
+                    console.log(
+                        "مواقع العائلة:",
+                        family.positions ||
+                        []
+                    );
+
+
+                    console.log(
+                        "======================================"
+                    );
+
+                    console.log(
+                        "انتهى اختبار عائلة استصلاح."
+                    );
+
+                    console.log(
+                        "======================================"
+                    );
+
+                }
+                catch (error) {
+
+                    console.error(
+                        "فشل اختبار فهرس استصلاح:",
+                        error
                     );
 
                 }
 
+
+                // ----------------------------------
+                // مهم جدًا:
+                // لا نكمل إلى البحث العادي
+                // ----------------------------------
+
+                return;
+
             }
-        );
 
-    };
 
+            // ======================================
+            // البحث العادي في المحادثات
+            // ======================================
+
+            if (!searchResults)
+                return;
+
+
+            searchResults.innerHTML =
+                "";
+
+
+            if (keyword === "")
+                return;
+
+
+            chats.forEach(
+                function (chat) {
+
+                    if (
+                        chat.title
+                            .toLowerCase()
+                            .includes(
+                                keyword
+                            )
+                    ) {
+
+                        const item =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        item.className =
+                            "search-result-item";
+
+
+                        item.innerHTML = `
+                            <span class="chat-title">
+                                ${chatIcon}
+                                ${chat.title}
+                            </span>
+                        `;
+
+
+                        item.onclick =
+                            function () {
+
+                                currentChat =
+                                    chat;
+
+
+                                renderChat();
+
+
+                                if (searchPopup) {
+
+                                    searchPopup
+                                        .classList
+                                        .remove(
+                                            "open"
+                                        );
+
+                                }
+
+
+                                searchInput.value =
+                                    "";
+
+
+                                searchResults.innerHTML =
+                                    "";
+
+                            };
+
+
+                        searchResults.appendChild(
+                            item
+                        );
+
+                    }
+
+                }
+            );
+
+        };
 
 }
 
