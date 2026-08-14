@@ -3059,6 +3059,60 @@ async function readCurrentWordDocument(
         );
 
         // ==================================
+        // فحص عائلة استصلاح مباشرة
+        // ==================================
+
+        const istislahFamily =
+            indexData.families &&
+            indexData.families["استصلاح"];
+
+        console.log(
+            "======================================"
+        );
+
+        console.log(
+            "عائلة استصلاح:",
+            istislahFamily
+        );
+
+        if (istislahFamily) {
+
+            console.log(
+                "عدد أفراد العائلة:",
+                istislahFamily.count
+            );
+
+            console.log(
+                "الألفاظ:",
+                istislahFamily.words
+            );
+
+            console.log(
+                "عدد الألفاظ المختلفة:",
+                istislahFamily.uniqueWords
+            );
+
+            console.log(
+                "عدد occurrences:",
+                istislahFamily.occurrences
+                    ? istislahFamily.occurrences.length
+                    : 0
+            );
+
+        }
+        else {
+
+            console.warn(
+                "❌ لم توجد عائلة استصلاح في الفهرس."
+            );
+
+        }
+
+        console.log(
+            "======================================"
+        );
+
+        // ==================================
         // اختبار الفهرس بعد اكتمال الفهرسة
         // ==================================
 
