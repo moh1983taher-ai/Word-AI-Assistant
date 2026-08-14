@@ -1191,72 +1191,11 @@ function tokenizeDocumentText(
 }
 
 
-// ======================================
-// Arabic Family Key
-// عائلة الكلمة
-// ======================================
-
-function getArabicFamilyKey(
-    word
-) {
-
-    let w =
-        normalizeSearchText(
-            word
-        );
-
-
-    if (!w)
-        return "";
-
-
-    w =
-        w.replace(
-            /[^\p{L}\p{N}]+/gu,
-            ""
-        );
-
-
-    if (!w)
-        return "";
-
-
-    if (
-        w.length <= 3
-    ) {
-
-        return w;
-
-    }
-
-
-    const protectedWords =
-        new Set([
-            "الله",
-            "القران",
-            "اسلام",
-            "اسلامي",
-            "اسلامية"
-        ]);
-
-
-    if (
-        protectedWords.has(w)
-    ) {
-
-        return w;
-
-    }
-
-
-    return w;
-
-}
-
 
 // ======================================
 // Conservative Family Key
-// الأصل الموجود فعليًا في المستند
+// مفتاح العائلة المحافظ
+// الأصل الأقصر الموجود فعليًا في المستند
 // ======================================
 
 function getConservativeFamilyKey(
@@ -1269,10 +1208,16 @@ function getConservativeFamilyKey(
             word
         );
 
+    if (!surface) {
 
-    if (!surface)
         return "";
 
+    }
+
+
+    // ==================================
+    // الكلمات القصيرة لا نشتق منها عائلة
+    // ==================================
 
     if (
         surface.length <= 3
@@ -1282,6 +1227,10 @@ function getConservativeFamilyKey(
 
     }
 
+
+    // ==================================
+    // كلمات محمية
+    // ==================================
 
     const protectedWords =
         new Set([
@@ -1304,10 +1253,26 @@ function getConservativeFamilyKey(
     }
 
 
-    // ----------------------------------
+    // ==================================
+    // إذا لم توجد مجموعة الكلمات
+    // نعيد اللفظ نفسه
+    // ==================================
+
+    if (
+        !surfaceSet ||
+        typeof surfaceSet.has !==
+            "function"
+    ) {
+
+        return surface;
+
+    }
+
+
+    // ==================================
     // السوابق
-    // نبدأ بالأطول
-    // ----------------------------------
+    // من الأطول إلى الأقصر
+    // ==================================
 
     const prefixes = [
         "وال",
@@ -1326,6 +1291,11 @@ function getConservativeFamilyKey(
     ];
 
 
+    // ==================================
+    // اللواحق
+    // من الأكثر تحديدًا إلى الأقصر
+    // ==================================
+
     const suffixes = [
         "يات",
         "ات",
@@ -1338,15 +1308,19 @@ function getConservativeFamilyKey(
         "ين",
         "ون",
         "ان",
-        "ي",
-        "ة",
-        "ه",
-        "ك",
         "كم",
         "كن",
+        "ه",
+        "ك",
+        "ي",
+        "ة",
         "ا"
     ];
 
+
+    // ==================================
+    // المرشحات
+    // ==================================
 
     const candidates =
         new Set();
@@ -1357,9 +1331,9 @@ function getConservativeFamilyKey(
     );
 
 
-    // ----------------------------------
+    // ==================================
     // إزالة سابقة فقط
-    // ----------------------------------
+    // ==================================
 
     prefixes.forEach(
         function (
@@ -1367,26 +1341,32 @@ function getConservativeFamilyKey(
         ) {
 
             if (
-                surface.startsWith(
+                !surface.startsWith(
                     prefix
                 )
             ) {
 
-                const candidate =
-                    surface.substring(
-                        prefix.length
-                    );
+                return;
+
+            }
 
 
-                if (
-                    candidate.length >= 3
-                ) {
+            const candidate =
+                surface.substring(
+                    prefix.length
+                );
 
-                    candidates.add(
-                        candidate
-                    );
 
-                }
+            if (
+                candidate.length >= 3 &&
+                surfaceSet.has(
+                    candidate
+                )
+            ) {
+
+                candidates.add(
+                    candidate
+                );
 
             }
 
@@ -1394,9 +1374,9 @@ function getConservativeFamilyKey(
     );
 
 
-    // ----------------------------------
+    // ==================================
     // إزالة لاحقة فقط
-    // ----------------------------------
+    // ==================================
 
     suffixes.forEach(
         function (
@@ -1404,28 +1384,34 @@ function getConservativeFamilyKey(
         ) {
 
             if (
-                surface.endsWith(
+                !surface.endsWith(
                     suffix
                 )
             ) {
 
-                const candidate =
-                    surface.substring(
-                        0,
-                        surface.length -
-                        suffix.length
-                    );
+                return;
+
+            }
 
 
-                if (
-                    candidate.length >= 3
-                ) {
+            const candidate =
+                surface.substring(
+                    0,
+                    surface.length -
+                    suffix.length
+                );
 
-                    candidates.add(
-                        candidate
-                    );
 
-                }
+            if (
+                candidate.length >= 3 &&
+                surfaceSet.has(
+                    candidate
+                )
+            ) {
+
+                candidates.add(
+                    candidate
+                );
 
             }
 
@@ -1433,9 +1419,9 @@ function getConservativeFamilyKey(
     );
 
 
-    // ----------------------------------
+    // ==================================
     // إزالة سابقة + لاحقة
-    // ----------------------------------
+    // ==================================
 
     prefixes.forEach(
         function (
@@ -1468,39 +1454,55 @@ function getConservativeFamilyKey(
             }
 
 
-            candidates.add(
-                afterPrefix
-            );
+            // الأصل بعد إزالة السابقة
+            if (
+                surfaceSet.has(
+                    afterPrefix
+                )
+            ) {
+
+                candidates.add(
+                    afterPrefix
+                );
+
+            }
 
 
+            // ثم إزالة لاحقة
             suffixes.forEach(
                 function (
                     suffix
                 ) {
 
                     if (
-                        afterPrefix.endsWith(
+                        !afterPrefix.endsWith(
                             suffix
                         )
                     ) {
 
-                        const candidate =
-                            afterPrefix.substring(
-                                0,
-                                afterPrefix.length -
-                                suffix.length
-                            );
+                        return;
+
+                    }
 
 
-                        if (
-                            candidate.length >= 3
-                        ) {
+                    const candidate =
+                        afterPrefix.substring(
+                            0,
+                            afterPrefix.length -
+                            suffix.length
+                        );
 
-                            candidates.add(
-                                candidate
-                            );
 
-                        }
+                    if (
+                        candidate.length >= 3 &&
+                        surfaceSet.has(
+                            candidate
+                        )
+                    ) {
+
+                        candidates.add(
+                            candidate
+                        );
 
                     }
 
@@ -1511,43 +1513,32 @@ function getConservativeFamilyKey(
     );
 
 
-    // ----------------------------------
-    // الأصل الأقصر الذي وجد بالفعل
-    // في نفس المستند
-    // ----------------------------------
+    // ==================================
+    // اختيار أقصر أصل موجود فعليًا
+    // ==================================
 
     let best =
         surface;
 
 
-    if (
-        surfaceSet &&
-        surfaceSet.size > 0
-    ) {
+    candidates.forEach(
+        function (
+            candidate
+        ) {
 
-        candidates.forEach(
-            function (
-                candidate
+            if (
+                candidate.length >= 3 &&
+                candidate.length <
+                    best.length
             ) {
 
-                if (
-                    candidate.length <
-                    best.length &&
-                    candidate.length >= 3 &&
-                    surfaceSet.has(
-                        candidate
-                    )
-                ) {
-
-                    best =
-                        candidate;
-
-                }
+                best =
+                    candidate;
 
             }
-        );
 
-    }
+        }
+    );
 
 
     return best;
@@ -1555,58 +1546,12 @@ function getConservativeFamilyKey(
 }
 
 
-// ======================================
-// Search Keys
-// ======================================
-
-function getSearchKeysForWord(
-    word
-) {
-
-    const surface =
-        normalizeSearchText(
-            word
-        );
-
-
-    const keys = [];
-
-
-    if (surface) {
-
-        keys.push(
-            surface
-        );
-
-    }
-
-
-    const family =
-        getArabicFamilyKey(
-            word
-        );
-
-
-    if (
-        family &&
-        family !== surface
-    ) {
-
-        keys.push(
-            family
-        );
-
-    }
-
-
-    return keys;
-
-}
 
 
 // ======================================
 // Build Document Index
 // النسخة الوحيدة المعتمدة
+// فهرسة الكلمات + العائلات + المواضع الذكية
 // ======================================
 
 function buildDocumentIndex(
@@ -1614,147 +1559,312 @@ function buildDocumentIndex(
     text
 ) {
 
+    // ==================================
+    // التحقق من البيانات
+    // ==================================
+
+    if (!documentId) {
+
+        throw new Error(
+            "معرّف المستند غير موجود."
+        );
+
+    }
+
+    if (
+        typeof text !==
+        "string"
+    ) {
+
+        throw new Error(
+            "نص المستند غير صالح للفهرسة."
+        );
+
+    }
+
+
+    // ==================================
+    // استخراج الكلمات الكلية
+    // ==================================
+
     const tokens =
         tokenizeDocumentText(
             text
         );
 
 
-    const terms =
-        {};
+    // ==================================
+    // هياكل الفهرس
+    // ==================================
 
-    const families =
-        {};
+    const terms = {};
+    const families = {};
 
 
+    // ==================================
     // الكلمات الموجودة فعليًا
+    // ==================================
+
     const surfaceSet =
         new Set(
             tokens
         );
 
 
-    tokens.forEach(
+    // ==================================
+    // تقسيم النص إلى فقرات
+    // ==================================
+    // نحافظ على ترتيب الفقرات نفسه
+    // لاستخدامه لاحقًا في الاسترجاع
+    // ==================================
+
+    const paragraphTexts =
+        String(text || "").split(
+            /\r\n|\r|\n/
+        );
+
+
+    // ==================================
+    // فهرسة الكلمات
+    // ==================================
+
+    let globalTokenPosition =
+        0;
+
+
+    paragraphTexts.forEach(
         function (
-            token,
-            index
+            paragraphText,
+            paragraphIndex
         ) {
 
-            const surface =
-                normalizeSearchText(
-                    token
-                );
-
-
-            if (!surface)
-                return;
-
-
-            // ----------------------------------
-            // terms
-            // ----------------------------------
-
-            if (
-                !terms[surface]
-            ) {
-
-                terms[surface] = {
-
-                    count:
-                        0,
-
-                    positions:
-                        [],
-
-                    family:
-                        ""
-
-                };
-
-            }
-
-
-            terms[surface].count +=
-                1;
-
-
-            terms[surface]
-                .positions
-                .push(
-                    index
+            const paragraphTokens =
+                tokenizeDocumentText(
+                    paragraphText
                 );
 
 
             // ----------------------------------
-            // العائلة
+            // كلمات الفقرة
             // ----------------------------------
 
-            const familyKey =
-                getConservativeFamilyKey(
-                    surface,
-                    surfaceSet
-                );
+            paragraphTokens.forEach(
+                function (
+                    token,
+                    tokenIndex
+                ) {
+
+                    const surface =
+                        normalizeSearchText(
+                            token
+                        );
 
 
-            terms[surface].family =
-                familyKey;
+                    if (!surface) {
+
+                        return;
+
+                    }
 
 
-            if (!familyKey)
-                return;
+                    // ==================================
+                    // تحديد العائلة
+                    // ==================================
+
+                    const familyKey =
+                        getConservativeFamilyKey(
+                            surface,
+                            surfaceSet
+                        );
 
 
-            if (
-                !families[familyKey]
-            ) {
+                    // ==================================
+                    // terms
+                    // ==================================
 
-                families[familyKey] = {
+                    if (
+                        !terms[surface]
+                    ) {
 
-                    count:
-                        0,
+                        terms[surface] = {
 
-                    positions:
-                        [],
+                            count:
+                                0,
 
-                    words:
-                        {}
+                            positions:
+                                [],
 
-                };
+                            occurrences:
+                                [],
 
-            }
+                            family:
+                                familyKey || ""
 
+                        };
 
-            families[familyKey]
-                .count +=
-                1;
-
-
-            families[familyKey]
-                .positions
-                .push(
-                    index
-                );
+                    }
 
 
-            if (
-                !families[familyKey]
-                    .words[surface]
-            ) {
-
-                families[familyKey]
-                    .words[surface] =
-                    0;
-
-            }
+                    terms[surface]
+                        .count +=
+                        1;
 
 
-            families[familyKey]
-                .words[surface] +=
-                1;
+                    // الموضع العام القديم
+                    terms[surface]
+                        .positions
+                        .push(
+                            globalTokenPosition
+                        );
+
+
+                    // الموضع الذكي
+                    terms[surface]
+                        .occurrences
+                        .push({
+
+                            paragraphIndex:
+                                paragraphIndex,
+
+                            tokenIndex:
+                                tokenIndex,
+
+                            globalIndex:
+                                globalTokenPosition
+
+                        });
+
+
+                    // ==================================
+                    // لا توجد عائلة
+                    // ==================================
+
+                    if (!familyKey) {
+
+                        globalTokenPosition +=
+                            1;
+
+                        return;
+
+                    }
+
+
+                    // ==================================
+                    // إنشاء العائلة
+                    // ==================================
+
+                    if (
+                        !families[familyKey]
+                    ) {
+
+                        families[familyKey] = {
+
+                            count:
+                                0,
+
+                            positions:
+                                [],
+
+                            occurrences:
+                                [],
+
+                            words:
+                                {},
+
+                            uniqueWords:
+                                0
+
+                        };
+
+                    }
+
+
+                    // ==================================
+                    // العدد الكلي
+                    // ==================================
+
+                    families[familyKey]
+                        .count +=
+                        1;
+
+
+                    // ==================================
+                    // الموضع العام
+                    // ==================================
+
+                    families[familyKey]
+                        .positions
+                        .push(
+                            globalTokenPosition
+                        );
+
+
+                    // ==================================
+                    // الموضع الذكي
+                    // ==================================
+
+                    families[familyKey]
+                        .occurrences
+                        .push({
+
+                            paragraphIndex:
+                                paragraphIndex,
+
+                            tokenIndex:
+                                tokenIndex,
+
+                            globalIndex:
+                                globalTokenPosition,
+
+                            word:
+                                surface
+
+                        });
+
+
+                    // ==================================
+                    // اللفظ الأصلي
+                    // ==================================
+
+                    if (
+                        !families[familyKey]
+                            .words[surface]
+                    ) {
+
+                        families[familyKey]
+                            .words[surface] =
+                            0;
+
+
+                        families[familyKey]
+                            .uniqueWords +=
+                            1;
+
+                    }
+
+
+                    families[familyKey]
+                        .words[surface] +=
+                        1;
+
+
+                    // ==================================
+                    // التالي
+                    // ==================================
+
+                    globalTokenPosition +=
+                        1;
+
+                }
+            );
 
         }
     );
 
+
+    // ==================================
+    // النتيجة النهائية
+    // ==================================
 
     return {
 
@@ -2425,7 +2535,8 @@ async function ensureDocumentStructure(
 
 // ======================================
 // Ensure Document Index
-// يعيد الفهرسة عند تغير نسخة الخوارزمية
+// التأكد من أن الفهرس حديث وكامل
+// وإعادة بنائه عند الحاجة
 // ======================================
 
 async function ensureDocumentIndex(
@@ -2441,24 +2552,179 @@ async function ensureDocumentIndex(
     }
 
 
+    // ==================================
+    // قراءة الفهرس الحالي
+    // ==================================
+
     let index =
         await getDocumentIndex(
             documentItem.id
         );
 
 
+    // ==================================
+    // التحقق من أن الفهرس حديث
+    // وكامل بالبنية الجديدة
+    // ==================================
+
+    let validIndex =
+        false;
+
+
     if (
         index &&
         index.indexVersion ===
             INDEX_SCHEMA_VERSION &&
+        index.terms &&
+        typeof index.terms ===
+            "object" &&
         index.families &&
-        typeof index.families === "object"
+        typeof index.families ===
+            "object"
     ) {
+
+        validIndex =
+            true;
+
+
+        // ----------------------------------
+        // التحقق من بنية المصطلحات
+        // ----------------------------------
+
+        const termKeys =
+            Object.keys(
+                index.terms
+            );
+
+
+        for (
+            let i = 0;
+            i < termKeys.length;
+            i++
+        ) {
+
+            const term =
+                index.terms[
+                    termKeys[i]
+                ];
+
+
+            if (
+                !term ||
+                !Array.isArray(
+                    term.positions
+                ) ||
+                !Array.isArray(
+                    term.occurrences
+                )
+            ) {
+
+                validIndex =
+                    false;
+
+                break;
+
+            }
+
+        }
+
+
+        // ----------------------------------
+        // التحقق من بنية العائلات
+        // ----------------------------------
+
+        if (
+            validIndex
+        ) {
+
+            const familyKeys =
+                Object.keys(
+                    index.families
+                );
+
+
+            for (
+                let i = 0;
+                i < familyKeys.length;
+                i++
+            ) {
+
+                const family =
+                    index.families[
+                        familyKeys[i]
+                    ];
+
+
+                if (
+                    !family ||
+                    !Array.isArray(
+                        family.positions
+                    ) ||
+                    !Array.isArray(
+                        family.occurrences
+                    ) ||
+                    !family.words ||
+                    typeof family.words !==
+                        "object"
+                ) {
+
+                    validIndex =
+                        false;
+
+                    break;
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+    // ==================================
+    // الفهرس صالح
+    // ==================================
+
+    if (
+        validIndex
+    ) {
+
+        documentItem.indexStatus =
+            "indexed";
+
+
+        documentItem.indexTokenCount =
+            index.tokenCount || 0;
+
+
+        documentItem.indexUniqueTerms =
+            index.uniqueTerms || 0;
+
+
+        documentItem.indexUniqueFamilies =
+            index.uniqueFamilies || 0;
+
+
+        documentItem.indexSchemaVersion =
+            index.indexVersion;
+
+
+        documentItem.indexUpdatedAt =
+            index.updatedAt || "";
+
+
+        saveDocuments();
+
 
         return index;
 
     }
 
+
+    // ==================================
+    // الفهرس قديم أو ناقص
+    // ==================================
 
     const textData =
         await getDocumentText(
@@ -2468,7 +2734,8 @@ async function ensureDocumentIndex(
 
     if (
         !textData ||
-        typeof textData.text !== "string"
+        typeof textData.text !==
+            "string"
     ) {
 
         return null;
@@ -2476,38 +2743,90 @@ async function ensureDocumentIndex(
     }
 
 
+    // ==================================
+    // بدء إعادة الفهرسة
+    // ==================================
+
     updateDocumentIndexStatus(
         documentItem,
         "indexing"
     );
 
 
-    index =
-        await rebuildDocumentIndex(
-            documentItem.id,
-            textData.text
+    try {
+
+        // ----------------------------------
+        // بناء الفهرس الجديد
+        // ----------------------------------
+
+        index =
+            await rebuildDocumentIndex(
+                documentItem.id,
+                textData.text
+            );
+
+
+        // ----------------------------------
+        // التأكد من بنية المستند
+        // ----------------------------------
+
+        await ensureDocumentStructure(
+            documentItem
         );
 
 
-    await ensureDocumentStructure(
-        documentItem
-    );
+        // ----------------------------------
+        // تثبيت بيانات المستند
+        // ----------------------------------
+
+        documentItem.indexStatus =
+            "indexed";
 
 
-    updateDocumentIndexStatus(
-        documentItem,
-        "indexed"
-    );
+        documentItem.indexTokenCount =
+            index.tokenCount || 0;
 
 
-    return index;
+        documentItem.indexUniqueTerms =
+            index.uniqueTerms || 0;
+
+
+        documentItem.indexUniqueFamilies =
+            index.uniqueFamilies || 0;
+
+
+        documentItem.indexSchemaVersion =
+            INDEX_SCHEMA_VERSION;
+
+
+        documentItem.indexUpdatedAt =
+            index.updatedAt || "";
+
+
+        saveDocuments();
+
+
+        return index;
+
+    }
+    catch (error) {
+
+        updateDocumentIndexStatus(
+            documentItem,
+            "error"
+        );
+
+
+        throw error;
+
+    }
 
 }
 
 
 // ======================================
 // Read Current Working Document
-// القراءة + الفهرسة في مسار واحد
+// القراءة + الفهرسة + البنية في مسار واحد
 // ======================================
 
 async function readCurrentWordDocument(
@@ -2523,6 +2842,10 @@ async function readCurrentWordDocument(
     }
 
 
+    // ==================================
+    // حالة القراءة
+    // ==================================
+
     updateDocumentReadStatus(
         documentItem,
         "reading"
@@ -2530,6 +2853,10 @@ async function readCurrentWordDocument(
 
 
     try {
+
+        // ==================================
+        // التحقق من دعم Word API
+        // ==================================
 
         if (
             !Office.context.requirements
@@ -2546,6 +2873,10 @@ async function readCurrentWordDocument(
         }
 
 
+        // ==================================
+        // استرجاع نسخة العمل
+        // ==================================
+
         const file =
             await getWorkingWordFile(
                 documentItem.storageId
@@ -2561,11 +2892,19 @@ async function readCurrentWordDocument(
         }
 
 
+        // ==================================
+        // تحويل الملف إلى Base64
+        // ==================================
+
         const base64 =
             await fileToBase64(
                 file
             );
 
+
+        // ==================================
+        // قراءة النص من مستند Word المخفي
+        // ==================================
 
         const text =
             await Word.run(
@@ -2601,11 +2940,19 @@ async function readCurrentWordDocument(
             );
 
 
+        // ==================================
+        // حفظ النص الخام
+        // ==================================
+
         await saveDocumentText(
             documentItem.id,
             text
         );
 
+
+        // ==================================
+        // تثبيت حالة القراءة
+        // ==================================
 
         updateDocumentReadStatus(
             documentItem,
@@ -2614,7 +2961,7 @@ async function readCurrentWordDocument(
 
 
         // ==================================
-        // الفهرسة
+        // بدء الفهرسة
         // ==================================
 
         updateDocumentIndexStatus(
@@ -2622,6 +2969,10 @@ async function readCurrentWordDocument(
             "indexing"
         );
 
+
+        // ==================================
+        // بناء الفهرس الجديد مرة واحدة
+        // ==================================
 
         const indexData =
             await rebuildDocumentIndex(
@@ -2631,7 +2982,7 @@ async function readCurrentWordDocument(
 
 
         // ==================================
-        // البنية
+        // بناء بنية المستند
         // ==================================
 
         const structureData =
@@ -2646,21 +2997,34 @@ async function readCurrentWordDocument(
         );
 
 
+        // ==================================
+        // حفظ إحصاءات الفهرس في المستند
+        // ==================================
+
         documentItem.indexTokenCount =
-            indexData.tokenCount;
+            indexData.tokenCount || 0;
+
 
         documentItem.indexUniqueTerms =
-            indexData.uniqueTerms;
+            indexData.uniqueTerms || 0;
+
 
         documentItem.indexUniqueFamilies =
-            indexData.uniqueFamilies;
+            indexData.uniqueFamilies || 0;
+
 
         documentItem.indexSchemaVersion =
             INDEX_SCHEMA_VERSION;
 
-        documentItem.indexUpdatedAt =
-            indexData.updatedAt;
 
+        documentItem.indexUpdatedAt =
+            indexData.updatedAt ||
+            new Date().toISOString();
+
+
+        // ==================================
+        // تثبيت حالة الفهرسة
+        // ==================================
 
         updateDocumentIndexStatus(
             documentItem,
@@ -2668,9 +3032,14 @@ async function readCurrentWordDocument(
         );
 
 
+        // ==================================
+        // سجل تشخيصي
+        // ==================================
+
         console.log(
-            "تمت قراءة المستند وفهرسته:",
+            "تمت قراءة المستند وفهرسته بنجاح:",
             {
+
                 documentId:
                     documentItem.id,
 
@@ -2681,7 +3050,11 @@ async function readCurrentWordDocument(
                     indexData.uniqueTerms,
 
                 uniqueFamilies:
-                    indexData.uniqueFamilies
+                    indexData.uniqueFamilies,
+
+                indexVersion:
+                    indexData.indexVersion
+
             }
         );
 
@@ -2690,6 +3063,10 @@ async function readCurrentWordDocument(
 
     }
     catch (error) {
+
+        // ==================================
+        // فشل القراءة أو الفهرسة
+        // ==================================
 
         updateDocumentReadStatus(
             documentItem,
@@ -2700,6 +3077,12 @@ async function readCurrentWordDocument(
         updateDocumentIndexStatus(
             documentItem,
             "error"
+        );
+
+
+        console.error(
+            "فشل قراءة/فهرسة المستند:",
+            error
         );
 
 
@@ -8540,7 +8923,7 @@ async function searchDocumentContext(
 
 // =====================================================
 // Search Indexed Document
-// البحث الذكي بالعائلات
+// البحث الذكي بالعائلات والمواضع المباشرة
 // =====================================================
 
 async function searchIndexedDocument(
@@ -8548,11 +8931,14 @@ async function searchIndexedDocument(
     query
 ) {
 
+    // ==================================
+    // تطبيع الاستعلام
+    // ==================================
+
     const searchTerm =
         normalizeSearchText(
             query
         );
-
 
     if (!searchTerm) {
 
@@ -8572,16 +8958,47 @@ async function searchIndexedDocument(
     }
 
 
+    // ==================================
+    // المستند
+    // ==================================
+
+    const documentItem =
+        documents.find(
+            function (doc) {
+
+                return (
+                    doc &&
+                    String(doc.id) ===
+                    String(documentId)
+                );
+
+            }
+        ) || currentDocument;
+
+
+    if (!documentItem) {
+
+        throw new Error(
+            "لم يتم العثور على المستند."
+        );
+
+    }
+
+
+    // ==================================
+    // التأكد من وجود فهرس حديث
+    // ==================================
+
     const indexData =
-        await getDocumentIndex(
-            documentId
+        await ensureDocumentIndex(
+            documentItem
         );
 
 
     if (!indexData) {
 
         throw new Error(
-            "لا يوجد فهرس لهذا المستند."
+            "لا يوجد فهرس صالح لهذا المستند."
         );
 
     }
@@ -8594,6 +9011,10 @@ async function searchIndexedDocument(
     const indexedFamilies =
         indexData.families || {};
 
+
+    // ==================================
+    // كلمات الاستعلام
+    // ==================================
 
     const queryTokens =
         tokenizeDocumentText(
@@ -8623,7 +9044,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // كل الكلمات الموجودة فعليًا
+    // تحديد عائلات الاستعلام
     // ==================================
 
     const indexedSurfaceSet =
@@ -8633,10 +9054,6 @@ async function searchIndexedDocument(
             )
         );
 
-
-    // ==================================
-    // عائلات الاستعلام
-    // ==================================
 
     const queryFamilyKeys =
         [];
@@ -8678,11 +9095,13 @@ async function searchIndexedDocument(
     const matchedFamilies =
         queryFamilyKeys.filter(
             function (
-                key
+                familyKey
             ) {
 
                 return Boolean(
-                    indexedFamilies[key]
+                    indexedFamilies[
+                        familyKey
+                    ]
                 );
 
             }
@@ -8690,26 +9109,32 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // fallback للفهرس القديم
+    // الكلمات المطابقة حرفيًا
     // ==================================
 
-    const fallbackTerms =
+    const matchedExactTerms =
         queryTokens.filter(
             function (
                 token
             ) {
 
                 return Boolean(
-                    indexedTerms[token]
+                    indexedTerms[
+                        token
+                    ]
                 );
 
             }
         );
 
 
+    // ==================================
+    // لا توجد مطابقة
+    // ==================================
+
     if (
         matchedFamilies.length === 0 &&
-        fallbackTerms.length === 0
+        matchedExactTerms.length === 0
     ) {
 
         return {
@@ -8739,8 +9164,7 @@ async function searchIndexedDocument(
                 indexData.uniqueTerms,
 
             indexUniqueFamilies:
-                indexData.uniqueFamilies ||
-                0,
+                indexData.uniqueFamilies || 0,
 
             indexedOccurrences:
                 0
@@ -8751,24 +9175,22 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // البنية
+    // بنية المستند
     // ==================================
 
     const structureData =
         await ensureDocumentStructure(
-            documents.find(
-                function (
-                    d
-                ) {
-
-                    return (
-                        String(d.id) ===
-                        String(documentId)
-                    );
-
-                }
-            ) || currentDocument
+            documentItem
         );
+
+
+    if (!structureData) {
+
+        throw new Error(
+            "لا توجد بنية محفوظة لهذا المستند."
+        );
+
+    }
 
 
     const paragraphs =
@@ -8788,15 +9210,12 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // نطاقات الكلمات
+    // خريطة الفقرات
+    // الوصول المباشر برقم الفقرة
     // ==================================
 
-    const paragraphRanges =
-        [];
-
-
-    let globalTokenOffset =
-        0;
+    const paragraphMap =
+        new Map();
 
 
     paragraphs.forEach(
@@ -8804,125 +9223,34 @@ async function searchIndexedDocument(
             paragraph
         ) {
 
-            const text =
+            if (
                 paragraph &&
-                paragraph.text
-                    ? String(
-                        paragraph.text
-                    )
-                    : "";
+                typeof paragraph.index !==
+                    "undefined"
+            ) {
 
-
-            const paragraphTokens =
-                tokenizeDocumentText(
-                    text
+                paragraphMap.set(
+                    paragraph.index,
+                    paragraph
                 );
 
-
-            const start =
-                globalTokenOffset;
-
-
-            const end =
-                start +
-                paragraphTokens.length -
-                1;
-
-
-            paragraphRanges.push({
-
-                paragraphIndex:
-                    paragraph.index,
-
-                start:
-                    start,
-
-                end:
-                    end
-
-            });
-
-
-            globalTokenOffset +=
-                paragraphTokens.length;
+            }
 
         }
     );
 
 
     // ==================================
-    // Find paragraph by token position
-    // ==================================
-
-    function findParagraphByTokenPosition(
-        tokenPosition
-    ) {
-
-        let low =
-            0;
-
-
-        let high =
-            paragraphRanges.length -
-            1;
-
-
-        while (
-            low <= high
-        ) {
-
-            const mid =
-                Math.floor(
-                    (
-                        low +
-                        high
-                    ) / 2
-                );
-
-
-            const range =
-                paragraphRanges[mid];
-
-
-            if (
-                tokenPosition <
-                range.start
-            ) {
-
-                high =
-                    mid - 1;
-
-            }
-            else if (
-                tokenPosition >
-                range.end
-            ) {
-
-                low =
-                    mid + 1;
-
-            }
-            else {
-
-                return range.paragraphIndex;
-
-            }
-
-        }
-
-
-        return -1;
-
-    }
-
-
-    // ==================================
-    // Candidate paragraphs
+    // الفقرات المرشحة
     // ==================================
 
     const candidateParagraphs =
         new Map();
 
+
+    // ==================================
+    // إضافة مواضع العائلات
+    // ==================================
 
     matchedFamilies.forEach(
         function (
@@ -8935,80 +9263,253 @@ async function searchIndexedDocument(
                 ];
 
 
-            if (
-                !family ||
-                !Array.isArray(
-                    family.positions
-                )
-            ) {
+            if (!family) {
 
                 return;
 
             }
 
 
-            family.positions.forEach(
-                function (
-                    tokenPosition
-                ) {
+            // ----------------------------------
+            // النسخة الجديدة
+            // occurrences
+            // ----------------------------------
 
-                    const paragraphIndex =
-                        findParagraphByTokenPosition(
-                            tokenPosition
-                        );
+            if (
+                Array.isArray(
+                    family.occurrences
+                )
+            ) {
 
-
-                    if (
-                        paragraphIndex ===
-                        -1
+                family.occurrences.forEach(
+                    function (
+                        occurrence
                     ) {
 
-                        return;
+                        if (
+                            !occurrence
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const paragraphIndex =
+                            occurrence.paragraphIndex;
+
+
+                        if (
+                            typeof paragraphIndex ===
+                            "undefined"
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            !candidateParagraphs.has(
+                                paragraphIndex
+                            )
+                        ) {
+
+                            candidateParagraphs.set(
+                                paragraphIndex,
+                                new Map()
+                            );
+
+                        }
+
+
+                        const paragraphMapEntry =
+                            candidateParagraphs.get(
+                                paragraphIndex
+                            );
+
+
+                        if (
+                            !paragraphMapEntry.has(
+                                familyKey
+                            )
+                        ) {
+
+                            paragraphMapEntry.set(
+                                familyKey,
+                                []
+                            );
+
+                        }
+
+
+                        paragraphMapEntry
+                            .get(
+                                familyKey
+                            )
+                            .push(
+                                occurrence
+                            );
 
                     }
+                );
+
+                return;
+
+            }
 
 
-                    if (
-                        !candidateParagraphs.has(
-                            paragraphIndex
-                        )
-                    ) {
+            // ----------------------------------
+            // توافق رجعي مع الفهرس القديم
+            // ----------------------------------
 
-                        candidateParagraphs.set(
-                            paragraphIndex,
-                            new Set()
-                        );
+            if (
+                Array.isArray(
+                    family.positions
+                )
+            ) {
 
-                    }
+                console.warn(
+                    "العائلة تستخدم positions القديمة:",
+                    familyKey
+                );
 
-
-                    candidateParagraphs
-                        .get(
-                            paragraphIndex
-                        )
-                        .add(
-                            familyKey
-                        );
-
-                }
-            );
+            }
 
         }
     );
 
 
     // ==================================
-    // Results
+    // إضافة الكلمات الحرفية
+    // ==================================
+
+    matchedExactTerms.forEach(
+        function (
+            term
+        ) {
+
+            const termData =
+                indexedTerms[
+                    term
+                ];
+
+
+            if (!termData) {
+
+                return;
+
+            }
+
+
+            // ----------------------------------
+            // النسخة الجديدة
+            // ----------------------------------
+
+            if (
+                Array.isArray(
+                    termData.occurrences
+                )
+            ) {
+
+                termData.occurrences.forEach(
+                    function (
+                        occurrence
+                    ) {
+
+                        if (
+                            !occurrence
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const paragraphIndex =
+                            occurrence.paragraphIndex;
+
+
+                        if (
+                            typeof paragraphIndex ===
+                            "undefined"
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            !candidateParagraphs.has(
+                                paragraphIndex
+                            )
+                        ) {
+
+                            candidateParagraphs.set(
+                                paragraphIndex,
+                                new Map()
+                            );
+
+                        }
+
+
+                        const paragraphMapEntry =
+                            candidateParagraphs.get(
+                                paragraphIndex
+                            );
+
+
+                        if (
+                            !paragraphMapEntry.has(
+                                term
+                            )
+                        ) {
+
+                            paragraphMapEntry.set(
+                                term,
+                                []
+                            );
+
+                        }
+
+
+                        paragraphMapEntry
+                            .get(
+                                term
+                            )
+                            .push(
+                                occurrence
+                            );
+
+                    }
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // إنشاء النتائج
     // ==================================
 
     const results =
         [];
 
 
-    paragraphs.forEach(
+    candidateParagraphs.forEach(
         function (
-            paragraph
+            matchedEntries,
+            paragraphIndex
         ) {
+
+            const paragraph =
+                paragraphMap.get(
+                    paragraphIndex
+                );
+
 
             if (
                 !paragraph ||
@@ -9020,41 +9521,21 @@ async function searchIndexedDocument(
             }
 
 
-            if (
-                matchedFamilies.length > 0 &&
-                !candidateParagraphs.has(
-                    paragraph.index
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            const originalParagraphText =
+            const originalText =
                 String(
                     paragraph.text
                 );
 
 
-            const normalizedParagraphText =
+            const normalizedText =
                 normalizeSearchText(
-                    originalParagraphText
+                    originalText
                 );
 
 
-            const paragraphTokens =
-                tokenizeDocumentText(
-                    normalizedParagraphText
-                );
-
-
-            const paragraphSurfaceSet =
-                new Set(
-                    paragraphTokens
-                );
-
+            // ==================================
+            // عدد العائلات المطابقة
+            // ==================================
 
             let matchedFamilyCount =
                 0;
@@ -9065,56 +9546,77 @@ async function searchIndexedDocument(
                     familyKey
                 ) {
 
-                    paragraphTokens.forEach(
-                        function (
-                            token
-                        ) {
+                    if (
+                        matchedEntries.has(
+                            familyKey
+                        )
+                    ) {
 
-                            const tokenFamily =
-                                getConservativeFamilyKey(
-                                    token,
-                                    indexedSurfaceSet
-                                );
+                        matchedFamilyCount +=
+                            1;
 
-
-                            if (
-                                tokenFamily ===
-                                familyKey
-                            ) {
-
-                                matchedFamilyCount++;
-
-                            }
-
-                        }
-                    );
+                    }
 
                 }
             );
 
 
+            // ==================================
+            // عدد الكلمات الحرفية المطابقة
+            // ==================================
+
+            let exactWordMatches =
+                0;
+
+
+            matchedExactTerms.forEach(
+                function (
+                    term
+                ) {
+
+                    if (
+                        matchedEntries.has(
+                            term
+                        )
+                    ) {
+
+                        exactWordMatches +=
+                            1;
+
+                    }
+
+                }
+            );
+
+
+            // ==================================
+            // الدرجة الأساسية
+            // ==================================
+
+            let score =
+                0;
+
+
             if (
-                matchedFamilyCount ===
-                0 &&
-                matchedFamilies.length > 0
+                matchedFamilies.length >
+                0
             ) {
 
-                return;
+                score +=
+                    (
+                        matchedFamilyCount /
+                        matchedFamilies.length
+                    ) * 5;
 
             }
 
 
-            let score =
-                matchedFamilies.length > 0
-                    ? (
-                        matchedFamilyCount /
-                        matchedFamilies.length
-                    ) * 5
-                    : 0;
-
+            // ==================================
+            // المطابقة الحرفية للعبارة
+            // ==================================
 
             if (
-                normalizedParagraphText.includes(
+                normalizedText.includes(
                     searchTerm
                 )
             ) {
@@ -9125,33 +9627,18 @@ async function searchIndexedDocument(
             }
 
 
-            let exactWordMatches =
-                0;
-
-
-            queryTokens.forEach(
-                function (
-                    token
-                ) {
-
-                    if (
-                        paragraphSurfaceSet.has(
-                            token
-                        )
-                    ) {
-
-                        exactWordMatches++;
-
-                    }
-
-                }
-            );
-
+            // ==================================
+            // المطابقة الحرفية للكلمات
+            // ==================================
 
             score +=
                 exactWordMatches *
                 1.25;
 
+
+            // ==================================
+            // العنوان الأقرب
+            // ==================================
 
             let nearestHeading =
                 null;
@@ -9165,13 +9652,15 @@ async function searchIndexedDocument(
             ) {
 
                 const heading =
-                    headings[i];
+                    headings[
+                        i
+                    ];
 
 
                 if (
                     heading &&
                     heading.index <
-                        paragraph.index
+                        paragraphIndex
                 ) {
 
                     nearestHeading =
@@ -9185,33 +9674,78 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // موضع المقتطف
+            // تحديد موضع المقتطف
             // ==================================
 
             let searchPosition =
-                normalizedParagraphText.indexOf(
+                normalizedText.indexOf(
                     searchTerm
                 );
 
+
+            // ----------------------------------
+            // إذا لم نجد العبارة حرفيًا
+            // نبحث عن أحد ألفاظ العائلة
+            // ----------------------------------
 
             if (
                 searchPosition ===
                 -1
             ) {
 
+                const familyWords =
+                    [];
+
+
+                matchedFamilies.forEach(
+                    function (
+                        familyKey
+                    ) {
+
+                        const family =
+                            indexedFamilies[
+                                familyKey
+                            ];
+
+
+                        if (
+                            !family ||
+                            !family.words
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        Object.keys(
+                            family.words
+                        )
+                        .forEach(
+                            function (
+                                word
+                            ) {
+
+                                familyWords.push(
+                                    word
+                                );
+
+                            }
+                        );
+
+                    }
+                );
+
+
                 for (
                     let i = 0;
-                    i < queryFamilyKeys.length;
+                    i < familyWords.length;
                     i++
                 ) {
 
-                    const familyKey =
-                        queryFamilyKeys[i];
-
-
                     const position =
-                        normalizedParagraphText.indexOf(
-                            familyKey
+                        normalizedText.indexOf(
+                            familyWords[i]
                         );
 
 
@@ -9232,8 +9766,12 @@ async function searchIndexedDocument(
             }
 
 
+            // ==================================
+            // المقتطف
+            // ==================================
+
             let context =
-                originalParagraphText;
+                originalText;
 
 
             if (
@@ -9244,19 +9782,22 @@ async function searchIndexedDocument(
                 const start =
                     Math.max(
                         0,
-                        searchPosition - 120
+                        searchPosition -
+                        120
                     );
 
 
                 const end =
                     Math.min(
-                        originalParagraphText.length,
-                        searchPosition + 300
+                        originalText.length,
+                        searchPosition +
+                        searchTerm.length +
+                        300
                     );
 
 
                 context =
-                    originalParagraphText.substring(
+                    originalText.substring(
                         start,
                         end
                     );
@@ -9265,7 +9806,7 @@ async function searchIndexedDocument(
             else {
 
                 context =
-                    originalParagraphText.substring(
+                    originalText.substring(
                         0,
                         420
                     );
@@ -9273,12 +9814,16 @@ async function searchIndexedDocument(
             }
 
 
+            // ==================================
+            // نوع المطابقة
+            // ==================================
+
             let matchType =
                 "family";
 
 
             if (
-                normalizedParagraphText.includes(
+                normalizedText.includes(
                     searchTerm
                 )
             ) {
@@ -9297,16 +9842,20 @@ async function searchIndexedDocument(
             }
 
 
+            // ==================================
+            // النتيجة
+            // ==================================
+
             results.push({
 
                 paragraphIndex:
-                    paragraph.index,
+                    paragraphIndex,
 
                 paragraphId:
                     paragraph.id,
 
                 text:
-                    originalParagraphText,
+                    originalText,
 
                 context:
                     context,
@@ -9322,7 +9871,7 @@ async function searchIndexedDocument(
                         : "",
 
                 matchedTerms:
-                    matchedFamilies,
+                    matchedExactTerms,
 
                 matchedFamilies:
                     matchedFamilies,
@@ -9349,7 +9898,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // Sort
+    // ترتيب النتائج
     // ==================================
 
     results.sort(
@@ -9407,7 +9956,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // Total occurrences
+    // عدد الظهورات المفهرسة
     // ==================================
 
     let indexedOccurrences =
@@ -9439,6 +9988,10 @@ async function searchIndexedDocument(
     );
 
 
+    // ==================================
+    // النتيجة النهائية
+    // ==================================
+
     return {
 
         query:
@@ -9451,7 +10004,7 @@ async function searchIndexedDocument(
             results,
 
         matchedTerms:
-            matchedFamilies,
+            matchedExactTerms,
 
         matchedFamilies:
             matchedFamilies,
