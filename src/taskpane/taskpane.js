@@ -2781,67 +2781,7 @@ async function saveDocumentIndex(
 
 }
 
-// ======================================
-// اختبار عائلة كلمة «استصلاح»
-// ======================================
 
-async function testIstislahFamily() {
-
-    if (!currentDocument) {
-
-        console.warn(
-            "لا يوجد مستند نشط."
-        );
-
-        return;
-
-    }
-
-    try {
-
-        const index =
-            await getDocumentIndex(
-                currentDocument.id
-            );
-
-        if (!index) {
-
-            console.warn(
-                "لا يوجد فهرس محفوظ لهذا المستند."
-            );
-
-            return;
-
-        }
-
-        console.log(
-            "عدد الكلمات:",
-            index.tokenCount
-        );
-
-        console.log(
-            "عدد العائلات:",
-            index.uniqueFamilies
-        );
-
-        console.log(
-            "عائلة استصلاح:",
-            index.families
-                ? index.families["استصلاح"]
-                : "لا يوجد نظام families"
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            "فشل اختبار عائلة استصلاح:",
-            error
-        );
-
-    }
-
-}
 
 // ======================================
 // Get Document Index
@@ -4073,6 +4013,149 @@ async function searchIndexedDocument(
             indexedOccurrences
 
     };
+
+}
+
+
+// ======================================
+// اختبار عائلة "استصلاح" مؤقتًا
+// ======================================
+
+async function testIstislahFamily() {
+
+    if (!currentDocument) {
+
+        console.warn(
+            "لا يوجد مستند نشط."
+        );
+
+        return;
+
+    }
+
+    try {
+
+        const index =
+            await getDocumentIndex(
+                currentDocument.id
+            );
+
+        if (!index) {
+
+            console.warn(
+                "لا يوجد فهرس محفوظ للمستند."
+            );
+
+            return;
+
+        }
+
+        console.log(
+            "=============================="
+        );
+
+        console.log(
+            "اختبار عائلة: استصلاح"
+        );
+
+        console.log(
+            "=============================="
+        );
+
+        console.log(
+            "عدد الكلمات:",
+            index.tokenCount
+        );
+
+        console.log(
+            "عدد المصطلحات:",
+            index.uniqueTerms
+        );
+
+        console.log(
+            "عدد العائلات:",
+            index.uniqueFamilies
+        );
+
+        const family =
+            index.families &&
+            index.families["استصلاح"];
+
+        if (!family) {
+
+            console.warn(
+                "لم توجد عائلة استصلاح في الفهرس."
+            );
+
+            console.log(
+                "المفاتيح الموجودة التي تحتوي استصلاح:"
+            );
+
+            const relatedKeys =
+                Object.keys(
+                    index.families || {}
+                ).filter(
+                    function (key) {
+
+                        return key.includes(
+                            "استصلاح"
+                        );
+
+                    }
+                );
+
+            console.log(
+                relatedKeys
+            );
+
+            return;
+
+        }
+
+        console.log(
+            "عائلة استصلاح كاملة:",
+            family
+        );
+
+        console.log(
+            "عدد أفراد العائلة:",
+            family.count
+        );
+
+        console.log(
+            "أفراد العائلة:",
+            family.words ||
+            family.terms ||
+            family.members ||
+            []
+        );
+
+        console.log(
+            "مواقع العائلة:",
+            family.positions || []
+        );
+
+        console.log(
+            "=============================="
+        );
+
+        console.log(
+            "انتهى اختبار عائلة استصلاح."
+        );
+
+        console.log(
+            "=============================="
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "فشل اختبار عائلة استصلاح:",
+            error
+        );
+
+    }
 
 }
 // ======================================
