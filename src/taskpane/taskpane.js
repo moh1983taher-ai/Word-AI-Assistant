@@ -2781,6 +2781,67 @@ async function saveDocumentIndex(
 
 }
 
+// ======================================
+// اختبار عائلة كلمة «استصلاح»
+// ======================================
+
+async function testIstislahFamily() {
+
+    if (!currentDocument) {
+
+        console.warn(
+            "لا يوجد مستند نشط."
+        );
+
+        return;
+
+    }
+
+    try {
+
+        const index =
+            await getDocumentIndex(
+                currentDocument.id
+            );
+
+        if (!index) {
+
+            console.warn(
+                "لا يوجد فهرس محفوظ لهذا المستند."
+            );
+
+            return;
+
+        }
+
+        console.log(
+            "عدد الكلمات:",
+            index.tokenCount
+        );
+
+        console.log(
+            "عدد العائلات:",
+            index.uniqueFamilies
+        );
+
+        console.log(
+            "عائلة استصلاح:",
+            index.families
+                ? index.families["استصلاح"]
+                : "لا يوجد نظام families"
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "فشل اختبار عائلة استصلاح:",
+            error
+        );
+
+    }
+
+}
 
 // ======================================
 // Get Document Index
@@ -4517,6 +4578,7 @@ async function readCurrentWordDocument(
                     documentItem.id,
                     text
                 );
+
 
             await saveDocumentIndex(
                 documentItem.id,
