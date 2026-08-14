@@ -1,9 +1,12 @@
 // ======================================
 // Word AI Assistant
 // Main Application Controller
+// PART 1 / 3
+// التخزين + المستندات + الفهرسة
 // ======================================
 
 Office.onReady(function () {
+
 
 // ======================================
 // Elements
@@ -29,820 +32,25 @@ const wordDocumentPicker =
         "word-document-picker"
     );
 
-// ======================================
-// Render Project Documents
-// ======================================
-
-function renderDocuments() {
-
-    if (!documentsList)
-        return;
-
-
-    documentsList.innerHTML = "";
-
-
-    // لا يوجد مشروع محدد
-    if (!currentProject) {
-
-        documentsList.innerHTML = `
-            <div class="empty-document">
-                اختر مشروعًا لعرض مستنداته
-            </div>
-        `;
-
-        return;
-    }
-
-
-    const projectDocuments =
-        getProjectDocuments(
-            currentProject.id
-        );
-
-
-    // لا توجد مستندات
-    if (projectDocuments.length === 0) {
-
-        documentsList.innerHTML = `
-            <div class="empty-document">
-                لا توجد مستندات
-            </div>
-        `;
-
-        return;
-    }
-
-
-    // ==================================
-    // عرض المستندات
-    // ==================================
-
-    projectDocuments.forEach(
-        function (documentItem, index) {
-
-            const item =
-                document.createElement("div");
-
-
-            item.className =
-                "document-item";
-
-            if (
-                currentDocument &&
-                currentDocument.id === documentItem.id
-            ) {
-
-                item.classList.add(
-                    "active-document"
-                );
-
-            }
-            // --------------------------------
-            // عنوان المستند
-            // --------------------------------
-
-            const title =
-                document.createElement("span");
-
-            title.className =
-                "document-title";
-
-            title.textContent =
-                documentItem.name;
-            const status =
-                document.createElement("span");
-
-            status.className =
-                "document-read-status";
-
-
-            if (
-                documentItem.indexStatus ===
-                "indexed"
-            ) {
-
-                status.textContent =
-                    "✓ مفهرس · " +
-                    documentItem.indexTokenCount +
-                    " كلمة · " +
-                    documentItem.indexUniqueTerms +
-                    " فريدة";
-
-            }
-            else if (
-                documentItem.indexStatus ===
-                "indexing"
-            ) {
-
-                status.textContent =
-                    "جارٍ الفهرسة...";
-
-            }
-            else if (
-                documentItem.indexStatus ===
-                "error"
-            ) {
-
-                status.textContent =
-                    "⚠ فشل الفهرسة";
-
-            }
-            else if (
-                documentItem.readStatus ===
-                "reading"
-            ) {
-
-                status.textContent =
-                    "جارٍ القراءة...";
-
-            }
-            else if (
-                documentItem.readStatus ===
-                "read"
-            ) {
-
-                status.textContent =
-                    "✓ تمت القراءة";
-
-            }
-            else {
-
-                status.textContent =
-                    "جديد";
-
-            }
-            title.onclick =
-                function (e) {
-
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    setCurrentDocument(
-                        documentItem
-                    );
-
-                };
-
-            // --------------------------------
-            // زر الخيارات
-            // --------------------------------
-
-            const menuButton =
-                document.createElement("button");
-
-            menuButton.className =
-                "document-menu";
-
-            menuButton.type =
-                "button";
-
-            menuButton.title =
-                "خيارات المستند";
-
-            menuButton.textContent =
-                "⋮";
-
-
-            // --------------------------------
-            // قائمة الخيارات
-            // --------------------------------
-
-            const options =
-                document.createElement("div");
-
-            options.className =
-                "document-options-menu";
-
-
-            options.innerHTML = `
-
-                <div class="rename-document">
-                    ✏ إعادة تسمية
-                </div>
-
-                <div class="move-document-up">
-                    ↑ نقل إلى أعلى
-                </div>
-
-                <div class="move-document-down">
-                    ↓ نقل إلى أسفل
-                </div>
-
-                <div class="delete-document">
-                    🗑 حذف
-                </div>
-
-            `;
-
-
-            // ==================================
-            // ضبط ترتيب الخيارات
-            // ==================================
-
-            if (index === 0) {
-
-                const moveUp =
-                    options.querySelector(
-                        ".move-document-up"
-                    );
-
-                if (moveUp) {
-                    moveUp.style.display =
-                        "none";
-                }
-
-            }
-
-
-            if (
-                index ===
-                projectDocuments.length - 1
-            ) {
-
-                const moveDown =
-                    options.querySelector(
-                        ".move-document-down"
-                    );
-
-                if (moveDown) {
-                    moveDown.style.display =
-                        "none";
-                }
-
-            }
-
-
-            // ==================================
-            // فتح / إغلاق القائمة
-            // ==================================
-
-            menuButton.onclick =
-                function (e) {
-
-                    e.preventDefault();
-                    e.stopPropagation();
-
-
-                    document
-                        .querySelectorAll(
-                            ".document-options-menu.open"
-                        )
-                        .forEach(
-                            function (menu) {
-
-                                if (
-                                    menu !==
-                                    options
-                                ) {
-
-                                    menu.classList.remove(
-                                        "open"
-                                    );
-
-                                }
-
-                            }
-                        );
-
-
-                    options.classList.toggle(
-                        "open"
-                    );
-
-                };
-
-
-            // ==================================
-            // إعادة التسمية
-            // ==================================
-
-            const renameButton =
-                options.querySelector(
-                    ".rename-document"
-                );
-
-
-            if (renameButton) {
-
-                renameButton.onclick =
-                    function (e) {
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-
-                        options.classList.remove(
-                            "open"
-                        );
-
-
-                        const oldName =
-                            documentItem.name;
-
-
-                        const inputRename =
-                            document.createElement(
-                                "input"
-                            );
-
-
-                        inputRename.className =
-                            "edit-document-title";
-
-
-                        inputRename.value =
-                            oldName;
-
-
-                        title.replaceWith(
-                            inputRename
-                        );
-
-
-                        inputRename.focus();
-
-
-                        inputRename.setSelectionRange(
-                            inputRename.value.length,
-                            inputRename.value.length
-                        );
-
-
-                        function finishRename(
-                            saveChange
-                        ) {
-
-                            const newName =
-                                inputRename.value.trim();
-
-
-                            if (
-                                saveChange &&
-                                newName !== ""
-                            ) {
-
-                                documentItem.name =
-                                    newName;
-
-                                documentItem.updatedAt =
-                                    new Date().toISOString();
-
-                                saveDocuments();
-
-                            }
-                            else {
-
-                                documentItem.name =
-                                    oldName;
-
-                            }
-
-
-                            renderDocuments();
-
-                        }
-
-
-                        inputRename.onkeydown =
-                            function (event) {
-
-                                if (
-                                    event.key ===
-                                    "Enter"
-                                ) {
-
-                                    event.preventDefault();
-
-                                    finishRename(true);
-
-                                }
-
-
-                                if (
-                                    event.key ===
-                                    "Escape"
-                                ) {
-
-                                    event.preventDefault();
-
-                                    finishRename(false);
-
-                                }
-
-                            };
-
-                    };
-
-            }
-
-
-            // ==================================
-            // نقل إلى أعلى
-            // ==================================
-
-            const moveUpButton =
-                options.querySelector(
-                    ".move-document-up"
-                );
-
-
-            if (moveUpButton) {
-
-                moveUpButton.onclick =
-                    function (e) {
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-
-                        if (index <= 0)
-                            return;
-
-
-                        const previousDocument =
-                            projectDocuments[
-                                index - 1
-                            ];
-
-
-                        const currentOrder =
-                            documentItem.order;
-
-
-                        documentItem.order =
-                            previousDocument.order;
-
-
-                        previousDocument.order =
-                            currentOrder;
-
-
-                        documentItem.updatedAt =
-                            new Date().toISOString();
-
-                        previousDocument.updatedAt =
-                            new Date().toISOString();
-
-
-                        saveDocuments();
-
-
-                        options.classList.remove(
-                            "open"
-                        );
-
-
-                        renderDocuments();
-
-                    };
-
-            }
-
-
-            // ==================================
-            // نقل إلى أسفل
-            // ==================================
-
-            const moveDownButton =
-                options.querySelector(
-                    ".move-document-down"
-                );
-
-
-            if (moveDownButton) {
-
-                moveDownButton.onclick =
-                    function (e) {
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-
-                        if (
-                            index >=
-                            projectDocuments.length - 1
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        const nextDocument =
-                            projectDocuments[
-                                index + 1
-                            ];
-
-
-                        const currentOrder =
-                            documentItem.order;
-
-
-                        documentItem.order =
-                            nextDocument.order;
-
-
-                        nextDocument.order =
-                            currentOrder;
-
-
-                        documentItem.updatedAt =
-                            new Date().toISOString();
-
-                        nextDocument.updatedAt =
-                            new Date().toISOString();
-
-
-                        saveDocuments();
-
-
-                        options.classList.remove(
-                            "open"
-                        );
-
-
-                        renderDocuments();
-
-                    };
-
-            }
-
-
-// ==================================
-// حذف المستند
-// ==================================
-
-const deleteButton =
-    options.querySelector(
-        ".delete-document"
-    );
-
-if (deleteButton) {
-
-    deleteButton.onclick =
-        function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            options.classList.remove(
-                "open"
-            );
-
-
-            // منع وجود أكثر من نافذة تأكيد
-            const oldConfirm =
-                document.querySelector(
-                    ".document-delete-confirm"
-                );
-
-            if (oldConfirm) {
-                oldConfirm.remove();
-            }
-
-
-            // ==================================
-            // نافذة التأكيد
-            // ==================================
-
-            const confirmBox =
-                document.createElement(
-                    "div"
-                );
-
-            confirmBox.className =
-                "document-delete-confirm";
-
-
-            confirmBox.innerHTML = `
-                <div class="document-delete-dialog">
-
-                    <div class="document-delete-message">
-                        هل تريد حذف المستند؟
-                    </div>
-
-                    <div class="document-delete-name">
-                        ${documentItem.name}
-                    </div>
-
-                    <div class="document-delete-buttons">
-
-                        <button
-                            type="button"
-                            class="confirm-document-delete">
-                            حذف
-                        </button>
-
-                        <button
-                            type="button"
-                            class="cancel-document-delete">
-                            إلغاء
-                        </button>
-
-                    </div>
-
-                </div>
-            `;
-
-
-            document.body.appendChild(
-                confirmBox
-            );
-
-
-            // ==================================
-            // تأكيد الحذف
-            // ==================================
-
-            const confirmDelete =
-                confirmBox.querySelector(
-                    ".confirm-document-delete"
-                );
-
-
-            if (confirmDelete) {
-
-                confirmDelete.onclick =
-                    function () {
-
-                        // حذف المستند من التخزين
-                        documents =
-                            documents.filter(
-                                function (doc) {
-
-                                    return (
-                                        doc.id !==
-                                        documentItem.id
-                                    );
-
-                                }
-                            );
-
-
-                        // حذف معرف المستند من المشروع
-                        if (
-                            currentProject &&
-                            Array.isArray(
-                                currentProject.documents
-                            )
-                        ) {
-
-                            currentProject.documents =
-                                currentProject.documents.filter(
-                                    function (id) {
-
-                                        return (
-                                            id !==
-                                            documentItem.id
-                                        );
-
-                                    }
-                                );
-
-
-                            currentProject.updatedAt =
-                                new Date().toISOString();
-
-
-                            saveProjects();
-
-                        }
-
-
-                        // إعادة ترتيب المستندات المتبقية
-                        const remaining =
-                            getProjectDocuments(
-                                currentProject.id
-                            );
-
-
-                        remaining.forEach(
-                            function (
-                                doc,
-                                newIndex
-                            ) {
-
-                                doc.order =
-                                    newIndex + 1;
-
-                                doc.updatedAt =
-                                    new Date().toISOString();
-
-                            }
-                        );
-
-
-                        // حفظ المستندات
-                        saveDocuments();
-
-
-                        // إغلاق نافذة التأكيد
-                        confirmBox.remove();
-
-
-                        // إعادة العرض
-                        renderDocuments();
-
-                    };
-
-            }
-
-
-            // ==================================
-            // إلغاء
-            // ==================================
-
-            const cancelDelete =
-                confirmBox.querySelector(
-                    ".cancel-document-delete"
-                );
-
-
-            if (cancelDelete) {
-
-                cancelDelete.onclick =
-                    function () {
-
-                        confirmBox.remove();
-
-                    };
-
-            }
-
-
-            // ==================================
-            // النقر خارج نافذة الحوار = إلغاء
-            // ==================================
-
-            confirmBox.onclick =
-                function (event) {
-
-                    if (
-                        event.target ===
-                        confirmBox
-                    ) {
-
-                        confirmBox.remove();
-
-                    }
-
-                };
-
-        };
-
-}
-
-
-            // ==================================
-            // إضافة العناصر
-            // ==================================
-
-            item.appendChild(
-                title
-            );
-
-            item.appendChild(
-                status
-            );
-
-            item.appendChild(
-                menuButton
-            );
-
-            item.appendChild(
-                options
-            );
-
-
-            documentsList.appendChild(
-                item
-            );
-
-        }
-    );
-
-}
-
 const newProjectBtn =
-document.getElementById("new-project-btn");
+    document.getElementById("new-project-btn");
 
 const chatBtn =
-document.getElementById("chat-btn");
+    document.getElementById("chat-btn");
 
 const newChatBtn =
-document.getElementById("new-chat-btn");
+    document.getElementById("new-chat-btn");
 
 const expandedSidebar =
-document.getElementById("expanded-sidebar");
+    document.getElementById("expanded-sidebar");
 
 const sidebarToggleBtn =
-document.getElementById("sidebar-toggle-btn");
+    document.getElementById("sidebar-toggle-btn");
 
 const expandedSidebarToggleSlot =
-document.getElementById(
-    "expanded-sidebar-toggle-slot"
-);
+    document.getElementById(
+        "expanded-sidebar-toggle-slot"
+    );
 
 const sidebarTogglePlaceholder =
     document.createComment(
@@ -862,83 +70,85 @@ if (
 }
 
 const input =
-document.getElementById("user-input");
+    document.getElementById("user-input");
 
 const sendBtn =
-document.getElementById("send-btn");
+    document.getElementById("send-btn");
 
 const chatArea =
-document.getElementById("chat-area");
+    document.getElementById("chat-area");
 
 const documentTitle =
-document.getElementById("document-title");
+    document.getElementById("document-title");
+
 
 // ======================================
-// AI Settings
+// AI Settings Elements
 // ======================================
 
 const settingsBtn =
-document.getElementById("settings-btn");
+    document.getElementById("settings-btn");
 
 const settingsWindow =
-document.getElementById("settings-window");
+    document.getElementById("settings-window");
 
 const closeSettings =
-document.getElementById("close-settings");
+    document.getElementById("close-settings");
 
 const showKey =
-document.getElementById("show-key");
+    document.getElementById("show-key");
 
 const apiKey =
-document.getElementById("api-key");
+    document.getElementById("api-key");
 
 const provider =
-document.getElementById("provider-select");
+    document.getElementById("provider-select");
 
 const modelSelect =
-document.getElementById("model-select");
+    document.getElementById("model-select");
 
 const refreshModels =
-document.getElementById("refresh-models");
+    document.getElementById("refresh-models");
 
 const saveSettings =
-document.getElementById("save-settings");
+    document.getElementById("save-settings");
 
 const testConnection =
-document.getElementById("test-connection");
+    document.getElementById("test-connection");
 
 const settingsStatus =
-document.getElementById("settings-status");
+    document.getElementById("settings-status");
 
 const providerInfo =
-document.getElementById("provider-info");
+    document.getElementById("provider-info");
+
 
 // ======================================
 // Chat popup
 // ======================================
 
 const chatPopup =
-document.getElementById("chat-popup");
+    document.getElementById("chat-popup");
 
 const recentChatList =
-document.getElementById("recent-chat-list");
+    document.getElementById("recent-chat-list");
+
 
 // ======================================
 // Search
 // ======================================
 
 const searchPopup =
-document.getElementById("search-popup");
+    document.getElementById("search-popup");
 
 const searchInput =
-document.getElementById("search-input");
+    document.getElementById("search-input");
 
 const searchResults =
-document.getElementById("search-results");
+    document.getElementById("search-results");
 
 const searchBtn =
-document.getElementById("search-btn");
-
+    document.getElementById("search-btn");
 
 
 // ======================================
@@ -963,10 +173,6 @@ catch (e) {
 
 }
 
-
-/* ======================================
-   ضمان البنية الجديدة للمشاريع
-   ====================================== */
 
 projects =
     projects
@@ -1062,8 +268,7 @@ try {
 
                 return (
                     documentItem &&
-                    typeof documentItem ===
-                        "object"
+                    typeof documentItem === "object"
                 );
 
             })
@@ -1085,6 +290,16 @@ try {
                 ) {
 
                     documentItem.indexUniqueTerms =
+                        0;
+
+                }
+
+                if (
+                    typeof documentItem.indexUniqueFamilies !==
+                    "number"
+                ) {
+
+                    documentItem.indexUniqueFamilies =
                         0;
 
                 }
@@ -1116,9 +331,9 @@ function saveDocuments() {
 
 saveDocuments();
 
+
 // ======================================
 // Working Documents Storage
-// IndexedDB
 // ======================================
 
 const DOCUMENT_DB_NAME =
@@ -1129,12 +344,26 @@ const DOCUMENT_DB_VERSION =
 
 const DOCUMENT_STORE_NAME =
     "files";
+
 const DOCUMENT_TEXT_STORE_NAME =
     "texts";
+
 const DOCUMENT_INDEX_STORE_NAME =
     "indexes";
+
 const DOCUMENT_STRUCTURE_STORE_NAME =
     "structures";
+
+
+// ======================================
+// Version of indexing algorithm
+// مهم: تغييره يجبر المستندات القديمة
+// على إعادة الفهرسة بالخوارزمية الجديدة
+// ======================================
+
+const INDEX_SCHEMA_VERSION =
+    2;
+
 
 // ======================================
 // Open Documents Database
@@ -1143,7 +372,10 @@ const DOCUMENT_STRUCTURE_STORE_NAME =
 function openDocumentDatabase() {
 
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const request =
                 indexedDB.open(
@@ -1171,7 +403,7 @@ function openDocumentDatabase() {
                         );
 
                     }
-                    
+
 
                     if (
                         !db.objectStoreNames
@@ -1186,6 +418,7 @@ function openDocumentDatabase() {
 
                     }
 
+
                     if (
                         !db.objectStoreNames
                             .contains(
@@ -1198,6 +431,7 @@ function openDocumentDatabase() {
                         );
 
                     }
+
 
                     if (
                         !db.objectStoreNames
@@ -1254,7 +488,10 @@ async function saveWorkingWordFile(
 
 
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const transaction =
                 db.transaction(
@@ -1262,12 +499,10 @@ async function saveWorkingWordFile(
                     "readwrite"
                 );
 
-
             const store =
                 transaction.objectStore(
                     DOCUMENT_STORE_NAME
                 );
-
 
             const request =
                 store.put(
@@ -1322,7 +557,10 @@ async function getWorkingWordFile(
 
 
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const transaction =
                 db.transaction(
@@ -1330,12 +568,10 @@ async function getWorkingWordFile(
                     "readonly"
                 );
 
-
             const store =
                 transaction.objectStore(
                     DOCUMENT_STORE_NAME
                 );
-
 
             const request =
                 store.get(
@@ -1376,2886 +612,6 @@ async function getWorkingWordFile(
 
 }
 
-// ======================================
-// Save Indexed Document Text
-// ======================================
-
-async function saveDocumentText(
-    documentId,
-    text
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-
-    return new Promise(
-        function (resolve, reject) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_TEXT_STORE_NAME,
-                    "readwrite"
-                );
-
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_TEXT_STORE_NAME
-                );
-
-
-            const record = {
-
-                documentId:
-                    String(documentId),
-
-                text:
-                    String(text || ""),
-
-                updatedAt:
-                    new Date().toISOString()
-
-            };
-
-
-            const request =
-                store.put(
-                    record,
-                    String(documentId)
-                );
-
-
-            request.onsuccess =
-                function () {
-
-                    resolve(record);
-
-                };
-
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error
-                    );
-
-                };
-
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-// ======================================
-// Get Indexed Document Text
-// ======================================
-
-async function getDocumentText(
-    documentId
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-
-    return new Promise(
-        function (resolve, reject) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_TEXT_STORE_NAME,
-                    "readonly"
-                );
-
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_TEXT_STORE_NAME
-                );
-
-
-            const request =
-                store.get(
-                    String(documentId)
-                );
-
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        request.result ||
-                        null
-                    );
-
-                };
-
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error
-                    );
-
-                };
-
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-// ======================================
-// Normalize Search Text
-// ======================================
-
-function normalizeSearchText(text) {
-
-    return String(
-        text || ""
-    )
-
-        // إزالة التشكيل
-        .replace(
-            /[\u064B-\u065F\u0670]/g,
-            ""
-        )
-
-        // إزالة التطويل
-        .replace(
-            /\u0640/g,
-            ""
-        )
-
-        // توحيد الألف
-        .replace(
-            /[أإآٱ]/g,
-            "ا"
-        )
-
-        // توحيد الياء
-        .replace(
-            /ى/g,
-            "ي"
-        )
-
-        // توحيد بعض أشكال الهمزة
-        .replace(
-            /ؤ/g,
-            "و"
-        )
-
-        .replace(
-            /ئ/g,
-            "ي"
-        )
-
-        // توحيد المسافات
-        .replace(
-            /\s+/g,
-            " "
-        )
-
-        .trim()
-        .toLowerCase();
-
-}
-
-// ======================================
-// Arabic Search Family Key
-// مفتاح عائلة الكلمة - محافظ ودقيق
-// ======================================
-
-function getArabicFamilyKey(word) {
-
-    let w =
-        normalizeSearchText(
-            word
-        );
-
-    if (!w)
-        return "";
-
-    // إزالة الرموز غير الحرفية/الرقمية
-    w =
-        w.replace(
-            /[^\p{L}\p{N}]+/gu,
-            ""
-        );
-
-    if (!w)
-        return "";
-
-    // الكلمات القصيرة لا تدخل في العائلات
-    if (w.length <= 3)
-        return w;
-
-    // كلمات وأسماء لا نريد العبث بها
-    const protectedWords = new Set([
-        "الله",
-        "القران",
-        "اسلام",
-        "اسلامي",
-        "اسلامية"
-    ]);
-
-    if (
-        protectedWords.has(w)
-    ) {
-        return w;
-    }
-
-    const original = w;
-
-    // ==================================
-    // 1) إزالة السابقة المركبة
-    // مرة واحدة فقط
-    // ==================================
-
-    const prefixes = [
-        "وال",
-        "بال",
-        "كال",
-        "فال",
-        "لل",
-        "ول",
-        "بل",
-        "فل",
-        "ال"
-    ];
-
-    for (
-        let i = 0;
-        i < prefixes.length;
-        i++
-    ) {
-
-        const prefix =
-            prefixes[i];
-
-        const remainingLength =
-            w.length -
-            prefix.length;
-
-        if (
-            w.startsWith(prefix) &&
-            remainingLength >= 3
-        ) {
-
-            w =
-                w.substring(
-                    prefix.length
-                );
-
-            break;
-        }
-    }
-
-    // ==================================
-    // 2) إزالة لاحقة واحدة فقط
-    // ==================================
-
-    const suffixes = [
-        "يات",
-        "ات",
-        "هما",
-        "هم",
-        "هن",
-        "ها",
-        "ان",
-        "ين",
-        "ون",
-        "ية",
-        "ي",
-        "ة"
-    ];
-
-    for (
-        let i = 0;
-        i < suffixes.length;
-        i++
-    ) {
-
-        const suffix =
-            suffixes[i];
-
-        const remainingLength =
-            w.length -
-            suffix.length;
-
-        if (
-            w.endsWith(suffix) &&
-            remainingLength >= 3
-        ) {
-
-            w =
-                w.substring(
-                    0,
-                    w.length -
-                    suffix.length
-                );
-
-            break;
-        }
-    }
-
-    // ==================================
-    // لا نسمح بتكوين عائلة إذا تغيرت
-    // الكلمة إلى صورة قصيرة جدًا
-    // ==================================
-
-    if (
-        w.length < 3
-    ) {
-
-        return original;
-
-    }
-
-    return w;
-}
-
-
-// ======================================
-// بناء مفاتيح البحث للكلمة
-// الأصل + العائلة
-// ======================================
-
-function getSearchKeysForWord(word) {
-
-    const surface =
-        normalizeSearchText(
-            word
-        );
-
-    const family =
-        getArabicFamilyKey(
-            word
-        );
-
-    const keys = [];
-
-    if (
-        surface
-    ) {
-
-        keys.push(
-            surface
-        );
-
-    }
-
-    if (
-        family &&
-        family !== surface
-    ) {
-
-        keys.push(
-            family
-        );
-
-    }
-
-    return keys;
-}
-
-
-// ======================================
-// Tokenize Document Text
-// ======================================
-
-function tokenizeDocumentText(text) {
-
-    const normalized =
-        normalizeSearchText(
-            text
-        );
-
-    const matches =
-        normalized.match(
-            /[\p{L}\p{N}]+/gu
-        );
-
-    return (
-        matches || []
-    );
-}
-
-
-// ======================================
-// Build Document Index
-// فهرسة الكلمات + بناء عائلات الكلمات
-// ======================================
-
-function buildDocumentIndex(
-    documentId,
-    text
-) {
-
-    const tokens =
-        tokenizeDocumentText(
-            text
-        );
-
-    // ==================================
-    // الفهرس الحرفي
-    // ==================================
-
-    const terms = {};
-
-    // ==================================
-    // فهرس العائلات
-    // ==================================
-
-    const families = {};
-
-    // ==================================
-    // إضافة سجل إلى الفهرس الحرفي
-    // ==================================
-
-    function addTerm(
-        key,
-        tokenIndex
-    ) {
-
-        if (!key)
-            return;
-
-        if (
-            !terms[key]
-        ) {
-
-            terms[key] = {
-
-                count:
-                    0,
-
-                positions:
-                    []
-
-            };
-
-        }
-
-        terms[key].count +=
-            1;
-
-        terms[key].positions.push(
-            tokenIndex
-        );
-
-    }
-
-    // ==================================
-    // إضافة كلمة إلى العائلة
-    // ==================================
-
-    function addFamilyWord(
-        familyKey,
-        originalWord,
-        tokenIndex
-    ) {
-
-        if (!familyKey)
-            return;
-
-        if (
-            familyKey.length < 3
-        )
-            return;
-
-        if (
-            !families[familyKey]
-        ) {
-
-            families[familyKey] = {
-
-                count:
-                    0,
-
-                words:
-                    {},
-
-                positions:
-                    []
-
-            };
-
-        }
-
-        const family =
-            families[
-                familyKey
-            ];
-
-        // عدد مرات ظهور العائلة
-        family.count +=
-            1;
-
-        // حفظ اللفظ نفسه
-        if (
-            !family.words[
-                originalWord
-            ]
-        ) {
-
-            family.words[
-                originalWord
-            ] = {
-
-                count:
-                    0,
-
-                positions:
-                    []
-
-            };
-
-        }
-
-        family.words[
-            originalWord
-        ].count +=
-            1;
-
-        family.words[
-            originalWord
-        ].positions.push(
-            tokenIndex
-        );
-
-        // موقع الظهور
-        family.positions.push(
-            tokenIndex
-        );
-
-    }
-
-    // ==================================
-    // المرور على جميع الكلمات
-    // ==================================
-
-    tokens.forEach(
-        function (
-            token,
-            index
-        ) {
-
-            if (!token)
-                return;
-
-            // ----------------------------------
-            // المفاتيح التقليدية
-            // ----------------------------------
-
-            const searchKeys =
-                getSearchKeysForWord(
-                    token
-                );
-
-            searchKeys.forEach(
-                function (
-                    key
-                ) {
-
-                    addTerm(
-                        key,
-                        index
-                    );
-
-                }
-            );
-
-            // ----------------------------------
-            // مفتاح العائلة
-            // ----------------------------------
-
-            const familyKey =
-                getArabicFamilyKey(
-                    token
-                );
-
-            if (
-                familyKey
-            ) {
-
-                addFamilyWord(
-                    familyKey,
-                    token,
-                    index
-                );
-
-            }
-
-        }
-    );
-
-    // ==================================
-    // عدد العائلات
-    // ==================================
-
-    const uniqueFamilies =
-        Object.keys(
-            families
-        ).length;
-
-    // ==================================
-    // إرجاع الفهرس
-    // ==================================
-
-    return {
-
-        documentId:
-            String(
-                documentId
-            ),
-
-        tokenCount:
-            tokens.length,
-
-        uniqueTerms:
-            Object.keys(
-                terms
-            ).length,
-
-        uniqueFamilies:
-            uniqueFamilies,
-
-        terms:
-            terms,
-
-        families:
-            families,
-
-        updatedAt:
-            new Date().toISOString()
-
-    };
-
-}
-
-
-// ======================================
-// Tokenize Document Text
-// ======================================
-
-function tokenizeDocumentText(
-    text
-) {
-
-    const normalized =
-        normalizeSearchText(
-            text
-        );
-
-    const matches =
-        normalized.match(
-            /[\p{L}\p{N}]+/gu
-        );
-
-    return (
-        matches || []
-    );
-
-}
-
-// ======================================
-// Arabic Family Key
-// مفتاح العائلة العربية
-// ======================================
-
-function getArabicFamilyKey(
-    word
-) {
-
-    let w =
-        normalizeSearchText(
-            word
-        );
-
-    if (!w)
-        return "";
-
-    // تنظيف الكلمة
-    w =
-        w.replace(
-            /[^\p{L}\p{N}]+/gu,
-            ""
-        );
-
-    if (!w)
-        return "";
-
-    // الكلمات القصيرة لا نشتق منها عائلة
-    if (
-        w.length < 3
-    ) {
-
-        return w;
-
-    }
-
-    // ==================================
-    // كلمات محمية
-    // ==================================
-
-    const protectedWords =
-        new Set([
-            "الله",
-            "القران",
-            "اسلام",
-            "اسلامي",
-            "اسلامية"
-        ]);
-
-    if (
-        protectedWords.has(
-            w
-        )
-    ) {
-
-        return w;
-
-    }
-
-    // ==================================
-    // إزالة السوابق
-    // ==================================
-
-    const prefixes = [
-
-        "وال",
-        "بال",
-        "كال",
-        "فال",
-        "لل",
-
-        "وا",
-        "با",
-        "كا",
-        "فا",
-        "ول",
-        "بل",
-        "فل",
-
-        "ال"
-
-    ];
-
-    let changed =
-        true;
-
-    while (
-        changed
-    ) {
-
-        changed =
-            false;
-
-        for (
-            let i = 0;
-            i < prefixes.length;
-            i++
-        ) {
-
-            const prefix =
-                prefixes[i];
-
-            if (
-                w.startsWith(
-                    prefix
-                ) &&
-                w.length -
-                    prefix.length >=
-                    3
-            ) {
-
-                w =
-                    w.substring(
-                        prefix.length
-                    );
-
-                changed =
-                    true;
-
-                break;
-
-            }
-
-        }
-
-    }
-
-    // ==================================
-    // إزالة لواحق شائعة
-    // ==================================
-
-    const suffixes = [
-
-        "يات",
-        "ات",
-        "ون",
-        "ين",
-        "ان",
-
-        "هما",
-        "هم",
-        "هن",
-        "ها",
-
-        "ية",
-        "ي",
-
-        "ة",
-
-        "ه",
-        "ك",
-        "كم",
-        "كن"
-
-    ];
-
-    changed =
-        true;
-
-    while (
-        changed
-    ) {
-
-        changed =
-            false;
-
-        for (
-            let i = 0;
-            i < suffixes.length;
-            i++
-        ) {
-
-            const suffix =
-                suffixes[i];
-
-            if (
-                w.endsWith(
-                    suffix
-                ) &&
-                w.length -
-                    suffix.length >=
-                    3
-            ) {
-
-                w =
-                    w.substring(
-                        0,
-                        w.length -
-                            suffix.length
-                    );
-
-                changed =
-                    true;
-
-                break;
-
-            }
-
-        }
-
-    }
-
-    // ==================================
-    // ألف التأنيث / الألف النهائية
-    // ==================================
-
-    if (
-        w.length > 3 &&
-        w.endsWith("ا")
-    ) {
-
-        const candidate =
-            w.substring(
-                0,
-                w.length - 1
-            );
-
-        if (
-            candidate.length >= 3
-        ) {
-
-            w =
-                candidate;
-
-        }
-
-    }
-
-    // ==================================
-    // حماية الحد الأدنى
-    // ==================================
-
-    if (
-        w.length < 3
-    ) {
-
-        return normalizeSearchText(
-            word
-        );
-
-    }
-
-    return w;
-
-}
-// ======================================
-// Build Document Index
-// فهرسة محافظة
-// ======================================
-
-function buildDocumentIndex(
-    documentId,
-    text
-) {
-
-    const tokens =
-        tokenizeDocumentText(
-            text
-        );
-
-    const terms =
-        {};
-
-    tokens.forEach(
-        function (
-            token,
-            index
-        ) {
-
-            const searchKeys =
-                getSearchKeysForWord(
-                    token
-                );
-
-            searchKeys.forEach(
-                function (
-                    key
-                ) {
-
-                    if (!key)
-                        return;
-
-                    if (
-                        !terms[key]
-                    ) {
-
-                        terms[key] = {
-
-                            count:
-                                0,
-
-                            positions:
-                                []
-
-                        };
-
-                    }
-
-                    terms[key].count +=
-                        1;
-
-                    terms[key].positions.push(
-                        index
-                    );
-
-                }
-            );
-
-        }
-    );
-
-    return {
-
-        documentId:
-            String(
-                documentId
-            ),
-
-        tokenCount:
-            tokens.length,
-
-        uniqueTerms:
-            Object.keys(
-                terms
-            ).length,
-
-        terms:
-            terms,
-
-        updatedAt:
-            new Date().toISOString()
-
-    };
-
-}
-
-
-// ======================================
-// Build Document Structure
-// ======================================
-
-async function buildDocumentStructure(
-    documentItem
-) {
-
-    if (!documentItem) {
-
-        throw new Error(
-            "لم يتم تحديد المستند."
-        );
-
-    }
-
-    const file =
-        await getWorkingWordFile(
-            documentItem.storageId
-        );
-
-    if (!file) {
-
-        throw new Error(
-            "لم يتم العثور على نسخة العمل."
-        );
-
-    }
-
-    const base64 =
-        await fileToBase64(
-            file
-        );
-
-    return await Word.run(
-        async function (
-            context
-        ) {
-
-            if (
-                !Office.context.requirements.isSetSupported(
-                    "WordApiHiddenDocument",
-                    "1.3"
-                )
-            ) {
-
-                throw new Error(
-                    "إصدار Word الحالي لا يدعم تحليل بنية المستند."
-                );
-
-            }
-
-            const workingDocument =
-                context.application.createDocument(
-                    base64
-                );
-
-            const paragraphs =
-                workingDocument.body.paragraphs;
-
-            paragraphs.load(
-                [
-                    "items/text",
-                    "items/styleBuiltIn",
-                    "items/tableNestingLevel"
-                ]
-            );
-
-            const tables =
-                workingDocument.body.tables;
-
-            tables.load(
-                [
-                    "items/rowCount",
-                    "items/columnCount",
-                    "items/styleBuiltIn"
-                ]
-            );
-
-            await context.sync();
-
-            const paragraphItems =
-                paragraphs.items.map(
-                    function (
-                        paragraph,
-                        index
-                    ) {
-
-                        const text =
-                            String(
-                                paragraph.text ||
-                                ""
-                            ).trim();
-
-                        return {
-
-                            index:
-                                index,
-
-                            id:
-                                String(
-                                    index
-                                ),
-
-                            text:
-                                text,
-
-                            style:
-                                paragraph.styleBuiltIn ||
-                                "",
-
-                            tableNestingLevel:
-                                paragraph.tableNestingLevel ||
-                                0
-
-                        };
-
-                    }
-                );
-
-            const headings =
-                paragraphItems.filter(
-                    function (
-                        paragraph
-                    ) {
-
-                        return (
-                            paragraph.style &&
-                            /^Heading[1-9]$/i.test(
-                                paragraph.style
-                            )
-                        );
-
-                    }
-                );
-
-            const tableItems =
-                tables.items.map(
-                    function (
-                        table,
-                        index
-                    ) {
-
-                        return {
-
-                            index:
-                                index,
-
-                            rows:
-                                table.rowCount,
-
-                            columns:
-                                table.columnCount,
-
-                            style:
-                                table.styleBuiltIn ||
-                                ""
-
-                        };
-
-                    }
-                );
-
-            return {
-
-                documentId:
-                    String(
-                        documentItem.id
-                    ),
-
-                paragraphCount:
-                    paragraphItems.length,
-
-                headingCount:
-                    headings.length,
-
-                tableCount:
-                    tableItems.length,
-
-                paragraphs:
-                    paragraphItems,
-
-                headings:
-                    headings,
-
-                tables:
-                    tableItems,
-
-                updatedAt:
-                    new Date().toISOString()
-
-            };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Save Document Structure
-// ======================================
-
-async function saveDocumentStructure(
-    documentId,
-    structureData
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_STRUCTURE_STORE_NAME,
-                    "readwrite"
-                );
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_STRUCTURE_STORE_NAME
-                );
-
-            const request =
-                store.put(
-                    structureData,
-                    String(
-                        documentId
-                    )
-                );
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        structureData
-                    );
-
-                };
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error
-                    );
-
-                };
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Get Document Structure
-// ======================================
-
-async function getDocumentStructure(
-    documentId
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_STRUCTURE_STORE_NAME,
-                    "readonly"
-                );
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_STRUCTURE_STORE_NAME
-                );
-
-            const request =
-                store.get(
-                    String(
-                        documentId
-                    )
-                );
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        request.result ||
-                        null
-                    );
-
-                };
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error
-                    );
-
-                };
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Search Document Context
-// ======================================
-
-async function searchDocumentContext(
-    documentId,
-    query
-) {
-
-    const searchTerm =
-        normalizeSearchText(
-            query
-        );
-
-    if (!searchTerm) {
-
-        return {
-
-            query:
-                "",
-
-            count:
-                0,
-
-            results:
-                []
-
-        };
-
-    }
-
-    const textData =
-        await getDocumentText(
-            documentId
-        );
-
-    if (!textData) {
-
-        throw new Error(
-            "لا يوجد نص محفوظ لهذا المستند."
-        );
-
-    }
-
-    const structureData =
-        await getDocumentStructure(
-            documentId
-        );
-
-    if (!structureData) {
-
-        throw new Error(
-            "لا توجد بنية محفوظة لهذا المستند."
-        );
-
-    }
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-    const headings =
-        Array.isArray(
-            structureData.headings
-        )
-            ? structureData.headings
-            : [];
-
-    const results =
-        [];
-
-    paragraphs.forEach(
-        function (
-            paragraph
-        ) {
-
-            if (
-                !paragraph ||
-                !paragraph.text
-            ) {
-
-                return;
-
-            }
-
-            const originalText =
-                String(
-                    paragraph.text
-                );
-
-            const normalizedParagraph =
-                normalizeSearchText(
-                    originalText
-                );
-
-            if (
-                !normalizedParagraph.includes(
-                    searchTerm
-                )
-            ) {
-
-                return;
-
-            }
-
-            let nearestHeading =
-                null;
-
-            headings.forEach(
-                function (
-                    heading
-                ) {
-
-                    if (
-                        heading.index <
-                        paragraph.index
-                    ) {
-
-                        if (
-                            !nearestHeading ||
-                            heading.index >
-                            nearestHeading.index
-                        ) {
-
-                            nearestHeading =
-                                heading;
-
-                        }
-
-                    }
-
-                }
-            );
-
-            const position =
-                normalizedParagraph.indexOf(
-                    searchTerm
-                );
-
-            const start =
-                Math.max(
-                    0,
-                    position - 100
-                );
-
-            const end =
-                Math.min(
-                    normalizedParagraph.length,
-                    position +
-                    searchTerm.length +
-                    160
-                );
-
-            const context =
-                normalizedParagraph.substring(
-                    start,
-                    end
-                );
-
-            results.push({
-
-                paragraphIndex:
-                    paragraph.index,
-
-                paragraphId:
-                    paragraph.id,
-
-                text:
-                    originalText,
-
-                context:
-                    context,
-
-                heading:
-                    nearestHeading
-                        ? nearestHeading.text
-                        : "",
-
-                headingLevel:
-                    nearestHeading
-                        ? nearestHeading.style
-                        : ""
-
-            });
-
-        }
-    );
-
-    return {
-
-        query:
-            searchTerm,
-
-        count:
-            results.length,
-
-        results:
-            results
-
-    };
-
-}
-
-
-// ======================================
-// Save Document Index
-// ======================================
-
-async function saveDocumentIndex(
-    documentId,
-    indexData
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_INDEX_STORE_NAME,
-                    "readwrite"
-                );
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_INDEX_STORE_NAME
-                );
-
-            const request =
-                store.put(
-                    indexData,
-                    String(
-                        documentId
-                    )
-                );
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        indexData
-                    );
-
-                };
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error
-                    );
-
-                };
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-
-// ======================================
-// Get Document Index
-// ======================================
-
-async function getDocumentIndex(
-    documentId
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_INDEX_STORE_NAME,
-                    "readonly"
-                );
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_INDEX_STORE_NAME
-                );
-
-            const request =
-                store.get(
-                    String(
-                        documentId
-                    )
-                );
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        request.result ||
-                        null
-                    );
-
-                };
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error
-                    );
-
-                };
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Test Document Index
-// ======================================
-
-async function testCurrentDocumentIndex() {
-
-    if (!currentDocument) {
-
-        console.warn(
-            "لا يوجد مستند نشط."
-        );
-
-        return;
-
-    }
-
-    try {
-
-        const index =
-            await getDocumentIndex(
-                currentDocument.id
-            );
-
-        console.log(
-            "الفهرس الحقيقي للمستند:",
-            index
-        );
-
-        if (!index) {
-
-            console.warn(
-                "لا يوجد فهرس محفوظ لهذا المستند."
-            );
-
-            return;
-
-        }
-
-        console.log(
-            "عدد الكلمات:",
-            index.tokenCount
-        );
-
-        console.log(
-            "عدد الكلمات الفريدة:",
-            index.uniqueTerms
-        );
-
-        console.log(
-            "الكلمات المفهرسة:",
-            Object.keys(
-                index.terms || {}
-            ).slice(
-                0,
-                20
-            )
-        );
-
-    }
-    catch (
-        error
-    ) {
-
-        console.error(
-            "فشل اختبار الفهرس:",
-            error
-        );
-
-    }
-
-}
-
-
-// ======================================
-// Search Indexed Document
-// البحث الذكي المعتمد على عائلات الكلمات
-// ======================================
-
-async function searchIndexedDocument(
-    documentId,
-    query
-) {
-
-    // ==================================
-    // تطبيع الاستعلام
-    // ==================================
-
-    const searchTerm =
-        normalizeSearchText(
-            query
-        );
-
-    if (!searchTerm) {
-
-        return {
-
-            query:
-                "",
-
-            count:
-                0,
-
-            results:
-                []
-
-        };
-
-    }
-
-
-    // ==================================
-    // استرجاع الفهرس
-    // ==================================
-
-    const indexData =
-        await getDocumentIndex(
-            documentId
-        );
-
-    if (!indexData) {
-
-        throw new Error(
-            "لا يوجد فهرس لهذا المستند."
-        );
-
-    }
-
-
-    const indexedTerms =
-        indexData.terms || {};
-
-    const indexedFamilies =
-        indexData.families || {};
-
-
-    // ==================================
-    // تقسيم الاستعلام إلى كلمات
-    // ==================================
-
-    const queryTokens =
-        tokenizeDocumentText(
-            searchTerm
-        );
-
-
-    if (
-        queryTokens.length === 0
-    ) {
-
-        return {
-
-            query:
-                searchTerm,
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                [],
-
-            totalQueryTerms:
-                0,
-
-            indexTokenCount:
-                indexData.tokenCount,
-
-            indexUniqueTerms:
-                indexData.uniqueTerms,
-
-            uniqueFamilies:
-                indexData.uniqueFamilies || 0
-
-        };
-
-    }
-
-
-    // ==================================
-    // بناء وصف كل كلمة مطلوبة
-    // مرة واحدة فقط
-    // ==================================
-
-    const queryItems = [];
-
-
-    queryTokens.forEach(
-        function (
-            token
-        ) {
-
-            if (!token) {
-
-                return;
-
-            }
-
-
-            const exact =
-                indexedTerms[token]
-                    ? token
-                    : "";
-
-
-            const family =
-                normalizeArabicSearchWord(
-                    token
-                );
-
-
-            const familyExists =
-                family &&
-                indexedFamilies[family]
-                    ? family
-                    : "";
-
-
-            queryItems.push({
-
-                token:
-                    token,
-
-                exact:
-                    exact,
-
-                family:
-                    familyExists
-
-            });
-
-        }
-    );
-
-
-    // ==================================
-    // حذف التكرار من الكلمات المطلوبة
-    // ==================================
-
-    const uniqueQueryItems = [];
-
-    const seenQueryTokens =
-        new Set();
-
-
-    queryItems.forEach(
-        function (
-            item
-        ) {
-
-            if (
-                seenQueryTokens.has(
-                    item.token
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            seenQueryTokens.add(
-                item.token
-            );
-
-
-            uniqueQueryItems.push(
-                item
-            );
-
-        }
-    );
-
-
-    if (
-        uniqueQueryItems.length === 0
-    ) {
-
-        return {
-
-            query:
-                searchTerm,
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                [],
-
-            totalQueryTerms:
-                0,
-
-            indexTokenCount:
-                indexData.tokenCount,
-
-            indexUniqueTerms:
-                indexData.uniqueTerms,
-
-            uniqueFamilies:
-                indexData.uniqueFamilies || 0
-
-        };
-
-    }
-
-
-    // ==================================
-    // الكلمات التي لها وجود فعلي
-    // ==================================
-
-    const matchedTerms = [];
-
-
-    uniqueQueryItems.forEach(
-        function (
-            item
-        ) {
-
-            if (
-                item.exact ||
-                item.family
-            ) {
-
-                matchedTerms.push(
-                    item.token
-                );
-
-            }
-
-        }
-    );
-
-
-    // ==================================
-    // لا توجد أي مطابقة
-    // ==================================
-
-    if (
-        matchedTerms.length === 0
-    ) {
-
-        return {
-
-            query:
-                searchTerm,
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                [],
-
-            totalQueryTerms:
-                uniqueQueryItems.length,
-
-            indexTokenCount:
-                indexData.tokenCount,
-
-            indexUniqueTerms:
-                indexData.uniqueTerms,
-
-            uniqueFamilies:
-                indexData.uniqueFamilies || 0
-
-        };
-
-    }
-
-
-    // ==================================
-    // استرجاع بنية المستند
-    // ==================================
-
-    const structureData =
-        await getDocumentStructure(
-            documentId
-        );
-
-    if (!structureData) {
-
-        throw new Error(
-            "لا توجد بنية محفوظة لهذا المستند."
-        );
-
-    }
-
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-
-    const headings =
-        Array.isArray(
-            structureData.headings
-        )
-            ? structureData.headings
-            : [];
-
-
-    // ==================================
-    // النتائج
-    // ==================================
-
-    const results = [];
-
-
-    // ==================================
-    // فهرس العناوين لتقليل البحث المتكرر
-    // ==================================
-
-    const sortedHeadings =
-        headings
-            .filter(
-                function (
-                    heading
-                ) {
-
-                    return Boolean(
-                        heading
-                    );
-
-                }
-            )
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return (
-                        a.index -
-                        b.index
-                    );
-
-                }
-            );
-
-
-    // ==================================
-    // تحديد العنوان السابق للفقرة
-    // باستخدام مؤشر متحرك
-    // بدل المرور على جميع العناوين
-    // ==================================
-
-    let headingPointer =
-        0;
-
-    let nearestHeading =
-        null;
-
-
-    // ==================================
-    // فحص الفقرات
-    // ==================================
-
-    paragraphs.forEach(
-        function (
-            paragraph
-        ) {
-
-            if (
-                !paragraph ||
-                !paragraph.text
-            ) {
-
-                return;
-
-            }
-
-
-            const paragraphIndex =
-                Number(
-                    paragraph.index
-                );
-
-
-            // ==================================
-            // تحديث العنوان الأقرب
-            // ==================================
-
-            while (
-                headingPointer <
-                sortedHeadings.length &&
-                Number(
-                    sortedHeadings[
-                        headingPointer
-                    ].index
-                ) <
-                paragraphIndex
-            ) {
-
-                nearestHeading =
-                    sortedHeadings[
-                        headingPointer
-                    ];
-
-                headingPointer +=
-                    1;
-
-            }
-
-
-            // ==================================
-            // النص
-            // ==================================
-
-            const originalParagraphText =
-                String(
-                    paragraph.text
-                );
-
-
-            const normalizedParagraphText =
-                normalizeSearchText(
-                    originalParagraphText
-                );
-
-
-            if (
-                !normalizedParagraphText
-            ) {
-
-                return;
-
-            }
-
-
-            // ==================================
-            // تقسيم الفقرة إلى كلمات
-            // مرة واحدة
-            // ==================================
-
-            const paragraphTokens =
-                tokenizeDocumentText(
-                    normalizedParagraphText
-                );
-
-
-            if (
-                paragraphTokens.length === 0
-            ) {
-
-                return;
-
-            }
-
-
-            // ==================================
-            // بناء مجموعة الكلمات
-            // ==================================
-
-            const paragraphTokenSet =
-                new Set(
-                    paragraphTokens
-                );
-
-
-            // ==================================
-            // بناء عائلات الكلمات الموجودة
-            // في الفقرة مرة واحدة
-            // ==================================
-
-            const paragraphFamilySet =
-                new Set();
-
-
-            paragraphTokens.forEach(
-                function (
-                    token
-                ) {
-
-                    const family =
-                        normalizeArabicSearchWord(
-                            token
-                        );
-
-
-                    if (
-                        family &&
-                        family.length >= 3
-                    ) {
-
-                        paragraphFamilySet.add(
-                            family
-                        );
-
-                    }
-
-                }
-            );
-
-
-            // ==================================
-            // حساب قوة المطابقة
-            // ==================================
-
-            let exactCount =
-                0;
-
-            let familyCount =
-                0;
-
-            let matchedCount =
-                0;
-
-
-            const matchedDetails = [];
-
-
-            uniqueQueryItems.forEach(
-                function (
-                    item
-                ) {
-
-                    // ------------------------------
-                    // المطابقة الحرفية
-                    // ------------------------------
-
-                    if (
-                        paragraphTokenSet.has(
-                            item.token
-                        )
-                    ) {
-
-                        exactCount +=
-                            1;
-
-                        matchedCount +=
-                            1;
-
-                        matchedDetails.push({
-
-                            token:
-                                item.token,
-
-                            matchType:
-                                "exact"
-
-                        });
-
-                        return;
-
-                    }
-
-
-                    // ------------------------------
-                    // المطابقة العائلية
-                    // ------------------------------
-
-                    if (
-                        item.family &&
-                        paragraphFamilySet.has(
-                            item.family
-                        )
-                    ) {
-
-                        familyCount +=
-                            1;
-
-                        matchedCount +=
-                            1;
-
-                        matchedDetails.push({
-
-                            token:
-                                item.token,
-
-                            matchType:
-                                "family"
-
-                        });
-
-                    }
-
-                }
-            );
-
-
-            // ==================================
-            // لا توجد مطابقة
-            // ==================================
-
-            if (
-                matchedCount === 0
-            ) {
-
-                return;
-
-            }
-
-
-            // ==================================
-            // درجة المطابقة الأساسية
-            // ==================================
-
-            let score =
-                matchedCount /
-                uniqueQueryItems.length;
-
-
-            // ==================================
-            // أولوية للمطابقة الحرفية
-            // ==================================
-
-            score +=
-                exactCount *
-                0.75;
-
-
-            // ==================================
-            // المطابقة العائلية أقل وزنًا
-            // لكنها ما زالت قوية
-            // ==================================
-
-            score +=
-                familyCount *
-                0.35;
-
-
-            // ==================================
-            // العبارة كاملة
-            // ==================================
-
-            if (
-                normalizedParagraphText.includes(
-                    searchTerm
-                )
-            ) {
-
-                score +=
-                    4;
-
-            }
-
-
-            // ==================================
-            // حساب موضع أفضل كلمة
-            // ==================================
-
-            let searchPosition =
-                normalizedParagraphText.indexOf(
-                    searchTerm
-                );
-
-
-            // ==================================
-            // إذا لم توجد العبارة كاملة
-            // ابحث عن أول كلمة حرفية
-            // ==================================
-
-            if (
-                searchPosition === -1
-            ) {
-
-                for (
-                    let i = 0;
-                    i < uniqueQueryItems.length;
-                    i++
-                ) {
-
-                    const token =
-                        uniqueQueryItems[i]
-                            .token;
-
-
-                    const position =
-                        normalizedParagraphText.indexOf(
-                            token
-                        );
-
-
-                    if (
-                        position !== -1
-                    ) {
-
-                        searchPosition =
-                            position;
-
-                        break;
-
-                    }
-
-                }
-
-            }
-
-
-            // ==================================
-            // إذا لم توجد كلمة حرفية
-            // ابحث عن كلمة من العائلة
-            // ==================================
-
-            if (
-                searchPosition === -1
-            ) {
-
-                for (
-                    let i = 0;
-                    i < uniqueQueryItems.length;
-                    i++
-                ) {
-
-                    const family =
-                        uniqueQueryItems[i]
-                            .family;
-
-
-                    if (
-                        !family
-                    ) {
-
-                        continue;
-
-                    }
-
-
-                    const position =
-                        normalizedParagraphText.indexOf(
-                            family
-                        );
-
-
-                    if (
-                        position !== -1
-                    ) {
-
-                        searchPosition =
-                            position;
-
-                        break;
-
-                    }
-
-                }
-
-            }
-
-
-            // ==================================
-            // استخراج المقتطف
-            // ==================================
-
-            let context =
-                originalParagraphText;
-
-
-            if (
-                searchPosition !== -1
-            ) {
-
-                const start =
-                    Math.max(
-                        0,
-                        searchPosition - 120
-                    );
-
-
-                const end =
-                    Math.min(
-                        originalParagraphText.length,
-                        searchPosition + 320
-                    );
-
-
-                context =
-                    originalParagraphText.substring(
-                        start,
-                        end
-                    );
-
-            }
-            else {
-
-                context =
-                    originalParagraphText.substring(
-                        0,
-                        440
-                    );
-
-            }
-
-
-            // ==================================
-            // نوع المطابقة
-            // ==================================
-
-            let matchType =
-                "family";
-
-
-            if (
-                exactCount ===
-                uniqueQueryItems.length
-            ) {
-
-                matchType =
-                    "exact";
-
-            }
-            else if (
-                exactCount > 0
-            ) {
-
-                matchType =
-                    "mixed";
-
-            }
-
-
-            // ==================================
-            // إضافة النتيجة
-            // ==================================
-
-            results.push({
-
-                paragraphIndex:
-                    paragraphIndex,
-
-                paragraphId:
-                    paragraph.id,
-
-                text:
-                    originalParagraphText,
-
-                context:
-                    context,
-
-                heading:
-                    nearestHeading
-                        ? nearestHeading.text
-                        : "",
-
-                headingLevel:
-                    nearestHeading
-                        ? nearestHeading.style
-                        : "",
-
-                matchedTerms:
-                    matchedTerms,
-
-                matchedDetails:
-                    matchedDetails,
-
-                matchedCount:
-                    matchedCount,
-
-                exactCount:
-                    exactCount,
-
-                familyCount:
-                    familyCount,
-
-                totalQueryTerms:
-                    uniqueQueryItems.length,
-
-                score:
-                    score,
-
-                matchType:
-                    matchType
-
-            });
-
-        }
-    );
-
-
-    // ==================================
-    // ترتيب النتائج
-    // ==================================
-
-    results.sort(
-        function (
-            a,
-            b
-        ) {
-
-            // 1. الدرجة
-            if (
-                b.score !==
-                a.score
-            ) {
-
-                return (
-                    b.score -
-                    a.score
-                );
-
-            }
-
-
-            // 2. المطابقة الحرفية
-            if (
-                b.exactCount !==
-                a.exactCount
-            ) {
-
-                return (
-                    b.exactCount -
-                    a.exactCount
-                );
-
-            }
-
-
-            // 3. عدد الكلمات المطابقة
-            if (
-                b.matchedCount !==
-                a.matchedCount
-            ) {
-
-                return (
-                    b.matchedCount -
-                    a.matchedCount
-                );
-
-            }
-
-
-            // 4. ترتيب المستند
-            return (
-                a.paragraphIndex -
-                b.paragraphIndex
-            );
-
-        }
-    );
-
-
-    // ==================================
-    // عدد النتائج المطابقة من الفهرس
-    // ==================================
-
-    let indexedOccurrences =
-        0;
-
-
-    const countedKeys =
-        new Set();
-
-
-    uniqueQueryItems.forEach(
-        function (
-            item
-        ) {
-
-            // ------------------------------
-            // الكلمة الأصلية
-            // ------------------------------
-
-            if (
-                item.exact &&
-                !countedKeys.has(
-                    item.exact
-                )
-            ) {
-
-                const exactItem =
-                    indexedTerms[
-                        item.exact
-                    ];
-
-
-                if (
-                    exactItem
-                ) {
-
-                    indexedOccurrences +=
-                        Number(
-                            exactItem.count ||
-                            0
-                        );
-
-                }
-
-
-                countedKeys.add(
-                    item.exact
-                );
-
-            }
-
-
-            // ------------------------------
-            // العائلة
-            // ------------------------------
-
-            if (
-                item.family &&
-                indexedFamilies[
-                    item.family
-                ] &&
-                !countedKeys.has(
-                    "family:" +
-                    item.family
-                )
-            ) {
-
-                indexedOccurrences +=
-                    Number(
-                        indexedFamilies[
-                            item.family
-                        ].count ||
-                        0
-                    );
-
-
-                countedKeys.add(
-                    "family:" +
-                    item.family
-                );
-
-            }
-
-        }
-    );
-
-
-    // ==================================
-    // النتيجة النهائية
-    // ==================================
-
-    return {
-
-        query:
-            searchTerm,
-
-        count:
-            results.length,
-
-        results:
-            results,
-
-        matchedTerms:
-            matchedTerms,
-
-        totalQueryTerms:
-            uniqueQueryItems.length,
-
-        indexTokenCount:
-            indexData.tokenCount,
-
-        indexUniqueTerms:
-            indexData.uniqueTerms,
-
-        uniqueFamilies:
-            indexData.uniqueFamilies || 0,
-
-        indexedOccurrences:
-            indexedOccurrences
-
-    };
-
-}
 
 // ======================================
 // Delete Working Word File
@@ -4270,7 +626,10 @@ async function deleteWorkingWordFile(
 
 
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const transaction =
                 db.transaction(
@@ -4278,12 +637,10 @@ async function deleteWorkingWordFile(
                     "readwrite"
                 );
 
-
             const store =
                 transaction.objectStore(
                     DOCUMENT_STORE_NAME
                 );
-
 
             const request =
                 store.delete(
@@ -4320,6 +677,8 @@ async function deleteWorkingWordFile(
     );
 
 }
+
+
 // ======================================
 // Convert Blob/File to Base64
 // ======================================
@@ -4327,10 +686,14 @@ async function deleteWorkingWordFile(
 function fileToBase64(file) {
 
     return new Promise(
-        function (resolve, reject) {
+        function (
+            resolve,
+            reject
+        ) {
 
             const reader =
                 new FileReader();
+
 
             reader.onload =
                 function () {
@@ -4343,6 +706,7 @@ function fileToBase64(file) {
                     const commaIndex =
                         result.indexOf(",");
 
+
                     if (
                         commaIndex === -1
                     ) {
@@ -4354,7 +718,9 @@ function fileToBase64(file) {
                         );
 
                         return;
+
                     }
+
 
                     resolve(
                         result.substring(
@@ -4363,6 +729,7 @@ function fileToBase64(file) {
                     );
 
                 };
+
 
             reader.onerror =
                 function () {
@@ -4376,12 +743,16 @@ function fileToBase64(file) {
 
                 };
 
-            reader.readAsDataURL(file);
+
+            reader.readAsDataURL(
+                file
+            );
 
         }
     );
 
 }
+
 
 // ======================================
 // Create Document
@@ -4432,13 +803,25 @@ function createDocument(
 
         type:
             "word",
-        
+
         readStatus:
             "new",
-        
+
         indexStatus:
-        "new",
-        
+            "new",
+
+        indexTokenCount:
+            0,
+
+        indexUniqueTerms:
+            0,
+
+        indexUniqueFamilies:
+            0,
+
+        indexSchemaVersion:
+            0,
+
         createdAt:
             now,
 
@@ -4459,6 +842,7 @@ function createDocument(
     return documentItem;
 
 }
+
 
 // ======================================
 // Update Document Read Status
@@ -4495,6 +879,8 @@ function updateDocumentReadStatus(
     saveDocuments();
 
 }
+
+
 // ======================================
 // Update Document Index Status
 // ======================================
@@ -4519,6 +905,8 @@ function updateDocumentIndexStatus(
     saveDocuments();
 
 }
+
+
 // ======================================
 // Get Project Documents
 // ======================================
@@ -4529,6 +917,7 @@ function getProjectDocuments(
 
     if (!projectId)
         return [];
+
 
     return documents
         .filter(function (documentItem) {
@@ -4551,93 +940,1574 @@ function getProjectDocuments(
 
 }
 
+
 // ======================================
-// Set Active Document
+// Save Indexed Document Text
 // ======================================
 
-function setCurrentDocument(documentItem) {
+async function saveDocumentText(
+    documentId,
+    text
+) {
 
-    if (!documentItem) {
+    const db =
+        await openDocumentDatabase();
 
-        currentDocument = null;
 
-        if (documentTitle) {
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
 
-            documentTitle.textContent =
-                "لا يوجد مستند مفتوح";
+            const transaction =
+                db.transaction(
+                    DOCUMENT_TEXT_STORE_NAME,
+                    "readwrite"
+                );
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_TEXT_STORE_NAME
+                );
+
+
+            const record = {
+
+                documentId:
+                    String(
+                        documentId
+                    ),
+
+                text:
+                    String(
+                        text || ""
+                    ),
+
+                updatedAt:
+                    new Date().toISOString()
+
+            };
+
+
+            const request =
+                store.put(
+                    record,
+                    String(
+                        documentId
+                    )
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        record
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
 
         }
+    );
 
-        renderDocuments();
-
-        return;
-    }
+}
 
 
-    currentDocument =
-        documentItem;
+// ======================================
+// Get Indexed Document Text
+// ======================================
+
+async function getDocumentText(
+    documentId
+) {
+
+    const db =
+        await openDocumentDatabase();
 
 
-    if (documentTitle) {
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
 
-        documentTitle.textContent =
-            documentItem.name;
+            const transaction =
+                db.transaction(
+                    DOCUMENT_TEXT_STORE_NAME,
+                    "readonly"
+                );
 
-    }
-
-
-    // ==================================
-    // القراءة تكون مرة واحدة فقط
-    // ==================================
-
-    if (
-        documentItem.readStatus ===
-        "read"
-    ) {
-
-        // المستند مقروء مسبقًا
-        renderDocuments();
-
-        return;
-
-    }
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_TEXT_STORE_NAME
+                );
 
 
-    // ==================================
-    // المستند يحتاج إلى قراءة
-    // ==================================
+            const request =
+                store.get(
+                    String(
+                        documentId
+                    )
+                );
 
-    readCurrentWordDocument(
-        documentItem
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result ||
+                        null
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Normalize Search Text
+// ======================================
+
+function normalizeSearchText(
+    text
+) {
+
+    return String(
+        text || ""
     )
-    .then(function (text) {
 
-        console.log(
-            "محتوى نسخة العمل:",
+        // إزالة التشكيل
+        .replace(
+            /[\u064B-\u065F\u0670]/g,
+            ""
+        )
+
+        // إزالة التطويل
+        .replace(
+            /\u0640/g,
+            ""
+        )
+
+        // توحيد الألف
+        .replace(
+            /[أإآٱ]/g,
+            "ا"
+        )
+
+        // توحيد الياء
+        .replace(
+            /ى/g,
+            "ي"
+        )
+
+        // توحيد بعض أشكال الهمزة
+        .replace(
+            /ؤ/g,
+            "و"
+        )
+
+        .replace(
+            /ئ/g,
+            "ي"
+        )
+
+        // تنظيف المسافات
+        .replace(
+            /\s+/g,
+            " "
+        )
+
+        .trim()
+        .toLowerCase();
+
+}
+
+
+// ======================================
+// Tokenize Document Text
+// تعريف واحد فقط
+// ======================================
+
+function tokenizeDocumentText(
+    text
+) {
+
+    const normalized =
+        normalizeSearchText(
             text
         );
 
-        renderDocuments();
 
-    })
-    .catch(function (error) {
-
-        console.error(
-            "تعذر قراءة نسخة العمل:",
-            error
+    const matches =
+        normalized.match(
+            /[\p{L}\p{N}]+/gu
         );
 
-        renderDocuments();
 
-    });
-
-
-    // إظهار "جارٍ القراءة..." فورًا
-    renderDocuments();
+    return (
+        matches || []
+    );
 
 }
+
+
+// ======================================
+// Arabic Family Key
+// عائلة الكلمة
+// ======================================
+
+function getArabicFamilyKey(
+    word
+) {
+
+    let w =
+        normalizeSearchText(
+            word
+        );
+
+
+    if (!w)
+        return "";
+
+
+    w =
+        w.replace(
+            /[^\p{L}\p{N}]+/gu,
+            ""
+        );
+
+
+    if (!w)
+        return "";
+
+
+    if (
+        w.length <= 3
+    ) {
+
+        return w;
+
+    }
+
+
+    const protectedWords =
+        new Set([
+            "الله",
+            "القران",
+            "اسلام",
+            "اسلامي",
+            "اسلامية"
+        ]);
+
+
+    if (
+        protectedWords.has(w)
+    ) {
+
+        return w;
+
+    }
+
+
+    return w;
+
+}
+
+
+// ======================================
+// Conservative Family Key
+// الأصل الموجود فعليًا في المستند
+// ======================================
+
+function getConservativeFamilyKey(
+    word,
+    surfaceSet
+) {
+
+    const surface =
+        normalizeSearchText(
+            word
+        );
+
+
+    if (!surface)
+        return "";
+
+
+    if (
+        surface.length <= 3
+    ) {
+
+        return surface;
+
+    }
+
+
+    const protectedWords =
+        new Set([
+            "الله",
+            "القران",
+            "اسلام",
+            "اسلامي",
+            "اسلامية"
+        ]);
+
+
+    if (
+        protectedWords.has(
+            surface
+        )
+    ) {
+
+        return surface;
+
+    }
+
+
+    // ----------------------------------
+    // السوابق
+    // نبدأ بالأطول
+    // ----------------------------------
+
+    const prefixes = [
+        "وال",
+        "بال",
+        "كال",
+        "فال",
+        "لل",
+        "ال",
+        "وا",
+        "با",
+        "كا",
+        "فا",
+        "ول",
+        "بل",
+        "فل"
+    ];
+
+
+    const suffixes = [
+        "يات",
+        "ات",
+        "هما",
+        "هم",
+        "هن",
+        "ها",
+        "ية",
+        "يا",
+        "ين",
+        "ون",
+        "ان",
+        "ي",
+        "ة",
+        "ه",
+        "ك",
+        "كم",
+        "كن",
+        "ا"
+    ];
+
+
+    const candidates =
+        new Set();
+
+
+    candidates.add(
+        surface
+    );
+
+
+    // ----------------------------------
+    // إزالة سابقة فقط
+    // ----------------------------------
+
+    prefixes.forEach(
+        function (
+            prefix
+        ) {
+
+            if (
+                surface.startsWith(
+                    prefix
+                )
+            ) {
+
+                const candidate =
+                    surface.substring(
+                        prefix.length
+                    );
+
+
+                if (
+                    candidate.length >= 3
+                ) {
+
+                    candidates.add(
+                        candidate
+                    );
+
+                }
+
+            }
+
+        }
+    );
+
+
+    // ----------------------------------
+    // إزالة لاحقة فقط
+    // ----------------------------------
+
+    suffixes.forEach(
+        function (
+            suffix
+        ) {
+
+            if (
+                surface.endsWith(
+                    suffix
+                )
+            ) {
+
+                const candidate =
+                    surface.substring(
+                        0,
+                        surface.length -
+                        suffix.length
+                    );
+
+
+                if (
+                    candidate.length >= 3
+                ) {
+
+                    candidates.add(
+                        candidate
+                    );
+
+                }
+
+            }
+
+        }
+    );
+
+
+    // ----------------------------------
+    // إزالة سابقة + لاحقة
+    // ----------------------------------
+
+    prefixes.forEach(
+        function (
+            prefix
+        ) {
+
+            if (
+                !surface.startsWith(
+                    prefix
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            const afterPrefix =
+                surface.substring(
+                    prefix.length
+                );
+
+
+            if (
+                afterPrefix.length < 3
+            ) {
+
+                return;
+
+            }
+
+
+            candidates.add(
+                afterPrefix
+            );
+
+
+            suffixes.forEach(
+                function (
+                    suffix
+                ) {
+
+                    if (
+                        afterPrefix.endsWith(
+                            suffix
+                        )
+                    ) {
+
+                        const candidate =
+                            afterPrefix.substring(
+                                0,
+                                afterPrefix.length -
+                                suffix.length
+                            );
+
+
+                        if (
+                            candidate.length >= 3
+                        ) {
+
+                            candidates.add(
+                                candidate
+                            );
+
+                        }
+
+                    }
+
+                }
+            );
+
+        }
+    );
+
+
+    // ----------------------------------
+    // الأصل الأقصر الذي وجد بالفعل
+    // في نفس المستند
+    // ----------------------------------
+
+    let best =
+        surface;
+
+
+    if (
+        surfaceSet &&
+        surfaceSet.size > 0
+    ) {
+
+        candidates.forEach(
+            function (
+                candidate
+            ) {
+
+                if (
+                    candidate.length <
+                    best.length &&
+                    candidate.length >= 3 &&
+                    surfaceSet.has(
+                        candidate
+                    )
+                ) {
+
+                    best =
+                        candidate;
+
+                }
+
+            }
+        );
+
+    }
+
+
+    return best;
+
+}
+
+
+// ======================================
+// Search Keys
+// ======================================
+
+function getSearchKeysForWord(
+    word
+) {
+
+    const surface =
+        normalizeSearchText(
+            word
+        );
+
+
+    const keys = [];
+
+
+    if (surface) {
+
+        keys.push(
+            surface
+        );
+
+    }
+
+
+    const family =
+        getArabicFamilyKey(
+            word
+        );
+
+
+    if (
+        family &&
+        family !== surface
+    ) {
+
+        keys.push(
+            family
+        );
+
+    }
+
+
+    return keys;
+
+}
+
+
+// ======================================
+// Build Document Index
+// النسخة الوحيدة المعتمدة
+// ======================================
+
+function buildDocumentIndex(
+    documentId,
+    text
+) {
+
+    const tokens =
+        tokenizeDocumentText(
+            text
+        );
+
+
+    const terms =
+        {};
+
+    const families =
+        {};
+
+
+    // الكلمات الموجودة فعليًا
+    const surfaceSet =
+        new Set(
+            tokens
+        );
+
+
+    tokens.forEach(
+        function (
+            token,
+            index
+        ) {
+
+            const surface =
+                normalizeSearchText(
+                    token
+                );
+
+
+            if (!surface)
+                return;
+
+
+            // ----------------------------------
+            // terms
+            // ----------------------------------
+
+            if (
+                !terms[surface]
+            ) {
+
+                terms[surface] = {
+
+                    count:
+                        0,
+
+                    positions:
+                        [],
+
+                    family:
+                        ""
+
+                };
+
+            }
+
+
+            terms[surface].count +=
+                1;
+
+
+            terms[surface]
+                .positions
+                .push(
+                    index
+                );
+
+
+            // ----------------------------------
+            // العائلة
+            // ----------------------------------
+
+            const familyKey =
+                getConservativeFamilyKey(
+                    surface,
+                    surfaceSet
+                );
+
+
+            terms[surface].family =
+                familyKey;
+
+
+            if (!familyKey)
+                return;
+
+
+            if (
+                !families[familyKey]
+            ) {
+
+                families[familyKey] = {
+
+                    count:
+                        0,
+
+                    positions:
+                        [],
+
+                    words:
+                        {}
+
+                };
+
+            }
+
+
+            families[familyKey]
+                .count +=
+                1;
+
+
+            families[familyKey]
+                .positions
+                .push(
+                    index
+                );
+
+
+            if (
+                !families[familyKey]
+                    .words[surface]
+            ) {
+
+                families[familyKey]
+                    .words[surface] =
+                    0;
+
+            }
+
+
+            families[familyKey]
+                .words[surface] +=
+                1;
+
+        }
+    );
+
+
+    return {
+
+        documentId:
+            String(
+                documentId
+            ),
+
+        indexVersion:
+            INDEX_SCHEMA_VERSION,
+
+        tokenCount:
+            tokens.length,
+
+        uniqueTerms:
+            Object.keys(
+                terms
+            ).length,
+
+        uniqueFamilies:
+            Object.keys(
+                families
+            ).length,
+
+        terms:
+            terms,
+
+        families:
+            families,
+
+        updatedAt:
+            new Date().toISOString()
+
+    };
+
+}
+
+
+// ======================================
+// Save Document Index
+// ======================================
+
+async function saveDocumentIndex(
+    documentId,
+    indexData
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_INDEX_STORE_NAME,
+                    "readwrite"
+                );
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_INDEX_STORE_NAME
+                );
+
+
+            const request =
+                store.put(
+                    indexData,
+                    String(
+                        documentId
+                    )
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        indexData
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Get Document Index
+// ======================================
+
+async function getDocumentIndex(
+    documentId
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_INDEX_STORE_NAME,
+                    "readonly"
+                );
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_INDEX_STORE_NAME
+                );
+
+
+            const request =
+                store.get(
+                    String(
+                        documentId
+                    )
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result ||
+                        null
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Build And Save Document Index
+// ======================================
+
+async function rebuildDocumentIndex(
+    documentId,
+    text
+) {
+
+    if (!documentId) {
+
+        throw new Error(
+            "معرّف المستند غير موجود."
+        );
+
+    }
+
+
+    if (
+        typeof text !==
+        "string"
+    ) {
+
+        throw new Error(
+            "نص المستند غير صالح للفهرسة."
+        );
+
+    }
+
+
+    const indexData =
+        buildDocumentIndex(
+            documentId,
+            text
+        );
+
+
+    await saveDocumentIndex(
+        documentId,
+        indexData
+    );
+
+
+    if (
+        currentDocument &&
+        String(
+            currentDocument.id
+        ) ===
+        String(
+            documentId
+        )
+    ) {
+
+        currentDocument.indexStatus =
+            "indexed";
+
+        currentDocument.indexTokenCount =
+            indexData.tokenCount;
+
+        currentDocument.indexUniqueTerms =
+            indexData.uniqueTerms;
+
+        currentDocument.indexUniqueFamilies =
+            indexData.uniqueFamilies;
+
+        currentDocument.indexSchemaVersion =
+            INDEX_SCHEMA_VERSION;
+
+        currentDocument.indexUpdatedAt =
+            indexData.updatedAt;
+
+        saveDocuments();
+
+    }
+
+
+    return indexData;
+
+}
+
+
+// ======================================
+// Build Document Structure
+// ======================================
+
+async function buildDocumentStructure(
+    documentItem
+) {
+
+    if (!documentItem) {
+
+        throw new Error(
+            "لم يتم تحديد المستند."
+        );
+
+    }
+
+
+    const file =
+        await getWorkingWordFile(
+            documentItem.storageId
+        );
+
+
+    if (!file) {
+
+        throw new Error(
+            "لم يتم العثور على نسخة العمل."
+        );
+
+    }
+
+
+    const base64 =
+        await fileToBase64(
+            file
+        );
+
+
+    return await Word.run(
+        async function (
+            context
+        ) {
+
+            if (
+                !Office.context.requirements
+                    .isSetSupported(
+                        "WordApiHiddenDocument",
+                        "1.3"
+                    )
+            ) {
+
+                throw new Error(
+                    "إصدار Word الحالي لا يدعم تحليل بنية المستند."
+                );
+
+            }
+
+
+            const workingDocument =
+                context.application
+                    .createDocument(
+                        base64
+                    );
+
+
+            const paragraphs =
+                workingDocument.body.paragraphs;
+
+
+            paragraphs.load(
+                [
+                    "items/text",
+                    "items/styleBuiltIn",
+                    "items/tableNestingLevel"
+                ]
+            );
+
+
+            const tables =
+                workingDocument.body.tables;
+
+
+            tables.load(
+                [
+                    "items/rowCount",
+                    "items/columnCount",
+                    "items/styleBuiltIn"
+                ]
+            );
+
+
+            await context.sync();
+
+
+            const paragraphItems =
+                paragraphs.items.map(
+                    function (
+                        paragraph,
+                        index
+                    ) {
+
+                        const text =
+                            String(
+                                paragraph.text ||
+                                ""
+                            ).trim();
+
+
+                        return {
+
+                            index:
+                                index,
+
+                            id:
+                                String(
+                                    index
+                                ),
+
+                            text:
+                                text,
+
+                            style:
+                                paragraph.styleBuiltIn ||
+                                "",
+
+                            tableNestingLevel:
+                                paragraph.tableNestingLevel ||
+                                0
+
+                        };
+
+                    }
+                );
+
+
+            const headings =
+                paragraphItems.filter(
+                    function (
+                        paragraph
+                    ) {
+
+                        return (
+                            paragraph.style &&
+                            /^Heading[1-9]$/i.test(
+                                paragraph.style
+                            )
+                        );
+
+                    }
+                );
+
+
+            const tableItems =
+                tables.items.map(
+                    function (
+                        table,
+                        index
+                    ) {
+
+                        return {
+
+                            index:
+                                index,
+
+                            rows:
+                                table.rowCount,
+
+                            columns:
+                                table.columnCount,
+
+                            style:
+                                table.styleBuiltIn ||
+                                ""
+
+                        };
+
+                    }
+                );
+
+
+            return {
+
+                documentId:
+                    String(
+                        documentItem.id
+                    ),
+
+                paragraphCount:
+                    paragraphItems.length,
+
+                headingCount:
+                    headings.length,
+
+                tableCount:
+                    tableItems.length,
+
+                paragraphs:
+                    paragraphItems,
+
+                headings:
+                    headings,
+
+                tables:
+                    tableItems,
+
+                updatedAt:
+                    new Date().toISOString()
+
+            };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Save Document Structure
+// ======================================
+
+async function saveDocumentStructure(
+    documentId,
+    structureData
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_STRUCTURE_STORE_NAME,
+                    "readwrite"
+                );
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_STRUCTURE_STORE_NAME
+                );
+
+
+            const request =
+                store.put(
+                    structureData,
+                    String(
+                        documentId
+                    )
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        structureData
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Get Document Structure
+// ======================================
+
+async function getDocumentStructure(
+    documentId
+) {
+
+    const db =
+        await openDocumentDatabase();
+
+
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
+
+            const transaction =
+                db.transaction(
+                    DOCUMENT_STRUCTURE_STORE_NAME,
+                    "readonly"
+                );
+
+            const store =
+                transaction.objectStore(
+                    DOCUMENT_STRUCTURE_STORE_NAME
+                );
+
+
+            const request =
+                store.get(
+                    String(
+                        documentId
+                    )
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result ||
+                        null
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Ensure Document Structure
+// ======================================
+
+async function ensureDocumentStructure(
+    documentItem
+) {
+
+    let structure =
+        await getDocumentStructure(
+            documentItem.id
+        );
+
+
+    if (
+        structure &&
+        Array.isArray(
+            structure.paragraphs
+        )
+    ) {
+
+        return structure;
+
+    }
+
+
+    structure =
+        await buildDocumentStructure(
+            documentItem
+        );
+
+
+    await saveDocumentStructure(
+        documentItem.id,
+        structure
+    );
+
+
+    return structure;
+
+}
+
+
+// ======================================
+// Ensure Document Index
+// يعيد الفهرسة عند تغير نسخة الخوارزمية
+// ======================================
+
+async function ensureDocumentIndex(
+    documentItem
+) {
+
+    if (!documentItem) {
+
+        throw new Error(
+            "لم يتم تحديد المستند."
+        );
+
+    }
+
+
+    let index =
+        await getDocumentIndex(
+            documentItem.id
+        );
+
+
+    if (
+        index &&
+        index.indexVersion ===
+            INDEX_SCHEMA_VERSION &&
+        index.families &&
+        typeof index.families === "object"
+    ) {
+
+        return index;
+
+    }
+
+
+    const textData =
+        await getDocumentText(
+            documentItem.id
+        );
+
+
+    if (
+        !textData ||
+        typeof textData.text !== "string"
+    ) {
+
+        return null;
+
+    }
+
+
+    updateDocumentIndexStatus(
+        documentItem,
+        "indexing"
+    );
+
+
+    index =
+        await rebuildDocumentIndex(
+            documentItem.id,
+            textData.text
+        );
+
+
+    await ensureDocumentStructure(
+        documentItem
+    );
+
+
+    updateDocumentIndexStatus(
+        documentItem,
+        "indexed"
+    );
+
+
+    return index;
+
+}
+
+
 // ======================================
 // Read Current Working Document
+// القراءة + الفهرسة في مسار واحد
 // ======================================
 
 async function readCurrentWordDocument(
@@ -4662,10 +2532,11 @@ async function readCurrentWordDocument(
     try {
 
         if (
-            !Office.context.requirements.isSetSupported(
-                "WordApiHiddenDocument",
-                "1.3"
-            )
+            !Office.context.requirements
+                .isSetSupported(
+                    "WordApiHiddenDocument",
+                    "1.3"
+                )
         ) {
 
             throw new Error(
@@ -4698,12 +2569,15 @@ async function readCurrentWordDocument(
 
         const text =
             await Word.run(
-                async function (context) {
+                async function (
+                    context
+                ) {
 
                     const workingDocument =
-                        context.application.createDocument(
-                            base64
-                        );
+                        context.application
+                            .createDocument(
+                                base64
+                            );
 
 
                     const body =
@@ -4733,19 +2607,15 @@ async function readCurrentWordDocument(
         );
 
 
-        // ======================================
-        // تمت القراءة
-        // ======================================
-
         updateDocumentReadStatus(
             documentItem,
             "read"
         );
 
 
-        // ======================================
-        // بدء الفهرسة
-        // ======================================
+        // ==================================
+        // الفهرسة
+        // ==================================
 
         updateDocumentIndexStatus(
             documentItem,
@@ -4753,106 +2623,81 @@ async function readCurrentWordDocument(
         );
 
 
-        try {
+        const indexData =
+            await rebuildDocumentIndex(
+                documentItem.id,
+                text
+            );
 
-            const indexData =
-                buildDocumentIndex(
+
+        // ==================================
+        // البنية
+        // ==================================
+
+        const structureData =
+            await buildDocumentStructure(
+                documentItem
+            );
+
+
+        await saveDocumentStructure(
+            documentItem.id,
+            structureData
+        );
+
+
+        documentItem.indexTokenCount =
+            indexData.tokenCount;
+
+        documentItem.indexUniqueTerms =
+            indexData.uniqueTerms;
+
+        documentItem.indexUniqueFamilies =
+            indexData.uniqueFamilies;
+
+        documentItem.indexSchemaVersion =
+            INDEX_SCHEMA_VERSION;
+
+        documentItem.indexUpdatedAt =
+            indexData.updatedAt;
+
+
+        updateDocumentIndexStatus(
+            documentItem,
+            "indexed"
+        );
+
+
+        console.log(
+            "تمت قراءة المستند وفهرسته:",
+            {
+                documentId:
                     documentItem.id,
-                    text
-                );
 
+                tokenCount:
+                    indexData.tokenCount,
 
-            await saveDocumentIndex(
-                documentItem.id,
-                indexData
-            );
-            
-            const savedIndex =
-                await getDocumentIndex(
-                    documentItem.id
-                );
+                uniqueTerms:
+                    indexData.uniqueTerms,
 
-
-            console.log(
-                "الفهرس المسترجع من IndexedDB:",
-                savedIndex
-            );
-
-            console.log(
-                "اختبار الفهرس الحقيقي:",
-                {
-                    documentId:
-                        documentItem.id,
-
-                    tokenCount:
-                        indexData.tokenCount,
-
-                    uniqueTerms:
-                        indexData.uniqueTerms,
-
-                    firstTerms:
-                        Object.keys(
-                            indexData.terms || {}
-                        ).slice(0, 20)
-                }
-            );
-
-            const structureData =
-                await buildDocumentStructure(
-                    documentItem
-                );
-
-
-            await saveDocumentStructure(
-                documentItem.id,
-                structureData
-            );
-
-            // ==================================
-            // حفظ إحصاءات الفهرس مع المستند
-            // ==================================
-
-            documentItem.indexTokenCount =
-                indexData.tokenCount;
-
-            documentItem.indexUniqueTerms =
-                indexData.uniqueTerms;
-
-            documentItem.indexUpdatedAt =
-                indexData.updatedAt;
-
-
-            // ==================================
-            // تثبيت حالة الفهرسة
-            // ==================================
-
-            updateDocumentIndexStatus(
-                documentItem,
-                "indexed"
-            );
-
-
-        }
-        catch (indexError) {
-
-            updateDocumentIndexStatus(
-                documentItem,
-                "error"
-            );
-
-
-            throw indexError;
-
-        }
+                uniqueFamilies:
+                    indexData.uniqueFamilies
+            }
+        );
 
 
         return text;
 
     }
-
     catch (error) {
 
         updateDocumentReadStatus(
+            documentItem,
+            "error"
+        );
+
+
+        updateDocumentIndexStatus(
             documentItem,
             "error"
         );
@@ -4863,6 +2708,131 @@ async function readCurrentWordDocument(
     }
 
 }
+
+
+// ======================================
+// Set Active Document
+// ======================================
+
+function setCurrentDocument(
+    documentItem
+) {
+
+    if (!documentItem) {
+
+        currentDocument =
+            null;
+
+
+        if (documentTitle) {
+
+            documentTitle.textContent =
+                "لا يوجد مستند مفتوح";
+
+        }
+
+
+        renderDocuments();
+
+
+        return;
+
+    }
+
+
+    currentDocument =
+        documentItem;
+
+
+    if (documentTitle) {
+
+        documentTitle.textContent =
+            documentItem.name;
+
+    }
+
+
+    // ==================================
+    // إذا كان النص موجودًا مسبقًا
+    // لا نعيد قراءة الملف من Word
+    // بل نتحقق من نسخة الفهرس
+    // ==================================
+
+    if (
+        documentItem.readStatus ===
+        "read"
+    ) {
+
+        ensureDocumentIndex(
+            documentItem
+        )
+        .then(
+            function () {
+
+                renderDocuments();
+
+            }
+        )
+        .catch(
+            function (error) {
+
+                console.error(
+                    "تعذر تحديث فهرس المستند:",
+                    error
+                );
+
+                renderDocuments();
+
+            }
+        );
+
+
+        renderDocuments();
+
+
+        return;
+
+    }
+
+
+    // ==================================
+    // المستند جديد
+    // ==================================
+
+    readCurrentWordDocument(
+        documentItem
+    )
+    .then(
+        function (text) {
+
+            console.log(
+                "محتوى نسخة العمل:",
+                text
+            );
+
+            renderDocuments();
+
+        }
+    )
+    .catch(
+        function (error) {
+
+            console.error(
+                "تعذر قراءة نسخة العمل:",
+                error
+            );
+
+            renderDocuments();
+
+        }
+    );
+
+
+    renderDocuments();
+
+}
+
+
 // ======================================
 // Update Document Timestamp
 // ======================================
@@ -4873,6 +2843,7 @@ function touchDocument(
 
     if (!documentItem)
         return;
+
 
     documentItem.updatedAt =
         new Date().toISOString();
@@ -4893,8 +2864,11 @@ function attachDocumentToProject(
         !project ||
         !documentItem
     ) {
+
         return;
+
     }
+
 
     if (
         !Array.isArray(
@@ -4907,6 +2881,7 @@ function attachDocumentToProject(
 
     }
 
+
     if (
         !project.documents.includes(
             documentItem.id
@@ -4917,25 +2892,34 @@ function attachDocumentToProject(
             documentItem.id
         );
 
+
         project.updatedAt =
             new Date().toISOString();
+
 
         saveProjects();
 
     }
 
 }
+
+
 // ======================================
 // Set Active Project
 // ======================================
 
-function setCurrentProject(project) {
+function setCurrentProject(
+    project
+) {
 
     if (!project) {
 
-        currentProject = null;
+        currentProject =
+            null;
+
 
         renderDocuments();
+
 
         return;
 
@@ -4952,8 +2936,7 @@ function setCurrentProject(project) {
 
 
 // ======================================
-// Add Document Button
-// Choose Real DOCX File
+// Add Document
 // ======================================
 
 if (
@@ -4985,7 +2968,6 @@ if (
             }
 
 
-            // فتح نافذة اختيار الملف
             wordDocumentPicker.value =
                 "";
 
@@ -4994,10 +2976,6 @@ if (
 
         };
 
-
-    // ==================================
-    // عند اختيار الملف
-    // ==================================
 
     wordDocumentPicker.onchange =
         async function () {
@@ -5013,14 +2991,11 @@ if (
                     return;
 
 
-                // نقبل DOCX فقط
-                const isDocx =
-                    /\.docx$/i.test(
+                if (
+                    !/\.docx$/i.test(
                         file.name
-                    );
-
-
-                if (!isDocx) {
+                    )
+                ) {
 
                     console.warn(
                         "الملف المختار ليس DOCX."
@@ -5031,16 +3006,9 @@ if (
                 }
 
 
-                if (!currentProject) {
-
+                if (!currentProject)
                     return;
 
-                }
-
-
-                // ==========================
-                // تحديد الترتيب
-                // ==========================
 
                 const projectDocuments =
                     getProjectDocuments(
@@ -5052,10 +3020,6 @@ if (
                     projectDocuments.length + 1;
 
 
-                // ==========================
-                // إنشاء سجل المستند
-                // ==========================
-
                 const documentItem =
                     createDocument(
                         file,
@@ -5064,19 +3028,11 @@ if (
                     );
 
 
-                // ==========================
-                // حفظ نسخة الملف
-                // ==========================
-
                 await saveWorkingWordFile(
                     documentItem.storageId,
                     file
                 );
 
-
-                // ==========================
-                // ربط المستند بالمشروع
-                // ==========================
 
                 attachDocumentToProject(
                     currentProject,
@@ -5084,18 +3040,10 @@ if (
                 );
 
 
-                // ==========================
-                // جعله المستند النشط
-                // ==========================
-
                 setCurrentDocument(
                     documentItem
                 );
 
-
-                // ==========================
-                // إعادة العرض
-                // ==========================
 
                 renderDocuments();
 
@@ -5115,13 +3063,13 @@ if (
                 );
 
             }
-
             catch (error) {
 
                 console.error(
                     "فشل استيراد مستند Word:",
                     error
                 );
+
 
                 if (documentsList) {
 
@@ -5138,6 +3086,14 @@ if (
         };
 
 }
+
+// ======================================
+// Word AI Assistant
+// PART 2 / 3
+// المشاريع + المستندات + المحادثات
+// ======================================
+
+
 // ======================================
 // Project Icon
 // ======================================
@@ -5160,9 +3116,12 @@ const projectIcon = `
 
     </svg>
 `;
+
+
 // ======================================
-// ايقونة محادثات
+// Chat Icon
 // ======================================
+
 const chatIcon = `
     <svg
         width="16"
@@ -5182,11 +3141,887 @@ const chatIcon = `
     </svg>
 `;
 
+
+// ======================================
+// Save Projects
+// ======================================
+
 function saveProjects() {
 
     localStorage.setItem(
         "WORD_AI_PROJECTS",
-        JSON.stringify(projects)
+        JSON.stringify(
+            projects
+        )
+    );
+
+}
+
+
+// ======================================
+// Render Documents
+// ======================================
+
+function renderDocuments() {
+
+    if (!documentsList)
+        return;
+
+
+    documentsList.innerHTML =
+        "";
+
+
+    if (!currentProject) {
+
+        documentsList.innerHTML = `
+            <div class="empty-document">
+                اختر مشروعًا لعرض مستنداته
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    const projectDocuments =
+        getProjectDocuments(
+            currentProject.id
+        );
+
+
+    if (
+        projectDocuments.length ===
+        0
+    ) {
+
+        documentsList.innerHTML = `
+            <div class="empty-document">
+                لا توجد مستندات
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    projectDocuments.forEach(
+        function (
+            documentItem,
+            index
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "document-item";
+
+
+            if (
+                currentDocument &&
+                currentDocument.id ===
+                    documentItem.id
+            ) {
+
+                item.classList.add(
+                    "active-document"
+                );
+
+            }
+
+
+            const title =
+                document.createElement(
+                    "span"
+                );
+
+
+            title.className =
+                "document-title";
+
+
+            title.textContent =
+                documentItem.name;
+
+
+            const status =
+                document.createElement(
+                    "span"
+                );
+
+
+            status.className =
+                "document-read-status";
+
+
+            if (
+                documentItem.indexStatus ===
+                "indexed"
+            ) {
+
+                status.textContent =
+                    "✓ مفهرس · " +
+                    documentItem.indexTokenCount +
+                    " كلمة · " +
+                    documentItem.indexUniqueTerms +
+                    " فريدة";
+
+                if (
+                    documentItem.indexUniqueFamilies
+                ) {
+
+                    status.textContent +=
+                        " · " +
+                        documentItem.indexUniqueFamilies +
+                        " عائلة";
+
+                }
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "indexing"
+            ) {
+
+                status.textContent =
+                    "جارٍ الفهرسة...";
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "error"
+            ) {
+
+                status.textContent =
+                    "⚠ فشل الفهرسة";
+
+            }
+            else if (
+                documentItem.readStatus ===
+                "reading"
+            ) {
+
+                status.textContent =
+                    "جارٍ القراءة...";
+
+            }
+            else if (
+                documentItem.readStatus ===
+                "read"
+            ) {
+
+                status.textContent =
+                    "✓ تمت القراءة";
+
+            }
+            else {
+
+                status.textContent =
+                    "جديد";
+
+            }
+
+
+            title.onclick =
+                function (e) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    setCurrentDocument(
+                        documentItem
+                    );
+
+                };
+
+
+            const menuButton =
+                document.createElement(
+                    "button"
+                );
+
+
+            menuButton.className =
+                "document-menu";
+
+
+            menuButton.type =
+                "button";
+
+
+            menuButton.title =
+                "خيارات المستند";
+
+
+            menuButton.textContent =
+                "⋮";
+
+
+            const options =
+                document.createElement(
+                    "div"
+                );
+
+
+            options.className =
+                "document-options-menu";
+
+
+            options.innerHTML = `
+
+                <div class="rename-document">
+                    ✏ إعادة تسمية
+                </div>
+
+                <div class="move-document-up">
+                    ↑ نقل إلى أعلى
+                </div>
+
+                <div class="move-document-down">
+                    ↓ نقل إلى أسفل
+                </div>
+
+                <div class="delete-document">
+                    🗑 حذف
+                </div>
+
+            `;
+
+
+            if (index === 0) {
+
+                const moveUp =
+                    options.querySelector(
+                        ".move-document-up"
+                    );
+
+                if (moveUp) {
+
+                    moveUp.style.display =
+                        "none";
+
+                }
+
+            }
+
+
+            if (
+                index ===
+                projectDocuments.length - 1
+            ) {
+
+                const moveDown =
+                    options.querySelector(
+                        ".move-document-down"
+                    );
+
+                if (moveDown) {
+
+                    moveDown.style.display =
+                        "none";
+
+                }
+
+            }
+
+
+            menuButton.onclick =
+                function (e) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    document
+                        .querySelectorAll(
+                            ".document-options-menu.open"
+                        )
+                        .forEach(
+                            function (menu) {
+
+                                if (
+                                    menu !==
+                                    options
+                                ) {
+
+                                    menu.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+
+                            }
+                        );
+
+
+                    options.classList.toggle(
+                        "open"
+                    );
+
+                };
+
+
+            // ==================================
+            // Rename
+            // ==================================
+
+            const renameButton =
+                options.querySelector(
+                    ".rename-document"
+                );
+
+
+            if (renameButton) {
+
+                renameButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        const oldName =
+                            documentItem.name;
+
+
+                        const inputRename =
+                            document.createElement(
+                                "input"
+                            );
+
+
+                        inputRename.className =
+                            "edit-document-title";
+
+
+                        inputRename.value =
+                            oldName;
+
+
+                        title.replaceWith(
+                            inputRename
+                        );
+
+
+                        inputRename.focus();
+
+
+                        inputRename.setSelectionRange(
+                            inputRename.value.length,
+                            inputRename.value.length
+                        );
+
+
+                        function finishRename(
+                            saveChange
+                        ) {
+
+                            const newName =
+                                inputRename.value.trim();
+
+
+                            if (
+                                saveChange &&
+                                newName !== ""
+                            ) {
+
+                                documentItem.name =
+                                    newName;
+
+
+                                documentItem.updatedAt =
+                                    new Date()
+                                        .toISOString();
+
+
+                                saveDocuments();
+
+                            }
+                            else {
+
+                                documentItem.name =
+                                    oldName;
+
+                            }
+
+
+                            renderDocuments();
+
+                        }
+
+
+                        inputRename.onkeydown =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    event.preventDefault();
+
+                                    finishRename(
+                                        true
+                                    );
+
+                                }
+
+
+                                if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    event.preventDefault();
+
+                                    finishRename(
+                                        false
+                                    );
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Move Up
+            // ==================================
+
+            const moveUpButton =
+                options.querySelector(
+                    ".move-document-up"
+                );
+
+
+            if (moveUpButton) {
+
+                moveUpButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        if (index <= 0)
+                            return;
+
+
+                        const previousDocument =
+                            projectDocuments[
+                                index - 1
+                            ];
+
+
+                        const currentOrder =
+                            documentItem.order;
+
+
+                        documentItem.order =
+                            previousDocument.order;
+
+
+                        previousDocument.order =
+                            currentOrder;
+
+
+                        documentItem.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        previousDocument.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        saveDocuments();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Move Down
+            // ==================================
+
+            const moveDownButton =
+                options.querySelector(
+                    ".move-document-down"
+                );
+
+
+            if (moveDownButton) {
+
+                moveDownButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        if (
+                            index >=
+                            projectDocuments.length - 1
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const nextDocument =
+                            projectDocuments[
+                                index + 1
+                            ];
+
+
+                        const currentOrder =
+                            documentItem.order;
+
+
+                        documentItem.order =
+                            nextDocument.order;
+
+
+                        nextDocument.order =
+                            currentOrder;
+
+
+                        documentItem.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        nextDocument.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        saveDocuments();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Delete
+            // ==================================
+
+            const deleteButton =
+                options.querySelector(
+                    ".delete-document"
+                );
+
+
+            if (deleteButton) {
+
+                deleteButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        const oldConfirm =
+                            document.querySelector(
+                                ".document-delete-confirm"
+                            );
+
+
+                        if (oldConfirm) {
+
+                            oldConfirm.remove();
+
+                        }
+
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "document-delete-confirm";
+
+
+                        confirmBox.innerHTML = `
+                            <div class="document-delete-dialog">
+
+                                <div class="document-delete-message">
+                                    هل تريد حذف المستند؟
+                                </div>
+
+                                <div class="document-delete-name">
+                                    ${documentItem.name}
+                                </div>
+
+                                <div class="document-delete-buttons">
+
+                                    <button
+                                        type="button"
+                                        class="confirm-document-delete">
+                                        حذف
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="cancel-document-delete">
+                                        إلغاء
+                                    </button>
+
+                                </div>
+
+                            </div>
+                        `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-document-delete"
+                            );
+
+
+                        if (confirmDelete) {
+
+                            confirmDelete.onclick =
+                                async function () {
+
+                                    documents =
+                                        documents.filter(
+                                            function (
+                                                doc
+                                            ) {
+
+                                                return (
+                                                    doc.id !==
+                                                    documentItem.id
+                                                );
+
+                                            }
+                                        );
+
+
+                                    if (
+                                        currentProject &&
+                                        Array.isArray(
+                                            currentProject.documents
+                                        )
+                                    ) {
+
+                                        currentProject.documents =
+                                            currentProject.documents.filter(
+                                                function (
+                                                    id
+                                                ) {
+
+                                                    return (
+                                                        id !==
+                                                        documentItem.id
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        currentProject.updatedAt =
+                                            new Date()
+                                                .toISOString();
+
+
+                                        saveProjects();
+
+                                    }
+
+
+                                    try {
+
+                                        await deleteWorkingWordFile(
+                                            documentItem.storageId
+                                        );
+
+                                    }
+                                    catch (
+                                        storageError
+                                    ) {
+
+                                        console.warn(
+                                            "تعذر حذف نسخة العمل:",
+                                            storageError
+                                        );
+
+                                    }
+
+
+                                    if (
+                                        currentDocument &&
+                                        currentDocument.id ===
+                                            documentItem.id
+                                    ) {
+
+                                        currentDocument =
+                                            null;
+
+
+                                        if (
+                                            documentTitle
+                                        ) {
+
+                                            documentTitle.textContent =
+                                                "لا يوجد مستند مفتوح";
+
+                                        }
+
+                                    }
+
+
+                                    const remaining =
+                                        getProjectDocuments(
+                                            currentProject.id
+                                        );
+
+
+                                    remaining.forEach(
+                                        function (
+                                            doc,
+                                            newIndex
+                                        ) {
+
+                                            doc.order =
+                                                newIndex + 1;
+
+
+                                            doc.updatedAt =
+                                                new Date()
+                                                    .toISOString();
+
+                                        }
+                                    );
+
+
+                                    saveDocuments();
+
+
+                                    confirmBox.remove();
+
+
+                                    renderDocuments();
+
+                                };
+
+                        }
+
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-document-delete"
+                            );
+
+
+                        if (cancelDelete) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        confirmBox.onclick =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.target ===
+                                    confirmBox
+                                ) {
+
+                                    confirmBox.remove();
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            item.appendChild(
+                title
+            );
+
+
+            item.appendChild(
+                status
+            );
+
+
+            item.appendChild(
+                menuButton
+            );
+
+
+            item.appendChild(
+                options
+            );
+
+
+            documentsList.appendChild(
+                item
+            );
+
+        }
     );
 
 }
@@ -5198,219 +4033,1429 @@ function saveProjects() {
 
 let chats = [];
 
+
 try {
 
-
-chats =
-    JSON.parse(
-        localStorage.getItem(
-            "WORD_AI_CHATS"
-        )
-    ) || [];
-
+    chats =
+        JSON.parse(
+            localStorage.getItem(
+                "WORD_AI_CHATS"
+            )
+        ) || [];
 
 }
 catch (e) {
 
-
-chats = [];
-
+    chats = [];
 
 }
+
 
 let currentChat = null;
 
+
 function saveChats() {
 
-
-localStorage.setItem(
-    "WORD_AI_CHATS",
-    JSON.stringify(chats)
-);
-
+    localStorage.setItem(
+        "WORD_AI_CHATS",
+        JSON.stringify(
+            chats
+        )
+    );
 
 }
 
+
 // ======================================
-// Sidebar
-// Expand / Collapse Sections
+// Initialize Sidebar Sections
 // ======================================
 
 function initializeSidebarSections() {
 
+    const headers =
+        document.querySelectorAll(
+            ".section-title[data-target], .section-toggle[data-target]"
+        );
 
-const headers =
-    document.querySelectorAll(
-        ".section-title[data-target], .section-toggle[data-target]"
+
+    headers.forEach(
+        function (
+            header
+        ) {
+
+            const targetId =
+                header.getAttribute(
+                    "data-target"
+                );
+
+
+            if (!targetId)
+                return;
+
+
+            const target =
+                document.getElementById(
+                    targetId
+                );
+
+
+            if (!target)
+                return;
+
+
+            target.classList.remove(
+                "open"
+            );
+
+
+            header.classList.remove(
+                "open"
+            );
+
+
+            header.onclick =
+                function (e) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    const isOpen =
+                        target.classList.contains(
+                            "open"
+                        );
+
+
+                    if (isOpen) {
+
+                        target.classList.remove(
+                            "open"
+                        );
+
+                        header.classList.remove(
+                            "open"
+                        );
+
+                    }
+                    else {
+
+                        target.classList.add(
+                            "open"
+                        );
+
+                        header.classList.add(
+                            "open"
+                        );
+
+                    }
+
+                };
+
+        }
     );
 
+}
 
-headers.forEach(function (header) {
 
-    const targetId =
-        header.getAttribute("data-target");
+// ======================================
+// Render Projects
+// ======================================
 
-    if (!targetId)
+function renderProjects() {
+
+    if (!projectsList)
         return;
 
 
-    const target =
-        document.getElementById(targetId);
-
-    if (!target)
-        return;
+    projectsList.innerHTML =
+        "";
 
 
-    target.classList.remove("open");
-    header.classList.remove("open");
+    projects.forEach(
+        function (
+            project
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
 
 
-    header.onclick =
+            item.className =
+                "project-item";
+
+
+            item.innerHTML = `
+
+                <span class="project-title">
+                    ${projectIcon}
+                    ${project.name}
+                </span>
+
+                <button
+                    class="project-menu"
+                    type="button">
+                    ⋮
+                </button>
+
+                <div class="project-options-menu">
+
+                    <div class="rename-project">
+                        ✏ إعادة تسمية
+                    </div>
+
+                    <div class="delete-project">
+                        🗑 حذف
+                    </div>
+
+                </div>
+
+            `;
+
+
+            item.onclick =
+                function (e) {
+
+                    e.stopPropagation();
+
+
+                    setCurrentProject(
+                        project
+                    );
+
+
+                    if (projectsPopup) {
+
+                        projectsPopup.classList.remove(
+                            "open"
+                        );
+
+                    }
+
+                };
+
+
+            const menu =
+                item.querySelector(
+                    ".project-menu"
+                );
+
+
+            if (menu) {
+
+                menu.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        document
+                            .querySelectorAll(
+                                ".project-options-menu"
+                            )
+                            .forEach(
+                                function (
+                                    m
+                                ) {
+
+                                    m.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+                            );
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (!options)
+                            return;
+
+
+                        options.classList.add(
+                            "open"
+                        );
+
+
+                        const rect =
+                            menu.getBoundingClientRect();
+
+
+                        const menuWidth =
+                            140;
+
+                        const menuHeight =
+                            options.offsetHeight ||
+                            80;
+
+                        const margin =
+                            8;
+
+
+                        let left =
+                            rect.left -
+                            menuWidth -
+                            margin;
+
+
+                        let top =
+                            rect.bottom +
+                            margin;
+
+
+                        if (
+                            left < margin
+                        ) {
+
+                            left =
+                                rect.right +
+                                margin;
+
+                        }
+
+
+                        if (
+                            left + menuWidth >
+                            window.innerWidth -
+                            margin
+                        ) {
+
+                            left =
+                                window.innerWidth -
+                                menuWidth -
+                                margin;
+
+                        }
+
+
+                        if (
+                            top + menuHeight >
+                            window.innerHeight -
+                            margin
+                        ) {
+
+                            top =
+                                rect.top -
+                                menuHeight -
+                                margin;
+
+                        }
+
+
+                        if (
+                            top < margin
+                        ) {
+
+                            top =
+                                margin;
+
+                        }
+
+
+                        options.style.position =
+                            "fixed";
+
+
+                        options.style.left =
+                            left + "px";
+
+
+                        options.style.top =
+                            top + "px";
+
+
+                        options.style.right =
+                            "auto";
+
+
+                        options.style.bottom =
+                            "auto";
+
+
+                        options.style.zIndex =
+                            "999999";
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Rename Project
+            // ==================================
+
+            const renameProject =
+                item.querySelector(
+                    ".rename-project"
+                );
+
+
+            if (renameProject) {
+
+                renameProject.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (options) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const title =
+                            item.querySelector(
+                                ".project-title"
+                            );
+
+
+                        if (!title)
+                            return;
+
+
+                        const oldName =
+                            project.name;
+
+
+                        title.innerHTML = `
+                            <input
+                                class="edit-project-title"
+                                value="${oldName}">
+                        `;
+
+
+                        const edit =
+                            title.querySelector(
+                                ".edit-project-title"
+                            );
+
+
+                        if (!edit)
+                            return;
+
+
+                        edit.focus();
+
+
+                        edit.setSelectionRange(
+                            edit.value.length,
+                            edit.value.length
+                        );
+
+
+                        edit.onkeydown =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    const value =
+                                        edit.value.trim();
+
+
+                                    project.name =
+                                        value !== ""
+                                            ? value
+                                            : oldName;
+
+
+                                    project.updatedAt =
+                                        new Date()
+                                            .toISOString();
+
+
+                                    saveProjects();
+
+
+                                    renderProjects();
+
+
+                                    renderExpandedProjects();
+
+                                }
+
+
+                                if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    project.name =
+                                        oldName;
+
+
+                                    renderProjects();
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Delete Project
+            // ==================================
+
+            const deleteProject =
+                item.querySelector(
+                    ".delete-project"
+                );
+
+
+            if (deleteProject) {
+
+                deleteProject.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (options) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "project-delete-confirm";
+
+
+                        confirmBox.innerHTML = `
+
+                            <div class="confirm-dialog">
+
+                                <p>
+                                    هل تريد حذف المشروع:
+                                    <br>
+
+                                    <strong>
+                                        ${project.name}
+                                    </strong>
+
+                                    ؟
+                                </p>
+
+                                <button
+                                    class="confirm-project-delete"
+                                    type="button">
+                                    حذف
+                                </button>
+
+                                <button
+                                    class="cancel-project-delete"
+                                    type="button">
+                                    إلغاء
+                                </button>
+
+                            </div>
+
+                        `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-project-delete"
+                            );
+
+
+                        if (confirmDelete) {
+
+                            confirmDelete.onclick =
+                                function () {
+
+                                    const projectDocumentIds =
+                                        Array.isArray(
+                                            project.documents
+                                        )
+                                            ? project.documents
+                                            : [];
+
+
+                                    projectDocumentIds
+                                        .forEach(
+                                            function (
+                                                id
+                                            ) {
+
+                                                const doc =
+                                                    documents.find(
+                                                        function (
+                                                            d
+                                                        ) {
+
+                                                            return (
+                                                                d.id ===
+                                                                id
+                                                            );
+
+                                                        }
+                                                    );
+
+
+                                                if (doc) {
+
+                                                    deleteWorkingWordFile(
+                                                        doc.storageId
+                                                    )
+                                                    .catch(
+                                                        function () {}
+                                                    );
+
+                                                }
+
+                                            }
+                                        );
+
+
+                                    documents =
+                                        documents.filter(
+                                            function (
+                                                doc
+                                            ) {
+
+                                                return (
+                                                    !projectDocumentIds.includes(
+                                                        doc.id
+                                                    )
+                                                );
+
+                                            }
+                                        );
+
+
+                                    projects =
+                                        projects.filter(
+                                            function (
+                                                p
+                                            ) {
+
+                                                return (
+                                                    p.id !==
+                                                    project.id
+                                                );
+
+                                            }
+                                        );
+
+
+                                    if (
+                                        currentProject &&
+                                        currentProject.id ===
+                                            project.id
+                                    ) {
+
+                                        currentProject =
+                                            null;
+
+
+                                        currentDocument =
+                                            null;
+
+
+                                        if (
+                                            documentTitle
+                                        ) {
+
+                                            documentTitle.textContent =
+                                                "لا يوجد مستند مفتوح";
+
+                                        }
+
+                                    }
+
+
+                                    saveDocuments();
+
+
+                                    saveProjects();
+
+
+                                    renderProjects();
+
+
+                                    renderExpandedProjects();
+
+
+                                    renderDocuments();
+
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-project-delete"
+                            );
+
+
+                        if (cancelDelete) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+                    };
+
+            }
+
+
+            projectsList.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Projects Button
+// ======================================
+
+if (projectsBtn) {
+
+    projectsBtn.onclick =
+        function (e) {
+
+            e.stopPropagation();
+
+
+            if (!projectsPopup)
+                return;
+
+
+            if (chatPopup) {
+
+                chatPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (searchPopup) {
+
+                searchPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (settingsWindow) {
+
+                settingsWindow.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            projectsPopup.classList.toggle(
+                "open"
+            );
+
+
+            renderProjects();
+
+        };
+
+}
+
+
+// ======================================
+// New Project
+// ======================================
+
+if (newProjectBtn) {
+
+    newProjectBtn.onclick =
+        function (e) {
+
+            e.stopPropagation();
+
+
+            if (!projectsPopup)
+                return;
+
+
+            const oldBox =
+                document.querySelector(
+                    ".project-create-box"
+                );
+
+
+            if (oldBox) {
+
+                oldBox.remove();
+
+            }
+
+
+            const box =
+                document.createElement(
+                    "div"
+                );
+
+
+            box.className =
+                "project-create-box";
+
+
+            box.innerHTML = `
+
+                <div class="rename-dialog">
+
+                    <input
+                        class="new-project-name"
+                        placeholder="اسم المشروع">
+
+                    <button
+                        class="save-project"
+                        type="button">
+                        حفظ
+                    </button>
+
+                    <button
+                        class="cancel-project"
+                        type="button">
+                        إلغاء
+                    </button>
+
+                </div>
+
+            `;
+
+
+            document.body.appendChild(
+                box
+            );
+
+
+            const buttonRect =
+                newProjectBtn.getBoundingClientRect();
+
+
+            const boxHeight =
+                120;
+
+            const screenMargin =
+                12;
+
+
+            let left =
+                buttonRect.left;
+
+            let top =
+                buttonRect.bottom + 8;
+
+
+            const actualBoxWidth =
+                box.offsetWidth ||
+                240;
+
+
+            if (
+                left + actualBoxWidth >
+                window.innerWidth -
+                screenMargin
+            ) {
+
+                left =
+                    window.innerWidth -
+                    actualBoxWidth -
+                    screenMargin;
+
+            }
+
+
+            if (
+                left < screenMargin
+            ) {
+
+                left =
+                    screenMargin;
+
+            }
+
+
+            if (
+                top + boxHeight >
+                window.innerHeight -
+                screenMargin
+            ) {
+
+                top =
+                    buttonRect.top -
+                    boxHeight -
+                    8;
+
+            }
+
+
+            box.style.position =
+                "fixed";
+
+            box.style.left =
+                left + "px";
+
+            box.style.top =
+                top + "px";
+
+            box.style.zIndex =
+                "999999";
+
+
+            const inputProject =
+                box.querySelector(
+                    ".new-project-name"
+                );
+
+
+            if (inputProject) {
+
+                inputProject.focus();
+
+            }
+
+
+            const saveProject =
+                box.querySelector(
+                    ".save-project"
+                );
+
+
+            if (saveProject) {
+
+                saveProject.onclick =
+                    function () {
+
+                        const name =
+                            inputProject
+                                ? inputProject.value.trim()
+                                : "";
+
+
+                        if (
+                            name !== ""
+                        ) {
+
+                            const now =
+                                new Date()
+                                    .toISOString();
+
+
+                            const newProject = {
+
+                                id:
+                                    Date.now(),
+
+                                name:
+                                    name,
+
+                                createdAt:
+                                    now,
+
+                                updatedAt:
+                                    now,
+
+                                documents:
+                                    [],
+
+                                references:
+                                    [],
+
+                                chatIds:
+                                    [],
+
+                                settings: {
+
+                                    citationStyle:
+                                        "",
+
+                                    notes:
+                                        ""
+
+                                }
+
+                            };
+
+
+                            projects.unshift(
+                                newProject
+                            );
+
+
+                            saveProjects();
+
+
+                            renderProjects();
+
+
+                            renderExpandedProjects();
+
+                        }
+
+
+                        box.remove();
+
+                    };
+
+            }
+
+
+            const cancelProject =
+                box.querySelector(
+                    ".cancel-project"
+                );
+
+
+            if (cancelProject) {
+
+                cancelProject.onclick =
+                    function () {
+
+                        box.remove();
+
+                    };
+
+            }
+
+
+            box.onclick =
+                function (e) {
+
+                    e.stopPropagation();
+
+                };
+
+        };
+
+}
+
+
+// ======================================
+// Expanded Sidebar
+// ======================================
+
+if (
+    sidebarToggleBtn &&
+    expandedSidebar
+) {
+
+    sidebarToggleBtn.onclick =
         function (e) {
 
             e.preventDefault();
             e.stopPropagation();
 
 
-            const isOpen =
-                target.classList.contains(
+            if (
+                !expandedSidebar ||
+                !expandedSidebarToggleSlot
+            ) {
+
+                return;
+
+            }
+
+
+            const isOpening =
+                !expandedSidebar.classList.contains(
                     "open"
                 );
 
 
-            if (isOpen) {
+            if (isOpening) {
 
-                target.classList.remove(
+                expandedSidebar.classList.add(
                     "open"
                 );
 
-                header.classList.remove(
-                    "open"
+
+                document.body.classList.add(
+                    "expanded-sidebar-open"
+                );
+
+
+                sidebarToggleBtn.title =
+                    "إخفاء القائمة";
+
+
+                sidebarToggleBtn.classList.add(
+                    "sidebar-open"
+                );
+
+
+                expandedSidebarToggleSlot.appendChild(
+                    sidebarToggleBtn
                 );
 
             }
             else {
 
-                target.classList.add(
+                expandedSidebar.classList.remove(
                     "open"
                 );
 
-                header.classList.add(
-                    "open"
+
+                document.body.classList.remove(
+                    "expanded-sidebar-open"
                 );
+
+
+                sidebarToggleBtn.title =
+                    "إظهار القائمة";
+
+
+                sidebarToggleBtn.classList.remove(
+                    "sidebar-open"
+                );
+
+
+                if (
+                    sidebarTogglePlaceholder.parentNode
+                ) {
+
+                    sidebarTogglePlaceholder
+                        .parentNode
+                        .insertBefore(
+                            sidebarToggleBtn,
+                            sidebarTogglePlaceholder.nextSibling
+                        );
+
+                }
 
             }
 
         };
 
-});
-
-
 }
 
+
 // ======================================
-// Close All Sidebar Sections
+// Render Projects in Expanded Sidebar
 // ======================================
 
-function closeAllSidebarSections() {
+function renderExpandedProjects() {
+
+    const list =
+        document.getElementById(
+            "expanded-projects-list"
+        );
 
 
-document
-    .querySelectorAll(
-        ".section-title[data-target], .section-toggle[data-target]"
-    )
-    .forEach(function (header) {
-
-        const targetId =
-            header.getAttribute("data-target");
-
-        if (!targetId)
-            return;
+    if (!list)
+        return;
 
 
-        const target =
-            document.getElementById(targetId);
+    list.innerHTML =
+        "";
 
 
-        if (target) {
+    projects.forEach(
+        function (
+            project
+        ) {
 
-            target.classList.remove(
-                "open"
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "expanded-project-item";
+
+
+            item.innerHTML = `
+                <span>
+                    ${projectIcon}
+                    ${project.name}
+                </span>
+            `;
+
+
+            item.onclick =
+                function (e) {
+
+                    e.stopPropagation();
+
+
+                    setCurrentProject(
+                        project
+                    );
+
+                };
+
+
+            list.appendChild(
+                item
             );
 
         }
-
-
-        header.classList.remove(
-            "open"
-        );
-
-    });
-
+    );
 
 }
 
+
 // ======================================
-// Projects
-// Render Projects
+// Sidebar Recent Chats
 // ======================================
 
-function renderProjects() {
+function renderSidebarChats() {
+
+    const list =
+        document.getElementById(
+            "new-chat-list"
+        );
 
 
-if (!projectsList)
-    return;
+    if (!list)
+        return;
 
 
-projectsList.innerHTML = "";
+    list.innerHTML =
+        "";
 
 
-projects.forEach(function (project) {
+    if (
+        chats.length ===
+        0
+    ) {
 
-    const item =
-        document.createElement("div");
+        list.innerHTML = `
+            <div class="empty-chat">
+                لا توجد محادثات
+            </div>
+        `;
+
+        return;
+
+    }
 
 
-    item.className =
-        "project-item";
+    chats
+        .slice(
+            0,
+            8
+        )
+        .forEach(
+            function (
+                chat
+            ) {
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
 
 
-    item.innerHTML = `
+                item.className =
+                    "recent-chat-item";
 
-        <span class="project-title">
-            ${projectIcon}
-            ${project.name}
-        </span>
 
-        <button
-            class="project-menu"
-            type="button">
-            ⋮
-        </button>
+                item.innerHTML = `
+                    <span class="chat-title">
+                        ${chatIcon}
+                        ${chat.title}
+                    </span>
+                `;
 
-        <div class="project-options-menu">
 
-            <div class="rename-project">
-                ✏ إعادة تسمية
+                item.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        currentChat =
+                            chat;
+
+
+                        renderChat();
+
+
+                        if (projectsPopup) {
+
+                            projectsPopup
+                                .classList
+                                .remove(
+                                    "open"
+                                );
+
+                        }
+
+
+                        if (chatPopup) {
+
+                            chatPopup
+                                .classList
+                                .remove(
+                                    "open"
+                                );
+
+                        }
+
+
+                        if (searchPopup) {
+
+                            searchPopup
+                                .classList
+                                .remove(
+                                    "open"
+                                );
+
+                        }
+
+                    };
+
+
+                list.appendChild(
+                    item
+                );
+
+            }
+        );
+
+}
+
+
+// ======================================
+// Create New Chat
+// ======================================
+
+function createNewChat() {
+
+    currentChat = {
+
+        id:
+            Date.now(),
+
+        title:
+            "محادثة جديدة",
+
+        messages:
+            [],
+
+        isTemporary:
+            true,
+
+        projectId:
+            currentProject
+                ? currentProject.id
+                : null
+
+    };
+
+
+    renderSidebarChats();
+
+
+    renderRecentChats();
+
+
+    if (input) {
+
+        input.value =
+            "";
+
+        input.style.height =
+            "auto";
+
+    }
+
+
+    if (chatArea) {
+
+        chatArea.innerHTML = `
+
+            <div class="welcome">
+
+                <div class="ai-symbol">
+                    ✦
+                </div>
+
+                <h2>
+                    مرحبًا بك
+                </h2>
+
+                <p>
+                    ابدأ محادثة جديدة
+                </p>
+
             </div>
 
-            <div class="delete-project">
-                🗑 حذف
-            </div>
+        `;
 
-        </div>
+    }
 
-    `;
+}
 
 
-        item.onclick =
+// ======================================
+// New Chat Button
+// ======================================
+
+if (newChatBtn) {
+
+    newChatBtn.onclick =
         function (e) {
 
             e.stopPropagation();
 
-            setCurrentProject(
-                project
-            );
 
             if (projectsPopup) {
 
@@ -5420,1361 +5465,1035 @@ projects.forEach(function (project) {
 
             }
 
-        };
 
+            if (chatPopup) {
 
-    const menu =
-        item.querySelector(
-            ".project-menu"
-        );
-
-
-    if (menu) {
-
-        menu.onclick =
-            function (e) {
-
-                e.stopPropagation();
-
-
-                document
-                    .querySelectorAll(
-                        ".project-options-menu"
-                    )
-                    .forEach(function (m) {
-
-                        m.classList.remove(
-                            "open"
-                        );
-
-                    });
-
-
-                const options =
-                    item.querySelector(
-                        ".project-options-menu"
-                    );
-
-
-                if (!options)
-                    return;
-
-
-                options.classList.add(
+                chatPopup.classList.remove(
                     "open"
                 );
 
-
-                const rect =
-                    menu.getBoundingClientRect();
+            }
 
 
-                const menuWidth = 140;
+            if (searchPopup) {
 
-                const menuHeight =
-                    options.offsetHeight || 80;
+                searchPopup.classList.remove(
+                    "open"
+                );
 
-                const margin = 8;
-
-
-                const viewportWidth =
-                    window.innerWidth;
-
-                const viewportHeight =
-                    window.innerHeight;
+            }
 
 
-                const spaceLeft =
-                    rect.left;
+            if (settingsWindow) {
 
-                const spaceBelow =
-                    viewportHeight -
-                    rect.bottom;
+                settingsWindow.classList.remove(
+                    "open"
+                );
 
-                const spaceAbove =
-                    rect.top;
+            }
 
 
-                let left;
-                let top;
+            createNewChat();
+
+        };
+
+}
 
 
-                if (
-                    spaceLeft >=
-                    menuWidth + margin
-                ) {
+// ======================================
+// Render Chat
+// ======================================
 
-                    left =
-                        rect.left -
-                        menuWidth -
-                        margin;
+function formatAIMessage(
+    text
+) {
 
-                }
-                else {
-
-                    left =
-                        rect.right +
-                        margin;
-
-                }
+    if (!text)
+        return "";
 
 
-                if (
-                    spaceBelow <
-                        menuHeight + margin &&
-                    spaceAbove >=
-                        menuHeight + margin
-                ) {
+    try {
 
-                    top =
-                        rect.top -
-                        menuHeight -
-                        margin;
+        return marked.parse(
+            text,
+            {
+                breaks: true,
+                gfm: true
+            }
+        );
 
-                }
-                else {
+    }
+    catch (error) {
 
-                    top =
-                        rect.bottom +
-                        margin;
-
-                }
+        console.error(
+            "Markdown formatting error:",
+            error
+        );
 
 
-                if (left < margin) {
+        return String(
+            text
+        ).replace(
+            /\n/g,
+            "<br>"
+        );
 
-                    left =
-                        margin;
+    }
 
-                }
-
-
-                if (
-                    left + menuWidth >
-                    viewportWidth - margin
-                ) {
-
-                    left =
-                        viewportWidth -
-                        menuWidth -
-                        margin;
-
-                }
+}
 
 
-                if (top < margin) {
+function renderChat() {
 
-                    top =
-                        margin;
-
-                }
+    if (!chatArea)
+        return;
 
 
-                if (
-                    top + menuHeight >
-                    viewportHeight - margin
-                ) {
-
-                    top =
-                        viewportHeight -
-                        menuHeight -
-                        margin;
-
-                }
+    chatArea.innerHTML =
+        "";
 
 
-                options.style.position =
-                    "fixed";
+    if (!currentChat) {
 
-                options.style.left =
-                    left + "px";
+        chatArea.innerHTML = `
 
-                options.style.top =
-                    top + "px";
+            <div class="welcome">
 
-                options.style.right =
-                    "auto";
+                <div class="ai-symbol">
+                    ✦
+                </div>
 
-                options.style.bottom =
-                    "auto";
+                <h2>
+                    مرحبًا بك
+                </h2>
 
-                options.style.zIndex =
-                    "999999";
+                <p>
+                    ابدأ محادثة جديدة
+                </p>
 
-            };
+            </div>
+
+        `;
+
+
+        return;
 
     }
 
 
-    const renameProject =
-        item.querySelector(
-            ".rename-project"
-        );
+    currentChat.messages.forEach(
+        function (
+            msg
+        ) {
 
-
-    if (renameProject) {
-
-        renameProject.onclick =
-            function (e) {
-
-                e.stopPropagation();
-
-
-                const options =
-                    item.querySelector(
-                        ".project-options-menu"
-                    );
-
-
-                if (options) {
-
-                    options.classList.remove(
-                        "open"
-                    );
-
-                }
-
-
-                const title =
-                    item.querySelector(
-                        ".project-title"
-                    );
-
-
-                if (!title)
-                    return;
-
-
-                const oldName =
-                    project.name;
-
-
-                title.innerHTML = `
-
-                    <input
-                        class="edit-project-title"
-                        value="${oldName}">
-
-                `;
-
-
-                const edit =
-                    title.querySelector(
-                        ".edit-project-title"
-                    );
-
-
-                if (!edit)
-                    return;
-
-
-                edit.focus();
-
-
-                edit.setSelectionRange(
-                    edit.value.length,
-                    edit.value.length
+            const div =
+                document.createElement(
+                    "div"
                 );
 
 
-                edit.onkeydown =
-                    function (event) {
+            div.className =
+                "message " +
+                (
+                    msg.role === "user"
+                        ? "user-message"
+                        : "ai-message"
+                );
+
+
+            if (
+                msg.role ===
+                "user"
+            ) {
+
+                div.textContent =
+                    msg.text || "";
+
+            }
+            else {
+
+                div.innerHTML =
+                    formatAIMessage(
+                        msg.text || ""
+                    );
+
+            }
+
+
+            chatArea.appendChild(
+                div
+            );
+
+        }
+    );
+
+
+    chatArea.scrollTop =
+        chatArea.scrollHeight;
+
+}
+
+
+// ======================================
+// Render Chat List
+// ======================================
+
+function renderChatList() {
+
+    const list =
+        document.getElementById(
+            "chat-list"
+        );
+
+
+    if (!list)
+        return;
+
+
+    list.innerHTML =
+        "";
+
+
+    if (
+        chats.length ===
+        0
+    ) {
+
+        list.innerHTML =
+            "<div class='empty-chat'>لا توجد محادثات</div>";
+
+        return;
+
+    }
+
+
+    chats.forEach(
+        function (
+            chat
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "chat-history-item";
+
+
+            item.innerHTML = `
+                <span class="chat-title">
+                    ${chatIcon}
+                    ${chat.title}
+                </span>
+
+                <button
+                    class="chat-menu"
+                    type="button">
+                    ⋮
+                </button>
+
+                <div class="chat-options-menu">
+
+                    <div class="rename-chat">
+                        ✏ إعادة تسمية
+                    </div>
+
+                    <div class="delete-chat">
+                        🗑 حذف
+                    </div>
+
+                </div>
+            `;
+
+
+            const title =
+                item.querySelector(
+                    ".chat-title"
+                );
+
+
+            if (title) {
+
+                title.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        currentChat =
+                            chat;
+
+
+                        renderChat();
+
 
                         if (
-                            event.key ===
-                            "Enter"
+                            expandedSidebar
                         ) {
 
-                            const value =
-                                edit.value.trim();
-
-
-                            if (value !== "") {
-
-                                project.name =
-                                    value;
-
-                            }
-                            else {
-
-                                project.name =
-                                    oldName;
-
-                            }
-
-
-                            saveProjects();
-
-                            renderProjects();
-
-                            renderExpandedProjects();
-
-                        }
-
-
-                        if (
-                            event.key ===
-                            "Escape"
-                        ) {
-
-                            project.name =
-                                oldName;
-
-                            renderProjects();
+                            expandedSidebar.classList.remove(
+                                "open"
+                            );
 
                         }
 
                     };
 
-            };
+            }
+
+
+            const menu =
+                item.querySelector(
+                    ".chat-menu"
+                );
+
+
+            if (menu) {
+
+                menu.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        document
+                            .querySelectorAll(
+                                ".chat-options-menu"
+                            )
+                            .forEach(
+                                function (
+                                    m
+                                ) {
+
+                                    m.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+                            );
+
+
+                        const options =
+                            item.querySelector(
+                                ".chat-options-menu"
+                            );
+
+
+                        if (!options)
+                            return;
+
+
+                        options.classList.add(
+                            "open"
+                        );
+
+
+                        const rect =
+                            menu.getBoundingClientRect();
+
+
+                        options.style.position =
+                            "fixed";
+
+
+                        options.style.left =
+                            Math.max(
+                                8,
+                                rect.left -
+                                140 -
+                                8
+                            ) + "px";
+
+
+                        options.style.top =
+                            rect.bottom +
+                            8 +
+                            "px";
+
+
+                        options.style.zIndex =
+                            "999999";
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Rename Chat
+            // ==================================
+
+            const renameBtn =
+                item.querySelector(
+                    ".rename-chat"
+                );
+
+
+            if (renameBtn) {
+
+                renameBtn.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".chat-options-menu"
+                            );
+
+
+                        if (options) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const titleSpan =
+                            item.querySelector(
+                                ".chat-title"
+                            );
+
+
+                        if (!titleSpan)
+                            return;
+
+
+                        const oldName =
+                            chat.title;
+
+
+                        titleSpan.innerHTML = `
+                            <input
+                                class="edit-chat-title"
+                                value="${oldName}">
+                        `;
+
+
+                        const editInput =
+                            titleSpan.querySelector(
+                                ".edit-chat-title"
+                            );
+
+
+                        if (!editInput)
+                            return;
+
+
+                        editInput.focus();
+
+
+                        editInput.setSelectionRange(
+                            editInput.value.length,
+                            editInput.value.length
+                        );
+
+
+                        editInput.onkeydown =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    const value =
+                                        editInput.value.trim();
+
+
+                                    chat.title =
+                                        value !== ""
+                                            ? value
+                                            : oldName;
+
+
+                                    saveChats();
+
+
+                                    renderChatList();
+
+
+                                    renderSidebarChats();
+
+
+                                    renderRecentChats();
+
+                                }
+
+
+                                if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    chat.title =
+                                        oldName;
+
+
+                                    renderChatList();
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Delete Chat
+            // ==================================
+
+            const deleteBtn =
+                item.querySelector(
+                    ".delete-chat"
+                );
+
+
+            if (deleteBtn) {
+
+                deleteBtn.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".chat-options-menu"
+                            );
+
+
+                        if (options) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "delete-confirm";
+
+
+                        confirmBox.innerHTML = `
+
+                            <div class="confirm-dialog">
+
+                                <p>
+                                    هل تريد حذف المحادثة:
+                                    <br>
+
+                                    <strong>
+                                        ${chat.title}
+                                    </strong>
+
+                                    ؟
+                                </p>
+
+                                <button
+                                    class="confirm-delete"
+                                    type="button">
+                                    حذف
+                                </button>
+
+                                <button
+                                    class="cancel-delete"
+                                    type="button">
+                                    إلغاء
+                                </button>
+
+                            </div>
+
+                        `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-delete"
+                            );
+
+
+                        if (confirmDelete) {
+
+                            confirmDelete.onclick =
+                                function () {
+
+                                    chats =
+                                        chats.filter(
+                                            function (
+                                                c
+                                            ) {
+
+                                                return (
+                                                    c.id !==
+                                                    chat.id
+                                                );
+
+                                            }
+                                        );
+
+
+                                    if (
+                                        currentChat &&
+                                        currentChat.id ===
+                                            chat.id
+                                    ) {
+
+                                        currentChat =
+                                            null;
+
+
+                                        renderChat();
+
+                                    }
+
+
+                                    saveChats();
+
+
+                                    renderChatList();
+
+
+                                    renderSidebarChats();
+
+
+                                    renderRecentChats();
+
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-delete"
+                            );
+
+
+                        if (cancelDelete) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+                    };
+
+            }
+
+
+            list.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Recent Chats Popup
+// ======================================
+
+function renderRecentChats() {
+
+    if (!recentChatList)
+        return;
+
+
+    recentChatList.innerHTML =
+        "";
+
+
+    if (
+        chats.length ===
+        0
+    ) {
+
+        recentChatList.innerHTML =
+            "<div class='empty-chat'>لا توجد محادثات</div>";
+
+        return;
 
     }
 
 
-    const deleteProject =
-        item.querySelector(
-            ".delete-project"
-        );
+    chats
+        .slice(
+            0,
+            8
+        )
+        .forEach(
+            function (
+                chat
+            ) {
 
-
-    if (deleteProject) {
-
-        deleteProject.onclick =
-            function (e) {
-
-                e.stopPropagation();
-
-
-                const options =
-                    item.querySelector(
-                        ".project-options-menu"
-                    );
-
-
-                if (options) {
-
-                    options.classList.remove(
-                        "open"
-                    );
-
-                }
-
-
-                const confirmBox =
+                const div =
                     document.createElement(
                         "div"
                     );
 
 
-                confirmBox.className =
-                    "project-delete-confirm";
+                div.className =
+                    "recent-chat-item";
 
 
-                confirmBox.innerHTML = `
-
-                    <div class="confirm-dialog">
-
-                        <p>
-                            هل تريد حذف المشروع:
-                            <br>
-
-                            <strong>
-                                ${project.name}
-                            </strong>
-
-                            ؟
-                        </p>
-
-                        <button
-                            class="confirm-project-delete"
-                            type="button">
-                            حذف
-                        </button>
-
-                        <button
-                            class="cancel-project-delete"
-                            type="button">
-                            إلغاء
-                        </button>
-
-                    </div>
-
+                div.innerHTML = `
+                    <span class="chat-title">
+                        ${chatIcon}
+                        ${chat.title}
+                    </span>
                 `;
 
 
-                document.body.appendChild(
-                    confirmBox
+                div.onclick =
+                    function () {
+
+                        currentChat =
+                            chat;
+
+
+                        renderChat();
+
+
+                        if (chatPopup) {
+
+                            chatPopup.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+                    };
+
+
+                recentChatList.appendChild(
+                    div
                 );
 
-
-                const confirmDelete =
-                    confirmBox.querySelector(
-                        ".confirm-project-delete"
-                    );
-
-
-                if (confirmDelete) {
-
-                    confirmDelete.onclick =
-                        function () {
-
-                            projects =
-                                projects.filter(
-                                    function (p) {
-
-                                        return (
-                                            p.id !==
-                                            project.id
-                                        );
-
-                                    }
-                                );
-
-
-                            if (
-                                currentProject &&
-                                currentProject.id ===
-                                project.id
-                            ) {
-
-                                currentProject =
-                                    null;
-
-                            }
-
-
-                            saveProjects();
-
-                            renderProjects();
-
-                            renderExpandedProjects();
-
-                            confirmBox.remove();
-
-                        };
-
-                }
-
-
-                const cancelDelete =
-                    confirmBox.querySelector(
-                        ".cancel-project-delete"
-                    );
-
-
-                if (cancelDelete) {
-
-                    cancelDelete.onclick =
-                        function () {
-
-                            confirmBox.remove();
-
-                        };
-
-                }
-
-            };
-
-    }
-
-
-    projectsList.appendChild(
-        item
-    );
-
-});
-
+            }
+        );
 
 }
 
-// ======================================
-// Projects Button
-// ======================================
-
-if (projectsBtn) {
-
-
-projectsBtn.onclick =
-    function (e) {
-
-        e.stopPropagation();
-
-
-        if (!projectsPopup)
-            return;
-
-
-        if (chatPopup)
-            chatPopup.classList.remove(
-                "open"
-            );
-
-
-        if (searchPopup)
-            searchPopup.classList.remove(
-                "open"
-            );
-
-
-        if (settingsWindow)
-            settingsWindow.classList.remove(
-                "open"
-            );
-
-
-        projectsPopup.classList.toggle(
-            "open"
-        );
-
-
-        renderProjects();
-
-    };
-
-
-}
 
 // ======================================
-// New Project
+// Chat Button
 // ======================================
 
-if (newProjectBtn) {
+if (chatBtn) {
 
-
-newProjectBtn.onclick =
-    function (e) {
-
-        e.stopPropagation();
-
-
-        if (!projectsPopup)
-            return;
-
-
-        const oldBox =
-            document.querySelector(
-                ".project-create-box"
-            );
-
-
-        if (oldBox) {
-
-            oldBox.remove();
-
-        }
-
-
-        const box =
-            document.createElement(
-                "div"
-            );
-
-
-        box.className =
-            "project-create-box";
-
-
-        box.innerHTML = `
-
-            <div class="rename-dialog">
-
-                <input
-                    class="new-project-name"
-                    placeholder="اسم المشروع">
-
-                <button
-                    class="save-project"
-                    type="button">
-                    حفظ
-                </button>
-
-                <button
-                    class="cancel-project"
-                    type="button">
-                    إلغاء
-                </button>
-
-            </div>
-
-        `;
-
-
-        document.body.appendChild(
-            box
-        );
-
-
-        const buttonRect =
-            newProjectBtn.getBoundingClientRect();
-
-
-        const boxWidth = 240;
-
-        const boxHeight = 120;
-
-        const screenMargin = 12;
-
-
-        let left =
-            buttonRect.left;
-
-        let top =
-            buttonRect.bottom + 8;
-
-
-        const actualBoxWidth =
-            box.offsetWidth ||
-            boxWidth;
-
-
-        if (
-            left + actualBoxWidth >
-            window.innerWidth -
-            screenMargin
-        ) {
-
-            left =
-                window.innerWidth -
-                actualBoxWidth -
-                screenMargin;
-
-        }
-
-
-        if (
-            left <
-            screenMargin
-        ) {
-
-            left =
-                screenMargin;
-
-        }
-
-
-        if (
-            top + boxHeight >
-            window.innerHeight -
-            screenMargin
-        ) {
-
-            top =
-                buttonRect.top -
-                boxHeight -
-                8;
-
-        }
-
-
-        if (left < 10) {
-
-            left = 10;
-
-        }
-
-
-        box.style.position =
-            "fixed";
-
-        box.style.left =
-            left + "px";
-
-        box.style.top =
-            top + "px";
-
-        box.style.zIndex =
-            "999999";
-
-
-        const inputProject =
-            box.querySelector(
-                ".new-project-name"
-            );
-
-
-        if (inputProject) {
-
-            inputProject.focus();
-
-        }
-
-
-        const saveProject =
-            box.querySelector(
-                ".save-project"
-            );
-
-
-        if (saveProject) {
-
-            saveProject.onclick =
-                function () {
-
-                    const name =
-                        inputProject
-                            ? inputProject.value.trim()
-                            : "";
-
-
-                    if (name !== "") {
-
-                        const now =
-    new Date().toISOString();
-
-
-                const newProject = {
-
-                    id:
-                        Date.now(),
-
-                    name:
-                        name,
-
-                    createdAt:
-                        now,
-
-                    updatedAt:
-                        now,
-
-                    documents:
-                        [],
-
-                    references:
-                        [],
-
-                    chatIds:
-                        [],
-
-                    settings: {
-
-                        citationStyle:
-                            "",
-
-                        notes:
-                            ""
-
-                    }
-
-                };
-
-
-                projects.unshift(
-                    newProject
-                );
-
-
-                        saveProjects();
-
-                        renderProjects();
-
-                        renderExpandedProjects();
-
-                    }
-
-
-                    box.remove();
-
-                };
-
-        }
-
-
-        const cancelProject =
-            box.querySelector(
-                ".cancel-project"
-            );
-
-
-        if (cancelProject) {
-
-            cancelProject.onclick =
-                function () {
-
-                    box.remove();
-
-                };
-
-        }
-
-
-        box.onclick =
-            function (e) {
-
-                e.stopPropagation();
-
-            };
-
-    };
-
-
-}
-
-// ======================================
-// Expanded Sidebar
-// القائمة الجانبية المنبثقة
-// ======================================
-
-if (sidebarToggleBtn && expandedSidebar) {
-
-
-sidebarToggleBtn.onclick = function (e) {
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (
-        !expandedSidebar ||
-        !sidebarToggleBtn ||
-        !expandedSidebarToggleSlot
-    ) {
-        return;
-    }
-
-    const isOpening =
-        !expandedSidebar.classList.contains("open");
-
-
-    /* =========================================
-       فتح القائمة
-       ========================================= */
-
-    if (isOpening) {
-
-        expandedSidebar.classList.add("open");
-
-        document.body.classList.add(
-            "expanded-sidebar-open"
-        );
-
-        sidebarToggleBtn.title =
-            "إخفاء القائمة";
-
-        sidebarToggleBtn.classList.add(
-            "sidebar-open"
-        );
-
-        /* نقل نفس الزر إلى داخل القائمة */
-        expandedSidebarToggleSlot.appendChild(
-            sidebarToggleBtn
-        );
-
-    }
-
-
-    /* =========================================
-       إغلاق القائمة
-       ========================================= */
-
-    else {
-
-        expandedSidebar.classList.remove("open");
-
-        document.body.classList.remove(
-            "expanded-sidebar-open"
-        );
-
-        sidebarToggleBtn.title =
-            "إظهار القائمة";
-
-        sidebarToggleBtn.classList.remove(
-            "sidebar-open"
-        );
-
-        /* إعادة الزر إلى مكانه الأصلي */
-        if (
-            sidebarTogglePlaceholder.parentNode
-        ) {
-
-            sidebarTogglePlaceholder.parentNode.insertBefore(
-                sidebarToggleBtn,
-                sidebarTogglePlaceholder.nextSibling
-            );
-
-        }
-
-    }
-
-};
-
-}
-
-// ======================================
-// Render Projects in Expanded Sidebar
-// ======================================
-
-function renderExpandedProjects() {
-
-
-const list =
-    document.getElementById(
-        "expanded-projects-list"
-    );
-
-
-if (!list)
-    return;
-
-
-list.innerHTML =
-    "";
-
-
-projects.forEach(
-    function (project) {
-
-        const item =
-            document.createElement(
-                "div"
-            );
-
-
-        item.className =
-            "expanded-project-item";
-
-
-        item.innerHTML = `
-
-            <span>
-            ${projectIcon}
-            ${project.name}
-            </span>
-
-        `;
-
-
-            item.onclick =
+    chatBtn.onclick =
         function (e) {
 
             e.stopPropagation();
 
-            setCurrentProject(
-                project
+
+            if (!chatPopup)
+                return;
+
+
+            if (projectsPopup) {
+
+                projectsPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (searchPopup) {
+
+                searchPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (settingsWindow) {
+
+                settingsWindow.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                chatPopup.classList.contains(
+                    "open"
+                )
+            ) {
+
+                chatPopup.classList.remove(
+                    "open"
+                );
+
+
+                return;
+
+            }
+
+
+            renderChatList();
+
+
+            chatPopup.classList.add(
+                "open"
             );
 
         };
 
-
-        list.appendChild(
-            item
-        );
-
-    }
-);
-
-
 }
-
-// ======================================
-// Sidebar — Recent Chats under New Chat
-// نفس آخر 8 محادثات التي يعرضها نظام المحادثات
-// ======================================
-
-function renderSidebarChats() {
-
-
-const list =
-    document.getElementById(
-        "new-chat-list"
-    );
-
-if (!list)
-    return;
-
-list.innerHTML = "";
-
-// نفس منطق آخر 8 محادثات
-if (chats.length === 0) {
-
-    list.innerHTML = `
-        <div class="empty-chat">
-            لا توجد محادثات
-        </div>
-    `;
-
-    return;
-}
-
-chats
-    .slice(0, 8)
-    .forEach(function (chat) {
-
-        const item =
-            document.createElement("div");
-
-        item.className =
-            "recent-chat-item";
-
-        item.innerHTML = `
-        <span class="chat-title">
-            ${chatIcon}
-            ${chat.title}
-        </span>
-        `;
-
-        // فتح المحادثة عند الضغط
-        item.onclick =
-            function (e) {
-
-                e.stopPropagation();
-
-                currentChat =
-                    chat;
-
-                renderChat();
-
-                // إغلاق القائمة المنسدلة إن كانت مفتوحة
-                if (projectsPopup) {
-
-                    projectsPopup
-                        .classList
-                        .remove("open");
-
-                }
-
-                if (chatPopup) {
-
-                    chatPopup
-                        .classList
-                        .remove("open");
-
-                }
-
-                if (searchPopup) {
-
-                    searchPopup
-                        .classList
-                        .remove("open");
-
-                }
-
-            };
-
-        list.appendChild(item);
-
-    });
-
-
-}
-
 
 
 // ======================================
-// Create New Chat
+// Save Initial Projects/Chats State
 // ======================================
 
-function createNewChat() {
-
-
-currentChat = {
-
-    id:
-        Date.now(),
-
-    title:
-        "محادثة جديدة",
-
-    messages:
-        [],
-
-    isTemporary:
-        true,
-
-    projectId:
-        currentProject
-            ? currentProject.id
-            : null
-
-};
-
-
-// لا نضيف المحادثة إلى chats هنا
-// لأنها لم تصبح محادثة فعلية بعد
-
-
-// تحديث قائمة آخر 8 محادثات فقط
-renderSidebarChats();
-
-renderRecentChats();
-
-
-// تنظيف مربع الإدخال
-if (input) {
-
-    input.value =
-        "";
-
-    input.style.height =
-        "auto";
-
-}
-
-
-// عرض شاشة المحادثة الجديدة
-if (chatArea) {
-
-    chatArea.innerHTML = `
-
-        <div class="welcome">
-
-            <div class="ai-symbol">
-                ✦
-            </div>
-
-            <h2>
-                مرحبًا بك
-            </h2>
-
-            <p>
-                ابدأ محادثة جديدة
-            </p>
-
-        </div>
-
-    `;
-
-}
-
-
-}
-
+saveProjects();
+saveChats();
 // ======================================
-// New Chat Button
+// Word AI Assistant
+// PART 3 / 3
+// AI + Search + Send + Initialization
 // ======================================
 
-if (newChatBtn) {
-
-
-newChatBtn.onclick =
-    function (e) {
-
-        e.stopPropagation();
-
-
-        if (projectsPopup)
-            projectsPopup.classList.remove(
-                "open"
-            );
-
-
-        if (chatPopup)
-            chatPopup.classList.remove(
-                "open"
-            );
-
-
-        if (searchPopup)
-            searchPopup.classList.remove(
-                "open"
-            );
-
-
-        if (settingsWindow)
-            settingsWindow.classList.remove(
-                "open"
-            );
-
-
-        createNewChat();
-
-    };
-
-
-}
 
 // =====================================================
+// AI SETTINGS
 // =====================================================
-// AI SYSTEM
-// التعديل يبدأ من هنا
-// =====================================================
-// =====================================================
-
-// ======================================
-// قراءة إعدادات الذكاء الاصطناعي
-// ======================================
 
 function getSavedSettings() {
 
+    try {
 
-try {
+        return (
+            JSON.parse(
+                localStorage.getItem(
+                    "AI_SETTINGS"
+                )
+            ) || {}
+        );
 
-    return (
-        JSON.parse(
-            localStorage.getItem(
-                "AI_SETTINGS"
-            )
-        ) || {}
+    }
+    catch (e) {
+
+        return {};
+
+    }
+
+}
+
+
+// ======================================
+// Save AI Settings
+// ======================================
+
+function saveAISettings(
+    data
+) {
+
+    localStorage.setItem(
+        "AI_SETTINGS",
+        JSON.stringify(
+            data
+        )
     );
 
 }
-catch (e) {
 
-    return {};
-
-}
-
-
-}
 
 // ======================================
-// حفظ إعدادات الذكاء الاصطناعي
-// ======================================
-
-function saveAISettings(data) {
-
-
-localStorage.setItem(
-    "AI_SETTINGS",
-    JSON.stringify(data)
-);
-
-
-}
-
-// ======================================
-// معلومات المزود
+// Provider Info
 // ======================================
 
 function updateProviderInfo() {
 
+    if (
+        !providerInfo ||
+        !provider
+    ) {
 
-if (!providerInfo || !provider)
-    return;
+        return;
+
+    }
 
 
-const value =
-    provider.value;
+    const value =
+        provider.value;
 
 
-if (value === "openrouter") {
+    if (
+        value ===
+        "openrouter"
+    ) {
+
+        providerInfo.innerHTML =
+            "OpenRouter: سيتم جلب النماذج المجانية المتاحة من حسابك.";
+
+        return;
+
+    }
+
+
+    if (
+        value ===
+        "openai"
+    ) {
+
+        providerInfo.innerHTML =
+            "OpenAI: سيتم جلب النماذج المتاحة من حسابك.";
+
+        return;
+
+    }
+
+
+    if (
+        value ===
+        "gemini"
+    ) {
+
+        providerInfo.innerHTML =
+            "Gemini: سيتم جلب النماذج التي تدعم generateContent.";
+
+        return;
+
+    }
+
 
     providerInfo.innerHTML =
-        "OpenRouter: سيتم جلب النماذج المجانية المتاحة من حسابك.";
-
-    return;
+        "سيتم تحديد رابط الاتصال حسب مزود الذكاء الاصطناعي.";
 
 }
 
-
-if (value === "openai") {
-
-    providerInfo.innerHTML =
-        "OpenAI: سيتم جلب النماذج المتاحة من حسابك.";
-
-    return;
-
-}
-
-
-if (value === "gemini") {
-
-    providerInfo.innerHTML =
-        "Gemini: سيتم جلب النماذج التي تدعم generateContent.";
-
-    return;
-
-}
-
-
-providerInfo.innerHTML =
-    "سيتم تحديد رابط الاتصال حسب مزود الذكاء الاصطناعي.";
-
-
-}
 
 // ======================================
-// تحميل الإعدادات
+// Load Settings
 // ======================================
 
 function loadSettings() {
 
-
-const data =
-    getSavedSettings();
-
-
-if (provider) {
-
-    provider.value =
-        data.provider ||
-        "openrouter";
-
-}
+    const data =
+        getSavedSettings();
 
 
-if (apiKey) {
+    if (provider) {
 
-    apiKey.value =
-        data.key ||
-        "";
-
-}
-
-
-if (modelSelect) {
-
-    const savedModel =
-        data.model ||
-        "";
-
-
-    modelSelect.innerHTML =
-        "";
-
-
-    if (savedModel !== "") {
-
-        const option =
-            document.createElement(
-                "option"
-            );
-
-
-        option.value =
-            savedModel;
-
-
-        option.textContent =
-            savedModel;
-
-
-        modelSelect.appendChild(
-            option
-        );
-
-
-        modelSelect.value =
-            savedModel;
+        provider.value =
+            data.provider ||
+            "openrouter";
 
     }
-    else {
-
-        const option =
-            document.createElement(
-                "option"
-            );
 
 
-        option.value =
+    if (apiKey) {
+
+        apiKey.value =
+            data.key ||
+            "";
+
+    }
+
+
+    if (modelSelect) {
+
+        const savedModel =
+            data.model ||
             "";
 
 
-        option.textContent =
-            "أدخل المفتاح ثم حدّث النماذج";
+        modelSelect.innerHTML =
+            "";
 
 
-        modelSelect.appendChild(
-            option
-        );
+        if (
+            savedModel !== ""
+        ) {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                savedModel;
+
+
+            option.textContent =
+                savedModel;
+
+
+            modelSelect.appendChild(
+                option
+            );
+
+
+            modelSelect.value =
+                savedModel;
+
+        }
+        else {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                "";
+
+
+            option.textContent =
+                "أدخل المفتاح ثم حدّث النماذج";
+
+
+            modelSelect.appendChild(
+                option
+            );
+
+        }
 
     }
 
-}
 
-
-updateProviderInfo();
-
+    updateProviderInfo();
 
 }
+
 
 // ======================================
 // Settings Button
@@ -6782,47 +6501,55 @@ updateProviderInfo();
 
 if (settingsBtn) {
 
+    settingsBtn.onclick =
+        function (e) {
 
-settingsBtn.onclick =
-    function (e) {
-
-        e.preventDefault();
-        e.stopPropagation();
-
-
-        if (projectsPopup)
-            projectsPopup.classList.remove(
-                "open"
-            );
+            e.preventDefault();
+            e.stopPropagation();
 
 
-        if (chatPopup)
-            chatPopup.classList.remove(
-                "open"
-            );
+            if (projectsPopup) {
+
+                projectsPopup.classList.remove(
+                    "open"
+                );
+
+            }
 
 
-        if (searchPopup)
-            searchPopup.classList.remove(
-                "open"
-            );
+            if (chatPopup) {
+
+                chatPopup.classList.remove(
+                    "open"
+                );
+
+            }
 
 
-        if (settingsWindow) {
+            if (searchPopup) {
 
-            settingsWindow.classList.add(
-                "open"
-            );
+                searchPopup.classList.remove(
+                    "open"
+                );
 
-        }
+            }
 
 
-        loadSettings();
+            if (settingsWindow) {
 
-    };
+                settingsWindow.classList.add(
+                    "open"
+                );
 
+            }
+
+
+            loadSettings();
+
+        };
 
 }
+
 
 // ======================================
 // Provider Change
@@ -6830,36 +6557,34 @@ settingsBtn.onclick =
 
 if (provider) {
 
+    provider.onchange =
+        function () {
 
-provider.onchange =
-    function () {
-
-        updateProviderInfo();
+            updateProviderInfo();
 
 
-        if (modelSelect) {
+            if (modelSelect) {
 
-            modelSelect.innerHTML = `
+                modelSelect.innerHTML = `
+                    <option value="">
+                        أدخل المفتاح ثم حدّث النماذج
+                    </option>
+                `;
 
-                <option value="">
-                    أدخل المفتاح ثم حدّث النماذج
-                </option>
+            }
 
-            `;
 
-        }
+            if (settingsStatus) {
 
-        if (settingsStatus) {
+                settingsStatus.innerHTML =
+                    "";
 
-            settingsStatus.innerHTML =
-                "";
+            }
 
-        }
-
-    };
-
+        };
 
 }
+
 
 // ======================================
 // Close Settings
@@ -6867,67 +6592,70 @@ provider.onchange =
 
 if (closeSettings) {
 
+    closeSettings.onclick =
+        function (e) {
 
-closeSettings.onclick =
-    function (e) {
-
-        e.preventDefault();
-        e.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
 
 
-        if (settingsWindow) {
+            if (settingsWindow) {
 
-            settingsWindow.classList.remove(
-                "open"
-            );
+                settingsWindow.classList.remove(
+                    "open"
+                );
 
-        }
+            }
 
-    };
-
+        };
 
 }
 
+
 // ======================================
-// Show / Hide API Key
+// Show/Hide Key
 // ======================================
 
-if (showKey && apiKey) {
+if (
+    showKey &&
+    apiKey
+) {
+
+    showKey.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
 
 
-showKey.onclick =
-    function (e) {
+            if (
+                apiKey.type ===
+                "password"
+            ) {
 
-        e.preventDefault();
-        e.stopPropagation();
+                apiKey.type =
+                    "text";
 
 
-        if (
-            apiKey.type ===
-            "password"
-        ) {
+                showKey.innerHTML =
+                    "🙈";
 
-            apiKey.type =
-                "text";
+            }
+            else {
 
-            showKey.innerHTML =
-                "🙈";
+                apiKey.type =
+                    "password";
 
-        }
-        else {
 
-            apiKey.type =
-                "password";
+                showKey.innerHTML =
+                    "👁";
 
-            showKey.innerHTML =
-                "👁";
+            }
 
-        }
-
-    };
-
+        };
 
 }
+
 
 // ======================================
 // Save Settings
@@ -6935,180 +6663,182 @@ showKey.onclick =
 
 if (saveSettings) {
 
+    saveSettings.onclick =
+        function (e) {
 
-saveSettings.onclick =
-    function (e) {
-
-        e.preventDefault();
-        e.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
 
 
-        const settings = {
+            const settings = {
 
-            provider:
-                provider
-                    ? provider.value
-                    : "openrouter",
+                provider:
+                    provider
+                        ? provider.value
+                        : "openrouter",
 
-            key:
-                apiKey
-                    ? apiKey.value.trim()
-                    : "",
+                key:
+                    apiKey
+                        ? apiKey.value.trim()
+                        : "",
 
-            model:
-                modelSelect
-                    ? modelSelect.value.trim()
-                    : ""
+                model:
+                    modelSelect
+                        ? modelSelect.value.trim()
+                        : ""
+
+            };
+
+
+            if (!settings.key) {
+
+                if (settingsStatus) {
+
+                    settingsStatus.innerHTML =
+                        "⚠ يرجى إدخال مفتاح API.";
+
+                }
+
+
+                return;
+
+            }
+
+
+            if (!settings.model) {
+
+                if (settingsStatus) {
+
+                    settingsStatus.innerHTML =
+                        "⚠ يرجى تحديد نموذج الذكاء الاصطناعي.";
+
+                }
+
+
+                return;
+
+            }
+
+
+            saveAISettings(
+                settings
+            );
+
+
+            if (settingsStatus) {
+
+                settingsStatus.innerHTML =
+                    "✓ تم حفظ إعدادات الذكاء الاصطناعي";
+
+            }
 
         };
 
-
-        if (!settings.key) {
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "⚠ يرجى إدخال مفتاح API.";
-
-            }
-
-            return;
-
-        }
-
-
-        if (!settings.model) {
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "⚠ يرجى تحديد نموذج الذكاء الاصطناعي.";
-
-            }
-
-            return;
-
-        }
-
-
-        saveAISettings(
-            settings
-        );
-
-
-        if (settingsStatus) {
-
-            settingsStatus.innerHTML =
-                "✓ تم حفظ إعدادات الذكاء الاصطناعي";
-
-        }
-
-    };
-
-
 }
+
 
 // =====================================================
 // AI MODELS
 // =====================================================
 
-// ======================================
-// تحديث النماذج
-// ======================================
-
 if (refreshModels) {
 
+    refreshModels.onclick =
+        async function (e) {
 
-refreshModels.onclick =
-    async function (e) {
-
-        e.preventDefault();
-        e.stopPropagation();
-
-
-        refreshModels.disabled =
-            true;
+            e.preventDefault();
+            e.stopPropagation();
 
 
-        try {
+            refreshModels.disabled =
+                true;
 
-            await loadModels();
 
-        }
+            try {
 
-        catch (error) {
+                await loadModels();
 
-            if (settingsStatus) {
+            }
+            catch (error) {
 
-                settingsStatus.innerHTML =
-                    "⚠ " +
-                    (
-                        error.message ||
-                        "تعذر تحديث النماذج"
-                    );
+                if (settingsStatus) {
+
+                    settingsStatus.innerHTML =
+                        "⚠ " +
+                        (
+                            error.message ||
+                            "تعذر تحديث النماذج"
+                        );
+
+                }
+
+            }
+            finally {
+
+                refreshModels.disabled =
+                    false;
 
             }
 
-        }
-
-        finally {
-
-            refreshModels.disabled =
-                false;
-
-        }
-
-    };
-
+        };
 
 }
 
+
 // ======================================
-// الدالة الرئيسية لتحميل النماذج
+// Load Models
 // ======================================
 
 async function loadModels() {
 
+    const selectedProvider =
+        provider
+            ? provider.value
+            : "openrouter";
 
-const selectedProvider =
-    provider
-        ? provider.value
-        : "openrouter";
+
+    if (
+        selectedProvider ===
+        "openrouter"
+    ) {
+
+        await loadOpenRouterModels();
+
+        return;
+
+    }
 
 
-if (selectedProvider === "openrouter") {
+    if (
+        selectedProvider ===
+        "openai"
+    ) {
 
-    await loadOpenRouterModels();
+        await loadOpenAIModels();
 
-    return;
+        return;
+
+    }
+
+
+    if (
+        selectedProvider ===
+        "gemini"
+    ) {
+
+        await loadGeminiModels();
+
+        return;
+
+    }
+
+
+    throw new Error(
+        "مزود الذكاء الاصطناعي غير معروف."
+    );
 
 }
 
-
-if (selectedProvider === "openai") {
-
-    await loadOpenAIModels();
-
-    return;
-
-}
-
-
-if (selectedProvider === "gemini") {
-
-    await loadGeminiModels();
-
-    return;
-
-}
-
-
-throw new Error(
-    "مزود الذكاء الاصطناعي غير معروف."
-);
-
-
-}
 
 // ======================================
 // OpenRouter Models
@@ -7116,616 +6846,42 @@ throw new Error(
 
 async function loadOpenRouterModels() {
 
-
-const key =
-    apiKey
-        ? apiKey.value.trim()
-        : "";
-
-
-if (!key) {
-
-    throw new Error(
-        "يرجى إدخال مفتاح OpenRouter أولاً."
-    );
-
-}
-
-
-if (settingsStatus) {
-
-    settingsStatus.innerHTML =
-        "⏳ جاري تحميل نماذج OpenRouter المجانية...";
-
-}
-
-
-const response =
-    await fetch(
-        "https://openrouter.ai/api/v1/models",
-        {
-
-            method:
-                "GET",
-
-            headers: {
-
-                "Authorization":
-                    "Bearer " + key,
-
-                "Content-Type":
-                    "application/json",
-
-                "HTTP-Referer":
-                    window.location.href,
-
-                "X-Title":
-                    "Research Tools"
-
-            }
-
-        }
-    );
-
-
-const result =
-    await readJSON(response);
-
-
-if (!response.ok) {
-
-    throw new Error(
-        getAPIError(
-            result,
-            "فشل الاتصال بـ OpenRouter."
-        )
-    );
-
-}
-
-
-if (
-    !result.data ||
-    !Array.isArray(result.data)
-) {
-
-    throw new Error(
-        "لم تصل قائمة النماذج من OpenRouter."
-    );
-
-}
-
-
-const freeModels =
-    result.data.filter(
-        function (item) {
-
-            if (
-                !item ||
-                !item.id
-            ) {
-
-                return false;
-
-            }
-
-
-            if (
-                !item.pricing
-            ) {
-
-                return false;
-
-            }
-
-
-            return (
-                String(item.pricing.prompt) === "0" &&
-                String(item.pricing.completion) === "0"
-            );
-
-        }
-    );
-
-
-populateModels(
-    freeModels.map(
-        function (item) {
-
-            return {
-
-                id:
-                    item.id,
-
-                name:
-                    item.name ||
-                    item.id
-
-            };
-
-        }
-    )
-);
-
-
-if (settingsStatus) {
-
-    settingsStatus.innerHTML =
-        "✓ تم تحديث النماذج المجانية: " +
-        freeModels.length;
-
-}
-
-
-}
-
-// ======================================
-// OpenAI Models
-// ======================================
-
-async function loadOpenAIModels() {
-
-
-const key =
-    apiKey
-        ? apiKey.value.trim()
-        : "";
-
-
-if (!key) {
-
-    throw new Error(
-        "يرجى إدخال مفتاح OpenAI أولاً."
-    );
-
-}
-
-
-if (settingsStatus) {
-
-    settingsStatus.innerHTML =
-        "⏳ جاري تحميل نماذج OpenAI...";
-
-}
-
-
-const response =
-    await fetch(
-        "https://api.openai.com/v1/models",
-        {
-
-            method:
-                "GET",
-
-            headers: {
-
-                "Authorization":
-                    "Bearer " + key,
-
-                "Content-Type":
-                    "application/json"
-
-            }
-
-        }
-    );
-
-
-const result =
-    await readJSON(response);
-
-
-if (!response.ok) {
-
-    throw new Error(
-        getAPIError(
-            result,
-            "فشل الاتصال بـ OpenAI."
-        )
-    );
-
-}
-
-
-if (
-    !result.data ||
-    !Array.isArray(result.data)
-) {
-
-    throw new Error(
-        "لم تصل قائمة نماذج OpenAI."
-    );
-
-}
-
-
-const models =
-    result.data.filter(
-        function (item) {
-
-            if (!item || !item.id)
-                return false;
-
-
-            const id =
-                item.id.toLowerCase();
-
-
-            return (
-                id.startsWith("gpt-") ||
-                id.startsWith("o1") ||
-                id.startsWith("o3") ||
-                id.startsWith("o4")
-            );
-
-        }
-    );
-
-
-models.sort(
-    function (a, b) {
-
-        return a.id.localeCompare(
-            b.id
-        );
-
-    }
-);
-
-
-populateModels(
-    models.map(
-        function (item) {
-
-            return {
-
-                id:
-                    item.id,
-
-                name:
-                    item.id
-
-            };
-
-        }
-    )
-);
-
-
-if (settingsStatus) {
-
-    settingsStatus.innerHTML =
-        "✓ تم تحديث نماذج OpenAI: " +
-        models.length;
-
-}
-
-
-}
-
-// ======================================
-// Gemini Models
-// ======================================
-
-async function loadGeminiModels() {
-
-
-const key =
-    apiKey
-        ? apiKey.value.trim()
-        : "";
-
-
-if (!key) {
-
-    throw new Error(
-        "يرجى إدخال مفتاح Gemini أولاً."
-    );
-
-}
-
-
-if (settingsStatus) {
-
-    settingsStatus.innerHTML =
-        "⏳ جاري تحميل نماذج Gemini...";
-
-}
-
-
-const url =
-    "https://generativelanguage.googleapis.com/v1beta/models?key=" +
-    encodeURIComponent(key);
-
-
-const response =
-    await fetch(
-        url,
-        {
-
-            method:
-                "GET"
-
-        }
-    );
-
-
-const result =
-    await readJSON(response);
-
-
-if (!response.ok) {
-
-    throw new Error(
-        getAPIError(
-            result,
-            "فشل الاتصال بـ Gemini."
-        )
-    );
-
-}
-
-
-if (
-    !result.models ||
-    !Array.isArray(result.models)
-) {
-
-    throw new Error(
-        "لم تصل قائمة نماذج Gemini."
-    );
-
-}
-
-
-const models =
-    result.models.filter(
-        function (item) {
-
-            if (!item)
-                return false;
-
-
-            if (!item.name)
-                return false;
-
-
-            if (
-                !item.supportedGenerationMethods
-            ) {
-
-                return false;
-
-            }
-
-
-            return (
-                item.supportedGenerationMethods
-                    .includes(
-                        "generateContent"
-                    )
-            );
-
-        }
-    );
-
-
-populateModels(
-    models.map(
-        function (item) {
-
-            const cleanId =
-                String(item.name)
-                    .replace(
-                        /^models\//,
-                        ""
-                    );
-
-
-            return {
-
-                id:
-                    cleanId,
-
-                name:
-                    item.displayName
-                        ? item.displayName +
-                          " — " +
-                          cleanId
-                        : cleanId
-
-            };
-
-        }
-    )
-);
-
-
-if (settingsStatus) {
-
-    settingsStatus.innerHTML =
-        "✓ تم تحديث نماذج Gemini: " +
-        models.length;
-
-}
-
-
-}
-
-// ======================================
-// وضع النماذج داخل القائمة
-// ======================================
-
-function populateModels(models) {
-
-
-if (!modelSelect)
-    return;
-
-
-const saved =
-    getSavedSettings();
-
-
-const savedModel =
-    saved.model ||
-    "";
-
-
-modelSelect.innerHTML =
-    "";
-
-
-if (
-    !models ||
-    models.length === 0
-) {
-
-    const option =
-        document.createElement(
-            "option"
-        );
-
-
-    option.value =
-        "";
-
-
-    option.textContent =
-        "لا توجد نماذج متاحة";
-
-
-    modelSelect.appendChild(
-        option
-    );
-
-
-    return;
-
-}
-
-
-models.forEach(
-    function (item) {
-
-        const option =
-            document.createElement(
-                "option"
-            );
-
-
-        option.value =
-            item.id;
-
-
-        option.textContent =
-            item.name;
-
-
-        modelSelect.appendChild(
-            option
-        );
-
-    }
-);
-
-
-if (savedModel) {
-
-    const exists =
-        Array.from(
-            modelSelect.options
-        ).some(
-            function (option) {
-
-                return (
-                    option.value ===
-                    savedModel
-                );
-
-            }
-        );
-
-
-    if (exists) {
-
-        modelSelect.value =
-            savedModel;
-
-    }
-
-}
-
-
-}
-
-// =====================================================
-// AI CONNECTION TEST
-// =====================================================
-
-async function testAIConnection() {
-
-
-const data = {
-
-    provider:
-        provider
-            ? provider.value
-            : "openrouter",
-
-    key:
+    const key =
         apiKey
             ? apiKey.value.trim()
-            : "",
-
-    model:
-        modelSelect
-            ? modelSelect.value.trim()
-            : ""
-
-};
+            : "";
 
 
-if (!data.key) {
+    if (!key) {
 
-    throw new Error(
-        "يرجى إدخال مفتاح API أولاً."
-    );
+        throw new Error(
+            "يرجى إدخال مفتاح OpenRouter أولاً."
+        );
 
-}
-
-
-if (!data.model) {
-
-    throw new Error(
-        "يرجى تحديد نموذج الذكاء الاصطناعي أولاً."
-    );
-
-}
+    }
 
 
-// --------------------------------------
-// OpenRouter
-// --------------------------------------
+    if (settingsStatus) {
 
-if (
-    data.provider ===
-    "openrouter"
-) {
+        settingsStatus.innerHTML =
+            "⏳ جاري تحميل نماذج OpenRouter المجانية...";
+
+    }
+
 
     const response =
         await fetch(
-            "https://openrouter.ai/api/v1/chat/completions",
+            "https://openrouter.ai/api/v1/models",
             {
 
                 method:
-                    "POST",
+                    "GET",
 
                 headers: {
 
                     "Authorization":
                         "Bearer " +
-                        data.key,
+                        key,
 
                     "Content-Type":
                         "application/json",
@@ -7736,39 +6892,16 @@ if (
                     "X-Title":
                         "Research Tools"
 
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            data.model,
-
-                        messages: [
-
-                            {
-
-                                role:
-                                    "user",
-
-                                content:
-                                    "أجب بكلمة واحدة فقط: متصل"
-
-                            }
-
-                        ],
-
-                        max_tokens:
-                            10
-
-                    })
+                }
 
             }
         );
 
 
     const result =
-        await readJSON(response);
+        await readJSON(
+            response
+        );
 
 
     if (!response.ok) {
@@ -7783,72 +6916,139 @@ if (
     }
 
 
-    return (
-        "✓ تم الاتصال بـ OpenRouter بنجاح"
+    if (
+        !result.data ||
+        !Array.isArray(
+            result.data
+        )
+    ) {
+
+        throw new Error(
+            "لم تصل قائمة النماذج من OpenRouter."
+        );
+
+    }
+
+
+    const freeModels =
+        result.data.filter(
+            function (
+                item
+            ) {
+
+                if (
+                    !item ||
+                    !item.id ||
+                    !item.pricing
+                ) {
+
+                    return false;
+
+                }
+
+
+                return (
+                    String(
+                        item.pricing.prompt
+                    ) === "0" &&
+                    String(
+                        item.pricing.completion
+                    ) === "0"
+                );
+
+            }
+        );
+
+
+    populateModels(
+        freeModels.map(
+            function (
+                item
+            ) {
+
+                return {
+
+                    id:
+                        item.id,
+
+                    name:
+                        item.name ||
+                        item.id
+
+                };
+
+            }
+        )
     );
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "✓ تم تحديث النماذج المجانية: " +
+            freeModels.length;
+
+    }
 
 }
 
 
-// --------------------------------------
-// OpenAI
-// --------------------------------------
+// ======================================
+// OpenAI Models
+// ======================================
 
-if (
-    data.provider ===
-    "openai"
-) {
+async function loadOpenAIModels() {
+
+    const key =
+        apiKey
+            ? apiKey.value.trim()
+            : "";
+
+
+    if (!key) {
+
+        throw new Error(
+            "يرجى إدخال مفتاح OpenAI أولاً."
+        );
+
+    }
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "⏳ جاري تحميل نماذج OpenAI...";
+
+    }
+
 
     const response =
         await fetch(
-            "https://api.openai.com/v1/chat/completions",
+            "https://api.openai.com/v1/models",
             {
 
                 method:
-                    "POST",
+                    "GET",
 
                 headers: {
 
                     "Authorization":
                         "Bearer " +
-                        data.key,
+                        key,
 
                     "Content-Type":
                         "application/json"
 
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            data.model,
-
-                        messages: [
-
-                            {
-
-                                role:
-                                    "user",
-
-                                content:
-                                    "أجب بكلمة واحدة فقط: متصل"
-
-                            }
-
-                        ],
-
-                        max_tokens:
-                            10
-
-                    })
+                }
 
             }
         );
 
 
     const result =
-        await readJSON(response);
+        await readJSON(
+            response
+        );
 
 
     if (!response.ok) {
@@ -7863,80 +7063,147 @@ if (
     }
 
 
-    return (
-        "✓ تم الاتصال بـ OpenAI بنجاح"
+    if (
+        !result.data ||
+        !Array.isArray(
+            result.data
+        )
+    ) {
+
+        throw new Error(
+            "لم تصل قائمة نماذج OpenAI."
+        );
+
+    }
+
+
+    const models =
+        result.data.filter(
+            function (
+                item
+            ) {
+
+                if (
+                    !item ||
+                    !item.id
+                ) {
+
+                    return false;
+
+                }
+
+
+                const id =
+                    item.id.toLowerCase();
+
+
+                return (
+                    id.startsWith("gpt-") ||
+                    id.startsWith("o1") ||
+                    id.startsWith("o3") ||
+                    id.startsWith("o4")
+                );
+
+            }
+        );
+
+
+    models.sort(
+        function (
+            a,
+            b
+        ) {
+
+            return a.id.localeCompare(
+                b.id
+            );
+
+        }
     );
+
+
+    populateModels(
+        models.map(
+            function (
+                item
+            ) {
+
+                return {
+
+                    id:
+                        item.id,
+
+                    name:
+                        item.id
+
+                };
+
+            }
+        )
+    );
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "✓ تم تحديث نماذج OpenAI: " +
+            models.length;
+
+    }
 
 }
 
 
-// --------------------------------------
-// Gemini
-// --------------------------------------
+// ======================================
+// Gemini Models
+// ======================================
 
-if (
-    data.provider ===
-    "gemini"
-) {
+async function loadGeminiModels() {
 
-    const model =
-        normalizeGeminiModel(
-            data.model
+    const key =
+        apiKey
+            ? apiKey.value.trim()
+            : "";
+
+
+    if (!key) {
+
+        throw new Error(
+            "يرجى إدخال مفتاح Gemini أولاً."
         );
+
+    }
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "⏳ جاري تحميل نماذج Gemini...";
+
+    }
 
 
     const url =
-        "https://generativelanguage.googleapis.com/v1beta/models/" +
-        encodeURIComponent(model) +
-        ":generateContent?key=" +
-        encodeURIComponent(data.key);
+        "https://generativelanguage.googleapis.com/v1beta/models?key=" +
+        encodeURIComponent(
+            key
+        );
 
 
     const response =
         await fetch(
             url,
             {
-
                 method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json"
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        contents: [
-
-                            {
-
-                                parts: [
-
-                                    {
-
-                                        text:
-                                            "أجب بكلمة واحدة فقط: متصل"
-
-                                    }
-
-                                ]
-
-                            }
-
-                        ]
-
-                    })
-
+                    "GET"
             }
         );
 
 
     const result =
-        await readJSON(response);
+        await readJSON(
+            response
+        );
 
 
     if (!response.ok) {
@@ -7951,19 +7218,507 @@ if (
     }
 
 
-    return (
-        "✓ تم الاتصال بـ Gemini بنجاح"
+    if (
+        !result.models ||
+        !Array.isArray(
+            result.models
+        )
+    ) {
+
+        throw new Error(
+            "لم تصل قائمة نماذج Gemini."
+        );
+
+    }
+
+
+    const models =
+        result.models.filter(
+            function (
+                item
+            ) {
+
+                if (
+                    !item ||
+                    !item.name ||
+                    !item.supportedGenerationMethods
+                ) {
+
+                    return false;
+
+                }
+
+
+                return (
+                    item.supportedGenerationMethods
+                        .includes(
+                            "generateContent"
+                        )
+                );
+
+            }
+        );
+
+
+    populateModels(
+        models.map(
+            function (
+                item
+            ) {
+
+                const cleanId =
+                    String(
+                        item.name
+                    ).replace(
+                        /^models\//,
+                        ""
+                    );
+
+
+                return {
+
+                    id:
+                        cleanId,
+
+                    name:
+                        item.displayName
+                            ? item.displayName +
+                              " — " +
+                              cleanId
+                            : cleanId
+
+                };
+
+            }
+        )
+    );
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "✓ تم تحديث نماذج Gemini: " +
+            models.length;
+
+    }
+
+}
+
+
+// ======================================
+// Populate Models
+// ======================================
+
+function populateModels(
+    models
+) {
+
+    if (!modelSelect)
+        return;
+
+
+    const saved =
+        getSavedSettings();
+
+
+    const savedModel =
+        saved.model ||
+        "";
+
+
+    modelSelect.innerHTML =
+        "";
+
+
+    if (
+        !models ||
+        models.length === 0
+    ) {
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+
+        option.value =
+            "";
+
+
+        option.textContent =
+            "لا توجد نماذج متاحة";
+
+
+        modelSelect.appendChild(
+            option
+        );
+
+
+        return;
+
+    }
+
+
+    models.forEach(
+        function (
+            item
+        ) {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                item.id;
+
+
+            option.textContent =
+                item.name;
+
+
+            modelSelect.appendChild(
+                option
+            );
+
+        }
+    );
+
+
+    if (savedModel) {
+
+        const exists =
+            Array.from(
+                modelSelect.options
+            ).some(
+                function (
+                    option
+                ) {
+
+                    return (
+                        option.value ===
+                        savedModel
+                    );
+
+                }
+            );
+
+
+        if (exists) {
+
+            modelSelect.value =
+                savedModel;
+
+        }
+
+    }
+
+}
+
+
+// =====================================================
+// AI CONNECTION TEST
+// =====================================================
+
+async function testAIConnection() {
+
+    const data = {
+
+        provider:
+            provider
+                ? provider.value
+                : "openrouter",
+
+        key:
+            apiKey
+                ? apiKey.value.trim()
+                : "",
+
+        model:
+            modelSelect
+                ? modelSelect.value.trim()
+                : ""
+
+    };
+
+
+    if (!data.key) {
+
+        throw new Error(
+            "يرجى إدخال مفتاح API أولاً."
+        );
+
+    }
+
+
+    if (!data.model) {
+
+        throw new Error(
+            "يرجى تحديد نموذج الذكاء الاصطناعي أولاً."
+        );
+
+    }
+
+
+    if (
+        data.provider ===
+        "openrouter"
+    ) {
+
+        const response =
+            await fetch(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key,
+
+                        "Content-Type":
+                            "application/json",
+
+                        "HTTP-Referer":
+                            window.location.href,
+
+                        "X-Title":
+                            "Research Tools"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                data.model,
+
+                            messages: [
+
+                                {
+
+                                    role:
+                                        "user",
+
+                                    content:
+                                        "أجب بكلمة واحدة فقط: متصل"
+
+                                }
+
+                            ],
+
+                            max_tokens:
+                                10
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ OpenRouter."
+                )
+            );
+
+        }
+
+
+        return (
+            "✓ تم الاتصال بـ OpenRouter بنجاح"
+        );
+
+    }
+
+
+    if (
+        data.provider ===
+        "openai"
+    ) {
+
+        const response =
+            await fetch(
+                "https://api.openai.com/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key,
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                data.model,
+
+                            messages: [
+
+                                {
+
+                                    role:
+                                        "user",
+
+                                    content:
+                                        "أجب بكلمة واحدة فقط: متصل"
+
+                                }
+
+                            ],
+
+                            max_tokens:
+                                10
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ OpenAI."
+                )
+            );
+
+        }
+
+
+        return (
+            "✓ تم الاتصال بـ OpenAI بنجاح"
+        );
+
+    }
+
+
+    if (
+        data.provider ===
+        "gemini"
+    ) {
+
+        const model =
+            normalizeGeminiModel(
+                data.model
+            );
+
+
+        const url =
+            "https://generativelanguage.googleapis.com/v1beta/models/" +
+            encodeURIComponent(
+                model
+            ) +
+            ":generateContent?key=" +
+            encodeURIComponent(
+                data.key
+            );
+
+
+        const response =
+            await fetch(
+                url,
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            contents: [
+
+                                {
+
+                                    parts: [
+
+                                        {
+
+                                            text:
+                                                "أجب بكلمة واحدة فقط: متصل"
+
+                                        }
+
+                                    ]
+
+                                }
+
+                            ]
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ Gemini."
+                )
+            );
+
+        }
+
+
+        return (
+            "✓ تم الاتصال بـ Gemini بنجاح"
+        );
+
+    }
+
+
+    throw new Error(
+        "مزود الذكاء الاصطناعي غير معروف."
     );
 
 }
 
-
-throw new Error(
-    "مزود الذكاء الاصطناعي غير معروف."
-);
-
-
-}
 
 // ======================================
 // Test Connection Button
@@ -7971,77 +7726,76 @@ throw new Error(
 
 if (testConnection) {
 
+    testConnection.onclick =
+        async function (e) {
 
-testConnection.onclick =
-    async function (e) {
+            e.preventDefault();
+            e.stopPropagation();
 
-        e.preventDefault();
-        e.stopPropagation();
-
-
-        testConnection.disabled =
-            true;
-
-
-        if (settingsStatus) {
-
-            settingsStatus.innerHTML =
-                "⏳ جاري اختبار الاتصال...";
-
-        }
-
-
-        try {
-
-            const message =
-                await testAIConnection();
-
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    message;
-
-            }
-
-        }
-
-        catch (error) {
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "⚠ " +
-                    (
-                        error.message ||
-                        "تعذر الاتصال"
-                    );
-
-            }
-
-        }
-
-        finally {
 
             testConnection.disabled =
-                false;
+                true;
 
-        }
 
-    };
+            if (settingsStatus) {
 
+                settingsStatus.innerHTML =
+                    "⏳ جاري اختبار الاتصال...";
+
+            }
+
+
+            try {
+
+                const message =
+                    await testAIConnection();
+
+
+                if (settingsStatus) {
+
+                    settingsStatus.innerHTML =
+                        message;
+
+                }
+
+            }
+            catch (error) {
+
+                if (settingsStatus) {
+
+                    settingsStatus.innerHTML =
+                        "⚠ " +
+                        (
+                            error.message ||
+                            "تعذر الاتصال"
+                        );
+
+                }
+
+            }
+            finally {
+
+                testConnection.disabled =
+                    false;
+
+            }
+
+        };
 
 }
 
+
 // =====================================================
 // AI REQUEST
-// إرسال المحادثة كاملة مع الرسالة الجديدة
 // =====================================================
 
-async function askAI(text) {
+async function askAI(
+    text
+) {
 
     const data =
         getSavedSettings();
+
 
     const selectedProvider =
         (
@@ -8049,9 +7803,11 @@ async function askAI(text) {
             "openrouter"
         ).toLowerCase();
 
+
     const key =
         data.key ||
         "";
+
 
     const model =
         data.model ||
@@ -8076,20 +7832,21 @@ async function askAI(text) {
     }
 
 
-    // =================================================
-    // بناء سياق المحادثة
-    // =================================================
-
-    const conversationMessages = [];
+    const conversationMessages =
+        [];
 
 
     if (
         currentChat &&
-        Array.isArray(currentChat.messages)
+        Array.isArray(
+            currentChat.messages
+        )
     ) {
 
         currentChat.messages.forEach(
-            function (msg) {
+            function (
+                msg
+            ) {
 
                 if (
                     !msg ||
@@ -8104,12 +7861,15 @@ async function askAI(text) {
                 conversationMessages.push({
 
                     role:
-                        msg.role === "ai"
+                        msg.role ===
+                        "ai"
                             ? "assistant"
                             : "user",
 
                     content:
-                        String(msg.text)
+                        String(
+                            msg.text
+                        )
 
                 });
 
@@ -8118,10 +7878,6 @@ async function askAI(text) {
 
     }
 
-
-    // =================================================
-    // إضافة السؤال الجديد
-    // =================================================
 
     conversationMessages.push({
 
@@ -8133,10 +7889,6 @@ async function askAI(text) {
 
     });
 
-
-    // ==================================
-    // OpenRouter
-    // ==================================
 
     if (
         selectedProvider ===
@@ -8203,10 +7955,6 @@ async function askAI(text) {
     }
 
 
-    // ==================================
-    // OpenAI
-    // ==================================
-
     if (
         selectedProvider ===
         "openai"
@@ -8272,10 +8020,6 @@ async function askAI(text) {
     }
 
 
-    // ==================================
-    // Gemini
-    // ==================================
-
     if (
         selectedProvider ===
         "gemini"
@@ -8298,15 +8042,17 @@ async function askAI(text) {
             );
 
 
-        // Gemini يستخدم contents بدل messages
         const contents =
             conversationMessages.map(
-                function (msg) {
+                function (
+                    msg
+                ) {
 
                     return {
 
                         role:
-                            msg.role === "assistant"
+                            msg.role ===
+                            "assistant"
                                 ? "model"
                                 : "user",
 
@@ -8386,1333 +8132,1517 @@ async function askAI(text) {
 
 }
 
+
 // ======================================
 // Gemini Model Normalization
 // ======================================
 
-function normalizeGeminiModel(model) {
-
-
-return String(
-    model || ""
-).replace(
-    /^models\//,
-    ""
-);
-
-
-}
-
-// ======================================
-// قراءة JSON بأمان
-// ======================================
-
-async function readJSON(response) {
-
-
-try {
-
-    return await response.json();
-
-}
-catch (e) {
-
-    return {};
-
-}
-
-
-}
-
-// ======================================
-// استخراج رسالة الخطأ
-// ======================================
-
-function getAPIError(
-result,
-fallback
+function normalizeGeminiModel(
+    model
 ) {
 
-
-if (
-    result &&
-    result.error
-) {
-
-    if (
-        typeof result.error ===
-        "string"
-    ) {
-
-        return result.error;
-
-    }
-
-
-    if (
-        result.error.message
-    ) {
-
-        return result.error.message;
-
-    }
+    return String(
+        model || ""
+    ).replace(
+        /^models\//,
+        ""
+    );
 
 }
 
-
-return fallback;
-
-
-}
 
 // ======================================
-// استخراج رد OpenAI / OpenRouter
+// JSON
 // ======================================
 
-function extractOpenAIStyleAnswer(
-result,
-providerName
+async function readJSON(
+    response
 ) {
-
-
-if (
-    result &&
-    result.choices &&
-    result.choices.length > 0
-) {
-
-    const choice =
-        result.choices[0];
-
-
-    if (
-        choice.message &&
-        typeof choice.message.content ===
-        "string"
-    ) {
-
-        return choice.message.content;
-
-    }
-
-}
-
-
-throw new Error(
-    "لم يصل رد صالح من " +
-    providerName +
-    "."
-);
-
-
-}
-
-// ======================================
-// استخراج رد Gemini
-// ======================================
-
-function extractGeminiAnswer(result) {
-
-
-if (
-    result &&
-    result.candidates &&
-    result.candidates.length > 0
-) {
-
-    const candidate =
-        result.candidates[0];
-
-
-    if (
-        candidate.content &&
-        candidate.content.parts &&
-        Array.isArray(
-            candidate.content.parts
-        )
-    ) {
-
-        const textParts =
-            candidate.content.parts
-                .filter(
-                    function (part) {
-
-                        return (
-                            part &&
-                            typeof part.text ===
-                            "string"
-                        );
-
-                    }
-                )
-                .map(
-                    function (part) {
-
-                        return part.text;
-
-                    }
-                );
-
-
-        if (textParts.length > 0) {
-
-            return textParts.join(
-                "\n"
-            );
-
-        }
-
-    }
-
-}
-
-
-throw new Error(
-    "لم يصل رد صالح من Gemini."
-);
-
-
-}
-
-// =====================================================
-// =====================================================
-// باقي النظام — كما هو
-// =====================================================
-// =====================================================
-function formatAIMessage(text) {
-
-    if (!text)
-        return "";
 
     try {
 
-        return marked.parse(text, {
-            breaks: true,
-            gfm: true
-        });
+        return await response.json();
+
+    }
+    catch (e) {
+
+        return {};
 
     }
 
-    catch (error) {
+}
 
-        console.error(
-            "Markdown formatting error:",
-            error
-        );
 
-        return String(text)
-            .replace(/\n/g, "<br>");
+// ======================================
+// API Error
+// ======================================
+
+function getAPIError(
+    result,
+    fallback
+) {
+
+    if (
+        result &&
+        result.error
+    ) {
+
+        if (
+            typeof result.error ===
+            "string"
+        ) {
+
+            return result.error;
+
+        }
+
+
+        if (
+            result.error.message
+        ) {
+
+            return result.error.message;
+
+        }
 
     }
+
+
+    return fallback;
+
 }
+
+
 // ======================================
-// Render Chat
+// OpenAI/OpenRouter Answer
 // ======================================
 
-function renderChat() {
+function extractOpenAIStyleAnswer(
+    result,
+    providerName
+) {
 
-if (!chatArea)
-    return;
+    if (
+        result &&
+        result.choices &&
+        result.choices.length > 0
+    ) {
 
-
-chatArea.innerHTML =
-    "";
-
-
-if (!currentChat) {
-
-    chatArea.innerHTML = `
-
-        <div class="welcome">
-
-            <div class="ai-symbol">
-                ✦
-            </div>
-
-            <h2>
-                مرحبًا بك
-            </h2>
-
-            <p>
-                ابدأ محادثة جديدة
-            </p>
-
-        </div>
-
-    `;
+        const choice =
+            result.choices[0];
 
 
-    return;
+        if (
+            choice.message &&
+            typeof choice.message.content ===
+            "string"
+        ) {
 
-}
+            return choice.message.content;
 
-
-currentChat.messages.forEach(
-    function (msg) {
-
-        const div =
-            document.createElement(
-                "div"
-            );
-
-
-        div.className =
-            "message " +
-            (
-                msg.role === "user"
-                    ? "user-message"
-                    : "ai-message"
-            );
-
-
-        if (msg.role === "user") {
-
-    div.textContent =
-        msg.text || "";
-
-}
-else {
-
-    div.innerHTML =
-        formatAIMessage(
-            msg.text || ""
-        );
-
-}
-
-
-        chatArea.appendChild(
-            div
-        );
+        }
 
     }
-);
 
 
-chatArea.scrollTop =
-    chatArea.scrollHeight;
-
-
-}
-
-// ======================================
-// Render Chat List
-// ======================================
-
-function renderChatList() {
-
-
-const list =
-    document.getElementById(
-        "chat-list"
+    throw new Error(
+        "لم يصل رد صالح من " +
+        providerName +
+        "."
     );
 
-
-if (!list)
-    return;
-
-
-list.innerHTML =
-    "";
-
-
-if (chats.length === 0) {
-
-    list.innerHTML =
-        "<div class='empty-chat'>لا توجد محادثات</div>";
-
-    return;
-
 }
 
-
-chats
-.forEach(function (chat) {
-
-        const item =
-            document.createElement(
-                "div"
-            );
-
-
-        item.className =
-            "chat-history-item";
-
-
-        item.innerHTML = `
-    <span class="chat-title">
-        ${chatIcon}
-        ${chat.title}
-    </span>
-
-    <button
-        class="chat-menu"
-        type="button">
-        ⋮
-    </button>
-
-    <div class="chat-options-menu">
-
-        <div class="rename-chat">
-            ✏ إعادة تسمية
-        </div>
-
-        <div class="delete-chat">
-            🗑 حذف
-        </div>
-
-    </div>
-`;
-
-
-        const title =
-            item.querySelector(
-                ".chat-title"
-            );
-
-
-        if (title) {
-
-            title.onclick =
-                function (e) {
-
-                    e.stopPropagation();
-
-
-                    currentChat =
-                        chat;
-
-
-                    renderChat();
-
-
-                    if (
-                        expandedSidebar
-                    ) {
-
-                        expandedSidebar.classList.remove(
-                            "open"
-                        );
-
-                    }
-
-                };
-
-        }
-
-
-        const menu =
-            item.querySelector(
-                ".chat-menu"
-            );
-
-
-        if (menu) {
-
-            menu.onclick =
-                function (e) {
-
-                    e.stopPropagation();
-
-
-                    document
-                        .querySelectorAll(
-                            ".chat-options-menu"
-                        )
-                        .forEach(
-                            function (m) {
-
-                                m.classList.remove(
-                                    "open"
-                                );
-
-                            }
-                        );
-
-
-                    const options =
-                        item.querySelector(
-                            ".chat-options-menu"
-                        );
-
-
-                    if (!options)
-                        return;
-
-
-                    options.classList.add(
-                        "open"
-                    );
-
-
-                    const rect =
-                        menu.getBoundingClientRect();
-
-
-                    const menuWidth =
-                        140;
-
-                    const menuHeight =
-                        options.offsetHeight ||
-                        80;
-
-                    const margin =
-                        8;
-
-
-                    const viewportWidth =
-                        window.innerWidth;
-
-                    const viewportHeight =
-                        window.innerHeight;
-
-
-                    const spaceLeft =
-                        rect.left;
-
-                    const spaceAbove =
-                        rect.top;
-
-                    const spaceBelow =
-                        viewportHeight -
-                        rect.bottom;
-
-
-                    let left;
-                    let top;
-
-
-                    if (
-                        spaceLeft >=
-                        menuWidth + margin
-                    ) {
-
-                        left =
-                            rect.left -
-                            menuWidth -
-                            margin;
-
-                    }
-                    else {
-
-                        left =
-                            rect.right +
-                            margin;
-
-                    }
-
-
-                    if (
-                        spaceBelow <
-                            menuHeight + margin &&
-                        spaceAbove >=
-                            menuHeight + margin
-                    ) {
-
-                        top =
-                            rect.top -
-                            menuHeight -
-                            margin;
-
-                    }
-                    else {
-
-                        top =
-                            rect.bottom +
-                            margin;
-
-                    }
-
-
-                    if (left < margin) {
-
-                        left =
-                            margin;
-
-                    }
-
-
-                    if (
-                        left + menuWidth >
-                        viewportWidth - margin
-                    ) {
-
-                        left =
-                            viewportWidth -
-                            menuWidth -
-                            margin;
-
-                    }
-
-
-                    if (top < margin) {
-
-                        top =
-                            margin;
-
-                    }
-
-
-                    if (
-                        top + menuHeight >
-                        viewportHeight - margin
-                    ) {
-
-                        top =
-                            viewportHeight -
-                            menuHeight -
-                            margin;
-
-                    }
-
-
-                    options.style.position =
-                        "fixed";
-
-                    options.style.left =
-                        left + "px";
-
-                    options.style.top =
-                        top + "px";
-
-                    options.style.right =
-                        "auto";
-
-                    options.style.bottom =
-                        "auto";
-
-                    options.style.zIndex =
-                        "999999";
-
-                };
-
-        }
-
-
-        const renameBtn =
-            item.querySelector(
-                ".rename-chat"
-            );
-
-
-        if (renameBtn) {
-
-            renameBtn.onclick =
-                function (e) {
-
-                    e.stopPropagation();
-
-
-                    const options =
-                        item.querySelector(
-                            ".chat-options-menu"
-                        );
-
-
-                    if (options) {
-
-                        options.classList.remove(
-                            "open"
-                        );
-
-                    }
-
-
-                    const titleSpan =
-                        item.querySelector(
-                            ".chat-title"
-                        );
-
-
-                    if (!titleSpan)
-                        return;
-
-
-                    const oldName =
-                        chat.title;
-
-
-                    titleSpan.innerHTML = `
-
-                        <input
-                            class="edit-chat-title"
-                            value="${oldName}">
-
-                    `;
-
-
-                    const editInput =
-                        titleSpan.querySelector(
-                            ".edit-chat-title"
-                        );
-
-
-                    if (!editInput)
-                        return;
-
-
-                    editInput.focus();
-
-
-                    editInput.setSelectionRange(
-                        editInput.value.length,
-                        editInput.value.length
-                    );
-
-
-                    editInput.onkeydown =
-                        function (event) {
-
-                            if (
-                                event.key ===
-                                "Enter"
-                            ) {
-
-                                const value =
-                                    editInput.value.trim();
-
-
-                                if (value !== "") {
-
-                                    chat.title =
-                                        value;
-
-                                }
-                                else {
-
-                                    chat.title =
-                                        oldName;
-
-                                }
-
-
-                                saveChats();
-
-                                renderChatList();
-
-                                renderSidebarChats();
-
-                                renderRecentChats();
-
-                            }
-
-
-                            if (
-                                event.key ===
-                                "Escape"
-                            ) {
-
-                                chat.title =
-                                    oldName;
-
-
-                                renderChatList();
-
-                            }
-
-                        };
-
-                };
-
-        }
-
-
-        const deleteBtn =
-            item.querySelector(
-                ".delete-chat"
-            );
-
-
-        if (deleteBtn) {
-
-            deleteBtn.onclick =
-                function (e) {
-
-                    e.stopPropagation();
-
-
-                    const options =
-                        item.querySelector(
-                            ".chat-options-menu"
-                        );
-
-
-                    if (options) {
-
-                        options.classList.remove(
-                            "open"
-                        );
-
-                    }
-
-
-                    const confirmBox =
-                        document.createElement(
-                            "div"
-                        );
-
-
-                    confirmBox.className =
-                        "delete-confirm";
-
-
-                    confirmBox.innerHTML = `
-
-                        <div class="confirm-dialog">
-
-                            <p>
-                                هل تريد حذف المحادثة:
-                                <br>
-
-                                <strong>
-                                    ${chat.title}
-                                </strong>
-
-                                ؟
-                            </p>
-
-                            <button
-                                class="confirm-delete"
-                                type="button">
-                                حذف
-                            </button>
-
-                            <button
-                                class="cancel-delete"
-                                type="button">
-                                إلغاء
-                            </button>
-
-                        </div>
-
-                    `;
-
-
-                    document.body.appendChild(
-                        confirmBox
-                    );
-
-
-                    const confirmDelete =
-                        confirmBox.querySelector(
-                            ".confirm-delete"
-                        );
-
-
-                    if (confirmDelete) {
-
-                        confirmDelete.onclick =
-                            function () {
-
-                                chats =
-                                    chats.filter(
-                                        function (c) {
-
-                                            return (
-                                                c.id !==
-                                                chat.id
-                                            );
-
-                                        }
-                                    );
-
-
-                                if (
-                                    currentChat &&
-                                    currentChat.id ===
-                                    chat.id
-                                ) {
-
-                                    currentChat =
-                                        null;
-
-                                    renderChat();
-
-                                }
-
-
-                                saveChats();
-
-                                renderChatList();
-
-                                renderSidebarChats();
-
-                                renderRecentChats();
-
-                                confirmBox.remove();
-
-                            };
-
-                    }
-
-
-                    const cancelDelete =
-                        confirmBox.querySelector(
-                            ".cancel-delete"
-                        );
-
-
-                    if (cancelDelete) {
-
-                        cancelDelete.onclick =
-                            function () {
-
-                                confirmBox.remove();
-
-                            };
-
-                    }
-
-                };
-
-        }
-
-
-        list.appendChild(
-            item
-        );
-
-    });
-
-
-}
 
 // ======================================
-// Chat Popup
+// Gemini Answer
 // ======================================
 
-function renderRecentChats() {
+function extractGeminiAnswer(
+    result
+) {
+
+    if (
+        result &&
+        result.candidates &&
+        result.candidates.length > 0
+    ) {
+
+        const candidate =
+            result.candidates[0];
 
 
-if (!recentChatList)
-    return;
+        if (
+            candidate.content &&
+            candidate.content.parts &&
+            Array.isArray(
+                candidate.content.parts
+            )
+        ) {
+
+            const textParts =
+                candidate.content.parts
+                    .filter(
+                        function (
+                            part
+                        ) {
+
+                            return (
+                                part &&
+                                typeof part.text ===
+                                "string"
+                            );
+
+                        }
+                    )
+                    .map(
+                        function (
+                            part
+                        ) {
+
+                            return part.text;
+
+                        }
+                    );
 
 
-recentChatList.innerHTML =
-    "";
+            if (
+                textParts.length >
+                0
+            ) {
 
-
-if (chats.length === 0) {
-
-    recentChatList.innerHTML =
-        "<div class='empty-chat'>لا توجد محادثات</div>";
-
-    return;
-
-}
-
-
-chats
-    .slice(0, 8)
-    .forEach(
-        function (chat) {
-
-            const div =
-                document.createElement(
-                    "div"
+                return textParts.join(
+                    "\n"
                 );
-
-
-            div.className =
-                "recent-chat-item";
-
-
-            div.innerHTML = `
-
-    <span class="chat-title">
-        ${chatIcon}
-        ${chat.title}
-    </span>
-
-`;
-
-
-            div.onclick =
-                function () {
-
-                    currentChat =
-                        chat;
-
-
-                    renderChat();
-
-
-                    if (chatPopup) {
-
-                        chatPopup.classList.remove(
-                            "open"
-                        );
-
-                    }
-
-                };
-
-
-            recentChatList.appendChild(
-                div
-            );
-
-        }
-    );
-
-
-}
-
-// ======================================
-// Chat Button
-// ======================================
-
-if (chatBtn) {
-
-
-chatBtn.onclick =
-    function (e) {
-
-        e.stopPropagation();
-
-
-        if (!chatPopup)
-            return;
-
-
-        if (projectsPopup)
-            projectsPopup.classList.remove(
-                "open"
-            );
-
-
-        if (searchPopup)
-            searchPopup.classList.remove(
-                "open"
-            );
-
-
-        if (settingsWindow)
-            settingsWindow.classList.remove(
-                "open"
-            );
-
-
-        if (
-            chatPopup.classList.contains(
-                "open"
-            )
-        ) {
-
-            chatPopup.classList.remove(
-                "open"
-            );
-
-            return;
-
-        }
-
-
-        // عرض جميع المحادثات
-        renderChatList();
-
-
-        chatPopup.classList.add(
-            "open"
-        );
-
-    };
-
-
-}
-
-// ======================================
-// Search
-// ======================================
-
-if (searchBtn) {
-
-
-searchBtn.onclick =
-    function (e) {
-
-        e.stopPropagation();
-
-
-        if (!searchPopup)
-            return;
-
-
-        if (projectsPopup)
-            projectsPopup.classList.remove(
-                "open"
-            );
-
-
-        if (chatPopup)
-            chatPopup.classList.remove(
-                "open"
-            );
-
-
-        if (settingsWindow)
-            settingsWindow.classList.remove(
-                "open"
-            );
-
-
-        searchPopup.classList.toggle(
-            "open"
-        );
-
-
-        if (
-            searchPopup.classList.contains(
-                "open"
-            )
-        ) {
-
-            if (searchInput) {
-
-                searchInput.focus();
 
             }
 
         }
 
-    };
+    }
 
+
+    throw new Error(
+        "لم يصل رد صالح من Gemini."
+    );
 
 }
 
-// ======================================
-// Search Input
-// ======================================
 
-if (searchInput) {
+// =====================================================
+// Search Document Context
+// البحث النصي القديم - للإبقاء على الوظيفة
+// =====================================================
 
-    searchInput.oninput =
-        async function () {
+async function searchDocumentContext(
+    documentId,
+    query
+) {
 
-            const keyword =
-                searchInput.value
-                    .trim()
-                    .toLowerCase();
+    const searchTerm =
+        normalizeSearchText(
+            query
+        );
 
 
-            // ======================================
-            // اختبار مؤقت لفهرس "استصلاح"
-            // الاستخدام: اكتب #استصلاح في مربع البحث
-            // ======================================
+    if (!searchTerm) {
 
-            if (keyword === "#استصلاح") {
+        return {
 
-                console.clear();
+            query:
+                "",
 
-                console.log(
-                    "======================================"
-                );
+            count:
+                0,
 
-                console.log(
-                    "اختبار فهرس المستند: استصلاح"
-                );
+            results:
+                []
 
-                console.log(
-                    "======================================"
-                );
+        };
 
+    }
 
-                try {
 
-                    // ----------------------------------
-                    // التحقق من وجود مستند حالي
-                    // ----------------------------------
+    const structureData =
+        await getDocumentStructure(
+            documentId
+        );
 
-                    if (!currentDocument) {
 
-                        console.warn(
-                            "لا يوجد مستند نشط."
-                        );
+    if (!structureData) {
 
-                        return;
+        throw new Error(
+            "لا توجد بنية محفوظة لهذا المستند."
+        );
 
-                    }
+    }
 
 
-                    // ----------------------------------
-                    // التحقق من دالة الفهرس
-                    // ----------------------------------
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
 
-                    if (
-                        typeof getDocumentIndex !==
-                        "function"
-                    ) {
 
-                        console.error(
-                            "getDocumentIndex غير متاحة في هذا النطاق."
-                        );
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+            : [];
 
-                        return;
 
-                    }
+    const results =
+        [];
 
 
-                    // ----------------------------------
-                    // استرجاع فهرس المستند
-                    // ----------------------------------
+    paragraphs.forEach(
+        function (
+            paragraph
+        ) {
 
-                    const index =
-                        await getDocumentIndex(
-                            currentDocument.id
-                        );
-
-
-                    if (!index) {
-
-                        console.warn(
-                            "لا يوجد فهرس محفوظ للمستند الحالي."
-                        );
-
-                        return;
-
-                    }
-
-
-                    // ----------------------------------
-                    // معلومات عامة
-                    // ----------------------------------
-
-                    console.log(
-                        "المستند:",
-                        currentDocument
-                    );
-
-                    console.log(
-                        "tokenCount:",
-                        index.tokenCount
-                    );
-
-                    console.log(
-                        "uniqueTerms:",
-                        index.uniqueTerms
-                    );
-
-                    console.log(
-                        "uniqueFamilies:",
-                        index.uniqueFamilies
-                    );
-
-
-                    // ----------------------------------
-                    // عائلة استصلاح
-                    // ----------------------------------
-
-                    const family =
-                        index.families &&
-                        index.families["استصلاح"];
-
-
-                    if (!family) {
-
-                        console.warn(
-                            "لم توجد عائلة استصلاح في الفهرس."
-                        );
-
-
-                        const familyKeys =
-                            Object.keys(
-                                index.families || {}
-                            );
-
-
-                        console.log(
-                            "عدد مفاتيح العائلات:",
-                            familyKeys.length
-                        );
-
-
-                        console.log(
-                            "المفاتيح التي تحتوي على استصلاح:",
-                            familyKeys.filter(
-                                function (key) {
-
-                                    return key.includes(
-                                        "استصلاح"
-                                    );
-
-                                }
-                            )
-                        );
-
-
-                        return;
-
-                    }
-
-
-                    // ----------------------------------
-                    // عرض العائلة
-                    // ----------------------------------
-
-                    console.log(
-                        "عائلة استصلاح كاملة:",
-                        family
-                    );
-
-
-                    console.log(
-                        "عدد أفراد العائلة:",
-                        family.count
-                    );
-
-
-                    console.log(
-                        "أفراد العائلة:",
-                        family.words ||
-                        family.terms ||
-                        family.members ||
-                        []
-                    );
-
-
-                    console.log(
-                        "مواقع العائلة:",
-                        family.positions ||
-                        []
-                    );
-
-
-                    console.log(
-                        "======================================"
-                    );
-
-                    console.log(
-                        "انتهى اختبار عائلة استصلاح."
-                    );
-
-                    console.log(
-                        "======================================"
-                    );
-
-                }
-                catch (error) {
-
-                    console.error(
-                        "فشل اختبار فهرس استصلاح:",
-                        error
-                    );
-
-                }
-
-
-                // ----------------------------------
-                // مهم جدًا:
-                // لا نكمل إلى البحث العادي
-                // ----------------------------------
+            if (
+                !paragraph ||
+                !paragraph.text
+            ) {
 
                 return;
 
             }
 
 
-            // ======================================
-            // البحث العادي في المحادثات
-            // ======================================
+            const originalText =
+                String(
+                    paragraph.text
+                );
+
+
+            const normalizedParagraph =
+                normalizeSearchText(
+                    originalText
+                );
+
+
+            if (
+                !normalizedParagraph.includes(
+                    searchTerm
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            let nearestHeading =
+                null;
+
+
+            for (
+                let i =
+                    headings.length - 1;
+                i >= 0;
+                i--
+            ) {
+
+                const heading =
+                    headings[i];
+
+
+                if (
+                    heading &&
+                    heading.index <
+                        paragraph.index
+                ) {
+
+                    nearestHeading =
+                        heading;
+
+                    break;
+
+                }
+
+            }
+
+
+            const position =
+                normalizedParagraph.indexOf(
+                    searchTerm
+                );
+
+
+            const start =
+                Math.max(
+                    0,
+                    position - 100
+                );
+
+
+            const end =
+                Math.min(
+                    originalText.length,
+                    position +
+                    searchTerm.length +
+                    160
+                );
+
+
+            results.push({
+
+                paragraphIndex:
+                    paragraph.index,
+
+                paragraphId:
+                    paragraph.id,
+
+                text:
+                    originalText,
+
+                context:
+                    originalText.substring(
+                        start,
+                        end
+                    ),
+
+                heading:
+                    nearestHeading
+                        ? nearestHeading.text
+                        : "",
+
+                headingLevel:
+                    nearestHeading
+                        ? nearestHeading.style
+                        : ""
+
+            });
+
+        }
+    );
+
+
+    return {
+
+        query:
+            searchTerm,
+
+        count:
+            results.length,
+
+        results:
+            results
+
+    };
+
+}
+
+
+// =====================================================
+// Search Indexed Document
+// البحث الذكي بالعائلات
+// =====================================================
+
+async function searchIndexedDocument(
+    documentId,
+    query
+) {
+
+    const searchTerm =
+        normalizeSearchText(
+            query
+        );
+
+
+    if (!searchTerm) {
+
+        return {
+
+            query:
+                "",
+
+            count:
+                0,
+
+            results:
+                []
+
+        };
+
+    }
+
+
+    const indexData =
+        await getDocumentIndex(
+            documentId
+        );
+
+
+    if (!indexData) {
+
+        throw new Error(
+            "لا يوجد فهرس لهذا المستند."
+        );
+
+    }
+
+
+    const indexedTerms =
+        indexData.terms || {};
+
+
+    const indexedFamilies =
+        indexData.families || {};
+
+
+    const queryTokens =
+        tokenizeDocumentText(
+            searchTerm
+        );
+
+
+    if (
+        queryTokens.length ===
+        0
+    ) {
+
+        return {
+
+            query:
+                searchTerm,
+
+            count:
+                0,
+
+            results:
+                []
+
+        };
+
+    }
+
+
+    // ==================================
+    // كل الكلمات الموجودة فعليًا
+    // ==================================
+
+    const indexedSurfaceSet =
+        new Set(
+            Object.keys(
+                indexedTerms
+            )
+        );
+
+
+    // ==================================
+    // عائلات الاستعلام
+    // ==================================
+
+    const queryFamilyKeys =
+        [];
+
+
+    queryTokens.forEach(
+        function (
+            token
+        ) {
+
+            const familyKey =
+                getConservativeFamilyKey(
+                    token,
+                    indexedSurfaceSet
+                );
+
+
+            if (
+                familyKey &&
+                !queryFamilyKeys.includes(
+                    familyKey
+                )
+            ) {
+
+                queryFamilyKeys.push(
+                    familyKey
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // العائلات الموجودة فعليًا
+    // ==================================
+
+    const matchedFamilies =
+        queryFamilyKeys.filter(
+            function (
+                key
+            ) {
+
+                return Boolean(
+                    indexedFamilies[key]
+                );
+
+            }
+        );
+
+
+    // ==================================
+    // fallback للفهرس القديم
+    // ==================================
+
+    const fallbackTerms =
+        queryTokens.filter(
+            function (
+                token
+            ) {
+
+                return Boolean(
+                    indexedTerms[token]
+                );
+
+            }
+        );
+
+
+    if (
+        matchedFamilies.length === 0 &&
+        fallbackTerms.length === 0
+    ) {
+
+        return {
+
+            query:
+                searchTerm,
+
+            count:
+                0,
+
+            results:
+                [],
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            totalQueryTerms:
+                queryTokens.length,
+
+            indexTokenCount:
+                indexData.tokenCount,
+
+            indexUniqueTerms:
+                indexData.uniqueTerms,
+
+            indexUniqueFamilies:
+                indexData.uniqueFamilies ||
+                0,
+
+            indexedOccurrences:
+                0
+
+        };
+
+    }
+
+
+    // ==================================
+    // البنية
+    // ==================================
+
+    const structureData =
+        await ensureDocumentStructure(
+            documents.find(
+                function (
+                    d
+                ) {
+
+                    return (
+                        String(d.id) ===
+                        String(documentId)
+                    );
+
+                }
+            ) || currentDocument
+        );
+
+
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
+
+
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+            : [];
+
+
+    // ==================================
+    // نطاقات الكلمات
+    // ==================================
+
+    const paragraphRanges =
+        [];
+
+
+    let globalTokenOffset =
+        0;
+
+
+    paragraphs.forEach(
+        function (
+            paragraph
+        ) {
+
+            const text =
+                paragraph &&
+                paragraph.text
+                    ? String(
+                        paragraph.text
+                    )
+                    : "";
+
+
+            const paragraphTokens =
+                tokenizeDocumentText(
+                    text
+                );
+
+
+            const start =
+                globalTokenOffset;
+
+
+            const end =
+                start +
+                paragraphTokens.length -
+                1;
+
+
+            paragraphRanges.push({
+
+                paragraphIndex:
+                    paragraph.index,
+
+                start:
+                    start,
+
+                end:
+                    end
+
+            });
+
+
+            globalTokenOffset +=
+                paragraphTokens.length;
+
+        }
+    );
+
+
+    // ==================================
+    // Find paragraph by token position
+    // ==================================
+
+    function findParagraphByTokenPosition(
+        tokenPosition
+    ) {
+
+        let low =
+            0;
+
+
+        let high =
+            paragraphRanges.length -
+            1;
+
+
+        while (
+            low <= high
+        ) {
+
+            const mid =
+                Math.floor(
+                    (
+                        low +
+                        high
+                    ) / 2
+                );
+
+
+            const range =
+                paragraphRanges[mid];
+
+
+            if (
+                tokenPosition <
+                range.start
+            ) {
+
+                high =
+                    mid - 1;
+
+            }
+            else if (
+                tokenPosition >
+                range.end
+            ) {
+
+                low =
+                    mid + 1;
+
+            }
+            else {
+
+                return range.paragraphIndex;
+
+            }
+
+        }
+
+
+        return -1;
+
+    }
+
+
+    // ==================================
+    // Candidate paragraphs
+    // ==================================
+
+    const candidateParagraphs =
+        new Map();
+
+
+    matchedFamilies.forEach(
+        function (
+            familyKey
+        ) {
+
+            const family =
+                indexedFamilies[
+                    familyKey
+                ];
+
+
+            if (
+                !family ||
+                !Array.isArray(
+                    family.positions
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            family.positions.forEach(
+                function (
+                    tokenPosition
+                ) {
+
+                    const paragraphIndex =
+                        findParagraphByTokenPosition(
+                            tokenPosition
+                        );
+
+
+                    if (
+                        paragraphIndex ===
+                        -1
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    if (
+                        !candidateParagraphs.has(
+                            paragraphIndex
+                        )
+                    ) {
+
+                        candidateParagraphs.set(
+                            paragraphIndex,
+                            new Set()
+                        );
+
+                    }
+
+
+                    candidateParagraphs
+                        .get(
+                            paragraphIndex
+                        )
+                        .add(
+                            familyKey
+                        );
+
+                }
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // Results
+    // ==================================
+
+    const results =
+        [];
+
+
+    paragraphs.forEach(
+        function (
+            paragraph
+        ) {
+
+            if (
+                !paragraph ||
+                !paragraph.text
+            ) {
+
+                return;
+
+            }
+
+
+            if (
+                matchedFamilies.length > 0 &&
+                !candidateParagraphs.has(
+                    paragraph.index
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            const originalParagraphText =
+                String(
+                    paragraph.text
+                );
+
+
+            const normalizedParagraphText =
+                normalizeSearchText(
+                    originalParagraphText
+                );
+
+
+            const paragraphTokens =
+                tokenizeDocumentText(
+                    normalizedParagraphText
+                );
+
+
+            const paragraphSurfaceSet =
+                new Set(
+                    paragraphTokens
+                );
+
+
+            let matchedFamilyCount =
+                0;
+
+
+            matchedFamilies.forEach(
+                function (
+                    familyKey
+                ) {
+
+                    paragraphTokens.forEach(
+                        function (
+                            token
+                        ) {
+
+                            const tokenFamily =
+                                getConservativeFamilyKey(
+                                    token,
+                                    indexedSurfaceSet
+                                );
+
+
+                            if (
+                                tokenFamily ===
+                                familyKey
+                            ) {
+
+                                matchedFamilyCount++;
+
+                            }
+
+                        }
+                    );
+
+                }
+            );
+
+
+            if (
+                matchedFamilyCount ===
+                0 &&
+                matchedFamilies.length > 0
+            ) {
+
+                return;
+
+            }
+
+
+            let score =
+                matchedFamilies.length > 0
+                    ? (
+                        matchedFamilyCount /
+                        matchedFamilies.length
+                    ) * 5
+                    : 0;
+
+
+            if (
+                normalizedParagraphText.includes(
+                    searchTerm
+                )
+            ) {
+
+                score +=
+                    6;
+
+            }
+
+
+            let exactWordMatches =
+                0;
+
+
+            queryTokens.forEach(
+                function (
+                    token
+                ) {
+
+                    if (
+                        paragraphSurfaceSet.has(
+                            token
+                        )
+                    ) {
+
+                        exactWordMatches++;
+
+                    }
+
+                }
+            );
+
+
+            score +=
+                exactWordMatches *
+                1.25;
+
+
+            let nearestHeading =
+                null;
+
+
+            for (
+                let i =
+                    headings.length - 1;
+                i >= 0;
+                i--
+            ) {
+
+                const heading =
+                    headings[i];
+
+
+                if (
+                    heading &&
+                    heading.index <
+                        paragraph.index
+                ) {
+
+                    nearestHeading =
+                        heading;
+
+                    break;
+
+                }
+
+            }
+
+
+            // ==================================
+            // موضع المقتطف
+            // ==================================
+
+            let searchPosition =
+                normalizedParagraphText.indexOf(
+                    searchTerm
+                );
+
+
+            if (
+                searchPosition ===
+                -1
+            ) {
+
+                for (
+                    let i = 0;
+                    i < queryFamilyKeys.length;
+                    i++
+                ) {
+
+                    const familyKey =
+                        queryFamilyKeys[i];
+
+
+                    const position =
+                        normalizedParagraphText.indexOf(
+                            familyKey
+                        );
+
+
+                    if (
+                        position !==
+                        -1
+                    ) {
+
+                        searchPosition =
+                            position;
+
+                        break;
+
+                    }
+
+                }
+
+            }
+
+
+            let context =
+                originalParagraphText;
+
+
+            if (
+                searchPosition !==
+                -1
+            ) {
+
+                const start =
+                    Math.max(
+                        0,
+                        searchPosition - 120
+                    );
+
+
+                const end =
+                    Math.min(
+                        originalParagraphText.length,
+                        searchPosition + 300
+                    );
+
+
+                context =
+                    originalParagraphText.substring(
+                        start,
+                        end
+                    );
+
+            }
+            else {
+
+                context =
+                    originalParagraphText.substring(
+                        0,
+                        420
+                    );
+
+            }
+
+
+            let matchType =
+                "family";
+
+
+            if (
+                normalizedParagraphText.includes(
+                    searchTerm
+                )
+            ) {
+
+                matchType =
+                    "exact";
+
+            }
+            else if (
+                exactWordMatches > 0
+            ) {
+
+                matchType =
+                    "word";
+
+            }
+
+
+            results.push({
+
+                paragraphIndex:
+                    paragraph.index,
+
+                paragraphId:
+                    paragraph.id,
+
+                text:
+                    originalParagraphText,
+
+                context:
+                    context,
+
+                heading:
+                    nearestHeading
+                        ? nearestHeading.text
+                        : "",
+
+                headingLevel:
+                    nearestHeading
+                        ? nearestHeading.style
+                        : "",
+
+                matchedTerms:
+                    matchedFamilies,
+
+                matchedFamilies:
+                    matchedFamilies,
+
+                matchedFamilyCount:
+                    matchedFamilyCount,
+
+                exactWordMatches:
+                    exactWordMatches,
+
+                totalQueryTerms:
+                    queryTokens.length,
+
+                score:
+                    score,
+
+                matchType:
+                    matchType
+
+            });
+
+        }
+    );
+
+
+    // ==================================
+    // Sort
+    // ==================================
+
+    results.sort(
+        function (
+            a,
+            b
+        ) {
+
+            if (
+                b.score !==
+                a.score
+            ) {
+
+                return (
+                    b.score -
+                    a.score
+                );
+
+            }
+
+
+            if (
+                b.matchedFamilyCount !==
+                a.matchedFamilyCount
+            ) {
+
+                return (
+                    b.matchedFamilyCount -
+                    a.matchedFamilyCount
+                );
+
+            }
+
+
+            if (
+                b.exactWordMatches !==
+                a.exactWordMatches
+            ) {
+
+                return (
+                    b.exactWordMatches -
+                    a.exactWordMatches
+                );
+
+            }
+
+
+            return (
+                a.paragraphIndex -
+                b.paragraphIndex
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // Total occurrences
+    // ==================================
+
+    let indexedOccurrences =
+        0;
+
+
+    matchedFamilies.forEach(
+        function (
+            familyKey
+        ) {
+
+            const family =
+                indexedFamilies[
+                    familyKey
+                ];
+
+
+            if (family) {
+
+                indexedOccurrences +=
+                    Number(
+                        family.count ||
+                        0
+                    );
+
+            }
+
+        }
+    );
+
+
+    return {
+
+        query:
+            searchTerm,
+
+        count:
+            results.length,
+
+        results:
+            results,
+
+        matchedTerms:
+            matchedFamilies,
+
+        matchedFamilies:
+            matchedFamilies,
+
+        totalQueryTerms:
+            queryTokens.length,
+
+        indexTokenCount:
+            indexData.tokenCount,
+
+        indexUniqueTerms:
+            indexData.uniqueTerms,
+
+        indexUniqueFamilies:
+            indexData.uniqueFamilies ||
+            0,
+
+        indexedOccurrences:
+            indexedOccurrences
+
+    };
+
+}
+
+
+// =====================================================
+// Temporary/Debug Test
+// يبقى داخل التطبيق، لكنه لا يعتمد على window
+// =====================================================
+
+async function testCurrentDocumentIndex() {
+
+    if (!currentDocument) {
+
+        console.warn(
+            "لا يوجد مستند نشط."
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        const index =
+            await getDocumentIndex(
+                currentDocument.id
+            );
+
+
+        console.log(
+            "الفهرس الحقيقي للمستند:",
+            index
+        );
+
+
+        if (!index) {
+
+            console.warn(
+                "لا يوجد فهرس محفوظ لهذا المستند."
+            );
+
+
+            return;
+
+        }
+
+
+        console.log(
+            "عدد الكلمات:",
+            index.tokenCount
+        );
+
+
+        console.log(
+            "عدد الكلمات الفريدة:",
+            index.uniqueTerms
+        );
+
+
+        console.log(
+            "عدد العائلات:",
+            index.uniqueFamilies
+        );
+
+
+        console.log(
+            "عائلة استصلاح:",
+            index.families &&
+            index.families["استصلاح"]
+        );
+
+
+    }
+    catch (error) {
+
+        console.error(
+            "فشل اختبار الفهرس:",
+            error
+        );
+
+    }
+
+}
+
+
+// =====================================================
+// Search box
+// ملاحظة: البحث الحالي في أسماء المحادثات
+// ولا نغيّره في هذه المرحلة حتى لا نعبث بالواجهة
+// =====================================================
+
+if (searchBtn) {
+
+    searchBtn.onclick =
+        function (e) {
+
+            e.stopPropagation();
+
+
+            if (!searchPopup)
+                return;
+
+
+            if (projectsPopup) {
+
+                projectsPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (chatPopup) {
+
+                chatPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (settingsWindow) {
+
+                settingsWindow.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            searchPopup.classList.toggle(
+                "open"
+            );
+
+
+            if (
+                searchPopup.classList.contains(
+                    "open"
+                )
+            ) {
+
+                if (searchInput) {
+
+                    searchInput.focus();
+
+                }
+
+            }
+
+        };
+
+}
+
+
+// ======================================
+// Search Input
+// البحث الحالي = المحادثات
+// ======================================
+
+if (searchInput) {
+
+    searchInput.oninput =
+        function () {
+
+            const keyword =
+                searchInput.value
+                    .trim()
+                    .toLowerCase();
+
 
             if (!searchResults)
                 return;
@@ -9722,12 +9652,20 @@ if (searchInput) {
                 "";
 
 
-            if (keyword === "")
+            if (
+                keyword ===
+                ""
+            ) {
+
                 return;
+
+            }
 
 
             chats.forEach(
-                function (chat) {
+                function (
+                    chat
+                ) {
 
                     if (
                         chat.title
@@ -9765,7 +9703,9 @@ if (searchInput) {
                                 renderChat();
 
 
-                                if (searchPopup) {
+                                if (
+                                    searchPopup
+                                ) {
 
                                     searchPopup
                                         .classList
@@ -9799,25 +9739,34 @@ if (searchInput) {
 
 }
 
-// ======================================
+
+// =====================================================
 // Send Message
-// ======================================
+// =====================================================
 
 async function sendMessage() {
 
     if (!input)
         return;
 
+
     const text =
         input.value.trim();
 
-    if (text === "")
+
+    if (
+        text ===
+        ""
+    ) {
+
         return;
 
+    }
 
-    // =================================================
-    // إنشاء محادثة جديدة إذا لم توجد محادثة حالية
-    // =================================================
+
+    // ==================================
+    // إنشاء محادثة
+    // ==================================
 
     if (!currentChat) {
 
@@ -9827,45 +9776,65 @@ async function sendMessage() {
                 Date.now(),
 
             title:
-                text.substring(0, 30),
+                text.substring(
+                    0,
+                    30
+                ),
 
             messages:
                 [],
 
             isTemporary:
-                true
+                true,
+
+            projectId:
+                currentProject
+                    ? currentProject.id
+                    : null
 
         };
 
     }
 
 
-    // =================================================
-    // تحويل المحادثة المؤقتة إلى محادثة محفوظة
-    // =================================================
+    // ==================================
+    // حفظ المحادثة المؤقتة
+    // ==================================
 
-    if (currentChat.isTemporary) {
+    if (
+        currentChat.isTemporary
+    ) {
 
         currentChat.isTemporary =
             false;
+
+
         currentChat.projectId =
             currentProject
                 ? currentProject.id
                 : null;
+
+
         currentChat.title =
-            text.substring(0, 30);
+            text.substring(
+                0,
+                30
+            );
 
 
-        // منع إضافة نفس المحادثة أكثر من مرة
         const alreadyExists =
-            chats.some(function (chat) {
+            chats.some(
+                function (
+                    chat
+                ) {
 
-                return (
-                    chat.id ===
-                    currentChat.id
-                );
+                    return (
+                        chat.id ===
+                        currentChat.id
+                    );
 
-            });
+                }
+            );
 
 
         if (!alreadyExists) {
@@ -9875,6 +9844,8 @@ async function sendMessage() {
             );
 
         }
+
+
         if (
             currentProject &&
             currentChat.projectId ===
@@ -9903,8 +9874,11 @@ async function sendMessage() {
                     currentChat.id
                 );
 
+
                 currentProject.updatedAt =
-                    new Date().toISOString();
+                    new Date()
+                        .toISOString();
+
 
                 saveProjects();
 
@@ -9912,15 +9886,15 @@ async function sendMessage() {
 
         }
 
-        // حفظ المحادثة مباشرة
+
         saveChats();
 
     }
 
 
-    // =================================================
-    // إضافة رسالة المستخدم
-    // =================================================
+    // ==================================
+    // User Message
+    // ==================================
 
     currentChat.messages.push({
 
@@ -9933,37 +9907,32 @@ async function sendMessage() {
     });
 
 
-    // حفظ بعد رسالة المستخدم مباشرة
     saveChats();
 
 
-    // =================================================
-    // تحديث الواجهات
-    // =================================================
-
     renderChat();
+
 
     renderChatList();
 
+
     renderSidebarChats();
+
 
     renderRecentChats();
 
 
-    // =================================================
-    // تنظيف مربع الإدخال
-    // =================================================
-
     input.value =
         "";
+
 
     input.style.height =
         "auto";
 
 
-    // =================================================
-    // رسالة الانتظار
-    // =================================================
+    // ==================================
+    // Loading
+    // ==================================
 
     const loading =
         document.createElement(
@@ -9985,15 +9954,16 @@ async function sendMessage() {
             loading
         );
 
+
         chatArea.scrollTop =
             chatArea.scrollHeight;
 
     }
 
 
-    // =================================================
-    // إرسال الطلب إلى الذكاء الاصطناعي
-    // =================================================
+    // ==================================
+    // AI
+    // ==================================
 
     try {
 
@@ -10003,17 +9973,12 @@ async function sendMessage() {
             );
 
 
-        // إزالة رسالة الانتظار
         if (loading) {
 
             loading.remove();
 
         }
 
-
-        // =================================================
-        // إضافة رد الذكاء الاصطناعي
-        // =================================================
 
         currentChat.messages.push({
 
@@ -10026,40 +9991,29 @@ async function sendMessage() {
         });
 
 
-        // =================================================
-        // حفظ المحادثة بعد رد الذكاء الاصطناعي
-        // =================================================
-
         saveChats();
 
 
-        // =================================================
-        // تحديث كل القوائم
-        // =================================================
-
         renderChat();
+
 
         renderChatList();
 
+
         renderSidebarChats();
+
 
         renderRecentChats();
 
     }
-
     catch (error) {
 
-        // إزالة رسالة الانتظار
         if (loading) {
 
             loading.remove();
 
         }
 
-
-        // =================================================
-        // تسجيل الخطأ داخل المحادثة
-        // =================================================
 
         currentChat.messages.push({
 
@@ -10076,16 +10030,17 @@ async function sendMessage() {
         });
 
 
-        // حفظ حتى لا تضيع المحادثة عند حدوث خطأ
         saveChats();
 
 
-        // تحديث الواجهات
         renderChat();
+
 
         renderChatList();
 
+
         renderSidebarChats();
+
 
         renderRecentChats();
 
@@ -10093,24 +10048,25 @@ async function sendMessage() {
 
 }
 
+
 // ======================================
 // Send Button
 // ======================================
 
 if (sendBtn) {
 
+    sendBtn.onclick =
+        function (e) {
 
-sendBtn.onclick =
-    function (e) {
+            e.preventDefault();
 
-        e.preventDefault();
 
-        sendMessage();
+            sendMessage();
 
-    };
-
+        };
 
 }
+
 
 // ======================================
 // Keyboard
@@ -10118,25 +10074,26 @@ sendBtn.onclick =
 
 if (input) {
 
+    input.onkeydown =
+        function (e) {
 
-input.onkeydown =
-    function (e) {
+            if (
+                e.key ===
+                    "Enter" &&
+                !e.shiftKey
+            ) {
 
-        if (
-            e.key === "Enter" &&
-            !e.shiftKey
-        ) {
+                e.preventDefault();
 
-            e.preventDefault();
 
-            sendMessage();
+                sendMessage();
 
-        }
+            }
 
-    };
-
+        };
 
 }
+
 
 // ======================================
 // Initial Render
@@ -10160,44 +10117,99 @@ renderChat();
 
 loadSettings();
 
+
+// ======================================
+// End Office.onReady
+// ======================================
+
 });
 
 
-const sidebar = document.querySelector(".sidebar");
-const pinSidebar = document.getElementById("pin-sidebar");
+// ======================================
+// Sidebar Pin
+// خارج Office.onReady كما كان
+// ======================================
 
-if (pinSidebar && sidebar) {
+const sidebar =
+    document.querySelector(
+        ".sidebar"
+    );
+
+
+const pinSidebar =
+    document.getElementById(
+        "pin-sidebar"
+    );
+
+
+if (
+    pinSidebar &&
+    sidebar
+) {
 
     let sidebarPinned =
-        localStorage.getItem("sidebarPinned") === "true";
+        localStorage.getItem(
+            "sidebarPinned"
+        ) ===
+        "true";
+
 
     if (sidebarPinned) {
-        sidebar.classList.add("pinned");
-        pinSidebar.classList.add("pinned");
 
-        // ربط تثبيت الشريط بمساحة الشات
-        document.body.classList.add("sidebar-is-pinned");
+        sidebar.classList.add(
+            "pinned"
+        );
+
+
+        pinSidebar.classList.add(
+            "pinned"
+        );
+
+
+        document.body.classList.add(
+            "sidebar-is-pinned"
+        );
+
     }
 
-    pinSidebar.addEventListener("click", function (e) {
 
-        e.stopPropagation();
+    pinSidebar.addEventListener(
+        "click",
+        function (e) {
 
-        sidebarPinned = !sidebarPinned;
+            e.stopPropagation();
 
-        sidebar.classList.toggle("pinned", sidebarPinned);
-        pinSidebar.classList.toggle("pinned", sidebarPinned);
 
-        // تمديد/انكماش مساحة الشات مع التثبيت
-        document.body.classList.toggle(
-            "sidebar-is-pinned",
-            sidebarPinned
-        );
+            sidebarPinned =
+                !sidebarPinned;
 
-        localStorage.setItem(
-            "sidebarPinned",
-            sidebarPinned ? "true" : "false"
-        );
-    });
+
+            sidebar.classList.toggle(
+                "pinned",
+                sidebarPinned
+            );
+
+
+            pinSidebar.classList.toggle(
+                "pinned",
+                sidebarPinned
+            );
+
+
+            document.body.classList.toggle(
+                "sidebar-is-pinned",
+                sidebarPinned
+            );
+
+
+            localStorage.setItem(
+                "sidebarPinned",
+                sidebarPinned
+                    ? "true"
+                    : "false"
+            );
+
+        }
+    );
 
 }
