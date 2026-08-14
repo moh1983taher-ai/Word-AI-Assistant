@@ -4016,149 +4016,6 @@ async function searchIndexedDocument(
 
 }
 
-
-// ======================================
-// اختبار عائلة "استصلاح" مؤقتًا
-// ======================================
-
-async function testIstislahFamily() {
-
-    if (!currentDocument) {
-
-        console.warn(
-            "لا يوجد مستند نشط."
-        );
-
-        return;
-
-    }
-
-    try {
-
-        const index =
-            await getDocumentIndex(
-                currentDocument.id
-            );
-
-        if (!index) {
-
-            console.warn(
-                "لا يوجد فهرس محفوظ للمستند."
-            );
-
-            return;
-
-        }
-
-        console.log(
-            "=============================="
-        );
-
-        console.log(
-            "اختبار عائلة: استصلاح"
-        );
-
-        console.log(
-            "=============================="
-        );
-
-        console.log(
-            "عدد الكلمات:",
-            index.tokenCount
-        );
-
-        console.log(
-            "عدد المصطلحات:",
-            index.uniqueTerms
-        );
-
-        console.log(
-            "عدد العائلات:",
-            index.uniqueFamilies
-        );
-
-        const family =
-            index.families &&
-            index.families["استصلاح"];
-
-        if (!family) {
-
-            console.warn(
-                "لم توجد عائلة استصلاح في الفهرس."
-            );
-
-            console.log(
-                "المفاتيح الموجودة التي تحتوي استصلاح:"
-            );
-
-            const relatedKeys =
-                Object.keys(
-                    index.families || {}
-                ).filter(
-                    function (key) {
-
-                        return key.includes(
-                            "استصلاح"
-                        );
-
-                    }
-                );
-
-            console.log(
-                relatedKeys
-            );
-
-            return;
-
-        }
-
-        console.log(
-            "عائلة استصلاح كاملة:",
-            family
-        );
-
-        console.log(
-            "عدد أفراد العائلة:",
-            family.count
-        );
-
-        console.log(
-            "أفراد العائلة:",
-            family.words ||
-            family.terms ||
-            family.members ||
-            []
-        );
-
-        console.log(
-            "مواقع العائلة:",
-            family.positions || []
-        );
-
-        console.log(
-            "=============================="
-        );
-
-        console.log(
-            "انتهى اختبار عائلة استصلاح."
-        );
-
-        console.log(
-            "=============================="
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            "فشل اختبار عائلة استصلاح:",
-            error
-        );
-
-    }
-
-}
-window.testIstislahFamily = testIstislahFamily;
 // ======================================
 // Delete Working Word File
 // ======================================
@@ -9397,6 +9254,160 @@ searchInput.oninput =
                 .trim()
                 .toLowerCase();
 
+        // ======================================
+// اختبار مؤقت للفهرس من داخل البحث
+// الأمر التجريبي: #استصلاح
+// ======================================
+
+if (
+    keyword === "#استصلاح"
+) {
+
+    console.clear();
+
+    console.log(
+        "======================================"
+    );
+
+    console.log(
+        "اختبار فهرس المستند: استصلاح"
+    );
+
+    console.log(
+        "======================================"
+    );
+
+    try {
+
+        if (!currentDocument) {
+
+            console.warn(
+                "لا يوجد مستند نشط."
+            );
+
+            return;
+
+        }
+
+        if (
+            typeof getDocumentIndex !==
+            "function"
+        ) {
+
+            console.error(
+                "getDocumentIndex غير متاحة في هذا النطاق."
+            );
+
+            return;
+
+        }
+
+        const index =
+            await getDocumentIndex(
+                currentDocument.id
+            );
+
+        if (!index) {
+
+                    console.warn(
+                        "لا يوجد فهرس محفوظ للمستند الحالي."
+                    );
+
+                    return;
+
+                }
+
+                console.log(
+                    "المستند:",
+                    currentDocument
+                );
+
+                console.log(
+                    "tokenCount:",
+                    index.tokenCount
+                );
+
+                console.log(
+                    "uniqueTerms:",
+                    index.uniqueTerms
+                );
+
+                console.log(
+                    "uniqueFamilies:",
+                    index.uniqueFamilies
+                );
+
+                const family =
+                    index.families &&
+                    index.families["استصلاح"];
+
+                if (!family) {
+
+                    console.warn(
+                        "لم توجد عائلة استصلاح."
+                    );
+
+                    console.log(
+                        "أقرب المفاتيح:",
+                        Object.keys(
+                            index.families || {}
+                        ).filter(
+                            function (key) {
+
+                                return key.includes(
+                                    "استصلاح"
+                                );
+
+                            }
+                        )
+                    );
+
+                    return;
+
+                }
+
+                console.log(
+                    "عائلة استصلاح:",
+                    family
+                );
+
+                console.log(
+                    "عدد أفراد العائلة:",
+                    family.count
+                );
+
+                console.log(
+                    "الألفاظ:",
+                    family.words ||
+                    family.terms ||
+                    family.members ||
+                    []
+                );
+
+                console.log(
+                    "المواضع:",
+                    family.positions ||
+                    []
+                );
+
+                console.log(
+                    "======================================"
+                );
+
+            }
+            catch (error) {
+
+                console.error(
+                    "فشل اختبار الفهرس:",
+                    error
+                );
+
+            }
+
+            return;
+
+        }
+        
 
         if (!searchResults)
             return;
