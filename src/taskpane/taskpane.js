@@ -6929,6 +6929,288 @@ if (settingsBtn) {
 
             loadSettings();
 
+            // ======================================
+            // Temporary Index Test
+            // اختبار عائلة استصلاح
+            // مؤقت وسيحذف بعد نجاح الاختبار
+            // ======================================
+
+            window.testIstislahIndex = async function () {
+
+                console.clear();
+
+                console.log(
+                    "======================================"
+                );
+
+                console.log(
+                    "اختبار الفهرسة: عائلة استصلاح"
+                );
+
+                console.log(
+                    "======================================"
+                );
+
+
+                try {
+
+                    // ----------------------------------
+                    // المستند النشط
+                    // ----------------------------------
+
+                    if (!currentDocument) {
+
+                        console.warn(
+                            "لا يوجد مستند نشط."
+                        );
+
+                        return;
+
+                    }
+
+
+                    console.log(
+                        "المستند:",
+                        currentDocument.name
+                    );
+
+
+                    // ----------------------------------
+                    // التأكد من الفهرس الحديث
+                    // ----------------------------------
+
+                    const index =
+                        await ensureDocumentIndex(
+                            currentDocument
+                        );
+
+
+                    if (!index) {
+
+                        console.warn(
+                            "تعذر الحصول على فهرس المستند."
+                        );
+
+                        return;
+
+                    }
+
+
+                    // ----------------------------------
+                    // معلومات الفهرس
+                    // ----------------------------------
+
+                    console.log(
+                        "إصدار الفهرس:",
+                        index.indexVersion
+                    );
+
+                    console.log(
+                        "عدد الكلمات:",
+                        index.tokenCount
+                    );
+
+                    console.log(
+                        "عدد الكلمات الفريدة:",
+                        index.uniqueTerms
+                    );
+
+                    console.log(
+                        "عدد العائلات:",
+                        index.uniqueFamilies
+                    );
+
+
+                    // ----------------------------------
+                    // عائلة استصلاح
+                    // ----------------------------------
+
+                    const family =
+                        index.families &&
+                        index.families["استصلاح"];
+
+
+                    if (!family) {
+
+                        console.error(
+                            "❌ لم توجد عائلة استصلاح."
+                        );
+
+                        console.log(
+                            "مفاتيح قريبة:",
+                            Object.keys(
+                                index.families || {}
+                            ).filter(
+                                function (key) {
+
+                                    return key.includes(
+                                        "استصلاح"
+                                    );
+
+                                }
+                            )
+                        );
+
+                        return;
+
+                    }
+
+
+                    console.log(
+                        "✅ عائلة استصلاح موجودة:",
+                        family
+                    );
+
+
+                    console.log(
+                        "عدد جميع أفراد العائلة:",
+                        family.count
+                    );
+
+
+                    console.log(
+                        "الألفاظ داخل العائلة:",
+                        family.words
+                    );
+
+
+                    console.log(
+                        "عدد الألفاظ المختلفة:",
+                        family.uniqueWords
+                    );
+
+
+                    console.log(
+                        "عدد occurrences:",
+                        Array.isArray(
+                            family.occurrences
+                        )
+                            ? family.occurrences.length
+                            : 0
+                    );
+
+
+                    console.log(
+                        "أول occurrences:",
+                        (
+                            family.occurrences || []
+                        ).slice(
+                            0,
+                            20
+                        )
+                    );
+
+
+                    // ----------------------------------
+                    // اختبار البحث في الفهرس
+                    // ----------------------------------
+
+                    const testQueries = [
+
+                        "استصلاح",
+                        "الاستصلاح",
+                        "استصلاحا",
+                        "استصلاحات",
+                        "استصلاحية"
+
+                    ];
+
+
+                    console.log(
+                        "======================================"
+                    );
+
+                    console.log(
+                        "اختبار صيغ العائلة"
+                    );
+
+                    console.log(
+                        "======================================"
+                    );
+
+
+                    for (
+                        let i = 0;
+                        i < testQueries.length;
+                        i++
+                    ) {
+
+                        const query =
+                            testQueries[i];
+
+
+                        const result =
+                            await searchIndexedDocument(
+                                currentDocument.id,
+                                query
+                            );
+
+
+                        console.log(
+                            "الاستعلام:",
+                            query
+                        );
+
+
+                        console.log(
+                            "عدد النتائج:",
+                            result.count
+                        );
+
+
+                        console.log(
+                            "العائلات المطابقة:",
+                            result.matchedFamilies
+                        );
+
+
+                        console.log(
+                            "عدد الظهورات المفهرسة:",
+                            result.indexedOccurrences
+                        );
+
+
+                        console.log(
+                            "النتائج:",
+                            result.results.slice(
+                                0,
+                                5
+                            )
+                        );
+
+
+                        console.log(
+                            "--------------------------------------"
+                        );
+
+                    }
+
+
+                    console.log(
+                        "======================================"
+                    );
+
+                    console.log(
+                        "✅ انتهى اختبار عائلة استصلاح."
+                    );
+
+                    console.log(
+                        "======================================"
+
+                    );
+
+                }
+                catch (error) {
+
+                    console.error(
+                        "❌ فشل اختبار الفهرسة:",
+                        error
+                    );
+
+                }
+
+            };
+
         };
 
 }
