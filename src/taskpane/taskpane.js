@@ -362,7 +362,7 @@ const DOCUMENT_STRUCTURE_STORE_NAME =
 // ======================================
 
 const INDEX_SCHEMA_VERSION =
-    3;
+    4;
 
 
 // ======================================
@@ -1194,8 +1194,9 @@ function tokenizeDocumentText(
 
 // ======================================
 // Conservative Family Key
-// مفتاح العائلة المحافظ
-// الأصل الأقصر الموجود فعليًا في المستند
+// مفتاح عائلة الكلمة
+// يعتمد على الأصل اللغوي المحافظ
+// مع إزالة السوابق واللواحق المحددة فقط
 // ======================================
 
 function getConservativeFamilyKey(
@@ -1203,12 +1204,13 @@ function getConservativeFamilyKey(
     surfaceSet
 ) {
 
-    const surface =
+    let w =
         normalizeSearchText(
             word
         );
 
-    if (!surface) {
+
+    if (!w) {
 
         return "";
 
@@ -1216,14 +1218,32 @@ function getConservativeFamilyKey(
 
 
     // ==================================
-    // الكلمات القصيرة لا نشتق منها عائلة
+    // تنظيف الرموز
+    // ==================================
+
+    w =
+        w.replace(
+            /[^\p{L}\p{N}]+/gu,
+            ""
+        );
+
+
+    if (!w) {
+
+        return "";
+
+    }
+
+
+    // ==================================
+    // الكلمات القصيرة
     // ==================================
 
     if (
-        surface.length <= 3
+        w.length <= 3
     ) {
 
-        return surface;
+        return w;
 
     }
 
@@ -1234,37 +1254,23 @@ function getConservativeFamilyKey(
 
     const protectedWords =
         new Set([
+
             "الله",
             "القران",
             "اسلام",
             "اسلامي",
             "اسلامية"
+
         ]);
 
 
     if (
         protectedWords.has(
-            surface
+            w
         )
     ) {
 
-        return surface;
-
-    }
-
-
-    // ==================================
-    // إذا لم توجد مجموعة الكلمات
-    // نعيد اللفظ نفسه
-    // ==================================
-
-    if (
-        !surfaceSet ||
-        typeof surfaceSet.has !==
-            "function"
-    ) {
-
-        return surface;
+        return w;
 
     }
 
@@ -1275,19 +1281,24 @@ function getConservativeFamilyKey(
     // ==================================
 
     const prefixes = [
+
         "وال",
         "بال",
         "كال",
         "فال",
         "لل",
+
+        "ول",
+        "بل",
+        "فل",
+
         "ال",
+
         "وا",
         "با",
         "كا",
-        "فا",
-        "ول",
-        "بل",
-        "فل"
+        "فا"
+
     ];
 
 
@@ -1297,251 +1308,176 @@ function getConservativeFamilyKey(
     // ==================================
 
     const suffixes = [
+
         "يات",
         "ات",
+
         "هما",
         "هم",
         "هن",
         "ها",
+
         "ية",
         "يا",
-        "ين",
+
         "ون",
+        "ين",
         "ان",
+
         "كم",
         "كن",
+
         "ه",
         "ك",
+
         "ي",
         "ة",
+
         "ا"
+
     ];
 
 
     // ==================================
-    // المرشحات
+    // حماية الحد الأدنى
     // ==================================
 
-    const candidates =
-        new Set();
-
-
-    candidates.add(
-        surface
-    );
+    const MIN_ROOT_LENGTH = 3;
 
 
     // ==================================
-    // إزالة سابقة فقط
+    // إزالة السوابق
+    // يمكن إزالة أكثر من سابقة
+    // إذا كانت متتابعة بوضوح
     // ==================================
 
-    prefixes.forEach(
-        function (
-            prefix
+    let prefixChanged =
+        true;
+
+
+    while (
+        prefixChanged
+    ) {
+
+        prefixChanged =
+            false;
+
+
+        for (
+            let i = 0;
+            i < prefixes.length;
+            i++
         ) {
 
+            const prefix =
+                prefixes[i];
+
+
             if (
-                !surface.startsWith(
+                w.startsWith(
                     prefix
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            const candidate =
-                surface.substring(
+                ) &&
+                (
+                    w.length -
                     prefix.length
-                );
-
-
-            if (
-                candidate.length >= 3 &&
-                surfaceSet.has(
-                    candidate
-                )
+                ) >=
+                    MIN_ROOT_LENGTH
             ) {
 
-                candidates.add(
-                    candidate
-                );
+                w =
+                    w.substring(
+                        prefix.length
+                    );
+
+
+                prefixChanged =
+                    true;
+
+
+                break;
 
             }
 
         }
-    );
+
+    }
 
 
     // ==================================
-    // إزالة لاحقة فقط
+    // إزالة اللواحق
     // ==================================
 
-    suffixes.forEach(
-        function (
-            suffix
+    let suffixChanged =
+        true;
+
+
+    while (
+        suffixChanged
+    ) {
+
+        suffixChanged =
+            false;
+
+
+        for (
+            let i = 0;
+            i < suffixes.length;
+            i++
         ) {
 
+            const suffix =
+                suffixes[i];
+
+
             if (
-                !surface.endsWith(
+                w.endsWith(
                     suffix
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            const candidate =
-                surface.substring(
-                    0,
-                    surface.length -
+                ) &&
+                (
+                    w.length -
                     suffix.length
-                );
-
-
-            if (
-                candidate.length >= 3 &&
-                surfaceSet.has(
-                    candidate
-                )
+                ) >=
+                    MIN_ROOT_LENGTH
             ) {
 
-                candidates.add(
-                    candidate
-                );
+                w =
+                    w.substring(
+                        0,
+                        w.length -
+                        suffix.length
+                    );
+
+
+                suffixChanged =
+                    true;
+
+
+                break;
 
             }
 
         }
-    );
+
+    }
 
 
     // ==================================
-    // إزالة سابقة + لاحقة
+    // الحماية النهائية
     // ==================================
 
-    prefixes.forEach(
-        function (
-            prefix
-        ) {
+    if (
+        w.length <
+        MIN_ROOT_LENGTH
+    ) {
 
-            if (
-                !surface.startsWith(
-                    prefix
-                )
-            ) {
+        return normalizeSearchText(
+            word
+        );
 
-                return;
-
-            }
+    }
 
 
-            const afterPrefix =
-                surface.substring(
-                    prefix.length
-                );
-
-
-            if (
-                afterPrefix.length < 3
-            ) {
-
-                return;
-
-            }
-
-
-            // الأصل بعد إزالة السابقة
-            if (
-                surfaceSet.has(
-                    afterPrefix
-                )
-            ) {
-
-                candidates.add(
-                    afterPrefix
-                );
-
-            }
-
-
-            // ثم إزالة لاحقة
-            suffixes.forEach(
-                function (
-                    suffix
-                ) {
-
-                    if (
-                        !afterPrefix.endsWith(
-                            suffix
-                        )
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    const candidate =
-                        afterPrefix.substring(
-                            0,
-                            afterPrefix.length -
-                            suffix.length
-                        );
-
-
-                    if (
-                        candidate.length >= 3 &&
-                        surfaceSet.has(
-                            candidate
-                        )
-                    ) {
-
-                        candidates.add(
-                            candidate
-                        );
-
-                    }
-
-                }
-            );
-
-        }
-    );
-
-
-    // ==================================
-    // اختيار أقصر أصل موجود فعليًا
-    // ==================================
-
-    let best =
-        surface;
-
-
-    candidates.forEach(
-        function (
-            candidate
-        ) {
-
-            if (
-                candidate.length >= 3 &&
-                candidate.length <
-                    best.length
-            ) {
-
-                best =
-                    candidate;
-
-            }
-
-        }
-    );
-
-
-    return best;
+    return w;
 
 }
 
