@@ -362,7 +362,7 @@ const DOCUMENT_STRUCTURE_STORE_NAME =
 // ======================================
 
 const INDEX_SCHEMA_VERSION =
-    2;
+    3;
 
 
 // ======================================
