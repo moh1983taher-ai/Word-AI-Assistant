@@ -7685,28 +7685,28 @@ async function loadOpenRouterModels() {
     // ==================================
 
     const freeModels =
-        result.data.filter(
-            function (
-                item
+    result.data.filter(
+        function (
+            item
+        ) {
+
+            if (
+                !item ||
+                !item.id
             ) {
 
-                if (
-                    !item ||
-                    !item.id
-                ) {
-
-                    return false;
-
-                }
-
-                return String(
-                    item.id
-                ).endsWith(
-                    ":free"
-                );
+                return false;
 
             }
-        );
+
+            return String(
+                item.id
+            ).endsWith(
+                ":free"
+            );
+
+        }
+    );
 
 
                 // ----------------------------------
@@ -7762,6 +7762,40 @@ async function loadOpenRouterModels() {
     // نماذج مجانية مهمة نضمن ظهورها
     // إذا لم تظهر في استجابة API
     // ==================================
+
+    const knownFreeModels = [
+
+        {
+
+            id:
+                "deepseek/deepseek-chat-v3.1:free",
+
+            name:
+                "DeepSeek V3.1 (مجاني)"
+
+        },
+
+        {
+
+            id:
+                "deepseek/deepseek-chat:free",
+
+            name:
+                "DeepSeek V3 (مجاني)"
+
+        },
+
+        {
+
+            id:
+                "openrouter/free",
+
+            name:
+                "OpenRouter Free Router (مجاني)"
+
+        }
+
+    ];
 
 
     knownFreeModels.forEach(
