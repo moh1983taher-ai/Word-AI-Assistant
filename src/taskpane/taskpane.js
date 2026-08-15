@@ -9232,6 +9232,7 @@ async function readJSON(
 
 // ======================================
 // API Error
+// عرض تفاصيل خطأ API كاملة
 // ======================================
 
 function getAPIError(
@@ -9239,10 +9240,14 @@ function getAPIError(
     fallback
 ) {
 
-    if (
-        result &&
-        result.error
-    ) {
+    if (!result) {
+
+        return fallback;
+
+    }
+
+
+    if (result.error) {
 
         if (
             typeof result.error ===
@@ -9258,9 +9263,35 @@ function getAPIError(
             result.error.message
         ) {
 
-            return result.error.message;
+            let message =
+                result.error.message;
+
+
+            if (
+                result.error.code
+            ) {
+
+                message +=
+                    " | Code: " +
+                    result.error.code;
+
+            }
+
+
+            return message;
 
         }
+
+    }
+
+
+    if (
+        result.message
+    ) {
+
+        return String(
+            result.message
+        );
 
     }
 
