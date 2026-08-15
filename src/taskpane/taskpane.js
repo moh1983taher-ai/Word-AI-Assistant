@@ -9095,67 +9095,7 @@ async function buildAIDocumentContext(
                 }
             );
 
-        // ======================================
-        // تحديد حجم السياق بحسب النموذج
-        // ======================================
-
-        const retrievalLimits =
-            getRetrievalLimits(
-                getSavedSettings().provider,
-                getSavedSettings().model
-            );
-
-
-        // ======================================
-        // إعطاء المقارنة مساحة أكبر
-        // ======================================
-
-        let retrievalMaxResults =
-            retrievalLimits.maxResults;
-
-
-        let retrievalMaxChars =
-            retrievalLimits.maxChars;
-
-
-        if (
-            retrievalProfile.type ===
-            "comparison"
-        ) {
-
-            retrievalMaxResults =
-                Math.min(
-                    retrievalMaxResults + 1,
-                    6
-                );
-
-
-            retrievalMaxChars =
-                Math.min(
-                    retrievalMaxChars + 1000,
-                    7000
-                );
-
-        }
-
-
-        // ======================================
-        // بناء السياق
-        // ======================================
-
-        const retrieval =
-            buildRetrievalContext(
-                searchResult,
-                {
-
-                    maxResults:
-                        retrievalMaxResults,
-
-                    maxChars:
-                        retrievalMaxChars
-
-                }
-            );
+        
         // ==================================
         // لا يوجد سياق فعلي
         // ==================================
