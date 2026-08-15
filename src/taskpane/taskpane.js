@@ -8905,9 +8905,9 @@ async function buildAIDocumentContext(
         }
 
 
-        // ==================================
-        // بناء سياق مخصص للسؤال
-        // ==================================
+        // ======================================
+        // بناء سياق المستند بحجم مناسب للنموذج
+        // ======================================
 
         const retrieval =
             buildRetrievalContext(
@@ -8915,10 +8915,16 @@ async function buildAIDocumentContext(
                 {
 
                     maxResults:
-                        retrievalProfile.maxResults,
+                        retrievalProfile.type ===
+                        "comparison"
+                            ? 5
+                            : 4,
 
                     maxChars:
-                        retrievalProfile.maxChars
+                        retrievalProfile.type ===
+                        "comparison"
+                            ? 5500
+                            : 4500
 
                 }
             );
@@ -9079,9 +9085,12 @@ async function askAI(
     }
 
 
-    // ==================================
+
+    // ======================================
     // بناء سياق المحادثة السابقة
-    // ==================================
+    // نرسل آخر 6 رسائل فقط
+    // لتقليل حجم الطلب
+    // ======================================
 
     const conversationMessages =
         [];
@@ -9094,7 +9103,13 @@ async function askAI(
         )
     ) {
 
-        currentChat.messages.forEach(
+        const previousMessages =
+            currentChat.messages.slice(
+                -6
+            );
+
+
+        previousMessages.forEach(
             function (
                 msg
             ) {
@@ -9522,7 +9537,7 @@ async function askAI(
                                 conversationMessages,
 
                             max_tokens:
-                                4000,
+                                3000,
 
                             temperature:
                                 0.2
@@ -12128,6 +12143,23 @@ function buildRetrievalContext(
         0;
 
 
+    // ==================================
+    // فقرات النتائج المختارة
+    // ==================================
+
+    const selectedParagraphIndexes =
+        new Set(
+            selected.map(
+                function (
+                    item
+                ) {
+
+                    return item.paragraphIndex;
+
+                }
+            )
+        );
+
     selected.forEach(
         function (
             result,
@@ -12177,6 +12209,23 @@ function buildRetrievalContext(
 
 
             // ==================================
+            // إذا كانت الفقرة السابقة نفسها
+            // نتيجة مختارة، لا نكررها
+            // ==================================
+
+            if (
+                selectedParagraphIndexes.has(
+                    Number(result.paragraphIndex) - 1
+                )
+            ) {
+
+                previousContext =
+                    "";
+
+            }
+
+
+            // ==================================
             // الفقرة التالية
             // ==================================
 
@@ -12195,6 +12244,22 @@ function buildRetrievalContext(
 
 
             // ==================================
+            // إذا كانت الفقرة التالية نفسها
+            // نتيجة مختارة، لا نكررها
+            // ==================================
+
+            if (
+                selectedParagraphIndexes.has(
+                    Number(result.paragraphIndex) + 1
+                )
+            ) {
+
+                nextContext =
+                    "";
+
+            }
+
+            // ==================================
             // العنوان
             // ==================================
 
@@ -12205,7 +12270,8 @@ function buildRetrievalContext(
                 )
                     .trim();
 
-
+            
+            
             // ==================================
             // المساحة المتبقية للمقطع
             // ==================================
