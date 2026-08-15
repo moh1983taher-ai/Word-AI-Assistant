@@ -7706,23 +7706,12 @@ async function loadOpenRouterModels() {
                     );
 
 
-                const pricing =
-                    item.pricing ||
-                    {};
+                return id.endsWith(
+                    ":free"
+                );
 
-
-                const promptPrice =
-                    String(
-                        pricing.prompt ??
-                        ""
-                    );
-
-
-                const completionPrice =
-                    String(
-                        pricing.completion ??
-                        ""
-                    );
+            }
+        );
 
 
                 // ----------------------------------
