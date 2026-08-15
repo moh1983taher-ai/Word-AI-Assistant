@@ -6873,11 +6873,11 @@ function updateProviderInfo() {
 
     if (
         value ===
-        "openai"
+        "gemini"
     ) {
 
         providerInfo.innerHTML =
-            "OpenAI: سيتم جلب النماذج المتاحة من حسابك.";
+            "Gemini: سيتم جلب النماذج التي تدعم generateContent.";
 
         return;
 
@@ -6886,11 +6886,24 @@ function updateProviderInfo() {
 
     if (
         value ===
-        "gemini"
+        "groq"
     ) {
 
         providerInfo.innerHTML =
-            "Gemini: سيتم جلب النماذج التي تدعم generateContent.";
+            "Groq: سيتم جلب النماذج المتاحة من حسابك.";
+
+        return;
+
+    }
+
+
+    if (
+        value ===
+        "openai"
+    ) {
+
+        providerInfo.innerHTML =
+            "OpenAI: سيتم جلب النماذج المتاحة من حسابك.";
 
         return;
 
@@ -7391,10 +7404,10 @@ async function loadModels() {
 
     if (
         selectedProvider ===
-        "openai"
+        "gemini"
     ) {
 
-        await loadOpenAIModels();
+        await loadGeminiModels();
 
         return;
 
@@ -7403,10 +7416,22 @@ async function loadModels() {
 
     if (
         selectedProvider ===
-        "gemini"
+        "groq"
     ) {
 
-        await loadGeminiModels();
+        await loadGroqModels();
+
+        return;
+
+    }
+
+
+    if (
+        selectedProvider ===
+        "openai"
+    ) {
+
+        await loadOpenAIModels();
 
         return;
 
@@ -7419,6 +7444,149 @@ async function loadModels() {
 
 }
 
+// ======================================
+// Groq Models
+// ======================================
+
+async function loadGroqModels() {
+
+    const key =
+        apiKey
+            ? apiKey.value.trim()
+            : "";
+
+
+    if (!key) {
+
+        throw new Error(
+            "يرجى إدخال مفتاح Groq أولاً."
+        );
+
+    }
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "⏳ جاري تحميل نماذج Groq...";
+
+    }
+
+
+    const response =
+        await fetch(
+            "https://api.groq.com/openai/v1/models",
+            {
+
+                method:
+                    "GET",
+
+                headers: {
+
+                    "Authorization":
+                        "Bearer " +
+                        key,
+
+                    "Content-Type":
+                        "application/json"
+
+                }
+
+            }
+        );
+
+
+    const result =
+        await readJSON(
+            response
+        );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ Groq."
+            )
+        );
+
+    }
+
+
+    if (
+        !result.data ||
+        !Array.isArray(
+            result.data
+        )
+    ) {
+
+        throw new Error(
+            "لم تصل قائمة نماذج Groq."
+        );
+
+    }
+
+
+    const models =
+        result.data
+            .filter(
+                function (
+                    item
+                ) {
+
+                    return (
+                        item &&
+                        item.id &&
+                        item.active !== false
+                    );
+
+                }
+            )
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    return a.id.localeCompare(
+                        b.id
+                    );
+
+                }
+            );
+
+
+    populateModels(
+        models.map(
+            function (
+                item
+            ) {
+
+                return {
+
+                    id:
+                        item.id,
+
+                    name:
+                        item.id
+
+                };
+
+            }
+        )
+    );
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "✓ تم تحديث نماذج Groq: " +
+            models.length;
+
+    }
+
+}
 
 // ======================================
 // OpenRouter Models
@@ -8436,6 +8604,86 @@ async function testAIConnection() {
 
     }
 
+    // ======================================
+    // Test Groq
+    // ======================================
+
+    if (
+        data.provider ===
+        "groq"
+    ) {
+
+        const response =
+            await fetch(
+                "https://api.groq.com/openai/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key,
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                data.model,
+
+                            messages: [
+
+                                {
+
+                                    role:
+                                        "user",
+
+                                    content:
+                                        "أجب بكلمة واحدة فقط: متصل"
+
+                                }
+
+                            ],
+
+                            max_tokens:
+                                10
+
+                        })
+
+                    }
+                );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ Groq."
+                )
+            );
+
+        }
+
+
+        return (
+            "✓ تم الاتصال بـ Groq بنجاح"
+        );
+
+    }
 
     throw new Error(
         "مزود الذكاء الاصطناعي غير معروف."
@@ -9325,6 +9573,79 @@ async function askAI(
 
     }
 
+    // ======================================
+    // Groq
+    // ======================================
+
+    if (
+        selectedProvider ===
+        "groq"
+    ) {
+
+        const response =
+            await fetch(
+                "https://api.groq.com/openai/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json",
+
+                        "Authorization":
+                            "Bearer " +
+                            key
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                model,
+
+                            messages:
+                                conversationMessages,
+
+                            max_tokens:
+                                4000,
+
+                            temperature:
+                                0.2
+
+                        })
+
+                    }
+                );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ Groq."
+                )
+            );
+
+        }
+
+
+        return extractOpenAIStyleAnswer(
+            result,
+            "Groq"
+        );
+
+    }
 
     throw new Error(
         "مزود الذكاء الاصطناعي غير معروف: " +
