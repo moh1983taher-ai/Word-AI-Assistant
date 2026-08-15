@@ -7590,8 +7590,7 @@ async function loadGroqModels() {
 
 // ======================================
 // OpenRouter Models
-// تحميل النماذج المجانية مع تضمين
-// النماذج المجانية المعروفة صراحةً
+// تحميل النماذج المجانية
 // ======================================
 
 async function loadOpenRouterModels() {
@@ -7681,7 +7680,8 @@ async function loadOpenRouterModels() {
 
 
     // ==================================
-    // استخراج النماذج المجانية
+    // النماذج التي يعلن OpenRouter
+    // أنها مجانية صراحةً
     // ==================================
 
     const freeModels =
@@ -7700,35 +7700,10 @@ async function loadOpenRouterModels() {
                 }
 
 
-                const id =
-                    String(
-                        item.id
-                    );
-
-
-                return id.endsWith(
+                return String(
+                    item.id
+                ).endsWith(
                     ":free"
-                );
-
-            }
-        );
-
-
-                // ----------------------------------
-                // مجاني حسب بيانات التسعير
-                // أو Free Variant صريح
-                // ----------------------------------
-
-                return (
-                    (
-                        promptPrice ===
-                            "0" &&
-                        completionPrice ===
-                            "0"
-                    ) ||
-                    id.endsWith(
-                        ":free"
-                    )
                 );
 
             }
@@ -7764,46 +7739,6 @@ async function loadOpenRouterModels() {
 
 
     // ==================================
-    // نماذج مجانية مهمة نضمن ظهورها
-    // إذا لم تظهر في استجابة API
-    // ==================================
-
-
-
-
-    knownFreeModels.forEach(
-        function (
-            knownModel
-        ) {
-
-            const exists =
-                models.some(
-                    function (
-                        item
-                    ) {
-
-                        return (
-                            item.id ===
-                            knownModel.id
-                        );
-
-                    }
-                );
-
-
-            if (!exists) {
-
-                models.push(
-                    knownModel
-                );
-
-            }
-
-        }
-    );
-
-
-    // ==================================
     // ترتيب النماذج
     // ==================================
 
@@ -7813,8 +7748,12 @@ async function loadOpenRouterModels() {
             b
         ) {
 
-            return a.name.localeCompare(
-                b.name,
+            return String(
+                a.name
+            ).localeCompare(
+                String(
+                    b.name
+                ),
                 "ar"
             );
 
