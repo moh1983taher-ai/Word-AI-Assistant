@@ -9116,16 +9116,16 @@ async function buildAIDocumentContext(
         // تحديد حجم السياق بحسب النموذج
         // ======================================
 
-        const settings =
-            getSavedSettings();
-
-
         const retrievalLimits =
             getRetrievalLimits(
-                settings.provider,
-                settings.model
+                getSavedSettings().provider,
+                getSavedSettings().model
             );
 
+
+        // ======================================
+        // إعطاء المقارنة مساحة أكبر
+        // ======================================
 
         let retrievalMaxResults =
             retrievalLimits.maxResults;
@@ -9134,10 +9134,6 @@ async function buildAIDocumentContext(
         let retrievalMaxChars =
             retrievalLimits.maxChars;
 
-
-        // ======================================
-        // إعطاء المقارنة مساحة أكبر
-        // ======================================
 
         if (
             retrievalProfile.type ===
@@ -9155,74 +9151,6 @@ async function buildAIDocumentContext(
                 Math.min(
                     retrievalMaxChars + 1000,
                     7000
-                );
-
-        }
-
-
-        // ======================================
-        // حماية عامة من تضخم سياق المستند
-        // ======================================
-
-        const MAX_RETRIEVAL_TOKENS =
-            2500;
-
-
-        const previewText =
-            searchResult.results
-                .slice(
-                    0,
-                    retrievalMaxResults
-                )
-                .map(
-                    function (
-                        result
-                    ) {
-
-                        return String(
-                            result.context ||
-                            result.text ||
-                            ""
-                        );
-
-                    }
-                )
-                .join(" ");
-
-
-        const estimatedTokens =
-            estimateTokenCount(
-                previewText
-            );
-
-
-        if (
-            estimatedTokens >
-            MAX_RETRIEVAL_TOKENS
-        ) {
-
-            const reductionRatio =
-                MAX_RETRIEVAL_TOKENS /
-                estimatedTokens;
-
-
-            retrievalMaxResults =
-                Math.max(
-                    2,
-                    Math.floor(
-                        retrievalMaxResults *
-                        reductionRatio
-                    )
-                );
-
-
-            retrievalMaxChars =
-                Math.max(
-                    2500,
-                    Math.floor(
-                        retrievalMaxChars *
-                        reductionRatio
-                    )
                 );
 
         }
