@@ -8978,8 +8978,6 @@ function getRetrievalLimits(
     };
 
 }
-
-
 // =====================================================
 // Build AI Document Context
 // بناء سياق المستند للذكاء الاصطناعي
@@ -9315,30 +9313,9 @@ async function askAI(
 
 
     // ======================================
-    // استرجاع سياق المستند أولًا
-    // ======================================
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
-
-
-    // ======================================
-    // تحديد حجم تاريخ المحادثة
-    // ======================================
-
-    const historyLimit =
-        documentContext &&
-        documentContext.found
-            ? 2
-            : 4;
-
-
-    // ======================================
     // بناء سياق المحادثة السابقة
-    // عند وجود المستند نحتاج تاريخًا أقل
-    // لأن سياق المستند يُبنى من جديد
+    // آخر 4 رسائل فقط
+    // مع حد أقصى لطول كل رسالة
     // ======================================
 
     const conversationMessages =
@@ -9354,7 +9331,7 @@ async function askAI(
 
         const previousMessages =
             currentChat.messages.slice(
-                -historyLimit
+                -4
             );
 
 
@@ -9380,10 +9357,7 @@ async function askAI(
 
 
                 const MAX_HISTORY_CHARS =
-                    documentContext &&
-                    documentContext.found
-                        ? 1000
-                        : 1500;
+                    1500;
 
 
                 if (
@@ -9404,8 +9378,7 @@ async function askAI(
                 conversationMessages.push({
 
                     role:
-                        msg.role ===
-                        "ai"
+                        msg.role === "ai"
                             ? "assistant"
                             : "user",
 
@@ -9418,6 +9391,16 @@ async function askAI(
         );
 
     }
+
+
+    // ======================================
+    // استرجاع سياق المستند النشط مرة واحدة
+    // ======================================
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
 
 
     // ======================================
