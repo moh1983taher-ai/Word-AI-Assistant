@@ -8979,22 +8979,7 @@ function getRetrievalLimits(
 
 }
 
-// =====================================================
-// Estimate Token Count
-// تقدير تقريبي لعدد التوكنات
-// =====================================================
 
-function estimateTokenCount(
-    text
-) {
-
-    return Math.ceil(
-        String(
-            text || ""
-        ).length / 4
-    );
-
-}
 // =====================================================
 // Build AI Document Context
 // بناء سياق المستند للذكاء الاصطناعي
