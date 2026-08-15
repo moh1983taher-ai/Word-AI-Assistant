@@ -11740,6 +11740,8 @@ function buildRetrievalContext(
 
     // ==================================
     // بناء المقاطع
+    // المقطع المطابق له الأولوية
+    // ثم السابق والتالي بحسب المساحة المتاحة
     // ==================================
 
     const contexts =
@@ -11765,7 +11767,12 @@ function buildRetrievalContext(
                     result.context ||
                     result.text ||
                     ""
-                ).trim();
+                )
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
 
 
             if (!mainContext) {
@@ -11773,15 +11780,6 @@ function buildRetrievalContext(
                 return;
 
             }
-
-
-            mainContext =
-                mainContext
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
 
 
             // ==================================
@@ -11793,7 +11791,12 @@ function buildRetrievalContext(
                     ? String(
                         result.previousParagraphText ||
                         ""
-                    ).trim()
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim()
                     : "";
 
 
@@ -11806,26 +11809,13 @@ function buildRetrievalContext(
                     ? String(
                         result.nextParagraphText ||
                         ""
-                    ).trim()
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim()
                     : "";
-
-
-            previousContext =
-                previousContext
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
-
-            nextContext =
-                nextContext
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
 
 
             // ==================================
@@ -11836,11 +11826,12 @@ function buildRetrievalContext(
                 String(
                     result.heading ||
                     ""
-                ).trim();
+                )
+                    .trim();
 
 
             // ==================================
-            // المساحة المتبقية
+            // المساحة المتبقية للمقطع
             // ==================================
 
             const remainingChars =
@@ -11866,7 +11857,7 @@ function buildRetrievalContext(
                 250;
 
 
-            let availableChars =
+            const availableChars =
                 Math.max(
                     300,
                     remainingChars -
@@ -11875,61 +11866,124 @@ function buildRetrievalContext(
 
 
             // ==================================
-            // بناء السياق المتصل
+            // المقطع الرئيسي له الأولوية
             // ==================================
-
-            const neighborParts =
-                [];
-
-
-            if (
-                previousContext
-            ) {
-
-                neighborParts.push(
-                    previousContext
-                );
-
-            }
-
-
-            neighborParts.push(
-                mainContext
-            );
-
-
-            if (
-                nextContext
-            ) {
-
-                neighborParts.push(
-                    nextContext
-                );
-
-            }
-
 
             let context =
-                neighborParts.join(
-                    " "
-                );
+                mainContext;
 
 
             // ==================================
-            // قص السياق عند الحاجة
+            // المساحة المتبقية بعد المقطع الرئيسي
+            // ==================================
+
+            let remainingForNeighbors =
+                availableChars -
+                context.length;
+
+
+            // ==================================
+            // إضافة الفقرة السابقة
             // ==================================
 
             if (
-                context.length >
-                availableChars
+                includeNeighbors &&
+                previousContext &&
+                remainingForNeighbors > 150
             ) {
 
-                context =
-                    context.substring(
+                const separatorLength =
+                    1;
+
+
+                const allowedPreviousLength =
+                    Math.max(
                         0,
-                        availableChars
-                    ) +
-                    "…";
+                        remainingForNeighbors -
+                        separatorLength
+                    );
+
+
+                if (
+                    allowedPreviousLength > 100
+                ) {
+
+                    const previousPart =
+                        previousContext.length >
+                        allowedPreviousLength
+                            ? previousContext.substring(
+                                Math.max(
+                                    0,
+                                    previousContext.length -
+                                    allowedPreviousLength
+                                )
+                            ) +
+                            "…"
+                            : previousContext;
+
+
+                    context =
+                        previousPart +
+                        " " +
+                        context;
+
+                }
+
+            }
+
+
+            // ==================================
+            // تحديث المساحة المتبقية
+            // ==================================
+
+            remainingForNeighbors =
+                availableChars -
+                context.length;
+
+
+            // ==================================
+            // إضافة الفقرة التالية
+            // ==================================
+
+            if (
+                includeNeighbors &&
+                nextContext &&
+                remainingForNeighbors > 150
+            ) {
+
+                const separatorLength =
+                    1;
+
+
+                const allowedNextLength =
+                    Math.max(
+                        0,
+                        remainingForNeighbors -
+                        separatorLength
+                    );
+
+
+                if (
+                    allowedNextLength > 100
+                ) {
+
+                    const nextPart =
+                        nextContext.length >
+                        allowedNextLength
+                            ? nextContext.substring(
+                                0,
+                                allowedNextLength
+                            ) +
+                            "…"
+                            : nextContext;
+
+
+                    context =
+                        context +
+                        " " +
+                        nextPart;
+
+                }
 
             }
 
@@ -11951,7 +12005,8 @@ function buildRetrievalContext(
 
                 score:
                     Number(
-                        result.score || 0
+                        result.score ||
+                        0
                     ),
 
                 matchType:
@@ -11992,10 +12047,18 @@ function buildRetrievalContext(
             };
 
 
+            // ==================================
+            // حفظ المقطع
+            // ==================================
+
             contexts.push(
                 item
             );
 
+
+            // ==================================
+            // تحديث إجمالي الأحرف
+            // ==================================
 
             totalChars +=
                 context.length;
