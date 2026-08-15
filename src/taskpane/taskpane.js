@@ -8376,11 +8376,6 @@ function getRetrievalProfile(
         normalizeSearchText(
             query
         );
-    const retrievalProfile =
-        options &&
-        options.profile
-            ? options.profile
-            : "general";
 
 
     // ==================================
@@ -8402,12 +8397,14 @@ function getRetrievalProfile(
 
 
     // ==================================
-    // تعريف / معنى / ما هو
+    // تعريف / معنى
     // ==================================
 
     if (
-        /ما هو|ماهي|ما هي|المقصود|معنى|تعريف|يقصد ب|المراد ب/
-            .test(text)
+        /ماهو|ماهو|ماهى|ماهي|ما هي|المقصود|معنى|تعريف|يقصد ب|المراد ب/
+            .test(
+                text
+            )
     ) {
 
         profile.type =
@@ -8430,7 +8427,9 @@ function getRetrievalProfile(
 
     if (
         /اثر|أثر|تاثير|تأثير|نتائج|ينتج عن|يترتب على|انعكاس/
-            .test(text)
+            .test(
+                text
+            )
     ) {
 
         profile.type =
@@ -8448,12 +8447,14 @@ function getRetrievalProfile(
 
 
     // ==================================
-    // مقارنة / فرق / مقارنة بين
+    // مقارنة
     // ==================================
 
     if (
         /الفرق|الفروق|مقارنة|يقارن|ما الفرق|التمييز بين|يفترق/
-            .test(text)
+            .test(
+                text
+            )
     ) {
 
         profile.type =
@@ -8471,12 +8472,14 @@ function getRetrievalProfile(
 
 
     // ==================================
-    // أسباب / علل / لماذا
+    // أسباب / علل
     // ==================================
 
     if (
-        /لماذا|سبب|اسباب|أسباب|علة|علل|لأن|بسبب/
-            .test(text)
+        /لماذا|سبب|اسباب|أسباب|علة|علل|لأن|لان|بسبب/
+            .test(
+                text
+            )
     ) {
 
         profile.type =
@@ -8494,12 +8497,14 @@ function getRetrievalProfile(
 
 
     // ==================================
-    // موضع / أين / في أي فصل
+    // موضع / فصل / مبحث / مطلب
     // ==================================
 
     if (
         /اين|أين|موضع|موضعه|الفصل|المبحث|المطلب|الصفحة/
-            .test(text)
+            .test(
+                text
+            )
     ) {
 
         profile.type =
@@ -8563,7 +8568,6 @@ async function buildAIDocumentContext(
             getRetrievalProfile(
                 query
             );
-            
 
 
         // ==================================
@@ -8590,7 +8594,8 @@ async function buildAIDocumentContext(
             !Array.isArray(
                 searchResult.results
             ) ||
-            searchResult.results.length === 0
+            searchResult.results.length ===
+                0
         ) {
 
             return {
@@ -8660,7 +8665,7 @@ async function buildAIDocumentContext(
 
 
         // ======================================
-        // بناء سجل الاسترجاع الموحد
+        // سجل الاسترجاع الموحد
         // ======================================
 
         return {
@@ -8718,10 +8723,6 @@ async function buildAIDocumentContext(
             error
         );
 
-
-        // ==================================
-        // فشل الاسترجاع لا يمنع الذكاء الاصطناعي
-        // ==================================
 
         return {
 
@@ -9702,6 +9703,7 @@ async function searchIndexedDocument(
             query
         );
 
+
     if (!searchTerm) {
 
         return {
@@ -9721,21 +9723,39 @@ async function searchIndexedDocument(
 
 
     // ==================================
+    // ملف تعريف الاسترجاع
+    // ==================================
+
+    const retrievalProfile =
+        options &&
+        options.profile
+            ? options.profile
+            : "general";
+
+
+    // ==================================
     // المستند
     // ==================================
 
     const documentItem =
         documents.find(
-            function (doc) {
+            function (
+                doc
+            ) {
 
                 return (
                     doc &&
-                    String(doc.id) ===
-                    String(documentId)
+                    String(
+                        doc.id
+                    ) ===
+                    String(
+                        documentId
+                    )
                 );
 
             }
-        ) || currentDocument;
+        ) ||
+        currentDocument;
 
 
     if (!documentItem) {
@@ -9767,11 +9787,13 @@ async function searchIndexedDocument(
 
 
     const indexedTerms =
-        indexData.terms || {};
+        indexData.terms ||
+        {};
 
 
     const indexedFamilies =
-        indexData.families || {};
+        indexData.families ||
+        {};
 
 
     // ==================================
@@ -9806,7 +9828,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // تحديد عائلات الاستعلام
+    // مجموعة الكلمات الموجودة في الفهرس
     // ==================================
 
     const indexedSurfaceSet =
@@ -9816,6 +9838,10 @@ async function searchIndexedDocument(
             )
         );
 
+
+    // ==================================
+    // تحديد عائلات الاستعلام
+    // ==================================
 
     const queryFamilyKeys =
         [];
@@ -9926,7 +9952,8 @@ async function searchIndexedDocument(
                 indexData.uniqueTerms,
 
             indexUniqueFamilies:
-                indexData.uniqueFamilies || 0,
+                indexData.uniqueFamilies ||
+                0,
 
             indexedOccurrences:
                 0
@@ -9973,7 +10000,6 @@ async function searchIndexedDocument(
 
     // ==================================
     // خريطة الفقرات
-    // الوصول المباشر برقم الفقرة
     // ==================================
 
     const paragraphMap =
@@ -10032,11 +10058,6 @@ async function searchIndexedDocument(
             }
 
 
-            // ----------------------------------
-            // النسخة الجديدة
-            // occurrences
-            // ----------------------------------
-
             if (
                 Array.isArray(
                     family.occurrences
@@ -10085,19 +10106,19 @@ async function searchIndexedDocument(
                         }
 
 
-                        const paragraphMapEntry =
+                        const entry =
                             candidateParagraphs.get(
                                 paragraphIndex
                             );
 
 
                         if (
-                            !paragraphMapEntry.has(
+                            !entry.has(
                                 familyKey
                             )
                         ) {
 
-                            paragraphMapEntry.set(
+                            entry.set(
                                 familyKey,
                                 []
                             );
@@ -10105,7 +10126,7 @@ async function searchIndexedDocument(
                         }
 
 
-                        paragraphMapEntry
+                        entry
                             .get(
                                 familyKey
                             )
@@ -10121,9 +10142,9 @@ async function searchIndexedDocument(
             }
 
 
-            // ----------------------------------
-            // توافق رجعي مع الفهرس القديم
-            // ----------------------------------
+            // ==================================
+            // توافق رجعي للفهرس القديم
+            // ==================================
 
             if (
                 Array.isArray(
@@ -10163,10 +10184,6 @@ async function searchIndexedDocument(
 
             }
 
-
-            // ----------------------------------
-            // النسخة الجديدة
-            // ----------------------------------
 
             if (
                 Array.isArray(
@@ -10216,19 +10233,19 @@ async function searchIndexedDocument(
                         }
 
 
-                        const paragraphMapEntry =
+                        const entry =
                             candidateParagraphs.get(
                                 paragraphIndex
                             );
 
 
                         if (
-                            !paragraphMapEntry.has(
+                            !entry.has(
                                 term
                             )
                         ) {
 
-                            paragraphMapEntry.set(
+                            entry.set(
                                 term,
                                 []
                             );
@@ -10236,7 +10253,7 @@ async function searchIndexedDocument(
                         }
 
 
-                        paragraphMapEntry
+                        entry
                             .get(
                                 term
                             )
@@ -10322,11 +10339,12 @@ async function searchIndexedDocument(
                 }
             );
 
+
             // ==================================
-            // عدد عائلات السؤال الموجودة في الفقرة
+            // عدد ظهور عائلات السؤال
             // ==================================
 
-            let matchedFamilyOccurrences =
+            let familyOccurrencesInParagraph =
                 0;
 
 
@@ -10347,7 +10365,7 @@ async function searchIndexedDocument(
                         )
                     ) {
 
-                        matchedFamilyOccurrences +=
+                        familyOccurrencesInParagraph +=
                             occurrences.length;
 
                     }
@@ -10355,8 +10373,9 @@ async function searchIndexedDocument(
                 }
             );
 
+
             // ==================================
-            // عدد الكلمات الحرفية المطابقة
+            // عدد الكلمات الحرفية
             // ==================================
 
             let exactWordMatches =
@@ -10382,10 +10401,9 @@ async function searchIndexedDocument(
                 }
             );
 
+
             // ==================================
             // تغطية السؤال
-            // كم عائلة من عائلات السؤال
-            // وجدنا داخل الفقرة؟
             // ==================================
 
             let queryCoverage =
@@ -10403,10 +10421,46 @@ async function searchIndexedDocument(
 
             }
 
+
             // ==================================
-            // قرب عائلات السؤال داخل الفقرة
-            // كلما اقتربت العائلات من بعضها
-            // ارتفعت درجة الصلة
+            // العنوان الأقرب
+            // ==================================
+
+            let nearestHeading =
+                null;
+
+
+            for (
+                let i =
+                    headings.length - 1;
+                i >= 0;
+                i--
+            ) {
+
+                const heading =
+                    headings[
+                        i
+                    ];
+
+
+                if (
+                    heading &&
+                    heading.index <
+                        paragraphIndex
+                ) {
+
+                    nearestHeading =
+                        heading;
+
+                    break;
+
+                }
+
+            }
+
+
+            // ==================================
+            // قرب عائلات السؤال
             // ==================================
 
             let familyProximityScore =
@@ -10417,10 +10471,6 @@ async function searchIndexedDocument(
                 null;
 
 
-            // ==================================
-            // القرب يحتاج أكثر من عائلة
-            // ==================================
-
             if (
                 matchedFamilies.length >
                 1
@@ -10429,10 +10479,6 @@ async function searchIndexedDocument(
                 const events =
                     [];
 
-
-                // ----------------------------------
-                // جمع مواقع كل عائلة
-                // ----------------------------------
 
                 matchedFamilies.forEach(
                     function (
@@ -10486,10 +10532,6 @@ async function searchIndexedDocument(
                 );
 
 
-                // ----------------------------------
-                // ترتيب المواقع
-                // ----------------------------------
-
                 events.sort(
                     function (
                         a,
@@ -10504,11 +10546,6 @@ async function searchIndexedDocument(
                     }
                 );
 
-
-                // ----------------------------------
-                // البحث عن أصغر نطاق
-                // يحتوي جميع العائلات
-                // ----------------------------------
 
                 let left =
                     0;
@@ -10529,13 +10566,16 @@ async function searchIndexedDocument(
                 ) {
 
                     const rightFamily =
-                        events[right].family;
+                        events[
+                            right
+                        ].family;
 
 
                     const oldCount =
                         familyCounts.get(
                             rightFamily
-                        ) || 0;
+                        ) ||
+                        0;
 
 
                     familyCounts.set(
@@ -10545,7 +10585,8 @@ async function searchIndexedDocument(
 
 
                     if (
-                        oldCount === 0
+                        oldCount ===
+                        0
                     ) {
 
                         familiesInside +=
@@ -10554,11 +10595,6 @@ async function searchIndexedDocument(
                     }
 
 
-                    // ----------------------------------
-                    // عندما يحتوي النطاق جميع العائلات
-                    // نحاول تصغيره
-                    // ----------------------------------
-
                     while (
                         familiesInside ===
                             matchedFamilies.length &&
@@ -10566,8 +10602,12 @@ async function searchIndexedDocument(
                     ) {
 
                         const currentSpan =
-                            events[right].position -
-                            events[left].position +
+                            events[
+                                right
+                            ].position -
+                            events[
+                                left
+                            ].position +
                             1;
 
 
@@ -10585,7 +10625,9 @@ async function searchIndexedDocument(
 
 
                         const leftFamily =
-                            events[left].family;
+                            events[
+                                left
+                            ].family;
 
 
                         const leftCount =
@@ -10626,53 +10668,17 @@ async function searchIndexedDocument(
                 }
 
 
-                // ----------------------------------
-                // تحويل النطاق إلى درجة
-                // ----------------------------------
-
                 if (
-                    familySpan !== null
+                    familySpan !==
+                    null
                 ) {
 
                     familyProximityScore =
-                        8 /
-                        familySpan;
-
-                }
-
-            }
-
-            // ==================================
-            // العنوان الأقرب
-            // ==================================
-
-            let nearestHeading =
-                null;
-
-
-            for (
-                let i =
-                    headings.length - 1;
-                i >= 0;
-                i--
-            ) {
-
-                const heading =
-                    headings[
-                        i
-                    ];
-
-
-                if (
-                    heading &&
-                    heading.index <
-                        paragraphIndex
-                ) {
-
-                    nearestHeading =
-                        heading;
-
-                    break;
+                        Math.min(
+                            8,
+                            40 /
+                            familySpan
+                        );
 
                 }
 
@@ -10680,35 +10686,139 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // 4) كثافة ظهور العائلة داخل الفقرة
+            // تحديد درجة النتيجة
+            // مهم: score يُعرّف قبل أي إضافة
             // ==================================
 
-            let familyOccurrencesInParagraph =
+            let score =
                 0;
 
 
-            matchedEntries.forEach(
-                function (
-                    occurrences,
-                    key
-                ) {
+            // ==================================
+            // 1) مطابقة العبارة كاملة
+            // ==================================
 
-                    if (
-                        matchedFamilies.includes(
-                            key
-                        )
-                    ) {
+            if (
+                normalizedText.includes(
+                    searchTerm
+                )
+            ) {
 
-                        familyOccurrencesInParagraph +=
-                            occurrences.length;
+                score +=
+                    12;
 
-                    }
+            }
 
-                }
-            );
 
             // ==================================
-            // 5) تخصيص الدرجة حسب نوع السؤال
+            // 2) المطابقة الحرفية للكلمات
+            // ==================================
+
+            score +=
+                exactWordMatches *
+                4;
+
+
+            // ==================================
+            // 3) تغطية عائلات السؤال
+            // ==================================
+
+            if (
+                matchedFamilies.length >
+                0
+            ) {
+
+                score +=
+                    queryCoverage *
+                    8;
+
+            }
+
+
+            // ==================================
+            // 4) قرب عائلات السؤال
+            // ==================================
+
+            score +=
+                familyProximityScore;
+
+
+            // ==================================
+            // 5) كثافة ظهور العائلات
+            // ==================================
+
+            score +=
+                Math.min(
+                    familyOccurrencesInParagraph,
+                    8
+                ) *
+                0.75;
+
+
+            // ==================================
+            // 6) ظهور الاستعلام في بداية الفقرة
+            // ==================================
+
+            if (
+                normalizedText.startsWith(
+                    searchTerm
+                )
+            ) {
+
+                score +=
+                    2;
+
+            }
+
+
+            // ==================================
+            // 7) العنوان يحتوي عائلة مطلوبة
+            // ==================================
+
+            if (
+                nearestHeading &&
+                matchedFamilies.some(
+                    function (
+                        familyKey
+                    ) {
+
+                        return normalizeSearchText(
+                            nearestHeading.text
+                        ).includes(
+                            familyKey
+                        );
+
+                    }
+                )
+            ) {
+
+                score +=
+                    4;
+
+            }
+
+
+            // ==================================
+            // 8) العنوان يحتوي السؤال
+            // ==================================
+
+            if (
+                nearestHeading &&
+                normalizeSearchText(
+                    nearestHeading.text
+                ).includes(
+                    searchTerm
+                )
+            ) {
+
+                score +=
+                    6;
+
+            }
+
+
+            // ==================================
+            // 9) تخصيص الدرجة بحسب نوع السؤال
             // ==================================
 
             if (
@@ -10716,15 +10826,15 @@ async function searchIndexedDocument(
                 "definition"
             ) {
 
-                // التعريف يستفيد من الفقرات التي
-                // تبدأ بالمفهوم أو تذكره مبكرًا
+                const position =
+                    normalizedText.indexOf(
+                        searchTerm
+                    );
+
+
                 if (
-                    normalizedText.indexOf(
-                        searchTerm
-                    ) >= 0 &&
-                    normalizedText.indexOf(
-                        searchTerm
-                    ) < 120
+                    position >= 0 &&
+                    position < 120
                 ) {
 
                     score +=
@@ -10760,9 +10870,6 @@ async function searchIndexedDocument(
                 "comparison"
             ) {
 
-                // إذا كان السؤال يحتوي أكثر من عائلة
-                // فالفقرات التي تجمع أكثر من عائلة
-                // تحصل على مكافأة إضافية
                 if (
                     matchedFamilyCount >=
                     2
@@ -10809,160 +10916,18 @@ async function searchIndexedDocument(
 
             if (
                 retrievalProfile ===
-                "location"
-            ) {
-
-                // العنوان مهم جدًا في أسئلة الموضع
-                if (
-                    nearestHeading
-                ) {
-
-                    score +=
-                        2;
-
-                }
-
-            }
-
-            // ==================================
-            // تحسين درجة النتيجة
-            // ==================================
-
-            let score = 0;
-
-
-            // ==================================
-            // 1) مطابقة العبارة كاملة
-            // ==================================
-
-            if (
-                normalizedText.includes(
-                    searchTerm
-                )
-            ) {
-
-                score += 12;
-
-            }
-
-
-            // ==================================
-            // 2) المطابقة الحرفية للكلمات
-            // ==================================
-
-            score +=
-                exactWordMatches *
-                4;
-
-
-            // ==================================
-            // 3) تغطية عائلات السؤال
-            // ==================================
-
-            if (
-                matchedFamilies.length >
-                0
+                "location" &&
+                nearestHeading
             ) {
 
                 score +=
-                    queryCoverage *
-                    8;
-
-            }
-            // ==================================
-            // مكافأة قرب عائلات السؤال
-            // ==================================
-
-            score +=
-                familyProximityScore;
-
-            // ==================================
-            // 4) كثافة ظهور عائلات السؤال
-            // ==================================
-
-            score +=
-                Math.min(
-                    matchedFamilyOccurrences,
-                    8
-                ) * 0.75;
-
-
-            
-
-
-            score +=
-                Math.min(
-                    familyOccurrencesInParagraph,
-                    6
-                ) * 0.75;
-
-
-            // ==================================
-            // 5) مكافأة ظهور الكلمة المطلوبة
-            // في بداية الفقرة تقريبًا
-            // ==================================
-
-            if (
-                normalizedText.startsWith(
-                    searchTerm
-                )
-            ) {
-
-                score += 2;
+                    2;
 
             }
 
 
             // ==================================
-            // 6) مكافأة العنوان إذا احتوى
-            // على العائلة المطلوبة
-            // ==================================
-
-            if (
-                nearestHeading &&
-                matchedFamilies.some(
-                    function (
-                        familyKey
-                    ) {
-
-                        return normalizeSearchText(
-                            nearestHeading.text
-                        ).includes(
-                            familyKey
-                        );
-
-                    }
-                )
-            ) {
-
-                score += 4;
-
-            }
-
-
-            // ==================================
-            // 7) مكافأة العنوان إذا احتوى
-            // على الاستعلام نفسه
-            // ==================================
-
-            if (
-                nearestHeading &&
-                normalizeSearchText(
-                    nearestHeading.text
-                ).includes(
-                    searchTerm
-                )
-            ) {
-
-                score += 6;
-
-            }
-            
-
-
-            // ==================================
-            // تحديد موضع المقتطف
-            // من الموضع الحرفي المفهرس مباشرة
+            // تحديد أول موضع حقيقي
             // ==================================
 
             let searchPosition =
@@ -10972,11 +10937,6 @@ async function searchIndexedDocument(
             let matchedOccurrence =
                 null;
 
-
-            // ==================================
-            // العثور على أول ظهور حقيقي
-            // في هذه الفقرة
-            // ==================================
 
             matchedEntries.forEach(
                 function (
@@ -10994,8 +10954,13 @@ async function searchIndexedDocument(
 
 
                     if (
-                        !matchedFamilies.includes(
-                            key
+                        !(
+                            matchedFamilies.includes(
+                                key
+                            ) ||
+                            matchedExactTerms.includes(
+                                key
+                            )
                         )
                     ) {
 
@@ -11043,7 +11008,6 @@ async function searchIndexedDocument(
 
             // ==================================
             // احتياط
-            // إذا لم يتوفر charStart
             // ==================================
 
             if (
@@ -11059,9 +11023,8 @@ async function searchIndexedDocument(
             }
 
 
-    
             // ==================================
-            // بناء المقتطف من الموضع الحقيقي
+            // بناء المقتطف
             // ==================================
 
             let context =
@@ -11083,11 +11046,11 @@ async function searchIndexedDocument(
                         "number"
                             ? matchedOccurrence.charEnd
                             : charStart +
-                            (
-                                matchedOccurrence.word
-                                    ? matchedOccurrence.word.length
-                                    : searchTerm.length
-                            );
+                                (
+                                    matchedOccurrence.word
+                                        ? matchedOccurrence.word.length
+                                        : searchTerm.length
+                                );
 
 
                 const contextStart =
@@ -11106,8 +11069,9 @@ async function searchIndexedDocument(
                     );
 
 
+                // استخدام النص الأصلي للمقتطف
                 context =
-                    normalizedText.substring(
+                    originalText.substring(
                         contextStart,
                         contextEnd
                     );
@@ -11128,7 +11092,7 @@ async function searchIndexedDocument(
 
                 const end =
                     Math.min(
-                        normalizedText.length,
+                        originalText.length,
                         searchPosition +
                         searchTerm.length +
                         300
@@ -11136,7 +11100,7 @@ async function searchIndexedDocument(
 
 
                 context =
-                    normalizedText.substring(
+                    originalText.substring(
                         start,
                         end
                     );
@@ -11198,7 +11162,7 @@ async function searchIndexedDocument(
 
                 context:
                     context,
-                
+
                 matchedOccurrence:
                     matchedOccurrence,
 
