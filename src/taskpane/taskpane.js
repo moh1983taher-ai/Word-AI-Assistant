@@ -9717,6 +9717,7 @@ function getSearchQueryTokens(
 // =====================================================
 // Search Indexed Document
 // البحث الذكي بالعائلات والمواضع المباشرة
+// + الفقرة السابقة والتالية للسياق
 // =====================================================
 
 async function searchIndexedDocument(
@@ -10344,6 +10345,40 @@ async function searchIndexedDocument(
 
 
             // ==================================
+            // الفقرة السابقة والتالية
+            // ==================================
+
+            const previousParagraph =
+                paragraphMap.get(
+                    paragraphIndex - 1
+                );
+
+
+            const nextParagraph =
+                paragraphMap.get(
+                    paragraphIndex + 1
+                );
+
+
+            const previousParagraphText =
+                previousParagraph &&
+                previousParagraph.text
+                    ? String(
+                        previousParagraph.text
+                    ).trim()
+                    : "";
+
+
+            const nextParagraphText =
+                nextParagraph &&
+                nextParagraph.text
+                    ? String(
+                        nextParagraph.text
+                    ).trim()
+                    : "";
+
+
+            // ==================================
             // عدد العائلات المطابقة
             // ==================================
 
@@ -10718,16 +10753,11 @@ async function searchIndexedDocument(
 
             // ==================================
             // تحديد درجة النتيجة
-            // مهم: score يُعرّف قبل أي إضافة
             // ==================================
 
             let score =
                 0;
 
-
-            // ==================================
-            // 1) مطابقة العبارة كاملة
-            // ==================================
 
             if (
                 normalizedText.includes(
@@ -10741,18 +10771,10 @@ async function searchIndexedDocument(
             }
 
 
-            // ==================================
-            // 2) المطابقة الحرفية للكلمات
-            // ==================================
-
             score +=
                 exactWordMatches *
                 4;
 
-
-            // ==================================
-            // 3) تغطية عائلات السؤال
-            // ==================================
 
             if (
                 matchedFamilies.length >
@@ -10766,17 +10788,9 @@ async function searchIndexedDocument(
             }
 
 
-            // ==================================
-            // 4) قرب عائلات السؤال
-            // ==================================
-
             score +=
                 familyProximityScore;
 
-
-            // ==================================
-            // 5) كثافة ظهور العائلات
-            // ==================================
 
             score +=
                 Math.min(
@@ -10785,10 +10799,6 @@ async function searchIndexedDocument(
                 ) *
                 0.75;
 
-
-            // ==================================
-            // 6) ظهور الاستعلام في بداية الفقرة
-            // ==================================
 
             if (
                 normalizedText.startsWith(
@@ -10801,10 +10811,6 @@ async function searchIndexedDocument(
 
             }
 
-
-            // ==================================
-            // 7) العنوان يحتوي عائلة مطلوبة
-            // ==================================
 
             if (
                 nearestHeading &&
@@ -10829,10 +10835,6 @@ async function searchIndexedDocument(
             }
 
 
-            // ==================================
-            // 8) العنوان يحتوي السؤال
-            // ==================================
-
             if (
                 nearestHeading &&
                 normalizeSearchText(
@@ -10849,7 +10851,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // 9) تخصيص الدرجة بحسب نوع السؤال
+            // تخصيص الدرجة بحسب نوع السؤال
             // ==================================
 
             if (
@@ -11055,7 +11057,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // بناء المقتطف
+            // بناء المقتطف الرئيسي
             // ==================================
 
             let context =
@@ -11094,13 +11096,12 @@ async function searchIndexedDocument(
 
                 const contextEnd =
                     Math.min(
-                        normalizedText.length,
+                        originalText.length,
                         charEnd +
                         300
                     );
 
 
-                // استخدام النص الأصلي للمقتطف
                 context =
                     originalText.substring(
                         contextStart,
@@ -11193,6 +11194,12 @@ async function searchIndexedDocument(
 
                 context:
                     context,
+
+                previousParagraphText:
+                    previousParagraphText,
+
+                nextParagraphText:
+                    nextParagraphText,
 
                 matchedOccurrence:
                     matchedOccurrence,
@@ -11481,6 +11488,7 @@ function getCommonTextLength(
 // =====================================================
 // Build Retrieval Context
 // تحويل نتائج البحث إلى سياق ذكي للذكاء الاصطناعي
+// يدعم المقطع السابق والتالي عند توفرهما
 // =====================================================
 
 function buildRetrievalContext(
@@ -11508,6 +11516,14 @@ function buildRetrievalContext(
             "number"
                 ? settings.maxChars
                 : 8000;
+
+
+    // ==================================
+    // هل نضيف الفقرات المجاورة؟
+    // ==================================
+
+    const includeNeighbors =
+        settings.includeNeighbors !== false;
 
 
     // ==================================
@@ -11596,7 +11612,6 @@ function buildRetrievalContext(
         [];
 
 
-    // الحد الأدنى للتداخل النصي المقبول
     const MAX_TEXT_OVERLAP =
         0.75;
 
@@ -11630,10 +11645,6 @@ function buildRetrievalContext(
 
         }
 
-
-        // ----------------------------------
-        // فحص التشابه مع المقاطع المختارة
-        // ----------------------------------
 
         let tooSimilar =
             false;
@@ -11682,7 +11693,7 @@ function buildRetrievalContext(
             const overlap =
                 shorterLength > 0
                     ? commonLength /
-                    shorterLength
+                      shorterLength
                     : 0;
 
 
@@ -11745,7 +11756,11 @@ function buildRetrievalContext(
             index
         ) {
 
-            let context =
+            // ==================================
+            // المقطع الرئيسي
+            // ==================================
+
+            let mainContext =
                 String(
                     result.context ||
                     result.text ||
@@ -11753,27 +11768,69 @@ function buildRetrievalContext(
                 ).trim();
 
 
-            if (!context) {
+            if (!mainContext) {
 
                 return;
 
             }
 
 
-            // ----------------------------------
-            // تنظيف مبالغ فيه للمسافات
-            // ----------------------------------
-
-            context =
-                context.replace(
-                    /\s+/g,
-                    " "
-                ).trim();
+            mainContext =
+                mainContext
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
 
 
-            // ----------------------------------
+            // ==================================
+            // الفقرة السابقة
+            // ==================================
+
+            let previousContext =
+                includeNeighbors
+                    ? String(
+                        result.previousParagraphText ||
+                        ""
+                    ).trim()
+                    : "";
+
+
+            // ==================================
+            // الفقرة التالية
+            // ==================================
+
+            let nextContext =
+                includeNeighbors
+                    ? String(
+                        result.nextParagraphText ||
+                        ""
+                    ).trim()
+                    : "";
+
+
+            previousContext =
+                previousContext
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
+
+
+            nextContext =
+                nextContext
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
+
+
+            // ==================================
             // العنوان
-            // ----------------------------------
+            // ==================================
 
             const heading =
                 String(
@@ -11782,9 +11839,9 @@ function buildRetrievalContext(
                 ).trim();
 
 
-            // ----------------------------------
-            // قص المقطع إذا تجاوز الحد
-            // ----------------------------------
+            // ==================================
+            // المساحة المتبقية
+            // ==================================
 
             const remainingChars =
                 maxChars -
@@ -11801,17 +11858,66 @@ function buildRetrievalContext(
             }
 
 
+            // ==================================
+            // مساحة البيانات الوصفية
+            // ==================================
+
             const reservedForMetadata =
-                180;
+                250;
 
 
-            const availableChars =
+            let availableChars =
                 Math.max(
                     300,
                     remainingChars -
                     reservedForMetadata
                 );
 
+
+            // ==================================
+            // بناء السياق المتصل
+            // ==================================
+
+            const neighborParts =
+                [];
+
+
+            if (
+                previousContext
+            ) {
+
+                neighborParts.push(
+                    previousContext
+                );
+
+            }
+
+
+            neighborParts.push(
+                mainContext
+            );
+
+
+            if (
+                nextContext
+            ) {
+
+                neighborParts.push(
+                    nextContext
+                );
+
+            }
+
+
+            let context =
+                neighborParts.join(
+                    " "
+                );
+
+
+            // ==================================
+            // قص السياق عند الحاجة
+            // ==================================
 
             if (
                 context.length >
@@ -11828,9 +11934,9 @@ function buildRetrievalContext(
             }
 
 
-            // ----------------------------------
+            // ==================================
             // سجل المقطع
-            // ----------------------------------
+            // ==================================
 
             const item = {
 
@@ -11870,6 +11976,15 @@ function buildRetrievalContext(
                         result.exactWordMatches ||
                         0
                     ),
+
+                previousParagraph:
+                    previousContext,
+
+                mainParagraph:
+                    mainContext,
+
+                nextParagraph:
+                    nextContext,
 
                 context:
                     context
@@ -11948,9 +12063,32 @@ function buildRetrievalContext(
             }
 
 
+            if (
+                item.previousParagraph
+            ) {
+
+                block +=
+                    "السياق السابق: " +
+                    item.previousParagraph +
+                    "\n";
+
+            }
+
+
             block +=
-                "النص: " +
-                item.context;
+                "المقطع المطابق: " +
+                item.mainParagraph;
+
+
+            if (
+                item.nextParagraph
+            ) {
+
+                block +=
+                    "\nالسياق التالي: " +
+                    item.nextParagraph;
+
+            }
 
 
             textParts.push(
@@ -11968,7 +12106,7 @@ function buildRetrievalContext(
 
 
     // ==================================
-    // النتيجة
+    // النتيجة النهائية
     // ==================================
 
     return {
