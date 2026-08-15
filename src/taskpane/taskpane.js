@@ -8812,6 +8812,189 @@ function getRetrievalProfile(
     return profile;
 
 }
+
+// =====================================================
+// Get Retrieval Limits By Model
+// تحديد حجم سياق المستند بحسب النموذج
+// =====================================================
+
+function getRetrievalLimits(
+    providerName,
+    modelName
+) {
+
+    const providerValue =
+        String(
+            providerName || ""
+        ).toLowerCase();
+
+
+    const modelValue =
+        String(
+            modelName || ""
+        ).toLowerCase();
+
+
+    // ==================================
+    // Groq - النماذج الصغيرة
+    // ==================================
+
+    if (
+        providerValue === "groq"
+    ) {
+
+        if (
+            modelValue.includes(
+                "allam-2-7b"
+            )
+        ) {
+
+            return {
+
+                maxResults:
+                    2,
+
+                maxChars:
+                    2200
+
+            };
+
+        }
+
+
+        if (
+            modelValue.includes(
+                "llama-3.3-70b"
+            ) ||
+            modelValue.includes(
+                "gpt-oss"
+            )
+        ) {
+
+            return {
+
+                maxResults:
+                    5,
+
+                maxChars:
+                    5500
+
+            };
+
+        }
+
+
+        return {
+
+            maxResults:
+                4,
+
+            maxChars:
+                4000
+
+        };
+
+    }
+
+
+    // ==================================
+    // OpenRouter
+    // ==================================
+
+    if (
+        providerValue ===
+        "openrouter"
+    ) {
+
+        return {
+
+            maxResults:
+                5,
+
+            maxChars:
+                5500
+
+        };
+
+    }
+
+
+    // ==================================
+    // Gemini
+    // ==================================
+
+    if (
+        providerValue ===
+        "gemini"
+    ) {
+
+        return {
+
+            maxResults:
+                6,
+
+            maxChars:
+                6500
+
+        };
+
+    }
+
+
+    // ==================================
+    // OpenAI
+    // ==================================
+
+    if (
+        providerValue ===
+        "openai"
+    ) {
+
+        return {
+
+            maxResults:
+                6,
+
+            maxChars:
+                6500
+
+        };
+
+    }
+
+
+    // ==================================
+    // الافتراضي
+    // ==================================
+
+    return {
+
+        maxResults:
+            4,
+
+        maxChars:
+            4000
+
+    };
+
+}
+
+// =====================================================
+// Estimate Token Count
+// تقدير تقريبي لعدد التوكنات
+// =====================================================
+
+function estimateTokenCount(
+    text
+) {
+
+    return Math.ceil(
+        String(
+            text || ""
+        ).length / 4
+    );
+
+}
 // =====================================================
 // Build AI Document Context
 // بناء سياق المستند للذكاء الاصطناعي
@@ -8929,7 +9112,139 @@ async function buildAIDocumentContext(
                 }
             );
 
+        // ======================================
+        // تحديد حجم السياق بحسب النموذج
+        // ======================================
 
+        const settings =
+            getSavedSettings();
+
+
+        const retrievalLimits =
+            getRetrievalLimits(
+                settings.provider,
+                settings.model
+            );
+
+
+        let retrievalMaxResults =
+            retrievalLimits.maxResults;
+
+
+        let retrievalMaxChars =
+            retrievalLimits.maxChars;
+
+
+        // ======================================
+        // إعطاء المقارنة مساحة أكبر
+        // ======================================
+
+        if (
+            retrievalProfile.type ===
+            "comparison"
+        ) {
+
+            retrievalMaxResults =
+                Math.min(
+                    retrievalMaxResults + 1,
+                    6
+                );
+
+
+            retrievalMaxChars =
+                Math.min(
+                    retrievalMaxChars + 1000,
+                    7000
+                );
+
+        }
+
+
+        // ======================================
+        // حماية عامة من تضخم سياق المستند
+        // ======================================
+
+        const MAX_RETRIEVAL_TOKENS =
+            2500;
+
+
+        const previewText =
+            searchResult.results
+                .slice(
+                    0,
+                    retrievalMaxResults
+                )
+                .map(
+                    function (
+                        result
+                    ) {
+
+                        return String(
+                            result.context ||
+                            result.text ||
+                            ""
+                        );
+
+                    }
+                )
+                .join(" ");
+
+
+        const estimatedTokens =
+            estimateTokenCount(
+                previewText
+            );
+
+
+        if (
+            estimatedTokens >
+            MAX_RETRIEVAL_TOKENS
+        ) {
+
+            const reductionRatio =
+                MAX_RETRIEVAL_TOKENS /
+                estimatedTokens;
+
+
+            retrievalMaxResults =
+                Math.max(
+                    2,
+                    Math.floor(
+                        retrievalMaxResults *
+                        reductionRatio
+                    )
+                );
+
+
+            retrievalMaxChars =
+                Math.max(
+                    2500,
+                    Math.floor(
+                        retrievalMaxChars *
+                        reductionRatio
+                    )
+                );
+
+        }
+
+
+        // ======================================
+        // بناء السياق
+        // ======================================
+
+        const retrieval =
+            buildRetrievalContext(
+                searchResult,
+                {
+
+                    maxResults:
+                        retrievalMaxResults,
+
+                    maxChars:
+                        retrievalMaxChars
+
+                }
+            );
         // ==================================
         // لا يوجد سياق فعلي
         // ==================================
@@ -9087,9 +9402,30 @@ async function askAI(
 
 
     // ======================================
+    // استرجاع سياق المستند أولًا
+    // ======================================
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    // ======================================
+    // تحديد حجم تاريخ المحادثة
+    // ======================================
+
+    const historyLimit =
+        documentContext &&
+        documentContext.found
+            ? 2
+            : 4;
+
+
+    // ======================================
     // بناء سياق المحادثة السابقة
-    // نرسل آخر 6 رسائل فقط
-    // لتقليل حجم الطلب
+    // عند وجود المستند نحتاج تاريخًا أقل
+    // لأن سياق المستند يُبنى من جديد
     // ======================================
 
     const conversationMessages =
@@ -9105,7 +9441,7 @@ async function askAI(
 
         const previousMessages =
             currentChat.messages.slice(
-                -6
+                -historyLimit
             );
 
 
@@ -9124,6 +9460,34 @@ async function askAI(
                 }
 
 
+                let messageText =
+                    String(
+                        msg.text
+                    ).trim();
+
+
+                const MAX_HISTORY_CHARS =
+                    documentContext &&
+                    documentContext.found
+                        ? 1000
+                        : 1500;
+
+
+                if (
+                    messageText.length >
+                    MAX_HISTORY_CHARS
+                ) {
+
+                    messageText =
+                        messageText.substring(
+                            0,
+                            MAX_HISTORY_CHARS
+                        ) +
+                        "…";
+
+                }
+
+
                 conversationMessages.push({
 
                     role:
@@ -9133,9 +9497,7 @@ async function askAI(
                             : "user",
 
                     content:
-                        String(
-                            msg.text
-                        )
+                        messageText
 
                 });
 
@@ -9143,16 +9505,6 @@ async function askAI(
         );
 
     }
-
-
-    // ======================================
-    // استرجاع سياق المستند النشط مرة واحدة
-    // ======================================
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
 
 
     // ======================================
@@ -12517,6 +12869,11 @@ function buildRetrievalContext(
         [];
 
 
+    // ==================================
+    // بناء النص النهائي للنموذج
+    // إزالة بيانات الترتيب الداخلية
+    // ==================================
+
     contexts.forEach(
         function (
             item
@@ -12528,6 +12885,10 @@ function buildRetrievalContext(
                 "]" +
                 "\n";
 
+
+            // ==================================
+            // العنوان
+            // ==================================
 
             if (
                 item.heading
@@ -12541,32 +12902,9 @@ function buildRetrievalContext(
             }
 
 
-            block +=
-                "الدرجة: " +
-                item.score.toFixed(2) +
-                "\n";
-
-
-            block +=
-                "نوع المطابقة: " +
-                item.matchType +
-                "\n";
-
-
-            if (
-                item.matchedFamilies.length >
-                0
-            ) {
-
-                block +=
-                    "العائلات: " +
-                    item.matchedFamilies.join(
-                        "، "
-                    ) +
-                    "\n";
-
-            }
-
+            // ==================================
+            // السياق السابق
+            // ==================================
 
             if (
                 item.previousParagraph
@@ -12580,10 +12918,18 @@ function buildRetrievalContext(
             }
 
 
+            // ==================================
+            // المقطع المطابق
+            // ==================================
+
             block +=
                 "المقطع المطابق: " +
                 item.mainParagraph;
 
+
+            // ==================================
+            // السياق التالي
+            // ==================================
 
             if (
                 item.nextParagraph
