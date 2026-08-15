@@ -7422,6 +7422,8 @@ async function loadModels() {
 
 // ======================================
 // OpenRouter Models
+// تحميل النماذج المجانية مع تضمين
+// النماذج المجانية المعروفة صراحةً
 // ======================================
 
 async function loadOpenRouterModels() {
@@ -7510,6 +7512,10 @@ async function loadOpenRouterModels() {
     }
 
 
+    // ==================================
+    // استخراج النماذج المجانية
+    // ==================================
+
     const freeModels =
         result.data.filter(
             function (
@@ -7518,8 +7524,7 @@ async function loadOpenRouterModels() {
 
                 if (
                     !item ||
-                    !item.id ||
-                    !item.pricing
+                    !item.id
                 ) {
 
                     return false;
@@ -7527,20 +7532,57 @@ async function loadOpenRouterModels() {
                 }
 
 
+                const id =
+                    String(
+                        item.id
+                    );
+
+
+                const pricing =
+                    item.pricing ||
+                    {};
+
+
+                const promptPrice =
+                    String(
+                        pricing.prompt ??
+                        ""
+                    );
+
+
+                const completionPrice =
+                    String(
+                        pricing.completion ??
+                        ""
+                    );
+
+
+                // ----------------------------------
+                // مجاني حسب بيانات التسعير
+                // أو Free Variant صريح
+                // ----------------------------------
+
                 return (
-                    String(
-                        item.pricing.prompt
-                    ) === "0" &&
-                    String(
-                        item.pricing.completion
-                    ) === "0"
+                    (
+                        promptPrice ===
+                            "0" &&
+                        completionPrice ===
+                            "0"
+                    ) ||
+                    id.endsWith(
+                        ":free"
+                    )
                 );
 
             }
         );
 
 
-    populateModels(
+    // ==================================
+    // تحويل النتائج إلى صيغة القائمة
+    // ==================================
+
+    const models =
         freeModels.map(
             function (
                 item
@@ -7552,13 +7594,115 @@ async function loadOpenRouterModels() {
                         item.id,
 
                     name:
-                        item.name ||
-                        item.id
+                        (
+                            item.name ||
+                            item.id
+                        ) +
+                        " (مجاني)"
 
                 };
 
             }
-        )
+        );
+
+
+    // ==================================
+    // نماذج مجانية مهمة نضمن ظهورها
+    // إذا لم تظهر في استجابة API
+    // ==================================
+
+    const knownFreeModels = [
+
+        {
+
+            id:
+                "deepseek/deepseek-chat-v3.1:free",
+
+            name:
+                "DeepSeek V3.1 (مجاني)"
+
+        },
+
+        {
+
+            id:
+                "deepseek/deepseek-chat:free",
+
+            name:
+                "DeepSeek V3 (مجاني)"
+
+        },
+
+        {
+
+            id:
+                "openrouter/free",
+
+            name:
+                "OpenRouter Free Router (مجاني)"
+
+        }
+
+    ];
+
+
+    knownFreeModels.forEach(
+        function (
+            knownModel
+        ) {
+
+            const exists =
+                models.some(
+                    function (
+                        item
+                    ) {
+
+                        return (
+                            item.id ===
+                            knownModel.id
+                        );
+
+                    }
+                );
+
+
+            if (!exists) {
+
+                models.push(
+                    knownModel
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // ترتيب النماذج
+    // ==================================
+
+    models.sort(
+        function (
+            a,
+            b
+        ) {
+
+            return a.name.localeCompare(
+                b.name,
+                "ar"
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // عرض النماذج
+    // ==================================
+
+    populateModels(
+        models
     );
 
 
@@ -7566,7 +7710,7 @@ async function loadOpenRouterModels() {
 
         settingsStatus.innerHTML =
             "✓ تم تحديث النماذج المجانية: " +
-            freeModels.length;
+            models.length;
 
     }
 
