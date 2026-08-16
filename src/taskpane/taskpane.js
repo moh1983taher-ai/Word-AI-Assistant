@@ -2,7 +2,7 @@
 // Word AI Assistant
 // Main Application Controller
 // PART 1 / 3
-// التخزين + المستندات + الفهرسة
+// التخزين + المستندات + الفهرسة + Orama
 // ======================================
 
 Office.onReady(function () {
@@ -77,26 +77,26 @@ const sendBtn =
 
 const chatArea =
     document.getElementById("chat-area");
+
+const documentTitle =
+    document.getElementById("document-title");
+
+
 // ======================================
 // Citation Click Handler
 // التعامل مع النقر على إحالات المقاطع
 // ======================================
 
-if (
-    chatArea
-) {
+if (chatArea) {
 
     chatArea.addEventListener(
         "click",
-        function (
-            event
-        ) {
+        function (event) {
 
             const citation =
                 event.target.closest(
                     ".document-citation"
                 );
-
 
             if (!citation) {
 
@@ -104,12 +104,8 @@ if (
 
             }
 
-
             event.preventDefault();
-
-
             event.stopPropagation();
-
 
             const rank =
                 Number(
@@ -117,7 +113,6 @@ if (
                         "data-citation-rank"
                     )
                 );
-
 
             if (
                 !Number.isNaN(
@@ -135,9 +130,6 @@ if (
     );
 
 }
-
-const documentTitle =
-    document.getElementById("document-title");
 
 
 // ======================================
@@ -225,7 +217,7 @@ try {
         ) || [];
 
 }
-catch (e) {
+catch (error) {
 
     projects = [];
 
@@ -234,74 +226,98 @@ catch (e) {
 
 projects =
     projects
-        .filter(function (project) {
+        .filter(
+            function (
+                project
+            ) {
 
-            return (
-                project &&
-                typeof project === "object"
-            );
+                return (
+                    project &&
+                    typeof project ===
+                        "object"
+                );
 
-        })
-        .map(function (project) {
+            }
+        )
+        .map(
+            function (
+                project
+            ) {
 
-            const now =
-                new Date().toISOString();
+                const now =
+                    new Date()
+                        .toISOString();
 
-            return {
+                return {
 
-                id:
-                    project.id ||
-                    Date.now(),
+                    id:
+                        project.id ||
+                        Date.now(),
 
-                name:
-                    project.name ||
-                    "مشروع جديد",
+                    name:
+                        project.name ||
+                        "مشروع جديد",
 
-                createdAt:
-                    project.createdAt ||
-                    now,
+                    createdAt:
+                        project.createdAt ||
+                        now,
 
-                updatedAt:
-                    project.updatedAt ||
-                    now,
+                    updatedAt:
+                        project.updatedAt ||
+                        now,
 
-                documents:
-                    Array.isArray(
-                        project.documents
-                    )
-                        ? project.documents
-                        : [],
+                    documents:
+                        Array.isArray(
+                            project.documents
+                        )
+                            ? project.documents
+                            : [],
 
-                references:
-                    Array.isArray(
-                        project.references
-                    )
-                        ? project.references
-                        : [],
+                    references:
+                        Array.isArray(
+                            project.references
+                        )
+                            ? project.references
+                            : [],
 
-                chatIds:
-                    Array.isArray(
-                        project.chatIds
-                    )
-                        ? project.chatIds
-                        : [],
+                    chatIds:
+                        Array.isArray(
+                            project.chatIds
+                        )
+                            ? project.chatIds
+                            : [],
 
-                settings:
-                    project.settings &&
-                    typeof project.settings === "object"
-                        ? project.settings
-                        : {
-                            citationStyle: "",
-                            notes: ""
-                        }
+                    settings:
+                        project.settings &&
+                        typeof project.settings ===
+                            "object"
+                            ? project.settings
+                            : {
+                                citationStyle: "",
+                                notes: ""
+                            }
 
-            };
+                };
 
-        });
+            }
+        );
 
 
-let currentProject = null;
-let currentDocument = null;
+let currentProject =
+    null;
+
+let currentDocument =
+    null;
+
+
+// ======================================
+// Citation Sources
+// مصادر الإحالات الحالية
+// ======================================
+
+let currentCitationSources =
+    [];
+
 
 // ======================================
 // Orama Retrieval Cache
@@ -313,6 +329,11 @@ let oramaRetrievalDb =
 
 let oramaRetrievalCacheKey =
     "";
+
+let oramaRetrievalRecords =
+    [];
+
+
 // ======================================
 // Documents System
 // ======================================
@@ -331,52 +352,64 @@ try {
 
     documents =
         documents
-            .filter(function (documentItem) {
-
-                return (
-                    documentItem &&
-                    typeof documentItem === "object"
-                );
-
-            })
-            .map(function (documentItem) {
-
-                if (
-                    typeof documentItem.indexTokenCount !==
-                    "number"
+            .filter(
+                function (
+                    documentItem
                 ) {
 
-                    documentItem.indexTokenCount =
-                        0;
+                    return (
+                        documentItem &&
+                        typeof documentItem ===
+                            "object"
+                    );
 
                 }
-
-                if (
-                    typeof documentItem.indexUniqueTerms !==
-                    "number"
+            )
+            .map(
+                function (
+                    documentItem
                 ) {
 
-                    documentItem.indexUniqueTerms =
-                        0;
+                    if (
+                        typeof documentItem.indexTokenCount !==
+                            "number"
+                    ) {
+
+                        documentItem.indexTokenCount =
+                            0;
+
+                    }
+
+
+                    if (
+                        typeof documentItem.indexUniqueTerms !==
+                            "number"
+                    ) {
+
+                        documentItem.indexUniqueTerms =
+                            0;
+
+                    }
+
+
+                    if (
+                        typeof documentItem.indexUniqueFamilies !==
+                            "number"
+                    ) {
+
+                        documentItem.indexUniqueFamilies =
+                            0;
+
+                    }
+
+
+                    return documentItem;
 
                 }
-
-                if (
-                    typeof documentItem.indexUniqueFamilies !==
-                    "number"
-                ) {
-
-                    documentItem.indexUniqueFamilies =
-                        0;
-
-                }
-
-                return documentItem;
-
-            });
+            );
 
 }
-catch (e) {
+catch (error) {
 
     documents = [];
 
@@ -391,10 +424,13 @@ function saveDocuments() {
 
     localStorage.setItem(
         "WORD_AI_DOCUMENTS",
-        JSON.stringify(documents)
+        JSON.stringify(
+            documents
+        )
     );
 
 }
+
 
 saveDocuments();
 
@@ -424,8 +460,8 @@ const DOCUMENT_STRUCTURE_STORE_NAME =
 
 // ======================================
 // Version of indexing algorithm
-// مهم: تغييره يجبر المستندات القديمة
-// على إعادة الفهرسة بالخوارزمية الجديدة
+// مهم: تغييره يجبر الفهرس القديم
+// على إعادة البناء
 // ======================================
 
 const INDEX_SCHEMA_VERSION =
@@ -459,10 +495,9 @@ function openDocumentDatabase() {
 
 
                     if (
-                        !db.objectStoreNames
-                            .contains(
-                                DOCUMENT_STORE_NAME
-                            )
+                        !db.objectStoreNames.contains(
+                            DOCUMENT_STORE_NAME
+                        )
                     ) {
 
                         db.createObjectStore(
@@ -473,10 +508,9 @@ function openDocumentDatabase() {
 
 
                     if (
-                        !db.objectStoreNames
-                            .contains(
-                                DOCUMENT_INDEX_STORE_NAME
-                            )
+                        !db.objectStoreNames.contains(
+                            DOCUMENT_INDEX_STORE_NAME
+                        )
                     ) {
 
                         db.createObjectStore(
@@ -487,10 +521,9 @@ function openDocumentDatabase() {
 
 
                     if (
-                        !db.objectStoreNames
-                            .contains(
-                                DOCUMENT_TEXT_STORE_NAME
-                            )
+                        !db.objectStoreNames.contains(
+                            DOCUMENT_TEXT_STORE_NAME
+                        )
                     ) {
 
                         db.createObjectStore(
@@ -501,10 +534,9 @@ function openDocumentDatabase() {
 
 
                     if (
-                        !db.objectStoreNames
-                            .contains(
-                                DOCUMENT_STRUCTURE_STORE_NAME
-                            )
+                        !db.objectStoreNames.contains(
+                            DOCUMENT_STRUCTURE_STORE_NAME
+                        )
                     ) {
 
                         db.createObjectStore(
@@ -566,10 +598,12 @@ async function saveWorkingWordFile(
                     "readwrite"
                 );
 
+
             const store =
                 transaction.objectStore(
                     DOCUMENT_STORE_NAME
                 );
+
 
             const request =
                 store.put(
@@ -635,10 +669,12 @@ async function getWorkingWordFile(
                     "readonly"
                 );
 
+
             const store =
                 transaction.objectStore(
                     DOCUMENT_STORE_NAME
                 );
+
 
             const request =
                 store.get(
@@ -704,10 +740,12 @@ async function deleteWorkingWordFile(
                     "readwrite"
                 );
 
+
             const store =
                 transaction.objectStore(
                     DOCUMENT_STORE_NAME
                 );
+
 
             const request =
                 store.delete(
@@ -750,7 +788,9 @@ async function deleteWorkingWordFile(
 // Convert Blob/File to Base64
 // ======================================
 
-function fileToBase64(file) {
+function fileToBase64(
+    file
+) {
 
     return new Promise(
         function (
@@ -767,15 +807,20 @@ function fileToBase64(file) {
 
                     const result =
                         String(
-                            reader.result || ""
+                            reader.result ||
+                            ""
                         );
 
+
                     const commaIndex =
-                        result.indexOf(",");
+                        result.indexOf(
+                            ","
+                        );
 
 
                     if (
-                        commaIndex === -1
+                        commaIndex ===
+                            -1
                     ) {
 
                         reject(
@@ -791,7 +836,8 @@ function fileToBase64(file) {
 
                     resolve(
                         result.substring(
-                            commaIndex + 1
+                            commaIndex +
+                            1
                         )
                     );
 
@@ -832,7 +878,8 @@ function createDocument(
 ) {
 
     const now =
-        new Date().toISOString();
+        new Date()
+            .toISOString();
 
 
     const documentId =
@@ -861,10 +908,13 @@ function createDocument(
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 
         storageId:
-            String(documentId),
+            String(
+                documentId
+            ),
 
         order:
-            typeof order === "number"
+            typeof order ===
+                "number"
                 ? order
                 : 0,
 
@@ -920,8 +970,13 @@ function updateDocumentReadStatus(
     status
 ) {
 
-    if (!documentItem)
+    if (
+        !documentItem
+    ) {
+
         return;
+
+    }
 
 
     documentItem.readStatus =
@@ -929,7 +984,8 @@ function updateDocumentReadStatus(
 
 
     documentItem.updatedAt =
-        new Date().toISOString();
+        new Date()
+            .toISOString();
 
 
     if (
@@ -938,7 +994,8 @@ function updateDocumentReadStatus(
     ) {
 
         documentItem.readAt =
-            new Date().toISOString();
+            new Date()
+                .toISOString();
 
     }
 
@@ -957,8 +1014,13 @@ function updateDocumentIndexStatus(
     status
 ) {
 
-    if (!documentItem)
+    if (
+        !documentItem
+    ) {
+
         return;
+
+    }
 
 
     documentItem.indexStatus =
@@ -966,7 +1028,8 @@ function updateDocumentIndexStatus(
 
 
     documentItem.updatedAt =
-        new Date().toISOString();
+        new Date()
+            .toISOString();
 
 
     saveDocuments();
@@ -982,28 +1045,42 @@ function getProjectDocuments(
     projectId
 ) {
 
-    if (!projectId)
+    if (
+        !projectId
+    ) {
+
         return [];
+
+    }
 
 
     return documents
-        .filter(function (documentItem) {
+        .filter(
+            function (
+                documentItem
+            ) {
 
-            return (
-                documentItem &&
-                documentItem.projectId ===
-                    projectId
-            );
+                return (
+                    documentItem &&
+                    documentItem.projectId ===
+                        projectId
+                );
 
-        })
-        .sort(function (a, b) {
+            }
+        )
+        .sort(
+            function (
+                a,
+                b
+            ) {
 
-            return (
-                a.order -
-                b.order
-            );
+                return (
+                    a.order -
+                    b.order
+                );
 
-        });
+            }
+        );
 
 }
 
@@ -1033,6 +1110,7 @@ async function saveDocumentText(
                     "readwrite"
                 );
 
+
             const store =
                 transaction.objectStore(
                     DOCUMENT_TEXT_STORE_NAME
@@ -1048,11 +1126,13 @@ async function saveDocumentText(
 
                 text:
                     String(
-                        text || ""
+                        text ||
+                        ""
                     ),
 
                 updatedAt:
-                    new Date().toISOString()
+                    new Date()
+                        .toISOString()
 
             };
 
@@ -1123,6 +1203,7 @@ async function getDocumentText(
                     "readonly"
                 );
 
+
             const store =
                 transaction.objectStore(
                     DOCUMENT_TEXT_STORE_NAME
@@ -1180,7 +1261,8 @@ function normalizeSearchText(
 ) {
 
     return String(
-        text || ""
+        text ||
+        ""
     )
 
         // إزالة التشكيل
@@ -1207,7 +1289,7 @@ function normalizeSearchText(
             "ي"
         )
 
-        // توحيد بعض أشكال الهمزة
+        // توحيد الهمزة
         .replace(
             /ؤ/g,
             "و"
@@ -1232,7 +1314,6 @@ function normalizeSearchText(
 
 // ======================================
 // Tokenize Document Text
-// تعريف واحد فقط
 // ======================================
 
 function tokenizeDocumentText(
@@ -1252,18 +1333,16 @@ function tokenizeDocumentText(
 
 
     return (
-        matches || []
+        matches ||
+        []
     );
 
 }
 
 
-
 // ======================================
 // Conservative Family Key
 // مفتاح عائلة الكلمة
-// يعتمد على الأصل اللغوي المحافظ
-// مع إزالة السوابق واللواحق المحددة فقط
 // ======================================
 
 function getConservativeFamilyKey(
@@ -1277,16 +1356,14 @@ function getConservativeFamilyKey(
         );
 
 
-    if (!w) {
+    if (
+        !w
+    ) {
 
         return "";
 
     }
 
-
-    // ==================================
-    // تنظيف الرموز
-    // ==================================
 
     w =
         w.replace(
@@ -1295,29 +1372,24 @@ function getConservativeFamilyKey(
         );
 
 
-    if (!w) {
+    if (
+        !w
+    ) {
 
         return "";
 
     }
 
 
-    // ==================================
-    // الكلمات القصيرة
-    // ==================================
-
     if (
-        w.length <= 3
+        w.length <=
+        3
     ) {
 
         return w;
 
     }
 
-
-    // ==================================
-    // كلمات محمية
-    // ==================================
 
     const protectedWords =
         new Set([
@@ -1342,11 +1414,6 @@ function getConservativeFamilyKey(
     }
 
 
-    // ==================================
-    // السوابق
-    // من الأطول إلى الأقصر
-    // ==================================
-
     const prefixes = [
 
         "وال",
@@ -1368,11 +1435,6 @@ function getConservativeFamilyKey(
 
     ];
 
-
-    // ==================================
-    // اللواحق
-    // من الأكثر تحديدًا إلى الأقصر
-    // ==================================
 
     const suffixes = [
 
@@ -1405,18 +1467,9 @@ function getConservativeFamilyKey(
     ];
 
 
-    // ==================================
-    // حماية الحد الأدنى
-    // ==================================
+    const MIN_ROOT_LENGTH =
+        3;
 
-    const MIN_ROOT_LENGTH = 3;
-
-
-    // ==================================
-    // إزالة السوابق
-    // يمكن إزالة أكثر من سابقة
-    // إذا كانت متتابعة بوضوح
-    // ==================================
 
     let prefixChanged =
         true;
@@ -1469,10 +1522,6 @@ function getConservativeFamilyKey(
 
     }
 
-
-    // ==================================
-    // إزالة اللواحق
-    // ==================================
 
     let suffixChanged =
         true;
@@ -1528,10 +1577,6 @@ function getConservativeFamilyKey(
     }
 
 
-    // ==================================
-    // الحماية النهائية
-    // ==================================
-
     if (
         w.length <
         MIN_ROOT_LENGTH
@@ -1549,24 +1594,20 @@ function getConservativeFamilyKey(
 }
 
 
-
-
-// ======================================
-// Build Document Index
-// النسخة الوحيدة المعتمدة
-// فهرسة الكلمات + العائلات + المواضع الذكية
-// ======================================
+// =====================================================
+// Legacy Document Index
+// يبقى للتوافق والإحصاءات فقط
+// وليس محرك البحث
+// =====================================================
 
 function buildDocumentIndex(
     documentId,
     text
 ) {
 
-    // ==================================
-    // التحقق من البيانات
-    // ==================================
-
-    if (!documentId) {
+    if (
+        !documentId
+    ) {
 
         throw new Error(
             "معرّف المستند غير موجود."
@@ -1574,9 +1615,10 @@ function buildDocumentIndex(
 
     }
 
+
     if (
         typeof text !==
-        "string"
+            "string"
     ) {
 
         throw new Error(
@@ -1586,27 +1628,18 @@ function buildDocumentIndex(
     }
 
 
-    // ==================================
-    // استخراج الكلمات الكلية
-    // ==================================
-
     const tokens =
         tokenizeDocumentText(
             text
         );
 
 
-    // ==================================
-    // هياكل الفهرس
-    // ==================================
+    const terms =
+        {};
 
-    const terms = {};
-    const families = {};
+    const families =
+        {};
 
-
-    // ==================================
-    // الكلمات الموجودة فعليًا
-    // ==================================
 
     const surfaceSet =
         new Set(
@@ -1614,85 +1647,73 @@ function buildDocumentIndex(
         );
 
 
-    // ==================================
-    // تقسيم النص إلى فقرات
-    // ==================================
-    // نحافظ على ترتيب الفقرات نفسه
-    // لاستخدامه لاحقًا في الاسترجاع
-    // ==================================
-
     const paragraphTexts =
-        String(text || "").split(
-            /\r\n|\r|\n/
-        );
+        String(
+            text ||
+            ""
+        )
+            .split(
+                /\r\n|\r|\n/
+            );
 
-
-    // ==================================
-    // فهرسة الكلمات
-    // ==================================
 
     let globalTokenPosition =
         0;
 
 
     paragraphTexts.forEach(
-    function (
-        paragraphText,
-        paragraphIndex
-    ) {
+        function (
+            paragraphText,
+            paragraphIndex
+        ) {
 
-        const normalizedParagraphText =
-            normalizeSearchText(
-                paragraphText
-            );
-
-
-        // ==================================
-        // استخراج الكلمات مع مواضعها الحرفية
-        // ==================================
-
-        const tokenMatches =
-            Array.from(
-                normalizedParagraphText.matchAll(
-                    /[\p{L}\p{N}]+/gu
-                )
-            );
+            const normalizedParagraphText =
+                normalizeSearchText(
+                    paragraphText
+                );
 
 
-        tokenMatches.forEach(
-            function (
-                match,
-                tokenIndex
-            ) {
-
-                const surface =
-                    match[0];
+            const tokenMatches =
+                Array.from(
+                    normalizedParagraphText.matchAll(
+                        /[\p{L}\p{N}]+/gu
+                    )
+                );
 
 
-                const charStart =
-                    typeof match.index ===
-                        "number"
+            tokenMatches.forEach(
+                function (
+                    match,
+                    tokenIndex
+                ) {
+
+                    const surface =
+                        match[0];
+
+
+                    const charStart =
+                        typeof match.index ===
+                            "number"
                             ? match.index
                             : -1;
 
 
-                const charEnd =
-                    charStart === -1
-                        ? -1
-                        : charStart +
-                          surface.length;
+                    const charEnd =
+                        charStart ===
+                            -1
+                            ? -1
+                            : charStart +
+                              surface.length;
 
 
-                    if (!surface) {
+                    if (
+                        !surface
+                    ) {
 
                         return;
 
                     }
 
-
-                    // ==================================
-                    // تحديد العائلة
-                    // ==================================
 
                     const familyKey =
                         getConservativeFamilyKey(
@@ -1700,10 +1721,6 @@ function buildDocumentIndex(
                             surfaceSet
                         );
 
-
-                    // ==================================
-                    // terms
-                    // ==================================
 
                     if (
                         !terms[surface]
@@ -1721,7 +1738,8 @@ function buildDocumentIndex(
                                 [],
 
                             family:
-                                familyKey || ""
+                                familyKey ||
+                                ""
 
                         };
 
@@ -1733,7 +1751,6 @@ function buildDocumentIndex(
                         1;
 
 
-                    // الموضع العام القديم
                     terms[surface]
                         .positions
                         .push(
@@ -1741,34 +1758,31 @@ function buildDocumentIndex(
                         );
 
 
-                    // الموضع الذكي
                     terms[surface]
-                    .occurrences
-                    .push({
+                        .occurrences
+                        .push({
 
-                        paragraphIndex:
-                            paragraphIndex,
+                            paragraphIndex:
+                                paragraphIndex,
 
-                        tokenIndex:
-                            tokenIndex,
+                            tokenIndex:
+                                tokenIndex,
 
-                        globalIndex:
-                            globalTokenPosition,
+                            globalIndex:
+                                globalTokenPosition,
 
-                        charStart:
-                            charStart,
+                            charStart:
+                                charStart,
 
-                        charEnd:
-                            charEnd
+                            charEnd:
+                                charEnd
 
-                    });
+                        });
 
 
-                    // ==================================
-                    // لا توجد عائلة
-                    // ==================================
-
-                    if (!familyKey) {
+                    if (
+                        !familyKey
+                    ) {
 
                         globalTokenPosition +=
                             1;
@@ -1778,15 +1792,15 @@ function buildDocumentIndex(
                     }
 
 
-                    // ==================================
-                    // إنشاء العائلة
-                    // ==================================
-
                     if (
-                        !families[familyKey]
+                        !families[
+                            familyKey
+                        ]
                     ) {
 
-                        families[familyKey] = {
+                        families[
+                            familyKey
+                        ] = {
 
                             count:
                                 0,
@@ -1808,84 +1822,82 @@ function buildDocumentIndex(
                     }
 
 
-                    // ==================================
-                    // العدد الكلي
-                    // ==================================
-
-                    families[familyKey]
+                    families[
+                        familyKey
+                    ]
                         .count +=
                         1;
 
 
-                    // ==================================
-                    // الموضع العام
-                    // ==================================
-
-                    families[familyKey]
+                    families[
+                        familyKey
+                    ]
                         .positions
                         .push(
                             globalTokenPosition
                         );
 
 
-                    // ==================================
-                    // الموضع الذكي
-                    // ==================================
+                    families[
+                        familyKey
+                    ]
+                        .occurrences
+                        .push({
 
-                    families[familyKey]
-                    .occurrences
-                    .push({
+                            paragraphIndex:
+                                paragraphIndex,
 
-                        paragraphIndex:
-                            paragraphIndex,
+                            tokenIndex:
+                                tokenIndex,
 
-                        tokenIndex:
-                            tokenIndex,
+                            globalIndex:
+                                globalTokenPosition,
 
-                        globalIndex:
-                            globalTokenPosition,
+                            charStart:
+                                charStart,
 
-                        charStart:
-                            charStart,
+                            charEnd:
+                                charEnd,
 
-                        charEnd:
-                            charEnd,
+                            word:
+                                surface
 
-                        word:
-                            surface
+                        });
 
-                    });
-
-
-                    // ==================================
-                    // اللفظ الأصلي
-                    // ==================================
 
                     if (
-                        !families[familyKey]
-                            .words[surface]
+                        !families[
+                            familyKey
+                        ].words[
+                            surface
+                        ]
                     ) {
 
-                        families[familyKey]
-                            .words[surface] =
+                        families[
+                            familyKey
+                        ].words[
+                            surface
+                        ] =
                             0;
 
 
-                        families[familyKey]
+                        families[
+                            familyKey
+                        ]
                             .uniqueWords +=
                             1;
 
                     }
 
 
-                    families[familyKey]
-                        .words[surface] +=
-                        1;
+                    families[
+                        familyKey
+                    ]
+                        .words[
+                            surface
+                        ] +=
+                            1;
 
-
-                    // ==================================
-                    // التالي
-                    // ==================================
 
                     globalTokenPosition +=
                         1;
@@ -1896,10 +1908,6 @@ function buildDocumentIndex(
         }
     );
 
-
-    // ==================================
-    // النتيجة النهائية
-    // ==================================
 
     return {
 
@@ -1931,7 +1939,8 @@ function buildDocumentIndex(
             families,
 
         updatedAt:
-            new Date().toISOString()
+            new Date()
+                .toISOString()
 
     };
 
@@ -1962,6 +1971,7 @@ async function saveDocumentIndex(
                     DOCUMENT_INDEX_STORE_NAME,
                     "readwrite"
                 );
+
 
             const store =
                 transaction.objectStore(
@@ -2035,6 +2045,7 @@ async function getDocumentIndex(
                     "readonly"
                 );
 
+
             const store =
                 transaction.objectStore(
                     DOCUMENT_INDEX_STORE_NAME
@@ -2092,7 +2103,9 @@ async function rebuildDocumentIndex(
     text
 ) {
 
-    if (!documentId) {
+    if (
+        !documentId
+    ) {
 
         throw new Error(
             "معرّف المستند غير موجود."
@@ -2103,7 +2116,7 @@ async function rebuildDocumentIndex(
 
     if (
         typeof text !==
-        "string"
+            "string"
     ) {
 
         throw new Error(
@@ -2159,6 +2172,17 @@ async function rebuildDocumentIndex(
     }
 
 
+    // إبطال ذاكرة Orama
+    oramaRetrievalDb =
+        null;
+
+    oramaRetrievalCacheKey =
+        "";
+
+    oramaRetrievalRecords =
+        [];
+
+
     return indexData;
 
 }
@@ -2172,7 +2196,9 @@ async function buildDocumentStructure(
     documentItem
 ) {
 
-    if (!documentItem) {
+    if (
+        !documentItem
+    ) {
 
         throw new Error(
             "لم يتم تحديد المستند."
@@ -2187,7 +2213,9 @@ async function buildDocumentStructure(
         );
 
 
-    if (!file) {
+    if (
+        !file
+    ) {
 
         throw new Error(
             "لم يتم العثور على نسخة العمل."
@@ -2370,7 +2398,8 @@ async function buildDocumentStructure(
                     tableItems,
 
                 updatedAt:
-                    new Date().toISOString()
+                    new Date()
+                        .toISOString()
 
             };
 
@@ -2404,6 +2433,7 @@ async function saveDocumentStructure(
                     DOCUMENT_STRUCTURE_STORE_NAME,
                     "readwrite"
                 );
+
 
             const store =
                 transaction.objectStore(
@@ -2476,6 +2506,7 @@ async function getDocumentStructure(
                     DOCUMENT_STRUCTURE_STORE_NAME,
                     "readonly"
                 );
+
 
             const store =
                 transaction.objectStore(
@@ -2563,6 +2594,17 @@ async function ensureDocumentStructure(
     );
 
 
+    // إبطال ذاكرة Orama
+    oramaRetrievalDb =
+        null;
+
+    oramaRetrievalCacheKey =
+        "";
+
+    oramaRetrievalRecords =
+        [];
+
+
     return structure;
 
 }
@@ -2570,15 +2612,19 @@ async function ensureDocumentStructure(
 
 // ======================================
 // Ensure Document Index
-// التأكد من أن الفهرس حديث وكامل
-// وإعادة بنائه عند الحاجة
+// ======================================
+// للتوافق والإحصاءات فقط.
+// لا يستخدم كمحرك بحث.
+//
 // ======================================
 
 async function ensureDocumentIndex(
     documentItem
 ) {
 
-    if (!documentItem) {
+    if (
+        !documentItem
+    ) {
 
         throw new Error(
             "لم يتم تحديد المستند."
@@ -2587,20 +2633,11 @@ async function ensureDocumentIndex(
     }
 
 
-    // ==================================
-    // قراءة الفهرس الحالي
-    // ==================================
-
     let index =
         await getDocumentIndex(
             documentItem.id
         );
 
-
-    // ==================================
-    // التحقق من أن الفهرس حديث
-    // وكامل بالبنية الجديدة
-    // ==================================
 
     let validIndex =
         false;
@@ -2621,10 +2658,6 @@ async function ensureDocumentIndex(
         validIndex =
             true;
 
-
-        // ----------------------------------
-        // التحقق من بنية المصطلحات
-        // ----------------------------------
 
         const termKeys =
             Object.keys(
@@ -2663,10 +2696,6 @@ async function ensureDocumentIndex(
 
         }
 
-
-        // ----------------------------------
-        // التحقق من بنية العائلات
-        // ----------------------------------
 
         if (
             validIndex
@@ -2717,10 +2746,6 @@ async function ensureDocumentIndex(
     }
 
 
-    // ==================================
-    // الفهرس صالح
-    // ==================================
-
     if (
         validIndex
     ) {
@@ -2730,15 +2755,18 @@ async function ensureDocumentIndex(
 
 
         documentItem.indexTokenCount =
-            index.tokenCount || 0;
+            index.tokenCount ||
+            0;
 
 
         documentItem.indexUniqueTerms =
-            index.uniqueTerms || 0;
+            index.uniqueTerms ||
+            0;
 
 
         documentItem.indexUniqueFamilies =
-            index.uniqueFamilies || 0;
+            index.uniqueFamilies ||
+            0;
 
 
         documentItem.indexSchemaVersion =
@@ -2746,7 +2774,8 @@ async function ensureDocumentIndex(
 
 
         documentItem.indexUpdatedAt =
-            index.updatedAt || "";
+            index.updatedAt ||
+            "";
 
 
         saveDocuments();
@@ -2756,10 +2785,6 @@ async function ensureDocumentIndex(
 
     }
 
-
-    // ==================================
-    // الفهرس قديم أو ناقص
-    // ==================================
 
     const textData =
         await getDocumentText(
@@ -2778,10 +2803,6 @@ async function ensureDocumentIndex(
     }
 
 
-    // ==================================
-    // بدء إعادة الفهرسة
-    // ==================================
-
     updateDocumentIndexStatus(
         documentItem,
         "indexing"
@@ -2790,10 +2811,6 @@ async function ensureDocumentIndex(
 
     try {
 
-        // ----------------------------------
-        // بناء الفهرس الجديد
-        // ----------------------------------
-
         index =
             await rebuildDocumentIndex(
                 documentItem.id,
@@ -2801,33 +2818,23 @@ async function ensureDocumentIndex(
             );
 
 
-        // ----------------------------------
-        // التأكد من بنية المستند
-        // ----------------------------------
-
-        await ensureDocumentStructure(
-            documentItem
-        );
-
-
-        // ----------------------------------
-        // تثبيت بيانات المستند
-        // ----------------------------------
-
         documentItem.indexStatus =
             "indexed";
 
 
         documentItem.indexTokenCount =
-            index.tokenCount || 0;
+            index.tokenCount ||
+            0;
 
 
         documentItem.indexUniqueTerms =
-            index.uniqueTerms || 0;
+            index.uniqueTerms ||
+            0;
 
 
         documentItem.indexUniqueFamilies =
-            index.uniqueFamilies || 0;
+            index.uniqueFamilies ||
+            0;
 
 
         documentItem.indexSchemaVersion =
@@ -2835,7 +2842,8 @@ async function ensureDocumentIndex(
 
 
         documentItem.indexUpdatedAt =
-            index.updatedAt || "";
+            index.updatedAt ||
+            "";
 
 
         saveDocuments();
@@ -2860,801 +2868,2180 @@ async function ensureDocumentIndex(
 
 
 // ======================================
-// Read Current Working Document
-// القراءة + الفهرسة + البنية في مسار واحد
+// Orama Retrieval Index
+// فهرس Orama الرئيسي
 // ======================================
 
-async function readCurrentWordDocument(
-    documentItem
+async function ensureOramaRetrievalIndex(
+    documentItem,
+    structureData
 ) {
 
-    if (!documentItem) {
-
-        throw new Error(
-            "لم يتم تحديد المستند."
+    const {
+        create,
+        insertMultiple
+    } =
+        require(
+            "@orama/orama"
         );
+
+
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
+
+
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+                .filter(
+                    function (
+                        heading
+                    ) {
+
+                        return (
+                            heading &&
+                            typeof heading.index !==
+                                "undefined" &&
+                            String(
+                                heading.text ||
+                                ""
+                            ).trim()
+                        );
+
+                    }
+                )
+                .sort(
+                    function (
+                        a,
+                        b
+                    ) {
+
+                        return (
+                            Number(
+                                a.index
+                            ) -
+                            Number(
+                                b.index
+                            )
+                        );
+
+                    }
+                )
+            : [];
+
+
+    const cacheKey =
+        [
+
+            String(
+                documentItem.id
+            ),
+
+            String(
+                documentItem.indexUpdatedAt ||
+                ""
+            ),
+
+            String(
+                structureData.updatedAt ||
+                ""
+            ),
+
+            String(
+                paragraphs.length
+            ),
+
+            String(
+                headings.length
+            )
+
+        ].join(
+            "|"
+        );
+
+
+    if (
+        oramaRetrievalDb &&
+        oramaRetrievalCacheKey ===
+            cacheKey &&
+        Array.isArray(
+            oramaRetrievalRecords
+        ) &&
+        oramaRetrievalRecords.length
+    ) {
+
+        return oramaRetrievalDb;
 
     }
 
 
     // ==================================
-    // حالة القراءة
+    // كل كلمات المستند
     // ==================================
 
-    updateDocumentReadStatus(
-        documentItem,
-        "reading"
-    );
+    const allTokens =
+        [];
 
 
-    try {
-
-        // ==================================
-        // التحقق من دعم Word API
-        // ==================================
-
-        if (
-            !Office.context.requirements
-                .isSetSupported(
-                    "WordApiHiddenDocument",
-                    "1.3"
-                )
+    paragraphs.forEach(
+        function (
+            paragraph
         ) {
 
-            throw new Error(
-                "إصدار Word الحالي لا يدعم قراءة نسخة العمل."
-            );
+            if (
+                paragraph &&
+                paragraph.text
+            ) {
 
-        }
-
-
-        // ==================================
-        // استرجاع نسخة العمل
-        // ==================================
-
-        const file =
-            await getWorkingWordFile(
-                documentItem.storageId
-            );
-
-
-        if (!file) {
-
-            throw new Error(
-                "لم يتم العثور على نسخة العمل."
-            );
-
-        }
-
-
-        // ==================================
-        // تحويل الملف إلى Base64
-        // ==================================
-
-        const base64 =
-            await fileToBase64(
-                file
-            );
-
-
-        // ==================================
-        // قراءة النص من مستند Word المخفي
-        // ==================================
-
-        const text =
-            await Word.run(
-                async function (
-                    context
-                ) {
-
-                    const workingDocument =
-                        context.application
-                            .createDocument(
-                                base64
-                            );
-
-
-                    const body =
-                        workingDocument.body;
-
-
-                    body.load(
-                        "text"
-                    );
-
-
-                    await context.sync();
-
-
-                    return (
-                        body.text ||
-                        ""
-                    );
-
-                }
-            );
-
-
-        // ==================================
-        // حفظ النص الخام
-        // ==================================
-
-        await saveDocumentText(
-            documentItem.id,
-            text
-        );
-
-
-        // ==================================
-        // تثبيت حالة القراءة
-        // ==================================
-
-        updateDocumentReadStatus(
-            documentItem,
-            "read"
-        );
-
-
-        // ==================================
-        // بدء الفهرسة
-        // ==================================
-
-        updateDocumentIndexStatus(
-            documentItem,
-            "indexing"
-        );
-
-
-        // ==================================
-        // بناء الفهرس الجديد مرة واحدة
-        // ==================================
-
-        const indexData =
-            await rebuildDocumentIndex(
-                documentItem.id,
-                text
-            );
-
-
-        // ======================================
-        // اختبار بحث عائلة استصلاح
-        // ======================================
-
-        const testQueries = [
-            "استصلاح",
-            "الاستصلاح",
-            "بالاستصلاح",
-            "استصلاحيا"
-        ];
-
-        console.log(
-            "======================================"
-        );
-
-        console.log(
-            "اختبار البحث في عائلة استصلاح"
-        );
-
-        console.log(
-            "======================================"
-        );
-
-        for (
-            let i = 0;
-            i < testQueries.length;
-            i++
-        ) {
-
-            const testQuery =
-                testQueries[i];
-
-            try {
-
-                const testResult =
-                    await searchIndexedDocument(
-                        documentItem.id,
-                        testQuery
-                    );
-
-                console.log(
-                    "الاستعلام:",
-                    testQuery
-                );
-
-                console.log(
-                    "عدد النتائج:",
-                    testResult.count
-                );
-
-                console.log(
-                    "العائلات المطابقة:",
-                    testResult.matchedFamilies
-                );
-
-                console.log(
-                    "عدد الظهورات المفهرسة:",
-                    testResult.indexedOccurrences
-                );
-
-                console.log(
-                    "أول 3 نتائج:",
-                    testResult.results.slice(
-                        0,
-                        3
+                allTokens.push(
+                    ...tokenizeDocumentText(
+                        paragraph.text
                     )
                 );
 
             }
-            catch (error) {
-
-                console.error(
-                    "فشل الاستعلام:",
-                    testQuery,
-                    error
-                );
-
-            }
-
-            console.log(
-                "--------------------------------------"
-            );
-
-        }
-
-        console.log(
-            "انتهى اختبار بحث عائلة استصلاح."
-        );
-
-        console.log(
-            "======================================"
-        );
-
-        // ==================================
-        // بناء بنية المستند
-        // ==================================
-
-        const structureData =
-            await buildDocumentStructure(
-                documentItem
-            );
-
-
-        await saveDocumentStructure(
-            documentItem.id,
-            structureData
-        );
-
-
-        // ==================================
-        // حفظ إحصاءات الفهرس في المستند
-        // ==================================
-
-        documentItem.indexTokenCount =
-            indexData.tokenCount || 0;
-
-
-        documentItem.indexUniqueTerms =
-            indexData.uniqueTerms || 0;
-
-
-        documentItem.indexUniqueFamilies =
-            indexData.uniqueFamilies || 0;
-
-
-        documentItem.indexSchemaVersion =
-            INDEX_SCHEMA_VERSION;
-
-
-        documentItem.indexUpdatedAt =
-            indexData.updatedAt ||
-            new Date().toISOString();
-
-
-        // ==================================
-        // تثبيت حالة الفهرسة
-        // ==================================
-
-        updateDocumentIndexStatus(
-            documentItem,
-            "indexed"
-        );
-
-
-        // ==================================
-        // سجل تشخيصي
-        // ==================================
-
-        console.log(
-            "تمت قراءة المستند وفهرسته بنجاح:",
-            {
-
-                documentId:
-                    documentItem.id,
-
-                tokenCount:
-                    indexData.tokenCount,
-
-                uniqueTerms:
-                    indexData.uniqueTerms,
-
-                uniqueFamilies:
-                    indexData.uniqueFamilies,
-
-                indexVersion:
-                    indexData.indexVersion
-
-            }
-        );
-
-        // ==================================
-        // فحص عائلة استصلاح مباشرة
-        // ==================================
-
-        const istislahFamily =
-            indexData.families &&
-            indexData.families["استصلاح"];
-
-        console.log(
-            "======================================"
-        );
-
-        console.log(
-            "عائلة استصلاح:",
-            istislahFamily
-        );
-
-        if (istislahFamily) {
-
-            console.log(
-                "عدد أفراد العائلة:",
-                istislahFamily.count
-            );
-
-            console.log(
-                "الألفاظ:",
-                istislahFamily.words
-            );
-
-            console.log(
-                "عدد الألفاظ المختلفة:",
-                istislahFamily.uniqueWords
-            );
-
-            console.log(
-                "عدد occurrences:",
-                istislahFamily.occurrences
-                    ? istislahFamily.occurrences.length
-                    : 0
-            );
-
-        }
-        else {
-
-            console.warn(
-                "❌ لم توجد عائلة استصلاح في الفهرس."
-            );
-
-        }
-
-        console.log(
-            "======================================"
-        );
-
-        // ==================================
-        // اختبار الفهرس بعد اكتمال الفهرسة
-        // ==================================
-
-        testCurrentDocumentIndex();
-
-
-        return text;
-
-    }
-    catch (error) {
-
-        // ==================================
-        // فشل القراءة أو الفهرسة
-        // ==================================
-
-        updateDocumentReadStatus(
-            documentItem,
-            "error"
-        );
-
-
-        updateDocumentIndexStatus(
-            documentItem,
-            "error"
-        );
-
-
-        console.error(
-            "فشل قراءة/فهرسة المستند:",
-            error
-        );
-
-
-        throw error;
-
-    }
-
-}
-
-
-// ======================================
-// Set Active Document
-// ======================================
-
-function setCurrentDocument(
-    documentItem
-) {
-
-    if (!documentItem) {
-
-        currentDocument =
-            null;
-
-
-        if (documentTitle) {
-
-            documentTitle.textContent =
-                "لا يوجد مستند مفتوح";
-
-        }
-
-
-        renderDocuments();
-
-
-        return;
-
-    }
-
-
-    currentDocument =
-        documentItem;
-
-
-    if (documentTitle) {
-
-        documentTitle.textContent =
-            documentItem.name;
-
-    }
-
-
-    // ==================================
-    // إذا كان النص موجودًا مسبقًا
-    // لا نعيد قراءة الملف من Word
-    // بل نتحقق من نسخة الفهرس
-    // ==================================
-
-    if (
-        documentItem.readStatus ===
-        "read"
-    ) {
-
-        ensureDocumentIndex(
-            documentItem
-        )
-        .then(
-            function () {
-
-                renderDocuments();
-
-            }
-        )
-        .catch(
-            function (error) {
-
-                console.error(
-                    "تعذر تحديث فهرس المستند:",
-                    error
-                );
-
-                renderDocuments();
-
-            }
-        );
-
-
-        renderDocuments();
-
-
-        return;
-
-    }
-
-
-    // ==================================
-    // المستند جديد
-    // ==================================
-
-    readCurrentWordDocument(
-        documentItem
-    )
-    .then(
-        function (text) {
-
-            console.log(
-                "محتوى نسخة العمل:",
-                text
-            );
-
-            renderDocuments();
-
-        }
-    )
-    .catch(
-        function (error) {
-
-            console.error(
-                "تعذر قراءة نسخة العمل:",
-                error
-            );
-
-            renderDocuments();
 
         }
     );
 
 
-    renderDocuments();
-
-}
-
-
-// ======================================
-// Update Document Timestamp
-// ======================================
-
-function touchDocument(
-    documentItem
-) {
-
-    if (!documentItem)
-        return;
-
-
-    documentItem.updatedAt =
-        new Date().toISOString();
-
-}
-
-
-// ======================================
-// Attach Document To Project
-// ======================================
-
-function attachDocumentToProject(
-    project,
-    documentItem
-) {
-
-    if (
-        !project ||
-        !documentItem
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        !Array.isArray(
-            project.documents
-        )
-    ) {
-
-        project.documents =
-            [];
-
-    }
-
-
-    if (
-        !project.documents.includes(
-            documentItem.id
-        )
-    ) {
-
-        project.documents.push(
-            documentItem.id
+    const surfaceSet =
+        new Set(
+            allTokens
         );
 
 
-        project.updatedAt =
-            new Date().toISOString();
+    // ==================================
+    // مستوى العنوان
+    // ==================================
+
+    function getHeadingLevel(
+        style
+    ) {
+
+        const match =
+            String(
+                style ||
+                ""
+            ).match(
+                /Heading\s*([1-9])/i
+            );
 
 
-        saveProjects();
-
-    }
-
-}
-
-
-// ======================================
-// Set Active Project
-// ======================================
-
-function setCurrentProject(
-    project
-) {
-
-    if (!project) {
-
-        currentProject =
-            null;
-
-
-        renderDocuments();
-
-
-        return;
+        return (
+            match
+                ? Number(
+                    match[1]
+                )
+                : 9
+        );
 
     }
 
 
-    currentProject =
-        project;
+    // ==================================
+    // أقرب عنوان
+    // ==================================
+
+    function getNearestHeading(
+        paragraphIndex
+    ) {
+
+        for (
+            let i =
+                headings.length - 1;
+
+            i >= 0;
+
+            i--
+        ) {
+
+            const heading =
+                headings[i];
 
 
-    renderDocuments();
+            if (
+                Number(
+                    heading.index
+                ) <
+                Number(
+                    paragraphIndex
+                )
+            ) {
 
-}
+                return heading;
 
+            }
 
-// ======================================
-// Add Document
-// ======================================
-
-if (
-    addDocumentBtn &&
-    wordDocumentPicker
-) {
-
-    addDocumentBtn.onclick =
-        function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
+        }
 
 
-            if (!currentProject) {
+        return null;
 
-                if (documentsList) {
+    }
 
-                    documentsList.innerHTML = `
-                        <div class="empty-document">
-                            اختر مشروعًا أولًا لإضافة مستند
-                        </div>
-                    `;
+
+    // ==================================
+    // أقرب عنوان رئيسي
+    // Heading 1–3
+    // ==================================
+
+    function getMajorHeading(
+        paragraphIndex
+    ) {
+
+        for (
+            let i =
+                headings.length - 1;
+
+            i >= 0;
+
+            i--
+        ) {
+
+            const heading =
+                headings[i];
+
+
+            if (
+                Number(
+                    heading.index
+                ) <
+                Number(
+                    paragraphIndex
+                ) &&
+                getHeadingLevel(
+                    heading.style
+                ) <=
+                    3
+            ) {
+
+                return heading;
+
+            }
+
+        }
+
+
+        return null;
+
+    }
+
+
+    // ==================================
+    // نهاية القسم
+    // يتوقف عند عنوان من نفس المستوى
+    // أو مستوى أعلى
+    // ==================================
+
+    function getSectionEnd(
+        headingIndex,
+        level
+    ) {
+
+        let endIndex =
+            paragraphs.length -
+            1;
+
+
+        for (
+            let i = 0;
+            i < headings.length;
+            i++
+        ) {
+
+            const heading =
+                headings[i];
+
+
+            const index =
+                Number(
+                    heading.index
+                );
+
+
+            if (
+                index <=
+                Number(
+                    headingIndex
+                )
+            ) {
+
+                continue;
+
+            }
+
+
+            if (
+                getHeadingLevel(
+                    heading.style
+                ) <=
+                    level
+            ) {
+
+                endIndex =
+                    index -
+                    1;
+
+                break;
+
+            }
+
+        }
+
+
+        return endIndex;
+
+    }
+
+
+    // ==================================
+    // نص العائلات
+    // ==================================
+
+    function buildFamilyText(
+        text
+    ) {
+
+        const tokens =
+            tokenizeDocumentText(
+                text
+            );
+
+
+        const familyTokens =
+            [];
+
+
+        tokens.forEach(
+            function (
+                token
+            ) {
+
+                const family =
+                    getConservativeFamilyKey(
+                        token,
+                        surfaceSet
+                    );
+
+
+                if (
+                    family
+                ) {
+
+                    familyTokens.push(
+                        family
+                    );
 
                 }
+
+            }
+        );
+
+
+        return familyTokens.join(
+            " "
+        );
+
+    }
+
+
+    // ==================================
+    // السجلات
+    // ==================================
+
+    const records =
+        [];
+
+
+    paragraphs.forEach(
+        function (
+            paragraph
+        ) {
+
+            if (
+                !paragraph
+            ) {
 
                 return;
 
             }
 
 
-            wordDocumentPicker.value =
-                "";
+            const text =
+                String(
+                    paragraph.text ||
+                    ""
+                ).trim();
 
 
-            wordDocumentPicker.click();
+            if (
+                !text
+            ) {
+
+                return;
+
+            }
+
+
+            const paragraphIndex =
+                Number(
+                    paragraph.index
+                );
+
+
+            const nearestHeading =
+                getNearestHeading(
+                    paragraphIndex
+                );
+
+
+            const majorHeading =
+                getMajorHeading(
+                    paragraphIndex
+                );
+
+
+            const majorHeadingLevel =
+                majorHeading
+                    ? getHeadingLevel(
+                        majorHeading.style
+                    )
+                    : 9;
+
+
+            const sectionEnd =
+                majorHeading
+                    ? getSectionEnd(
+                        majorHeading.index,
+                        majorHeadingLevel
+                    )
+                    : paragraphs.length -
+                        1;
+
+
+            records.push({
+
+                id:
+                    "p-" +
+                    String(
+                        paragraphIndex
+                    ),
+
+                paragraphIndex:
+                    paragraphIndex,
+
+                text:
+                    text,
+
+                heading:
+                    nearestHeading
+                        ? String(
+                            nearestHeading.text ||
+                            ""
+                        ).trim()
+                        : "",
+
+                headingIndex:
+                    nearestHeading
+                        ? Number(
+                            nearestHeading.index
+                        )
+                        : -1,
+
+                headingLevel:
+                    nearestHeading
+                        ? getHeadingLevel(
+                            nearestHeading.style
+                        )
+                        : 9,
+
+                majorHeading:
+                    majorHeading
+                        ? String(
+                            majorHeading.text ||
+                            ""
+                        ).trim()
+                        : "",
+
+                majorHeadingIndex:
+                    majorHeading
+                        ? Number(
+                            majorHeading.index
+                        )
+                        : -1,
+
+                majorHeadingLevel:
+                    majorHeadingLevel,
+
+                sectionEnd:
+                    sectionEnd,
+
+                familyText:
+                    buildFamilyText(
+                        text
+                    ),
+
+                isHeading:
+                    Boolean(
+                        nearestHeading &&
+                        Number(
+                            nearestHeading.index
+                        ) ===
+                        paragraphIndex
+                    )
+
+            });
+
+        }
+    );
+
+
+    // ==================================
+    // إنشاء قاعدة Orama
+    // ==================================
+
+    const db =
+        create({
+
+            schema: {
+
+                id:
+                    "string",
+
+                paragraphIndex:
+                    "number",
+
+                text:
+                    "string",
+
+                heading:
+                    "string",
+
+                headingIndex:
+                    "number",
+
+                headingLevel:
+                    "number",
+
+                majorHeading:
+                    "string",
+
+                majorHeadingIndex:
+                    "number",
+
+                majorHeadingLevel:
+                    "number",
+
+                sectionEnd:
+                    "number",
+
+                familyText:
+                    "string",
+
+                isHeading:
+                    "boolean"
+
+            },
+
+            language:
+                "arabic"
+
+        });
+
+
+    // ==================================
+    // الإدخال في دفعة واحدة
+    // ==================================
+
+    if (
+        records.length >
+        0
+    ) {
+
+        insertMultiple(
+            db,
+            records,
+            500
+        );
+
+    }
+
+
+    // ==================================
+    // حفظ الذاكرة
+    // ==================================
+
+    oramaRetrievalDb =
+        db;
+
+
+    oramaRetrievalCacheKey =
+        cacheKey;
+
+
+    oramaRetrievalRecords =
+        records;
+
+
+    console.log(
+        "تم بناء فهرس Orama:",
+        records.length,
+        "فقرة"
+    );
+
+
+    return db;
+
+}
+
+
+// =====================================================
+// Search Indexed Document
+// البحث الجديد بالكامل باستخدام Orama
+// =====================================================
+
+async function searchIndexedDocument(
+    documentId,
+    query,
+    options
+) {
+
+    const searchTerm =
+        normalizeSearchText(
+            query
+        );
+
+
+    if (
+        !searchTerm
+    ) {
+
+        return {
+
+            query:
+                "",
+
+            count:
+                0,
+
+            results:
+                [],
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            totalQueryTerms:
+                0,
+
+            indexedOccurrences:
+                0
 
         };
 
+    }
 
-    wordDocumentPicker.onchange =
-        async function () {
+
+    const documentItem =
+        documents.find(
+            function (
+                doc
+            ) {
+
+                return (
+                    doc &&
+                    String(
+                        doc.id
+                    ) ===
+                    String(
+                        documentId
+                    )
+                );
+
+            }
+        ) ||
+        currentDocument;
+
+
+    if (
+        !documentItem
+    ) {
+
+        throw new Error(
+            "لم يتم العثور على المستند."
+        );
+
+    }
+
+
+    const structureData =
+        await ensureDocumentStructure(
+            documentItem
+        );
+
+
+    if (
+        !structureData
+    ) {
+
+        throw new Error(
+            "لا توجد بنية محفوظة لهذا المستند."
+        );
+
+    }
+
+
+    const db =
+        await ensureOramaRetrievalIndex(
+            documentItem,
+            structureData
+        );
+
+
+    const {
+        search
+    } =
+        require(
+            "@orama/orama"
+        );
+
+
+    // ==================================
+    // كلمات السؤال
+    // ==================================
+
+    const queryTokens =
+        getSearchQueryTokens(
+            searchTerm
+        );
+
+
+    // ==================================
+    // العائلات المطلوبة
+    // ==================================
+
+    const surfaceSet =
+        new Set();
+
+
+    oramaRetrievalRecords.forEach(
+        function (
+            record
+        ) {
+
+            tokenizeDocumentText(
+                record.text
+            ).forEach(
+                function (
+                    token
+                ) {
+
+                    surfaceSet.add(
+                        token
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+    const queryFamilies =
+        [];
+
+
+    queryTokens.forEach(
+        function (
+            token
+        ) {
+
+            const family =
+                getConservativeFamilyKey(
+                    token,
+                    surfaceSet
+                );
+
+
+            if (
+                family &&
+                !queryFamilies.includes(
+                    family
+                )
+            ) {
+
+                queryFamilies.push(
+                    family
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // إنشاء استعلامات Orama
+    // ==================================
+    // لا نرسل السؤال الطويل فقط.
+    // نستخدم أيضًا الكلمات المهمة والعائلات.
+    // ==================================
+
+    const searchTerms =
+        [
+            searchTerm,
+            ...queryTokens,
+            ...queryFamilies
+        ]
+            .filter(
+                function (
+                    value,
+                    index,
+                    array
+                ) {
+
+                    return (
+                        value &&
+                        array.indexOf(
+                            value
+                        ) ===
+                        index
+                    );
+
+                }
+            );
+
+
+    const resultMap =
+        new Map();
+
+
+    searchTerms.forEach(
+        function (
+            term
+        ) {
+
+            let result;
+
 
             try {
 
-                const file =
-                    wordDocumentPicker.files &&
-                    wordDocumentPicker.files[0];
+                result =
+                    search(
+                        db,
+                        {
 
+                            term:
+                                term,
 
-                if (!file)
-                    return;
+                            properties: [
 
+                                "text",
+                                "heading",
+                                "majorHeading",
+                                "familyText"
 
-                if (
-                    !/\.docx$/i.test(
-                        file.name
-                    )
-                ) {
+                            ],
 
-                    console.warn(
-                        "الملف المختار ليس DOCX."
+                            boost: {
+
+                                heading:
+                                    8,
+
+                                majorHeading:
+                                    7,
+
+                                familyText:
+                                    3,
+
+                                text:
+                                    1
+
+                            },
+
+                            tolerance:
+                                2,
+
+                            limit:
+                                50
+
+                        }
                     );
-
-                    return;
-
-                }
-
-
-                if (!currentProject)
-                    return;
-
-
-                const projectDocuments =
-                    getProjectDocuments(
-                        currentProject.id
-                    );
-
-
-                const nextOrder =
-                    projectDocuments.length + 1;
-
-
-                const documentItem =
-                    createDocument(
-                        file,
-                        currentProject.id,
-                        nextOrder
-                    );
-
-
-                await saveWorkingWordFile(
-                    documentItem.storageId,
-                    file
-                );
-
-
-                attachDocumentToProject(
-                    currentProject,
-                    documentItem
-                );
-
-
-                setCurrentDocument(
-                    documentItem
-                );
-
-
-                renderDocuments();
-
-
-                console.log(
-                    "تم استيراد مستند Word:",
-                    {
-                        name:
-                            documentItem.name,
-
-                        fileName:
-                            documentItem.fileName,
-
-                        storageId:
-                            documentItem.storageId
-                    }
-                );
 
             }
             catch (error) {
 
-                console.error(
-                    "فشل استيراد مستند Word:",
+                console.warn(
+                    "فشل استعلام Orama:",
+                    term,
                     error
                 );
 
+                return;
 
-                if (documentsList) {
+            }
 
-                    documentsList.innerHTML = `
-                        <div class="empty-document">
-                            تعذر استيراد المستند
-                        </div>
-                    `;
+
+            if (
+                !result ||
+                !Array.isArray(
+                    result.hits
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            result.hits.forEach(
+                function (
+                    hit
+                ) {
+
+                    if (
+                        !hit ||
+                        !hit.document
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    const index =
+                        Number(
+                            hit.document
+                                .paragraphIndex
+                        );
+
+
+                    if (
+                        !resultMap.has(
+                            index
+                        )
+                    ) {
+
+                        resultMap.set(
+                            index,
+                            {
+
+                                document:
+                                    hit.document,
+
+                                score:
+                                    0,
+
+                                bestScore:
+                                    0,
+
+                                matchedTerms:
+                                    new Set()
+
+                            }
+                        );
+
+                    }
+
+
+                    const entry =
+                        resultMap.get(
+                            index
+                        );
+
+
+                    const hitScore =
+                        Number(
+                            hit.score ||
+                            0
+                        );
+
+
+                    entry.score +=
+                        hitScore;
+
+
+                    entry.bestScore =
+                        Math.max(
+                            entry.bestScore,
+                            hitScore
+                        );
+
+
+                    entry.matchedTerms.add(
+                        term
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+    if (
+        resultMap.size ===
+        0
+    ) {
+
+        return {
+
+            query:
+                searchTerm,
+
+            count:
+                0,
+
+            results:
+                [],
+
+            matchedTerms:
+                queryTokens,
+
+            matchedFamilies:
+                queryFamilies,
+
+            totalQueryTerms:
+                queryTokens.length,
+
+            indexedOccurrences:
+                0
+
+        };
+
+    }
+
+
+    // ==================================
+    // خريطة الفقرات
+    // ==================================
+
+    const paragraphMap =
+        new Map();
+
+
+    oramaRetrievalRecords.forEach(
+        function (
+            record
+        ) {
+
+            paragraphMap.set(
+                Number(
+                    record.paragraphIndex
+                ),
+                record
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // قوة العنوان
+    // ==================================
+
+    function calculateHeadingScore(
+        heading
+    ) {
+
+        const normalizedHeading =
+            normalizeSearchText(
+                heading
+            );
+
+
+        if (
+            !normalizedHeading
+        ) {
+
+            return 0;
+
+        }
+
+
+        let score =
+            0;
+
+
+        // ==================================
+        // تطابق العبارة نفسها
+        // ==================================
+
+        if (
+            normalizedHeading.includes(
+                searchTerm
+            )
+        ) {
+
+            score +=
+                60;
+
+        }
+
+
+        // ==================================
+        // العائلات
+        // ==================================
+
+        const headingTokens =
+            getSearchQueryTokens(
+                normalizedHeading
+            );
+
+
+        const headingFamilies =
+            new Set();
+
+
+        headingTokens.forEach(
+            function (
+                token
+            ) {
+
+                const family =
+                    getConservativeFamilyKey(
+                        token,
+                        surfaceSet
+                    );
+
+
+                if (
+                    family
+                ) {
+
+                    headingFamilies.add(
+                        family
+                    );
+
+                }
+
+            }
+        );
+
+
+        let matchedFamilies =
+            0;
+
+
+        queryFamilies.forEach(
+            function (
+                family
+            ) {
+
+                if (
+                    headingFamilies.has(
+                        family
+                    )
+                ) {
+
+                    matchedFamilies +=
+                        1;
+
+                }
+
+            }
+        );
+
+
+        if (
+            queryFamilies.length >
+            0
+        ) {
+
+            score +=
+                (
+                    matchedFamilies /
+                    queryFamilies.length
+                ) *
+                35;
+
+        }
+
+
+        // ==================================
+        // أولوية المطلب/المبحث
+        // ==================================
+
+        if (
+            /المطلب|المبحث|الفصل|الباب/
+                .test(
+                    normalizedHeading
+                )
+        ) {
+
+            score +=
+                8;
+
+        }
+
+
+        // ==================================
+        // العناوين الجزئية
+        // ==================================
+
+        if (
+            /^اولا|^أولا|^ثانيا|^ثالثا|^رابعا|^خامسا/
+                .test(
+                    normalizedHeading
+                )
+        ) {
+
+            score -=
+                3;
+
+        }
+
+
+        return score;
+
+    }
+
+
+    // ==================================
+    // اكتشاف الأقسام
+    // ==================================
+
+    const sectionMap =
+        new Map();
+
+
+    resultMap.forEach(
+        function (
+            entry
+        ) {
+
+            const record =
+                entry.document;
+
+
+            const sectionIndex =
+                Number(
+                    record.majorHeadingIndex
+                );
+
+
+            if (
+                sectionIndex <
+                0
+            ) {
+
+                return;
+
+            }
+
+
+            const score =
+                calculateHeadingScore(
+                    record.majorHeading
+                );
+
+
+            const old =
+                sectionMap.get(
+                    sectionIndex
+                );
+
+
+            if (
+                !old ||
+                score >
+                    old.score
+            ) {
+
+                sectionMap.set(
+                    sectionIndex,
+                    {
+
+                        score:
+                            score,
+
+                        heading:
+                            record.majorHeading,
+
+                        headingIndex:
+                            record.majorHeadingIndex,
+
+                        sectionEnd:
+                            record.sectionEnd,
+
+                        level:
+                            record.majorHeadingLevel
+
+                    }
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // الأقسام ذات الصلة
+    // ==================================
+
+    const prioritySections =
+        Array.from(
+            sectionMap.entries()
+        )
+            .filter(
+                function (
+                    entry
+                ) {
+
+                    return (
+                        entry[1].score >=
+                        12
+                    );
+
+                }
+            )
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    return (
+                        b[1].score -
+                        a[1].score
+                    );
+
+                }
+            )
+            .slice(
+                0,
+                3
+            );
+
+
+    const prioritySectionMap =
+        new Map(
+            prioritySections
+        );
+
+
+    // ==================================
+    // إنشاء النتائج الأساسية
+    // ==================================
+
+    const rankedMap =
+        new Map();
+
+
+    resultMap.forEach(
+        function (
+            entry,
+            paragraphIndex
+        ) {
+
+            const record =
+                entry.document;
+
+
+            let score =
+                entry.score;
+
+
+            const normalizedText =
+                normalizeSearchText(
+                    record.text
+                );
+
+
+            const exactPhrase =
+                normalizedText.includes(
+                    searchTerm
+                );
+
+
+            const headingScore =
+                calculateHeadingScore(
+                    record.heading
+                );
+
+
+            const majorHeadingScore =
+                calculateHeadingScore(
+                    record.majorHeading
+                );
+
+
+            if (
+                exactPhrase
+            ) {
+
+                score +=
+                    35;
+
+            }
+
+
+            score +=
+                headingScore;
+
+
+            score +=
+                majorHeadingScore;
+
+
+            // ==================================
+            // تغطية كلمات السؤال
+            // ==================================
+
+            let matchedTermsCount =
+                0;
+
+
+            queryTokens.forEach(
+                function (
+                    token
+                ) {
+
+                    if (
+                        normalizedText.includes(
+                            token
+                        )
+                    ) {
+
+                        matchedTermsCount +=
+                            1;
+
+                    }
+
+                }
+            );
+
+
+            const coverage =
+                queryTokens.length >
+                0
+                    ? matchedTermsCount /
+                      queryTokens.length
+                    : 0;
+
+
+            score +=
+                coverage *
+                15;
+
+
+            // ==================================
+            // أولوية القسم
+            // ==================================
+
+            const sectionIndex =
+                Number(
+                    record.majorHeadingIndex
+                );
+
+
+            const prioritySection =
+                prioritySectionMap.get(
+                    sectionIndex
+                );
+
+
+            if (
+                prioritySection
+            ) {
+
+                score +=
+                    30 +
+                    prioritySection.score;
+
+            }
+
+
+            // ==================================
+            // تخفيض المقدمة والمنهج
+            // عندما يوجد قسم حقيقي قوي
+            // ==================================
+
+            if (
+                prioritySections.length >
+                0
+            ) {
+
+                const sectionHeading =
+                    normalizeSearchText(
+                        record.majorHeading ||
+                        ""
+                    );
+
+
+                if (
+                    sectionHeading ===
+                        "مقدمة" ||
+                    sectionHeading.includes(
+                        "مشكلة الدراسة"
+                    ) ||
+                    sectionHeading.includes(
+                        "اهداف الدراسة"
+                    ) ||
+                    sectionHeading.includes(
+                        "أهداف الدراسة"
+                    ) ||
+                    sectionHeading.includes(
+                        "منهج الدراسة"
+                    ) ||
+                    sectionHeading.includes(
+                        "اسئلة الدراسة"
+                    ) ||
+                    sectionHeading.includes(
+                        "أسئلة الدراسة"
+                    )
+                ) {
+
+                    score -=
+                        30;
 
                 }
 
             }
 
-        };
+
+            // ==================================
+            // نوع المطابقة
+            // ==================================
+
+            let matchType =
+                "orama";
+
+
+            if (
+                majorHeadingScore >=
+                12 ||
+                headingScore >=
+                12
+            ) {
+
+                matchType =
+                    "heading";
+
+            }
+            else if (
+                exactPhrase
+            ) {
+
+                matchType =
+                    "exact";
+
+            }
+            else if (
+                matchedTermsCount >
+                0
+            ) {
+
+                matchType =
+                    "term";
+
+            }
+
+
+            // ==================================
+            // موضع النص
+            // ==================================
+
+            let context =
+                record.text;
+
+
+            const exactPosition =
+                normalizedText.indexOf(
+                    searchTerm
+                );
+
+
+            if (
+                exactPosition >=
+                0
+            ) {
+
+                const contextStart =
+                    Math.max(
+                        0,
+                        exactPosition -
+                        120
+                    );
+
+
+                const contextEnd =
+                    Math.min(
+                        record.text.length,
+                        exactPosition +
+                        searchTerm.length +
+                        300
+                    );
+
+
+                context =
+                    record.text.substring(
+                        contextStart,
+                        contextEnd
+                    );
+
+            }
+            else {
+
+                context =
+                    record.text.substring(
+                        0,
+                        420
+                    );
+
+            }
+
+
+            const previous =
+                paragraphMap.get(
+                    paragraphIndex -
+                    1
+                );
+
+
+            const next =
+                paragraphMap.get(
+                    paragraphIndex +
+                    1
+                );
+
+
+            rankedMap.set(
+                paragraphIndex,
+                {
+
+                    paragraphIndex:
+                        paragraphIndex,
+
+                    paragraphId:
+                        record.id,
+
+                    text:
+                        record.text,
+
+                    context:
+                        context,
+
+                    heading:
+                        record.heading ||
+                        "",
+
+                    headingLevel:
+                        record.headingLevel,
+
+                    majorHeading:
+                        record.majorHeading ||
+                        "",
+
+                    majorHeadingIndex:
+                        record.majorHeadingIndex,
+
+                    sectionEnd:
+                        record.sectionEnd,
+
+                    previousParagraphText:
+                        previous
+                            ? previous.text
+                            : "",
+
+                    nextParagraphText:
+                        next
+                            ? next.text
+                            : "",
+
+                    score:
+                        score,
+
+                    matchType:
+                        matchType,
+
+                    matchedFamilies:
+                        queryFamilies,
+
+                    matchedFamilyCount:
+                        queryFamilies.length,
+
+                    familyOccurrencesInParagraph:
+                        matchedTermsCount,
+
+                    exactWordMatches:
+                        matchedTermsCount,
+
+                    totalQueryTerms:
+                        queryTokens.length,
+
+                    headingMatch:
+                        (
+                            headingScore >=
+                            12 ||
+                            majorHeadingScore >=
+                            12
+                        ),
+
+                    sectionPriority:
+                        Boolean(
+                            prioritySection
+                        )
+
+                }
+
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // توسيع القسم الأقوى
+    // ==================================
+    // مهم جدًا:
+    // لا نضيف 3 فقرات فقط.
+    // نأخذ نطاق المطلب/المبحث حتى
+    // قبل العنوان من المستوى نفسه.
+    // ==================================
+
+    prioritySections.forEach(
+        function (
+            entry
+        ) {
+
+            const sectionIndex =
+                Number(
+                    entry[0]
+                );
+
+
+            const section =
+                entry[1];
+
+
+            const sectionRecords =
+                oramaRetrievalRecords
+                    .filter(
+                        function (
+                            record
+                        ) {
+
+                            return (
+                                Number(
+                                    record.majorHeadingIndex
+                                ) ===
+                                sectionIndex &&
+                                Number(
+                                    record.paragraphIndex
+                                ) <=
+                                Number(
+                                    section.sectionEnd
+                                )
+                            );
+
+                        }
+                    );
+
+
+            sectionRecords.forEach(
+                function (
+                    record
+                ) {
+
+                    const index =
+                        Number(
+                            record.paragraphIndex
+                        );
+
+
+                    if (
+                        rankedMap.has(
+                            index
+                        )
+                    ) {
+
+                        const existing =
+                            rankedMap.get(
+                                index
+                            );
+
+
+                        existing.score +=
+                            10;
+
+
+                        existing.sectionPriority =
+                            true;
+
+
+                        rankedMap.set(
+                            index,
+                            existing
+                        );
+
+
+                        return;
+
+                    }
+
+
+                    const previous =
+                        paragraphMap.get(
+                            index -
+                            1
+                        );
+
+
+                    const next =
+                        paragraphMap.get(
+                            index +
+                            1
+                        );
+
+
+                    rankedMap.set(
+                        index,
+                        {
+
+                            paragraphIndex:
+                                index,
+
+                            paragraphId:
+                                record.id,
+
+                            text:
+                                record.text,
+
+                            context:
+                                record.text,
+
+                            heading:
+                                record.heading ||
+                                "",
+
+                            headingLevel:
+                                record.headingLevel,
+
+                            majorHeading:
+                                record.majorHeading ||
+                                "",
+
+                            majorHeadingIndex:
+                                record.majorHeadingIndex,
+
+                            sectionEnd:
+                                record.sectionEnd,
+
+                            previousParagraphText:
+                                previous
+                                    ? previous.text
+                                    : "",
+
+                            nextParagraphText:
+                                next
+                                    ? next.text
+                                    : "",
+
+                            score:
+                                20 +
+                                section.score,
+
+                            matchType:
+                                "section",
+
+                            matchedFamilies:
+                                queryFamilies,
+
+                            matchedFamilyCount:
+                                0,
+
+                            familyOccurrencesInParagraph:
+                                0,
+
+                            exactWordMatches:
+                                0,
+
+                            totalQueryTerms:
+                                queryTokens.length,
+
+                            headingMatch:
+                                true,
+
+                            sectionPriority:
+                                true
+
+                        }
+
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // تحويل إلى مصفوفة
+    // ==================================
+
+    const results =
+        Array.from(
+            rankedMap.values()
+        );
+
+
+    // ==================================
+    // ترتيب نهائي
+    // ==================================
+
+    results.sort(
+        function (
+            a,
+            b
+        ) {
+
+            if (
+                b.score !==
+                a.score
+            ) {
+
+                return (
+                    b.score -
+                    a.score
+                );
+
+            }
+
+
+            if (
+                Boolean(
+                    b.sectionPriority
+                ) !==
+                Boolean(
+                    a.sectionPriority
+                )
+            ) {
+
+                return (
+                    b.sectionPriority
+                        ? 1
+                        : -1
+                );
+
+            }
+
+
+            if (
+                Boolean(
+                    b.headingMatch
+                ) !==
+                Boolean(
+                    a.headingMatch
+                )
+            ) {
+
+                return (
+                    b.headingMatch
+                        ? 1
+                        : -1
+                );
+
+            }
+
+
+            return (
+                a.paragraphIndex -
+                b.paragraphIndex
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // منع التكرار شبه التام
+    // ==================================
+
+    const selected =
+        [];
+
+
+    const MAX_TEXT_OVERLAP =
+        0.75;
+
+
+    results.forEach(
+        function (
+            candidate
+        ) {
+
+            if (
+                selected.length >=
+                30
+            ) {
+
+                return;
+
+            }
+
+
+            const candidateText =
+                String(
+                    candidate.text ||
+                    ""
+                )
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
+
+
+            if (
+                !candidateText
+            ) {
+
+                return;
+
+            }
+
+
+            let tooSimilar =
+                false;
+
+
+            for (
+                let i = 0;
+                i < selected.length;
+                i++
+            ) {
+
+                const selectedText =
+                    String(
+                        selected[i].text ||
+                        ""
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim();
+
+
+                const shorterLength =
+                    Math.min(
+                        candidateText.length,
+                        selectedText.length
+                    );
+
+
+                const commonLength =
+                    getCommonTextLength(
+                        candidateText,
+                        selectedText
+                    );
+
+
+                const overlap =
+                    shorterLength > 0
+                        ? commonLength /
+                          shorterLength
+                        : 0;
+
+
+                if (
+                    overlap >=
+                    MAX_TEXT_OVERLAP
+                ) {
+
+                    tooSimilar =
+                        true;
+
+                    break;
+
+                }
+
+            }
+
+
+            if (
+                !tooSimilar
+            ) {
+
+                selected.push(
+                    candidate
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // إجمالي الظهورات
+    // ==================================
+
+    const indexedOccurrences =
+        selected.reduce(
+            function (
+                total,
+                item
+            ) {
+
+                return (
+                    total +
+                    Number(
+                        item.familyOccurrencesInParagraph ||
+                        0
+                    )
+                );
+
+            },
+            0
+        );
+
+
+    return {
+
+        query:
+            searchTerm,
+
+        count:
+            selected.length,
+
+        results:
+            selected,
+
+        matchedTerms:
+            queryTokens,
+
+        matchedFamilies:
+            queryFamilies,
+
+        totalQueryTerms:
+            queryTokens.length,
+
+        indexTokenCount:
+            oramaRetrievalRecords.length,
+
+        indexUniqueTerms:
+            0,
+
+        indexUniqueFamilies:
+            queryFamilies.length,
+
+        indexedOccurrences:
+            indexedOccurrences
+
+    };
 
 }
 
@@ -3843,6 +5230,7 @@ function renderDocuments() {
                     documentItem.indexUniqueTerms +
                     " فريدة";
 
+
                 if (
                     documentItem.indexUniqueFamilies
                 ) {
@@ -3966,12 +5354,16 @@ function renderDocuments() {
             `;
 
 
-            if (index === 0) {
+            if (
+                index ===
+                0
+            ) {
 
                 const moveUp =
                     options.querySelector(
                         ".move-document-up"
                     );
+
 
                 if (moveUp) {
 
@@ -3985,13 +5377,15 @@ function renderDocuments() {
 
             if (
                 index ===
-                projectDocuments.length - 1
+                projectDocuments.length -
+                1
             ) {
 
                 const moveDown =
                     options.querySelector(
                         ".move-document-down"
                     );
+
 
                 if (moveDown) {
 
@@ -4015,7 +5409,9 @@ function renderDocuments() {
                             ".document-options-menu.open"
                         )
                         .forEach(
-                            function (menu) {
+                            function (
+                                menu
+                            ) {
 
                                 if (
                                     menu !==
@@ -4105,7 +5501,8 @@ function renderDocuments() {
 
                             if (
                                 saveChange &&
-                                newName !== ""
+                                newName !==
+                                    ""
                             ) {
 
                                 documentItem.name =
@@ -4145,6 +5542,7 @@ function renderDocuments() {
 
                                     event.preventDefault();
 
+
                                     finishRename(
                                         true
                                     );
@@ -4158,6 +5556,7 @@ function renderDocuments() {
                                 ) {
 
                                     event.preventDefault();
+
 
                                     finishRename(
                                         false
@@ -4191,8 +5590,14 @@ function renderDocuments() {
                         e.stopPropagation();
 
 
-                        if (index <= 0)
+                        if (
+                            index <=
+                            0
+                        ) {
+
                             return;
+
+                        }
 
 
                         const previousDocument =
@@ -4259,7 +5664,8 @@ function renderDocuments() {
 
                         if (
                             index >=
-                            projectDocuments.length - 1
+                            projectDocuments.length -
+                            1
                         ) {
 
                             return;
@@ -4358,6 +5764,7 @@ function renderDocuments() {
 
 
                         confirmBox.innerHTML = `
+
                             <div class="document-delete-dialog">
 
                                 <div class="document-delete-message">
@@ -4385,6 +5792,7 @@ function renderDocuments() {
                                 </div>
 
                             </div>
+
                         `;
 
 
@@ -4480,6 +5888,10 @@ function renderDocuments() {
                                             null;
 
 
+                                        currentCitationSources =
+                                            [];
+
+
                                         if (
                                             documentTitle
                                         ) {
@@ -4490,6 +5902,17 @@ function renderDocuments() {
                                         }
 
                                     }
+
+
+                                    // إبطال ذاكرة Orama
+                                    oramaRetrievalDb =
+                                        null;
+
+                                    oramaRetrievalCacheKey =
+                                        "";
+
+                                    oramaRetrievalRecords =
+                                        [];
 
 
                                     const remaining =
@@ -4505,7 +5928,8 @@ function renderDocuments() {
                                         ) {
 
                                             doc.order =
-                                                newIndex + 1;
+                                                newIndex +
+                                                1;
 
 
                                             doc.updatedAt =
@@ -4615,14 +6039,15 @@ try {
         ) || [];
 
 }
-catch (e) {
+catch (error) {
 
     chats = [];
 
 }
 
 
-let currentChat = null;
+let currentChat =
+    null;
 
 
 function saveChats() {
@@ -4660,8 +6085,13 @@ function initializeSidebarSections() {
                 );
 
 
-            if (!targetId)
+            if (
+                !targetId
+            ) {
+
                 return;
+
+            }
 
 
             const target =
@@ -4670,8 +6100,13 @@ function initializeSidebarSections() {
                 );
 
 
-            if (!target)
+            if (
+                !target
+            ) {
+
                 return;
+
+            }
 
 
             target.classList.remove(
@@ -4697,11 +6132,14 @@ function initializeSidebarSections() {
                         );
 
 
-                    if (isOpen) {
+                    if (
+                        isOpen
+                    ) {
 
                         target.classList.remove(
                             "open"
                         );
+
 
                         header.classList.remove(
                             "open"
@@ -4713,6 +6151,7 @@ function initializeSidebarSections() {
                         target.classList.add(
                             "open"
                         );
+
 
                         header.classList.add(
                             "open"
@@ -4734,8 +6173,13 @@ function initializeSidebarSections() {
 
 function renderProjects() {
 
-    if (!projectsList)
+    if (
+        !projectsList
+    ) {
+
         return;
+
+    }
 
 
     projectsList.innerHTML =
@@ -4796,7 +6240,9 @@ function renderProjects() {
                     );
 
 
-                    if (projectsPopup) {
+                    if (
+                        projectsPopup
+                    ) {
 
                         projectsPopup.classList.remove(
                             "open"
@@ -4844,8 +6290,13 @@ function renderProjects() {
                             );
 
 
-                        if (!options)
+                        if (
+                            !options
+                        ) {
+
                             return;
+
+                        }
 
 
                         options.classList.add(
@@ -4860,9 +6311,11 @@ function renderProjects() {
                         const menuWidth =
                             140;
 
+
                         const menuHeight =
                             options.offsetHeight ||
                             80;
+
 
                         const margin =
                             8;
@@ -4880,7 +6333,8 @@ function renderProjects() {
 
 
                         if (
-                            left < margin
+                            left <
+                            margin
                         ) {
 
                             left =
@@ -4891,7 +6345,8 @@ function renderProjects() {
 
 
                         if (
-                            left + menuWidth >
+                            left +
+                            menuWidth >
                             window.innerWidth -
                             margin
                         ) {
@@ -4905,7 +6360,8 @@ function renderProjects() {
 
 
                         if (
-                            top + menuHeight >
+                            top +
+                            menuHeight >
                             window.innerHeight -
                             margin
                         ) {
@@ -4919,7 +6375,8 @@ function renderProjects() {
 
 
                         if (
-                            top < margin
+                            top <
+                            margin
                         ) {
 
                             top =
@@ -4980,7 +6437,9 @@ function renderProjects() {
                             );
 
 
-                        if (options) {
+                        if (
+                            options
+                        ) {
 
                             options.classList.remove(
                                 "open"
@@ -4995,8 +6454,13 @@ function renderProjects() {
                             );
 
 
-                        if (!title)
+                        if (
+                            !title
+                        ) {
+
                             return;
+
+                        }
 
 
                         const oldName =
@@ -5016,8 +6480,13 @@ function renderProjects() {
                             );
 
 
-                        if (!edit)
+                        if (
+                            !edit
+                        ) {
+
                             return;
+
+                        }
 
 
                         edit.focus();
@@ -5044,7 +6513,8 @@ function renderProjects() {
 
 
                                     project.name =
-                                        value !== ""
+                                        value !==
+                                            ""
                                             ? value
                                             : oldName;
 
@@ -5109,7 +6579,9 @@ function renderProjects() {
                             );
 
 
-                        if (options) {
+                        if (
+                            options
+                        ) {
 
                             options.classList.remove(
                                 "open"
@@ -5171,7 +6643,9 @@ function renderProjects() {
                             );
 
 
-                        if (confirmDelete) {
+                        if (
+                            confirmDelete
+                        ) {
 
                             confirmDelete.onclick =
                                 function () {
@@ -5205,14 +6679,16 @@ function renderProjects() {
                                                     );
 
 
-                                                if (doc) {
+                                                if (
+                                                    doc
+                                                ) {
 
                                                     deleteWorkingWordFile(
                                                         doc.storageId
                                                     )
-                                                    .catch(
-                                                        function () {}
-                                                    );
+                                                        .catch(
+                                                            function () {}
+                                                        );
 
                                                 }
 
@@ -5265,6 +6741,10 @@ function renderProjects() {
                                             null;
 
 
+                                        currentCitationSources =
+                                            [];
+
+
                                         if (
                                             documentTitle
                                         ) {
@@ -5277,20 +6757,26 @@ function renderProjects() {
                                     }
 
 
-                                    saveDocuments();
+                                    // إبطال Orama
+                                    oramaRetrievalDb =
+                                        null;
 
+                                    oramaRetrievalCacheKey =
+                                        "";
+
+                                    oramaRetrievalRecords =
+                                        [];
+
+
+                                    saveDocuments();
 
                                     saveProjects();
 
-
                                     renderProjects();
-
 
                                     renderExpandedProjects();
 
-
                                     renderDocuments();
-
 
                                     confirmBox.remove();
 
@@ -5305,7 +6791,9 @@ function renderProjects() {
                             );
 
 
-                        if (cancelDelete) {
+                        if (
+                            cancelDelete
+                        ) {
 
                             cancelDelete.onclick =
                                 function () {
@@ -5335,7 +6823,9 @@ function renderProjects() {
 // Projects Button
 // ======================================
 
-if (projectsBtn) {
+if (
+    projectsBtn
+) {
 
     projectsBtn.onclick =
         function (e) {
@@ -5343,11 +6833,18 @@ if (projectsBtn) {
             e.stopPropagation();
 
 
-            if (!projectsPopup)
+            if (
+                !projectsPopup
+            ) {
+
                 return;
 
+            }
 
-            if (chatPopup) {
+
+            if (
+                chatPopup
+            ) {
 
                 chatPopup.classList.remove(
                     "open"
@@ -5356,7 +6853,9 @@ if (projectsBtn) {
             }
 
 
-            if (searchPopup) {
+            if (
+                searchPopup
+            ) {
 
                 searchPopup.classList.remove(
                     "open"
@@ -5365,7 +6864,9 @@ if (projectsBtn) {
             }
 
 
-            if (settingsWindow) {
+            if (
+                settingsWindow
+            ) {
 
                 settingsWindow.classList.remove(
                     "open"
@@ -5380,277 +6881,6 @@ if (projectsBtn) {
 
 
             renderProjects();
-
-        };
-
-}
-
-
-// ======================================
-// New Project
-// ======================================
-
-if (newProjectBtn) {
-
-    newProjectBtn.onclick =
-        function (e) {
-
-            e.stopPropagation();
-
-
-            if (!projectsPopup)
-                return;
-
-
-            const oldBox =
-                document.querySelector(
-                    ".project-create-box"
-                );
-
-
-            if (oldBox) {
-
-                oldBox.remove();
-
-            }
-
-
-            const box =
-                document.createElement(
-                    "div"
-                );
-
-
-            box.className =
-                "project-create-box";
-
-
-            box.innerHTML = `
-
-                <div class="rename-dialog">
-
-                    <input
-                        class="new-project-name"
-                        placeholder="اسم المشروع">
-
-                    <button
-                        class="save-project"
-                        type="button">
-                        حفظ
-                    </button>
-
-                    <button
-                        class="cancel-project"
-                        type="button">
-                        إلغاء
-                    </button>
-
-                </div>
-
-            `;
-
-
-            document.body.appendChild(
-                box
-            );
-
-
-            const buttonRect =
-                newProjectBtn.getBoundingClientRect();
-
-
-            const boxHeight =
-                120;
-
-            const screenMargin =
-                12;
-
-
-            let left =
-                buttonRect.left;
-
-            let top =
-                buttonRect.bottom + 8;
-
-
-            const actualBoxWidth =
-                box.offsetWidth ||
-                240;
-
-
-            if (
-                left + actualBoxWidth >
-                window.innerWidth -
-                screenMargin
-            ) {
-
-                left =
-                    window.innerWidth -
-                    actualBoxWidth -
-                    screenMargin;
-
-            }
-
-
-            if (
-                left < screenMargin
-            ) {
-
-                left =
-                    screenMargin;
-
-            }
-
-
-            if (
-                top + boxHeight >
-                window.innerHeight -
-                screenMargin
-            ) {
-
-                top =
-                    buttonRect.top -
-                    boxHeight -
-                    8;
-
-            }
-
-
-            box.style.position =
-                "fixed";
-
-            box.style.left =
-                left + "px";
-
-            box.style.top =
-                top + "px";
-
-            box.style.zIndex =
-                "999999";
-
-
-            const inputProject =
-                box.querySelector(
-                    ".new-project-name"
-                );
-
-
-            if (inputProject) {
-
-                inputProject.focus();
-
-            }
-
-
-            const saveProject =
-                box.querySelector(
-                    ".save-project"
-                );
-
-
-            if (saveProject) {
-
-                saveProject.onclick =
-                    function () {
-
-                        const name =
-                            inputProject
-                                ? inputProject.value.trim()
-                                : "";
-
-
-                        if (
-                            name !== ""
-                        ) {
-
-                            const now =
-                                new Date()
-                                    .toISOString();
-
-
-                            const newProject = {
-
-                                id:
-                                    Date.now(),
-
-                                name:
-                                    name,
-
-                                createdAt:
-                                    now,
-
-                                updatedAt:
-                                    now,
-
-                                documents:
-                                    [],
-
-                                references:
-                                    [],
-
-                                chatIds:
-                                    [],
-
-                                settings: {
-
-                                    citationStyle:
-                                        "",
-
-                                    notes:
-                                        ""
-
-                                }
-
-                            };
-
-
-                            projects.unshift(
-                                newProject
-                            );
-
-
-                            saveProjects();
-
-
-                            renderProjects();
-
-
-                            renderExpandedProjects();
-
-                        }
-
-
-                        box.remove();
-
-                    };
-
-            }
-
-
-            const cancelProject =
-                box.querySelector(
-                    ".cancel-project"
-                );
-
-
-            if (cancelProject) {
-
-                cancelProject.onclick =
-                    function () {
-
-                        box.remove();
-
-                    };
-
-            }
-
-
-            box.onclick =
-                function (e) {
-
-                    e.stopPropagation();
-
-                };
 
         };
 
@@ -5689,7 +6919,9 @@ if (
                 );
 
 
-            if (isOpening) {
+            if (
+                isOpening
+            ) {
 
                 expandedSidebar.classList.add(
                     "open"
@@ -5768,8 +7000,13 @@ function renderExpandedProjects() {
         );
 
 
-    if (!list)
+    if (
+        !list
+    ) {
+
         return;
+
+    }
 
 
     list.innerHTML =
@@ -5834,8 +7071,13 @@ function renderSidebarChats() {
         );
 
 
-    if (!list)
+    if (
+        !list
+    ) {
+
         return;
+
+    }
 
 
     list.innerHTML =
@@ -5899,7 +7141,9 @@ function renderSidebarChats() {
                         renderChat();
 
 
-                        if (projectsPopup) {
+                        if (
+                            projectsPopup
+                        ) {
 
                             projectsPopup
                                 .classList
@@ -5910,7 +7154,9 @@ function renderSidebarChats() {
                         }
 
 
-                        if (chatPopup) {
+                        if (
+                            chatPopup
+                        ) {
 
                             chatPopup
                                 .classList
@@ -5921,7 +7167,9 @@ function renderSidebarChats() {
                         }
 
 
-                        if (searchPopup) {
+                        if (
+                            searchPopup
+                        ) {
 
                             searchPopup
                                 .classList
@@ -5978,10 +7226,13 @@ function createNewChat() {
     renderRecentChats();
 
 
-    if (input) {
+    if (
+        input
+    ) {
 
         input.value =
             "";
+
 
         input.style.height =
             "auto";
@@ -5989,7 +7240,9 @@ function createNewChat() {
     }
 
 
-    if (chatArea) {
+    if (
+        chatArea
+    ) {
 
         chatArea.innerHTML = `
 
@@ -6020,7 +7273,9 @@ function createNewChat() {
 // New Chat Button
 // ======================================
 
-if (newChatBtn) {
+if (
+    newChatBtn
+) {
 
     newChatBtn.onclick =
         function (e) {
@@ -6028,7 +7283,9 @@ if (newChatBtn) {
             e.stopPropagation();
 
 
-            if (projectsPopup) {
+            if (
+                projectsPopup
+            ) {
 
                 projectsPopup.classList.remove(
                     "open"
@@ -6037,7 +7294,9 @@ if (newChatBtn) {
             }
 
 
-            if (chatPopup) {
+            if (
+                chatPopup
+            ) {
 
                 chatPopup.classList.remove(
                     "open"
@@ -6046,7 +7305,9 @@ if (newChatBtn) {
             }
 
 
-            if (searchPopup) {
+            if (
+                searchPopup
+            ) {
 
                 searchPopup.classList.remove(
                     "open"
@@ -6055,7 +7316,9 @@ if (newChatBtn) {
             }
 
 
-            if (settingsWindow) {
+            if (
+                settingsWindow
+            ) {
 
                 settingsWindow.classList.remove(
                     "open"
@@ -6072,8 +7335,1748 @@ if (newChatBtn) {
 
 
 // ======================================
+// Render Chat
+// ======================================
+
+function renderChat() {
+
+    if (
+        !chatArea
+    ) {
+
+        return;
+
+    }
+
+
+    chatArea.innerHTML =
+        "";
+
+
+    if (
+        !currentChat
+    ) {
+
+        chatArea.innerHTML = `
+            <div class="welcome">
+
+                <div class="ai-symbol">
+                    ✦
+                </div>
+
+                <h2>
+                    مرحبًا بك
+                </h2>
+
+                <p>
+                    ابدأ محادثة جديدة
+                </p>
+
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    currentChat.messages.forEach(
+        function (
+            msg
+        ) {
+
+            const div =
+                document.createElement(
+                    "div"
+                );
+
+
+            div.className =
+                "message " +
+                (
+                    msg.role ===
+                    "user"
+                        ? "user-message"
+                        : "ai-message"
+                );
+
+
+            if (
+                msg.role ===
+                "user"
+            ) {
+
+                div.textContent =
+                    msg.text ||
+                    "";
+
+            }
+            else {
+
+                div.innerHTML =
+                    formatAIMessage(
+                        msg.text ||
+                        "",
+                        Array.isArray(
+                            msg.citationSources
+                        )
+                            ? msg.citationSources
+                            : []
+                    );
+
+            }
+
+
+            chatArea.appendChild(
+                div
+            );
+
+        }
+    );
+
+
+    chatArea.scrollTop =
+        chatArea.scrollHeight;
+
+}
+
+
+// ======================================
+// Render Chat List
+// ======================================
+
+function renderChatList() {
+
+    const list =
+        document.getElementById(
+            "chat-list"
+        );
+
+
+    if (
+        !list
+    ) {
+
+        return;
+
+    }
+
+
+    list.innerHTML =
+        "";
+
+
+    if (
+        chats.length ===
+        0
+    ) {
+
+        list.innerHTML =
+            "<div class='empty-chat'>لا توجد محادثات</div>";
+
+
+        return;
+
+    }
+
+
+    chats.forEach(
+        function (
+            chat
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "chat-history-item";
+
+
+            item.innerHTML = `
+
+                <span class="chat-title">
+                    ${chatIcon}
+                    ${chat.title}
+                </span>
+
+                <button
+                    class="chat-menu"
+                    type="button">
+                    ⋮
+                </button>
+
+                <div class="chat-options-menu">
+
+                    <div class="rename-chat">
+                        ✏ إعادة تسمية
+                    </div>
+
+                    <div class="delete-chat">
+                        🗑 حذف
+                    </div>
+
+                </div>
+
+            `;
+
+
+            const title =
+                item.querySelector(
+                    ".chat-title"
+                );
+
+
+            if (
+                title
+            ) {
+
+                title.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        currentChat =
+                            chat;
+
+
+                        renderChat();
+
+
+                        if (
+                            expandedSidebar
+                        ) {
+
+                            expandedSidebar.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+                    };
+
+            }
+
+
+            const menu =
+                item.querySelector(
+                    ".chat-menu"
+                );
+
+
+            if (
+                menu
+            ) {
+
+                menu.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        document
+                            .querySelectorAll(
+                                ".chat-options-menu"
+                            )
+                            .forEach(
+                                function (
+                                    m
+                                ) {
+
+                                    m.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+                            );
+
+
+                        const options =
+                            item.querySelector(
+                                ".chat-options-menu"
+                            );
+
+
+                        if (
+                            !options
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        options.classList.add(
+                            "open"
+                        );
+
+
+                        const rect =
+                            menu.getBoundingClientRect();
+
+
+                        options.style.position =
+                            "fixed";
+
+
+                        options.style.left =
+                            Math.max(
+                                8,
+                                rect.left -
+                                140 -
+                                8
+                            ) + "px";
+
+
+                        options.style.top =
+                            rect.bottom +
+                            8 +
+                            "px";
+
+
+                        options.style.zIndex =
+                            "999999";
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Rename Chat
+            // ==================================
+
+            const renameBtn =
+                item.querySelector(
+                    ".rename-chat"
+                );
+
+
+            if (
+                renameBtn
+            ) {
+
+                renameBtn.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".chat-options-menu"
+                            );
+
+
+                        if (
+                            options
+                        ) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const titleSpan =
+                            item.querySelector(
+                                ".chat-title"
+                            );
+
+
+                        if (
+                            !titleSpan
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const oldName =
+                            chat.title;
+
+
+                        titleSpan.innerHTML = `
+                            <input
+                                class="edit-chat-title"
+                                value="${oldName}">
+                        `;
+
+
+                        const editInput =
+                            titleSpan.querySelector(
+                                ".edit-chat-title"
+                            );
+
+
+                        if (
+                            !editInput
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        editInput.focus();
+
+
+                        editInput.setSelectionRange(
+                            editInput.value.length,
+                            editInput.value.length
+                        );
+
+
+                        editInput.onkeydown =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    const value =
+                                        editInput.value.trim();
+
+
+                                    chat.title =
+                                        value !==
+                                            ""
+                                            ? value
+                                            : oldName;
+
+
+                                    saveChats();
+
+
+                                    renderChatList();
+
+
+                                    renderSidebarChats();
+
+
+                                    renderRecentChats();
+
+                                }
+
+
+                                if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    chat.title =
+                                        oldName;
+
+
+                                    renderChatList();
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Delete Chat
+            // ==================================
+
+            const deleteBtn =
+                item.querySelector(
+                    ".delete-chat"
+                );
+
+
+            if (
+                deleteBtn
+            ) {
+
+                deleteBtn.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".chat-options-menu"
+                            );
+
+
+                        if (
+                            options
+                        ) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "delete-confirm";
+
+
+                        confirmBox.innerHTML = `
+
+                            <div class="confirm-dialog">
+
+                                <p>
+                                    هل تريد حذف المحادثة:
+                                    <br>
+
+                                    <strong>
+                                        ${chat.title}
+                                    </strong>
+
+                                    ؟
+                                </p>
+
+                                <button
+                                    class="confirm-delete"
+                                    type="button">
+                                    حذف
+                                </button>
+
+                                <button
+                                    class="cancel-delete"
+                                    type="button">
+                                    إلغاء
+                                </button>
+
+                            </div>
+
+                        `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-delete"
+                            );
+
+
+                        if (
+                            confirmDelete
+                        ) {
+
+                            confirmDelete.onclick =
+                                function () {
+
+                                    chats =
+                                        chats.filter(
+                                            function (
+                                                c
+                                            ) {
+
+                                                return (
+                                                    c.id !==
+                                                    chat.id
+                                                );
+
+                                            }
+                                        );
+
+
+                                    if (
+                                        currentChat &&
+                                        currentChat.id ===
+                                            chat.id
+                                    ) {
+
+                                        currentChat =
+                                            null;
+
+
+                                        renderChat();
+
+                                    }
+
+
+                                    saveChats();
+
+
+                                    renderChatList();
+
+
+                                    renderSidebarChats();
+
+
+                                    renderRecentChats();
+
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-delete"
+                            );
+
+
+                        if (
+                            cancelDelete
+                        ) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+                    };
+
+            }
+
+
+            list.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
+
+
+// ======================================
+// Recent Chats Popup
+// ======================================
+
+function renderRecentChats() {
+
+    if (
+        !recentChatList
+    ) {
+
+        return;
+
+    }
+
+
+    recentChatList.innerHTML =
+        "";
+
+
+    if (
+        chats.length ===
+        0
+    ) {
+
+        recentChatList.innerHTML =
+            "<div class='empty-chat'>لا توجد محادثات</div>";
+
+        return;
+
+    }
+
+
+    chats
+        .slice(
+            0,
+            8
+        )
+        .forEach(
+            function (
+                chat
+            ) {
+
+                const div =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                div.className =
+                    "recent-chat-item";
+
+
+                div.innerHTML = `
+                    <span class="chat-title">
+                        ${chatIcon}
+                        ${chat.title}
+                    </span>
+                `;
+
+
+                div.onclick =
+                    function () {
+
+                        currentChat =
+                            chat;
+
+
+                        renderChat();
+
+
+                        if (
+                            chatPopup
+                        ) {
+
+                            chatPopup.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+                    };
+
+
+                recentChatList.appendChild(
+                    div
+                );
+
+            }
+        );
+
+}
+
+
+// ======================================
+// Chat Button
+// ======================================
+
+if (
+    chatBtn
+) {
+
+    chatBtn.onclick =
+        function (e) {
+
+            e.stopPropagation();
+
+
+            if (
+                !chatPopup
+            ) {
+
+                return;
+
+            }
+
+
+            if (
+                projectsPopup
+            ) {
+
+                projectsPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                searchPopup
+            ) {
+
+                searchPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                settingsWindow
+            ) {
+
+                settingsWindow.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                chatPopup.classList.contains(
+                    "open"
+                )
+            ) {
+
+                chatPopup.classList.remove(
+                    "open"
+                );
+
+
+                return;
+
+            }
+
+
+            renderChatList();
+
+
+            chatPopup.classList.add(
+                "open"
+            );
+
+        };
+
+}
+
+
+// ======================================
+// Save Initial Projects/Chats State
+// ======================================
+
+saveProjects();
+saveChats();
+
+        // ======================================
+        // New Project
+        // ======================================
+
+        if (newProjectBtn) {
+
+            newProjectBtn.onclick =
+                function (e) {
+
+                    e.stopPropagation();
+
+
+                    if (!projectsPopup)
+                        return;
+
+
+                    const oldBox =
+                        document.querySelector(
+                            ".project-create-box"
+                        );
+
+
+                    if (oldBox) {
+
+                        oldBox.remove();
+
+                    }
+
+
+                    const box =
+                        document.createElement(
+                            "div"
+                        );
+
+
+                    box.className =
+                        "project-create-box";
+
+
+                    box.innerHTML = `
+
+                        <div class="rename-dialog">
+
+                            <input
+                                class="new-project-name"
+                                placeholder="اسم المشروع">
+
+                            <button
+                                class="save-project"
+                                type="button">
+                                حفظ
+                            </button>
+
+                            <button
+                                class="cancel-project"
+                                type="button">
+                                إلغاء
+                            </button>
+
+                        </div>
+
+                    `;
+
+
+                    document.body.appendChild(
+                        box
+                    );
+
+
+                    const buttonRect =
+                        newProjectBtn.getBoundingClientRect();
+
+
+                    const boxHeight =
+                        120;
+
+                    const screenMargin =
+                        12;
+
+
+                    let left =
+                        buttonRect.left;
+
+
+                    let top =
+                        buttonRect.bottom +
+                        8;
+
+
+                    const actualBoxWidth =
+                        box.offsetWidth ||
+                        240;
+
+
+                    if (
+                        left +
+                        actualBoxWidth >
+                        window.innerWidth -
+                        screenMargin
+                    ) {
+
+                        left =
+                            window.innerWidth -
+                            actualBoxWidth -
+                            screenMargin;
+
+                    }
+
+
+                    if (
+                        left <
+                        screenMargin
+                    ) {
+
+                        left =
+                            screenMargin;
+
+                    }
+
+
+                    if (
+                        top +
+                        boxHeight >
+                        window.innerHeight -
+                        screenMargin
+                    ) {
+
+                        top =
+                            buttonRect.top -
+                            boxHeight -
+                            8;
+
+                    }
+
+
+                    box.style.position =
+                        "fixed";
+
+
+                    box.style.left =
+                        left +
+                        "px";
+
+
+                    box.style.top =
+                        top +
+                        "px";
+
+
+                    box.style.zIndex =
+                        "999999";
+
+
+                    const inputProject =
+                        box.querySelector(
+                            ".new-project-name"
+                        );
+
+
+                    if (inputProject) {
+
+                        inputProject.focus();
+
+                    }
+
+
+                    const saveProject =
+                        box.querySelector(
+                            ".save-project"
+                        );
+
+
+                    if (saveProject) {
+
+                        saveProject.onclick =
+                            function () {
+
+                                const name =
+                                    inputProject
+                                        ? inputProject.value.trim()
+                                        : "";
+
+
+                                if (
+                                    name !== ""
+                                ) {
+
+                                    const now =
+                                        new Date()
+                                            .toISOString();
+
+
+                                    const newProject = {
+
+                                        id:
+                                            Date.now(),
+
+                                        name:
+                                            name,
+
+                                        createdAt:
+                                            now,
+
+                                        updatedAt:
+                                            now,
+
+                                        documents:
+                                            [],
+
+                                        references:
+                                            [],
+
+                                        chatIds:
+                                            [],
+
+                                        settings: {
+
+                                            citationStyle:
+                                                "",
+
+                                            notes:
+                                                ""
+
+                                        }
+
+                                    };
+
+
+                                    projects.unshift(
+                                        newProject
+                                    );
+
+
+                                    saveProjects();
+
+
+                                    renderProjects();
+
+
+                                    renderExpandedProjects();
+
+                                }
+
+
+                                box.remove();
+
+                            };
+
+                    }
+
+
+                    const cancelProject =
+                        box.querySelector(
+                            ".cancel-project"
+                        );
+
+
+                    if (cancelProject) {
+
+                        cancelProject.onclick =
+                            function () {
+
+                                box.remove();
+
+                            };
+
+                    }
+
+
+                    box.onclick =
+                        function (e) {
+
+                            e.stopPropagation();
+
+                        };
+
+                };
+
+        }
+
+
+// ======================================
+// Attach Document To Project
+// ======================================
+
+function attachDocumentToProject(
+    project,
+    documentItem
+) {
+
+    if (
+        !project ||
+        !documentItem
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        !Array.isArray(
+            project.documents
+        )
+    ) {
+
+        project.documents =
+            [];
+
+    }
+
+
+    if (
+        !project.documents.includes(
+            documentItem.id
+        )
+    ) {
+
+        project.documents.push(
+            documentItem.id
+        );
+
+
+        project.updatedAt =
+            new Date()
+                .toISOString();
+
+
+        saveProjects();
+
+    }
+
+}
+
+
+// ======================================
+// Set Active Project
+// ======================================
+
+function setCurrentProject(
+    project
+) {
+
+    if (!project) {
+
+        currentProject =
+            null;
+
+
+        renderDocuments();
+
+
+        return;
+
+    }
+
+
+    currentProject =
+        project;
+
+
+    renderDocuments();
+
+}
+
+
+// ======================================
+// Read Current Working Document
+// القراءة + الفهرسة + البنية
+// ======================================
+
+async function readCurrentWordDocument(
+    documentItem
+) {
+
+    if (!documentItem) {
+
+        throw new Error(
+            "لم يتم تحديد المستند."
+        );
+
+    }
+
+
+    updateDocumentReadStatus(
+        documentItem,
+        "reading"
+    );
+
+
+    try {
+
+        if (
+            !Office.context.requirements
+                .isSetSupported(
+                    "WordApiHiddenDocument",
+                    "1.3"
+                )
+        ) {
+
+            throw new Error(
+                "إصدار Word الحالي لا يدعم قراءة نسخة العمل."
+            );
+
+        }
+
+
+        const file =
+            await getWorkingWordFile(
+                documentItem.storageId
+            );
+
+
+        if (!file) {
+
+            throw new Error(
+                "لم يتم العثور على نسخة العمل."
+            );
+
+        }
+
+
+        const base64 =
+            await fileToBase64(
+                file
+            );
+
+
+        const text =
+            await Word.run(
+                async function (
+                    context
+                ) {
+
+                    const workingDocument =
+                        context.application
+                            .createDocument(
+                                base64
+                            );
+
+
+                    const body =
+                        workingDocument.body;
+
+
+                    body.load(
+                        "text"
+                    );
+
+
+                    await context.sync();
+
+
+                    return body.text ||
+                        "";
+
+                }
+            );
+
+
+        await saveDocumentText(
+            documentItem.id,
+            text
+        );
+
+
+        updateDocumentReadStatus(
+            documentItem,
+            "read"
+        );
+
+
+        updateDocumentIndexStatus(
+            documentItem,
+            "indexing"
+        );
+
+
+        const indexData =
+            await rebuildDocumentIndex(
+                documentItem.id,
+                text
+            );
+
+
+        const structureData =
+            await buildDocumentStructure(
+                documentItem
+            );
+
+
+        await saveDocumentStructure(
+            documentItem.id,
+            structureData
+        );
+
+
+        // ==============================
+        // تثبيت بيانات الفهرس
+        // ==============================
+
+        documentItem.indexStatus =
+            "indexed";
+
+
+        documentItem.indexTokenCount =
+            indexData.tokenCount ||
+            0;
+
+
+        documentItem.indexUniqueTerms =
+            indexData.uniqueTerms ||
+            0;
+
+
+        documentItem.indexUniqueFamilies =
+            indexData.uniqueFamilies ||
+            0;
+
+
+        documentItem.indexSchemaVersion =
+            INDEX_SCHEMA_VERSION;
+
+
+        documentItem.indexUpdatedAt =
+            indexData.updatedAt ||
+            new Date()
+                .toISOString();
+
+
+        saveDocuments();
+
+
+        // ==============================
+        // بناء Orama فعليًا
+        // ==============================
+
+        oramaRetrievalDb =
+            null;
+
+
+        oramaRetrievalCacheKey =
+            "";
+
+
+        oramaRetrievalRecords =
+            [];
+
+
+        await ensureOramaRetrievalIndex(
+            documentItem,
+            structureData
+        );
+
+
+        console.log(
+            "تمت قراءة المستند وبناء الفهرس بنجاح:",
+            {
+                documentId:
+                    documentItem.id,
+
+                tokenCount:
+                    indexData.tokenCount,
+
+                uniqueTerms:
+                    indexData.uniqueTerms,
+
+                uniqueFamilies:
+                    indexData.uniqueFamilies,
+
+                indexVersion:
+                    indexData.indexVersion,
+
+                oramaRecords:
+                    oramaRetrievalRecords.length
+            }
+        );
+
+
+        return text;
+
+    }
+    catch (error) {
+
+        updateDocumentReadStatus(
+            documentItem,
+            "error"
+        );
+
+
+        updateDocumentIndexStatus(
+            documentItem,
+            "error"
+        );
+
+
+        console.error(
+            "فشل قراءة/فهرسة المستند:",
+            error
+        );
+
+
+        throw error;
+
+    }
+
+}
+
+
+// ======================================
+// Set Active Document
+// ======================================
+
+function setCurrentDocument(
+    documentItem
+) {
+
+    if (!documentItem) {
+
+        currentDocument =
+            null;
+
+
+        currentCitationSources =
+            [];
+
+
+        if (documentTitle) {
+
+            documentTitle.textContent =
+                "لا يوجد مستند مفتوح";
+
+        }
+
+
+        renderDocuments();
+
+
+        return;
+
+    }
+
+
+    currentDocument =
+        documentItem;
+
+
+    currentCitationSources =
+        [];
+
+
+    if (documentTitle) {
+
+        documentTitle.textContent =
+            documentItem.name;
+
+    }
+
+
+    if (
+        documentItem.readStatus ===
+        "read"
+    ) {
+
+        ensureDocumentIndex(
+            documentItem
+        )
+            .then(
+                async function () {
+
+                    const structure =
+                        await ensureDocumentStructure(
+                            documentItem
+                        );
+
+
+                    if (structure) {
+
+                        await ensureOramaRetrievalIndex(
+                            documentItem,
+                            structure
+                        );
+
+                    }
+
+
+                    renderDocuments();
+
+                }
+            )
+            .catch(
+                function (error) {
+
+                    console.error(
+                        "تعذر تحديث فهرس المستند:",
+                        error
+                    );
+
+
+                    renderDocuments();
+
+                }
+            );
+
+
+        renderDocuments();
+
+
+        return;
+
+    }
+
+
+    readCurrentWordDocument(
+        documentItem
+    )
+        .then(
+            function (text) {
+
+                console.log(
+                    "محتوى نسخة العمل:",
+                    text
+                );
+
+
+                renderDocuments();
+
+            }
+        )
+        .catch(
+            function (error) {
+
+                console.error(
+                    "تعذر قراءة نسخة العمل:",
+                    error
+                );
+
+
+                renderDocuments();
+
+            }
+        );
+
+
+    renderDocuments();
+
+}
+
+
+// ======================================
+// Update Document Timestamp
+// ======================================
+
+function touchDocument(
+    documentItem
+) {
+
+    if (!documentItem)
+        return;
+
+
+    documentItem.updatedAt =
+        new Date()
+            .toISOString();
+
+}
+
+
+// ======================================
+// Add Document
+// ======================================
+
+if (
+    addDocumentBtn &&
+    wordDocumentPicker
+) {
+
+    addDocumentBtn.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            if (!currentProject) {
+
+                if (documentsList) {
+
+                    documentsList.innerHTML = `
+                        <div class="empty-document">
+                            اختر مشروعًا أولًا لإضافة مستند
+                        </div>
+                    `;
+
+                }
+
+
+                return;
+
+            }
+
+
+            wordDocumentPicker.value =
+                "";
+
+
+            wordDocumentPicker.click();
+
+        };
+
+
+    wordDocumentPicker.onchange =
+        async function () {
+
+            try {
+
+                const file =
+                    wordDocumentPicker.files &&
+                    wordDocumentPicker.files[0];
+
+
+                if (!file)
+                    return;
+
+
+                if (
+                    !/\.docx$/i.test(
+                        file.name
+                    )
+                ) {
+
+                    console.warn(
+                        "الملف المختار ليس DOCX."
+                    );
+
+
+                    return;
+
+                }
+
+
+                if (!currentProject)
+                    return;
+
+
+                const projectDocuments =
+                    getProjectDocuments(
+                        currentProject.id
+                    );
+
+
+                const nextOrder =
+                    projectDocuments.length +
+                    1;
+
+
+                const documentItem =
+                    createDocument(
+                        file,
+                        currentProject.id,
+                        nextOrder
+                    );
+
+
+                await saveWorkingWordFile(
+                    documentItem.storageId,
+                    file
+                );
+
+
+                attachDocumentToProject(
+                    currentProject,
+                    documentItem
+                );
+
+
+                setCurrentDocument(
+                    documentItem
+                );
+
+
+                renderDocuments();
+
+
+                console.log(
+                    "تم استيراد مستند Word:",
+                    {
+                        name:
+                            documentItem.name,
+
+                        fileName:
+                            documentItem.fileName,
+
+                        storageId:
+                            documentItem.storageId
+                    }
+                );
+
+            }
+            catch (error) {
+
+                console.error(
+                    "فشل استيراد مستند Word:",
+                    error
+                );
+
+
+                if (documentsList) {
+
+                    documentsList.innerHTML = `
+                        <div class="empty-document">
+                            تعذر استيراد المستند
+                        </div>
+                    `;
+
+                }
+
+            }
+
+        };
+
+}
+
+
+// ======================================
 // Format AI Message
-// تحويل Markdown + إحالات المقاطع
 // ======================================
 
 function formatAIMessage(
@@ -6104,19 +9107,16 @@ function formatAIMessage(
                     text
                 ),
                 {
+
                     breaks:
                         true,
 
                     gfm:
                         true
+
                 }
             );
 
-
-        // ==================================
-        // تحويل الإحالات المفردة أو المتعددة
-        // إلى إحالات مستقلة قابلة للنقر
-        // ==================================
 
         html =
             html.replace(
@@ -6214,52 +9214,51 @@ function formatAIMessage(
 
 
                     const citationButtons =
-                        ranks
-                            .map(
-                                function (
-                                    rank
-                                ) {
+                        ranks.map(
+                            function (
+                                rank
+                            ) {
 
-                                    const source =
-                                        sources.find(
-                                            function (
-                                                item
-                                            ) {
+                                const source =
+                                    sources.find(
+                                        function (
+                                            item
+                                        ) {
 
-                                                return (
-                                                    Number(
-                                                        item.rank
-                                                    ) ===
-                                                    rank
-                                                );
+                                            return (
+                                                Number(
+                                                    item.rank
+                                                ) ===
+                                                rank
+                                            );
 
-                                            }
-                                        );
-
-
-                                    if (!source) {
-
-                                        return (
-                                            "[مقطع " +
-                                            rank +
-                                            "]"
-                                        );
-
-                                    }
+                                        }
+                                    );
 
 
-                                    return `
-                                        <button
-                                            type="button"
-                                            class="document-citation"
-                                            data-citation-rank="${rank}"
-                                            title="الانتقال إلى المقطع ${rank}">
-                                            [مقطع ${rank}]
-                                        </button>
-                                    `;
+                                if (!source) {
+
+                                    return (
+                                        "[مقطع " +
+                                        rank +
+                                        "]"
+                                    );
 
                                 }
-                            );
+
+
+                                return `
+                                    <button
+                                        type="button"
+                                        class="document-citation"
+                                        data-citation-rank="${rank}"
+                                        title="الانتقال إلى المقطع ${rank}">
+                                        [مقطع ${rank}]
+                                    </button>
+                                `;
+
+                            }
+                        );
 
 
                     return citationButtons.join(
@@ -6273,9 +9272,7 @@ function formatAIMessage(
         return html;
 
     }
-    catch (
-        error
-    ) {
+    catch (error) {
 
         console.error(
             "Markdown formatting error:",
@@ -6296,119 +9293,7 @@ function formatAIMessage(
 
 
 // ======================================
-// Render Chat
-// عرض المحادثة
-// ======================================
-
-function renderChat() {
-
-    if (!chatArea) {
-
-        return;
-
-    }
-
-
-    chatArea.innerHTML =
-        "";
-
-
-    if (!currentChat) {
-
-        chatArea.innerHTML = `
-            <div class="welcome">
-                <div class="ai-symbol">
-                    ✦
-                </div>
-
-                <h2>
-                    مرحبًا بك
-                </h2>
-
-                <p>
-                    ابدأ محادثة جديدة
-                </p>
-            </div>
-        `;
-
-        return;
-
-    }
-
-
-    currentChat.messages.forEach(
-        function (
-            msg
-        ) {
-
-            const div =
-                document.createElement(
-                    "div"
-                );
-
-
-            div.className =
-                "message " +
-                (
-                    msg.role ===
-                    "user"
-                        ? "user-message"
-                        : "ai-message"
-                );
-
-
-            // ==================================
-            // رسالة المستخدم
-            // ==================================
-
-            if (
-                msg.role ===
-                "user"
-            ) {
-
-                div.textContent =
-                    msg.text ||
-                    "";
-
-            }
-
-
-            // ==================================
-            // رسالة الذكاء الاصطناعي
-            // ==================================
-
-            else {
-
-                div.innerHTML =
-                    formatAIMessage(
-                        msg.text ||
-                        "",
-
-                        Array.isArray(
-                            msg.citationSources
-                        )
-                            ? msg.citationSources
-                            : []
-                    );
-
-            }
-
-
-            chatArea.appendChild(
-                div
-            );
-
-        }
-    );
-
-
-    chatArea.scrollTop =
-        chatArea.scrollHeight;
-
-}
-// ======================================
 // Open Citation In Word
-// الانتقال إلى المقطع الأصلي في Word
 // ======================================
 
 async function openCitationInWord(
@@ -6441,6 +9326,7 @@ async function openCitationInWord(
             rank
         );
 
+
         return;
 
     }
@@ -6454,6 +9340,7 @@ async function openCitationInWord(
         console.warn(
             "Word API غير متاحة."
         );
+
 
         return;
 
@@ -6470,10 +9357,6 @@ async function openCitationInWord(
                 const body =
                     context.document.body;
 
-
-                // ==================================
-                // النص الأصلي للمقطع
-                // ==================================
 
                 let searchText =
                     String(
@@ -6497,10 +9380,6 @@ async function openCitationInWord(
                 }
 
 
-                // ==================================
-                // استخدام بداية المقطع إذا كان طويلًا
-                // ==================================
-
                 if (
                     searchText.length >
                     180
@@ -6515,11 +9394,7 @@ async function openCitationInWord(
                 }
 
 
-                // ==================================
-                // البحث داخل مستند Word
-                // ==================================
-
-                const results =
+                let results =
                     body.search(
                         searchText,
                         {
@@ -6551,16 +9426,11 @@ async function openCitationInWord(
                 await context.sync();
 
 
-                // ==================================
-                // لم نجد النص
-                // ==================================
-
                 if (
                     results.items.length ===
                     0
                 ) {
 
-                    // محاولة ثانية باستخدام النص الأقصر
                     const fallbackText =
                         searchText.substring(
                             0,
@@ -6612,9 +9482,7 @@ async function openCitationInWord(
                     }
 
 
-                    fallbackResults.items[
-                        0
-                    ].select(
+                    fallbackResults.items[0].select(
                         "Select"
                     );
 
@@ -6627,13 +9495,7 @@ async function openCitationInWord(
                 }
 
 
-                // ==================================
-                // تحديد النتيجة الأولى
-                // ==================================
-
-                results.items[
-                    0
-                ].select(
+                results.items[0].select(
                     "Select"
                 );
 
@@ -6655,661 +9517,6 @@ async function openCitationInWord(
 
 }
 
-// ======================================
-// Render Chat List
-// ======================================
-
-function renderChatList() {
-
-    const list =
-        document.getElementById(
-            "chat-list"
-        );
-
-
-    if (!list)
-        return;
-
-
-    list.innerHTML =
-        "";
-
-
-    if (
-        chats.length ===
-        0
-    ) {
-
-        list.innerHTML =
-            "<div class='empty-chat'>لا توجد محادثات</div>";
-
-        return;
-
-    }
-
-
-    chats.forEach(
-        function (
-            chat
-        ) {
-
-            const item =
-                document.createElement(
-                    "div"
-                );
-
-
-            item.className =
-                "chat-history-item";
-
-
-            item.innerHTML = `
-                <span class="chat-title">
-                    ${chatIcon}
-                    ${chat.title}
-                </span>
-
-                <button
-                    class="chat-menu"
-                    type="button">
-                    ⋮
-                </button>
-
-                <div class="chat-options-menu">
-
-                    <div class="rename-chat">
-                        ✏ إعادة تسمية
-                    </div>
-
-                    <div class="delete-chat">
-                        🗑 حذف
-                    </div>
-
-                </div>
-            `;
-
-
-            const title =
-                item.querySelector(
-                    ".chat-title"
-                );
-
-
-            if (title) {
-
-                title.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        currentChat =
-                            chat;
-
-
-                        renderChat();
-
-
-                        if (
-                            expandedSidebar
-                        ) {
-
-                            expandedSidebar.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-                    };
-
-            }
-
-
-            const menu =
-                item.querySelector(
-                    ".chat-menu"
-                );
-
-
-            if (menu) {
-
-                menu.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        document
-                            .querySelectorAll(
-                                ".chat-options-menu"
-                            )
-                            .forEach(
-                                function (
-                                    m
-                                ) {
-
-                                    m.classList.remove(
-                                        "open"
-                                    );
-
-                                }
-                            );
-
-
-                        const options =
-                            item.querySelector(
-                                ".chat-options-menu"
-                            );
-
-
-                        if (!options)
-                            return;
-
-
-                        options.classList.add(
-                            "open"
-                        );
-
-
-                        const rect =
-                            menu.getBoundingClientRect();
-
-
-                        options.style.position =
-                            "fixed";
-
-
-                        options.style.left =
-                            Math.max(
-                                8,
-                                rect.left -
-                                140 -
-                                8
-                            ) + "px";
-
-
-                        options.style.top =
-                            rect.bottom +
-                            8 +
-                            "px";
-
-
-                        options.style.zIndex =
-                            "999999";
-
-                    };
-
-            }
-
-
-            // ==================================
-            // Rename Chat
-            // ==================================
-
-            const renameBtn =
-                item.querySelector(
-                    ".rename-chat"
-                );
-
-
-            if (renameBtn) {
-
-                renameBtn.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        const options =
-                            item.querySelector(
-                                ".chat-options-menu"
-                            );
-
-
-                        if (options) {
-
-                            options.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        const titleSpan =
-                            item.querySelector(
-                                ".chat-title"
-                            );
-
-
-                        if (!titleSpan)
-                            return;
-
-
-                        const oldName =
-                            chat.title;
-
-
-                        titleSpan.innerHTML = `
-                            <input
-                                class="edit-chat-title"
-                                value="${oldName}">
-                        `;
-
-
-                        const editInput =
-                            titleSpan.querySelector(
-                                ".edit-chat-title"
-                            );
-
-
-                        if (!editInput)
-                            return;
-
-
-                        editInput.focus();
-
-
-                        editInput.setSelectionRange(
-                            editInput.value.length,
-                            editInput.value.length
-                        );
-
-
-                        editInput.onkeydown =
-                            function (
-                                event
-                            ) {
-
-                                if (
-                                    event.key ===
-                                    "Enter"
-                                ) {
-
-                                    const value =
-                                        editInput.value.trim();
-
-
-                                    chat.title =
-                                        value !== ""
-                                            ? value
-                                            : oldName;
-
-
-                                    saveChats();
-
-
-                                    renderChatList();
-
-
-                                    renderSidebarChats();
-
-
-                                    renderRecentChats();
-
-                                }
-
-
-                                if (
-                                    event.key ===
-                                    "Escape"
-                                ) {
-
-                                    chat.title =
-                                        oldName;
-
-
-                                    renderChatList();
-
-                                }
-
-                            };
-
-                    };
-
-            }
-
-
-            // ==================================
-            // Delete Chat
-            // ==================================
-
-            const deleteBtn =
-                item.querySelector(
-                    ".delete-chat"
-                );
-
-
-            if (deleteBtn) {
-
-                deleteBtn.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        const options =
-                            item.querySelector(
-                                ".chat-options-menu"
-                            );
-
-
-                        if (options) {
-
-                            options.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        const confirmBox =
-                            document.createElement(
-                                "div"
-                            );
-
-
-                        confirmBox.className =
-                            "delete-confirm";
-
-
-                        confirmBox.innerHTML = `
-
-                            <div class="confirm-dialog">
-
-                                <p>
-                                    هل تريد حذف المحادثة:
-                                    <br>
-
-                                    <strong>
-                                        ${chat.title}
-                                    </strong>
-
-                                    ؟
-                                </p>
-
-                                <button
-                                    class="confirm-delete"
-                                    type="button">
-                                    حذف
-                                </button>
-
-                                <button
-                                    class="cancel-delete"
-                                    type="button">
-                                    إلغاء
-                                </button>
-
-                            </div>
-
-                        `;
-
-
-                        document.body.appendChild(
-                            confirmBox
-                        );
-
-
-                        const confirmDelete =
-                            confirmBox.querySelector(
-                                ".confirm-delete"
-                            );
-
-
-                        if (confirmDelete) {
-
-                            confirmDelete.onclick =
-                                function () {
-
-                                    chats =
-                                        chats.filter(
-                                            function (
-                                                c
-                                            ) {
-
-                                                return (
-                                                    c.id !==
-                                                    chat.id
-                                                );
-
-                                            }
-                                        );
-
-
-                                    if (
-                                        currentChat &&
-                                        currentChat.id ===
-                                            chat.id
-                                    ) {
-
-                                        currentChat =
-                                            null;
-
-
-                                        renderChat();
-
-                                    }
-
-
-                                    saveChats();
-
-
-                                    renderChatList();
-
-
-                                    renderSidebarChats();
-
-
-                                    renderRecentChats();
-
-
-                                    confirmBox.remove();
-
-                                };
-
-                        }
-
-
-                        const cancelDelete =
-                            confirmBox.querySelector(
-                                ".cancel-delete"
-                            );
-
-
-                        if (cancelDelete) {
-
-                            cancelDelete.onclick =
-                                function () {
-
-                                    confirmBox.remove();
-
-                                };
-
-                        }
-
-                    };
-
-            }
-
-
-            list.appendChild(
-                item
-            );
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Recent Chats Popup
-// ======================================
-
-function renderRecentChats() {
-
-    if (!recentChatList)
-        return;
-
-
-    recentChatList.innerHTML =
-        "";
-
-
-    if (
-        chats.length ===
-        0
-    ) {
-
-        recentChatList.innerHTML =
-            "<div class='empty-chat'>لا توجد محادثات</div>";
-
-        return;
-
-    }
-
-
-    chats
-        .slice(
-            0,
-            8
-        )
-        .forEach(
-            function (
-                chat
-            ) {
-
-                const div =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                div.className =
-                    "recent-chat-item";
-
-
-                div.innerHTML = `
-                    <span class="chat-title">
-                        ${chatIcon}
-                        ${chat.title}
-                    </span>
-                `;
-
-
-                div.onclick =
-                    function () {
-
-                        currentChat =
-                            chat;
-
-
-                        renderChat();
-
-
-                        if (chatPopup) {
-
-                            chatPopup.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-                    };
-
-
-                recentChatList.appendChild(
-                    div
-                );
-
-            }
-        );
-
-}
-
-
-// ======================================
-// Chat Button
-// ======================================
-
-if (chatBtn) {
-
-    chatBtn.onclick =
-        function (e) {
-
-            e.stopPropagation();
-
-
-            if (!chatPopup)
-                return;
-
-
-            if (projectsPopup) {
-
-                projectsPopup.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            if (searchPopup) {
-
-                searchPopup.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            if (settingsWindow) {
-
-                settingsWindow.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            if (
-                chatPopup.classList.contains(
-                    "open"
-                )
-            ) {
-
-                chatPopup.classList.remove(
-                    "open"
-                );
-
-
-                return;
-
-            }
-
-
-            renderChatList();
-
-
-            chatPopup.classList.add(
-                "open"
-            );
-
-        };
-
-}
-
-
-// ======================================
-// Save Initial Projects/Chats State
-// ======================================
-
-saveProjects();
-saveChats();
-// ======================================
-// Word AI Assistant
-// PART 3 / 3
-// AI + Search + Send + Initialization
-// ======================================
-
 
 // =====================================================
 // AI SETTINGS
@@ -7328,7 +9535,7 @@ function getSavedSettings() {
         );
 
     }
-    catch (e) {
+    catch (error) {
 
         return {};
 
@@ -7336,10 +9543,6 @@ function getSavedSettings() {
 
 }
 
-
-// ======================================
-// Save AI Settings
-// ======================================
 
 function saveAISettings(
     data
@@ -7383,6 +9586,7 @@ function updateProviderInfo() {
         providerInfo.innerHTML =
             "OpenRouter: سيتم جلب النماذج المجانية المتاحة من حسابك.";
 
+
         return;
 
     }
@@ -7395,6 +9599,7 @@ function updateProviderInfo() {
 
         providerInfo.innerHTML =
             "Gemini: سيتم جلب النماذج التي تدعم generateContent.";
+
 
         return;
 
@@ -7409,6 +9614,7 @@ function updateProviderInfo() {
         providerInfo.innerHTML =
             "Groq: سيتم جلب النماذج المتاحة من حسابك.";
 
+
         return;
 
     }
@@ -7421,6 +9627,7 @@ function updateProviderInfo() {
 
         providerInfo.innerHTML =
             "OpenAI: سيتم جلب النماذج المتاحة من حسابك.";
+
 
         return;
 
@@ -7472,52 +9679,32 @@ function loadSettings() {
             "";
 
 
-        if (
-            savedModel !== ""
-        ) {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                savedModel;
-
-
-            option.textContent =
-                savedModel;
-
-
-            modelSelect.appendChild(
-                option
+        const option =
+            document.createElement(
+                "option"
             );
 
+
+        option.value =
+            savedModel;
+
+
+        option.textContent =
+            savedModel ||
+            "أدخل المفتاح ثم حدّث النماذج";
+
+
+        modelSelect.appendChild(
+            option
+        );
+
+
+        if (
+            savedModel
+        ) {
 
             modelSelect.value =
                 savedModel;
-
-        }
-        else {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                "";
-
-
-            option.textContent =
-                "أدخل المفتاح ثم حدّث النماذج";
-
-
-            modelSelect.appendChild(
-                option
-            );
 
         }
 
@@ -7579,82 +9766,6 @@ if (settingsBtn) {
 
 
             loadSettings();
-
-            // ======================================
-            // Temporary Index Test Bridge
-            // ======================================
-
-            window.testIstislahIndex = async function () {
-
-                try {
-
-                    if (!currentDocument) {
-
-                        console.warn(
-                            "لا يوجد مستند نشط."
-                        );
-
-                        return;
-
-                    }
-
-                    const result =
-                        await searchIndexedDocument(
-                            currentDocument.id,
-                            "استصلاح"
-                        );
-
-                    console.log(
-                        "======================================"
-                    );
-
-                    console.log(
-                        "اختبار استصلاح"
-                    );
-
-                    console.log(
-                        "المستند:",
-                        currentDocument.name
-                    );
-
-                    console.log(
-                        "عدد النتائج:",
-                        result.count
-                    );
-
-                    console.log(
-                        "العائلات المطابقة:",
-                        result.matchedFamilies
-                    );
-
-                    console.log(
-                        "عدد الظهورات:",
-                        result.indexedOccurrences
-                    );
-
-                    console.log(
-                        "أول النتائج:",
-                        result.results.slice(
-                            0,
-                            10
-                        )
-                    );
-
-                    console.log(
-                        "======================================"
-                    );
-
-                }
-                catch (error) {
-
-                    console.error(
-                        "فشل اختبار استصلاح:",
-                        error
-                    );
-
-                }
-
-            };
 
         };
 
@@ -7723,7 +9834,7 @@ if (closeSettings) {
 
 
 // ======================================
-// Show/Hide Key
+// Show / Hide Key
 // ======================================
 
 if (
@@ -7768,7 +9879,7 @@ if (
 
 
 // ======================================
-// Save Settings
+// Save AI Settings
 // ======================================
 
 if (saveSettings) {
@@ -7847,54 +9958,6 @@ if (saveSettings) {
 }
 
 
-// =====================================================
-// AI MODELS
-// =====================================================
-
-if (refreshModels) {
-
-    refreshModels.onclick =
-        async function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            refreshModels.disabled =
-                true;
-
-
-            try {
-
-                await loadModels();
-
-            }
-            catch (error) {
-
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        "⚠ " +
-                        (
-                            error.message ||
-                            "تعذر تحديث النماذج"
-                        );
-
-                }
-
-            }
-            finally {
-
-                refreshModels.disabled =
-                    false;
-
-            }
-
-        };
-
-}
-
-
 // ======================================
 // Load Models
 // ======================================
@@ -7914,6 +9977,7 @@ async function loadModels() {
 
         await loadOpenRouterModels();
 
+
         return;
 
     }
@@ -7925,6 +9989,7 @@ async function loadModels() {
     ) {
 
         await loadGeminiModels();
+
 
         return;
 
@@ -7938,6 +10003,7 @@ async function loadModels() {
 
         await loadGroqModels();
 
+
         return;
 
     }
@@ -7950,6 +10016,7 @@ async function loadModels() {
 
         await loadOpenAIModels();
 
+
         return;
 
     }
@@ -7960,6 +10027,7 @@ async function loadModels() {
     );
 
 }
+
 
 // ======================================
 // Groq Models
@@ -8000,7 +10068,7 @@ async function loadGroqModels() {
 
                 headers: {
 
-                    "Authorization":
+                    Authorization:
                         "Bearer " +
                         key,
 
@@ -8055,7 +10123,8 @@ async function loadGroqModels() {
                     return (
                         item &&
                         item.id &&
-                        item.active !== false
+                        item.active !==
+                            false
                     );
 
                 }
@@ -8105,9 +10174,9 @@ async function loadGroqModels() {
 
 }
 
+
 // ======================================
 // OpenRouter Models
-// تحميل النماذج المجانية
 // ======================================
 
 async function loadOpenRouterModels() {
@@ -8145,7 +10214,7 @@ async function loadOpenRouterModels() {
 
                 headers: {
 
-                    "Authorization":
+                    Authorization:
                         "Bearer " +
                         key,
 
@@ -8196,40 +10265,25 @@ async function loadOpenRouterModels() {
     }
 
 
-    // ==================================
-    // النماذج التي يعلن OpenRouter
-    // أنها مجانية صراحةً
-    // ==================================
-
     const freeModels =
         result.data.filter(
             function (
                 item
             ) {
 
-                if (
-                    !item ||
-                    !item.id
-                ) {
-
-                    return false;
-
-                }
-
-
-                return String(
-                    item.id
-                ).endsWith(
-                    ":free"
+                return (
+                    item &&
+                    item.id &&
+                    String(
+                        item.id
+                    ).endsWith(
+                        ":free"
+                    )
                 );
 
             }
         );
 
-
-    // ==================================
-    // تحويل النتائج إلى صيغة القائمة
-    // ==================================
 
     const models =
         freeModels.map(
@@ -8255,10 +10309,6 @@ async function loadOpenRouterModels() {
         );
 
 
-    // ==================================
-    // ترتيب النماذج
-    // ==================================
-
     models.sort(
         function (
             a,
@@ -8277,10 +10327,6 @@ async function loadOpenRouterModels() {
         }
     );
 
-
-    // ==================================
-    // عرض النماذج
-    // ==================================
 
     populateModels(
         models
@@ -8337,7 +10383,7 @@ async function loadOpenAIModels() {
 
                 headers: {
 
-                    "Authorization":
+                    Authorization:
                         "Bearer " +
                         key,
 
@@ -8499,8 +10545,10 @@ async function loadGeminiModels() {
         await fetch(
             url,
             {
+
                 method:
                     "GET"
+
             }
         );
 
@@ -8543,22 +10591,15 @@ async function loadGeminiModels() {
                 item
             ) {
 
-                if (
-                    !item ||
-                    !item.name ||
-                    !item.supportedGenerationMethods
-                ) {
-
-                    return false;
-
-                }
-
-
                 return (
-                    item.supportedGenerationMethods
-                        .includes(
-                            "generateContent"
-                        )
+                    item &&
+                    item.name &&
+                    Array.isArray(
+                        item.supportedGenerationMethods
+                    ) &&
+                    item.supportedGenerationMethods.includes(
+                        "generateContent"
+                    )
                 );
 
             }
@@ -8637,7 +10678,8 @@ function populateModels(
 
     if (
         !models ||
-        models.length === 0
+        models.length ===
+            0
     ) {
 
         const option =
@@ -8722,9 +10764,9 @@ function populateModels(
 }
 
 
-// =====================================================
-// AI CONNECTION TEST
-// =====================================================
+// ======================================
+// Test AI Connection
+// ======================================
 
 async function testAIConnection() {
 
@@ -8781,7 +10823,7 @@ async function testAIConnection() {
 
                     headers: {
 
-                        "Authorization":
+                        Authorization:
                             "Bearer " +
                             data.key,
 
@@ -8843,9 +10885,7 @@ async function testAIConnection() {
         }
 
 
-        return (
-            "✓ تم الاتصال بـ OpenRouter بنجاح"
-        );
+        return "✓ تم الاتصال بـ OpenRouter بنجاح";
 
     }
 
@@ -8865,7 +10905,7 @@ async function testAIConnection() {
 
                     headers: {
 
-                        "Authorization":
+                        Authorization:
                             "Bearer " +
                             data.key,
 
@@ -8921,9 +10961,7 @@ async function testAIConnection() {
         }
 
 
-        return (
-            "✓ تم الاتصال بـ OpenAI بنجاح"
-        );
+        return "✓ تم الاتصال بـ OpenAI بنجاح";
 
     }
 
@@ -9011,15 +11049,10 @@ async function testAIConnection() {
         }
 
 
-        return (
-            "✓ تم الاتصال بـ Gemini بنجاح"
-        );
+        return "✓ تم الاتصال بـ Gemini بنجاح";
 
     }
 
-    // ======================================
-    // Test Groq
-    // ======================================
 
     if (
         data.provider ===
@@ -9036,7 +11069,7 @@ async function testAIConnection() {
 
                     headers: {
 
-                        "Authorization":
+                        Authorization:
                             "Bearer " +
                             data.key,
 
@@ -9070,8 +11103,8 @@ async function testAIConnection() {
 
                         })
 
-                    }
-                );
+                }
+            );
 
 
         const result =
@@ -9092,11 +11125,10 @@ async function testAIConnection() {
         }
 
 
-        return (
-            "✓ تم الاتصال بـ Groq بنجاح"
-        );
+        return "✓ تم الاتصال بـ Groq بنجاح";
 
     }
+
 
     throw new Error(
         "مزود الذكاء الاصطناعي غير معروف."
@@ -9168,9 +11200,10 @@ if (testConnection) {
         };
 
 }
+
+
 // =====================================================
 // Detect Retrieval Profile
-// تحديد نوع الاسترجاع بحسب السؤال
 // =====================================================
 
 function getRetrievalProfile(
@@ -9182,10 +11215,6 @@ function getRetrievalProfile(
             query
         );
 
-
-    // ==================================
-    // الإعداد الافتراضي
-    // ==================================
 
     const profile = {
 
@@ -9201,12 +11230,8 @@ function getRetrievalProfile(
     };
 
 
-    // ==================================
-    // تعريف / معنى
-    // ==================================
-
     if (
-        /ماهو|ماهو|ماهى|ماهي|ما هي|المقصود|معنى|تعريف|يقصد ب|المراد ب/
+        /ماهو|ماهى|ماهي|ما هي|المقصود|معنى|تعريف|يقصد ب|المراد ب/
             .test(
                 text
             )
@@ -9215,23 +11240,22 @@ function getRetrievalProfile(
         profile.type =
             "definition";
 
+
         profile.maxResults =
             5;
 
+
         profile.maxChars =
             6000;
+
 
         return profile;
 
     }
 
 
-    // ==================================
-    // أثر / نتائج / تأثير
-    // ==================================
-
     if (
-        /اثر|أثر|تاثير|تأثير|نتائج|ينتج عن|يترتب على|انعكاس/
+        /اثر|تاثير|نتائج|ينتج عن|يترتب على|انعكاس/
             .test(
                 text
             )
@@ -9240,20 +11264,19 @@ function getRetrievalProfile(
         profile.type =
             "effect";
 
+
         profile.maxResults =
             8;
 
+
         profile.maxChars =
             9000;
+
 
         return profile;
 
     }
 
-
-    // ==================================
-    // مقارنة
-    // ==================================
 
     if (
         /الفرق|الفروق|مقارنة|يقارن|ما الفرق|التمييز بين|يفترق/
@@ -9265,23 +11288,22 @@ function getRetrievalProfile(
         profile.type =
             "comparison";
 
+
         profile.maxResults =
             10;
 
+
         profile.maxChars =
             10000;
+
 
         return profile;
 
     }
 
 
-    // ==================================
-    // أسباب / علل
-    // ==================================
-
     if (
-        /لماذا|سبب|اسباب|أسباب|علة|علل|لأن|لان|بسبب/
+        /لماذا|سبب|اسباب|علة|علل|لأن|لان|بسبب/
             .test(
                 text
             )
@@ -9290,23 +11312,22 @@ function getRetrievalProfile(
         profile.type =
             "causes";
 
+
         profile.maxResults =
             8;
 
+
         profile.maxChars =
             9000;
+
 
         return profile;
 
     }
 
 
-    // ==================================
-    // موضع / فصل / مبحث / مطلب
-    // ==================================
-
     if (
-        /اين|أين|موضع|موضعه|الفصل|المبحث|المطلب|الصفحة/
+        /اين|موضع|موضعه|الفصل|المبحث|المطلب|الصفحة/
             .test(
                 text
             )
@@ -9315,11 +11336,14 @@ function getRetrievalProfile(
         profile.type =
             "location";
 
+
         profile.maxResults =
             6;
 
+
         profile.maxChars =
             6000;
+
 
         return profile;
 
@@ -9330,10 +11354,9 @@ function getRetrievalProfile(
 
 }
 
+
 // =====================================================
 // Get Retrieval Limits
-// تحديد حجم سياق المستند بحسب المزود
-// دون ربطه باسم نموذج محدد
 // =====================================================
 
 function getRetrievalLimits(
@@ -9343,13 +11366,10 @@ function getRetrievalLimits(
 
     const providerValue =
         String(
-            providerName || ""
+            providerName ||
+            ""
         ).toLowerCase();
 
-
-    // ==================================
-    // Groq
-    // ==================================
 
     if (
         providerValue ===
@@ -9369,10 +11389,6 @@ function getRetrievalLimits(
     }
 
 
-    // ==================================
-    // OpenRouter
-    // ==================================
-
     if (
         providerValue ===
         "openrouter"
@@ -9390,10 +11406,6 @@ function getRetrievalLimits(
 
     }
 
-
-    // ==================================
-    // Gemini
-    // ==================================
 
     if (
         providerValue ===
@@ -9413,10 +11425,6 @@ function getRetrievalLimits(
     }
 
 
-    // ==================================
-    // OpenAI
-    // ==================================
-
     if (
         providerValue ===
         "openai"
@@ -9435,10 +11443,6 @@ function getRetrievalLimits(
     }
 
 
-    // ==================================
-    // الافتراضي
-    // ==================================
-
     return {
 
         maxResults:
@@ -9450,9 +11454,10 @@ function getRetrievalLimits(
     };
 
 }
+
+
 // =====================================================
 // Estimate Token Count
-// تقدير تقريبي لعدد التوكنات
 // =====================================================
 
 function estimateTokenCount(
@@ -9461,15 +11466,17 @@ function estimateTokenCount(
 
     return Math.ceil(
         String(
-            text || ""
-        ).length / 4
+            text ||
+            ""
+        ).length /
+        4
     );
 
 }
+
+
 // =====================================================
 // Build AI Document Context
-// بناء سياق المستند للذكاء الاصطناعي
-// مع حفظ مصادر الإحالات
 // =====================================================
 
 async function buildAIDocumentContext(
@@ -9601,7 +11608,10 @@ async function buildAIDocumentContext(
                         maxResults,
 
                     maxChars:
-                        maxChars
+                        maxChars,
+
+                    includeNeighbors:
+                        true
 
                 }
             );
@@ -9634,10 +11644,6 @@ async function buildAIDocumentContext(
 
         }
 
-
-        // ==================================
-        // حفظ مصادر المقاطع
-        // ==================================
 
         currentCitationSources =
             Array.isArray(
@@ -9761,9 +11767,10 @@ async function buildAIDocumentContext(
     }
 
 }
+
+
 // =====================================================
 // AI REQUEST
-// إرسال السؤال مع سياق المستند عند توفره
 // =====================================================
 
 async function askAI(
@@ -9809,20 +11816,19 @@ async function askAI(
     }
 
 
+    // مهم:
+    // بناء سياق المستند قبل حساب historyLimit
+    // حتى لا يحدث الوصول إلى const قبل تهيئته.
 
-    // ======================================
-    // بناء سياق المحادثة السابقة
-    // ======================================
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
 
     const conversationMessages =
         [];
 
-
-    // ======================================
-    // عدد الرسائل السابقة
-    // أقل عند وجود مستند
-    // لأن سياق المستند سيُضاف من جديد
-    // ======================================
 
     const historyLimit =
         documentContext &&
@@ -9865,10 +11871,6 @@ async function askAI(
                     ).trim();
 
 
-                // ==================================
-                // حد أقصى لطول الرسالة السابقة
-                // ==================================
-
                 const maxHistoryChars =
                     documentContext &&
                     documentContext.found
@@ -9910,20 +11912,6 @@ async function askAI(
     }
 
 
-    // ======================================
-    // استرجاع سياق المستند النشط مرة واحدة
-    // ======================================
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
-
-
-    // ======================================
-    // بناء محتوى رسالة المستخدم
-    // ======================================
-
     let userContent =
         text;
 
@@ -9958,48 +11946,38 @@ async function askAI(
                 "العائلات المطابقة: " +
                     (
                         documentContext.matchedFamilies &&
-                        documentContext.matchedFamilies.length > 0
-                            ? documentContext.matchedFamilies.join("، ")
+                        documentContext.matchedFamilies.length
+                            ? documentContext.matchedFamilies.join(
+                                "، "
+                            )
                             : "لا توجد"
                     ),
 
                 "",
 
-                "=== بداية المادة المستخرجة من المستند ===",
+                "=== المادة المستخرجة من المستند ===",
                 documentContext.text,
-                "=== نهاية المادة المستخرجة من المستند ===",
 
                 "",
-
-                // ======================================
-                // قواعد الإجابة
-                // ======================================
 
                 "=== قواعد الإجابة ===",
                 "أجب عن سؤال المستخدم اعتمادًا على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
                 "استخرج الأفكار المرتبطة بالسؤال فقط.",
                 "ادمج الأفكار المتشابهة في فكرة واحدة ولا تكررها بصيغ مختلفة.",
-                "رتب الإجابة وفق محاور السؤال، ولا تنتقل بين الأفكار دون حاجة.",
+                "رتب الإجابة وفق محاور السؤال.",
                 "إذا كان السؤال يتضمن أكثر من جانب، أجب عن جميع الجوانب التي تدعمها المقاطع.",
                 "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المقاطع المستخرجة.",
                 "إذا لم تتوفر في المقاطع إجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
                 "لا تستخدم المعرفة العامة لسد نقص المستند إلا إذا طلب المستخدم ذلك صراحة.",
+                "استبعد المقاطع التي لا تجيب مباشرة عن السؤال حتى لو احتوت كلمات البحث.",
+                "إذا تكررت الفكرة نفسها في أكثر من مقطع، اذكرها مرة واحدة واجمع الإحالات.",
+                "لا تذكر مشكلة الدراسة أو أهداف البحث أو منهجه أو أسئلته إلا إذا طلب المستخدم ذلك صراحة.",
+                "ضع الإحالة [مقطع رقم] بعد الفكرة التي يدعمها المقطع.",
+                "لا تخترع أرقام المقاطع أو الإحالات.",
                 "حافظ على العربية والأسلوب الأكاديمي الواضح.",
                 "لا تبدأ باعتذار أو تمهيد عام غير ضروري.",
                 "لا تعيد صياغة سؤال المستخدم.",
-                "اجعل الإجابة مترابطة ومعتدلة الطول، ولا تحول كل مقطع إلى نقطة مستقلة إذا كانت المقاطع تخدم الفكرة نفسها.",
-                "ضع الإحالة [مقطع رقم] بعد الفكرة أو المجموعة من الأفكار التي يدعمها ذلك المقطع.",
-                "لا تكرر الإحالة نفسها دون فائدة.",
-                "لا تخترع أرقام مقاطع أو تنسب فكرة إلى مقطع لا يدعمها.",
-                "لا تذكر صياغة مشكلة الدراسة أو أهداف البحث أو منهجه أو أسئلته أو عبارات الباحث المنهجية إلا إذا كان السؤال يطلبها صراحة.",
-                "استبعد من الإجابة أي مقطع مستخرج لا يجيب مباشرة عن سؤال المستخدم، حتى لو كان يحتوي كلمات البحث نفسها.",
-                "إذا تكررت الفكرة نفسها في أكثر من مقطع، اذكرها مرة واحدة فقط، واجمع الإحالات المتعددة في نهاية الفكرة.",
-                "لا تنشئ فقرة جديدة لمجرد وجود مقطع جديد إذا كان المقطع يكرر المعنى السابق.",
-                "قدّم خلاصة تركيبية للمقاطع بدل تلخيص كل مقطع على حدة.",
-                "لا تذكر صياغة مشكلة الدراسة أو سؤال الدراسة أو أهداف البحث أو منهجه أو ألفاظ الباحث المنهجية إلا إذا طلب المستخدم ذلك صراحة.",
-                "وجود كلمات السؤال داخل المقطع لا يعني أن المقطع صالح للإجابة؛ استخدم فقط ما يجيب مباشرة عن السؤال.",
-                "إذا احتوى المقطع على معلومة جانبية لا تخدم السؤال مباشرة، فتجاهلها.",
-                "لا تحوّل كل مقطع مستخرج إلى فقرة في الإجابة؛ انتقِ فقط المقاطع التي تحمل جوابًا مباشرًا."  
+                "قدّم خلاصة تركيبية مترابطة من المادة المستخرجة."
 
             ].join(
                 "\n"
@@ -10007,10 +11985,6 @@ async function askAI(
 
     }
 
-
-    // ======================================
-    // إضافة السؤال النهائي
-    // ======================================
 
     conversationMessages.push({
 
@@ -10022,10 +11996,6 @@ async function askAI(
 
     });
 
-
-    // ======================================
-    // OpenRouter
-    // ======================================
 
     if (
         selectedProvider ===
@@ -10045,7 +12015,7 @@ async function askAI(
                         "Content-Type":
                             "application/json",
 
-                        "Authorization":
+                        Authorization:
                             "Bearer " +
                             key
 
@@ -10078,7 +12048,9 @@ async function askAI(
             );
 
 
-        if (!response.ok) {
+        if (
+            !response.ok
+        ) {
 
             throw new Error(
                 getAPIError(
@@ -10098,10 +12070,6 @@ async function askAI(
     }
 
 
-    // ======================================
-    // OpenAI
-    // ======================================
-
     if (
         selectedProvider ===
         "openai"
@@ -10120,7 +12088,7 @@ async function askAI(
                         "Content-Type":
                             "application/json",
 
-                        "Authorization":
+                        Authorization:
                             "Bearer " +
                             key
 
@@ -10153,7 +12121,9 @@ async function askAI(
             );
 
 
-        if (!response.ok) {
+        if (
+            !response.ok
+        ) {
 
             throw new Error(
                 getAPIError(
@@ -10172,10 +12142,6 @@ async function askAI(
 
     }
 
-
-    // ======================================
-    // Gemini
-    // ======================================
 
     if (
         selectedProvider ===
@@ -10263,7 +12229,9 @@ async function askAI(
             );
 
 
-        if (!response.ok) {
+        if (
+            !response.ok
+        ) {
 
             throw new Error(
                 getAPIError(
@@ -10281,9 +12249,6 @@ async function askAI(
 
     }
 
-    // ======================================
-    // Groq
-    // ======================================
 
     if (
         selectedProvider ===
@@ -10303,7 +12268,7 @@ async function askAI(
                         "Content-Type":
                             "application/json",
 
-                        "Authorization":
+                        Authorization:
                             "Bearer " +
                             key
 
@@ -10326,8 +12291,8 @@ async function askAI(
 
                         })
 
-                    }
-                );
+                }
+            );
 
 
         const result =
@@ -10336,7 +12301,9 @@ async function askAI(
             );
 
 
-        if (!response.ok) {
+        if (
+            !response.ok
+        ) {
 
             throw new Error(
                 getAPIError(
@@ -10355,6 +12322,7 @@ async function askAI(
 
     }
 
+
     throw new Error(
         "مزود الذكاء الاصطناعي غير معروف: " +
         selectedProvider
@@ -10363,5231 +12331,9 @@ async function askAI(
 }
 
 
-// ======================================
-// Gemini Model Normalization
-// ======================================
-
-function normalizeGeminiModel(
-    model
-) {
-
-    return String(
-        model || ""
-    ).replace(
-        /^models\//,
-        ""
-    );
-
-}
-
-
-// ======================================
-// JSON
-// ======================================
-
-async function readJSON(
-    response
-) {
-
-    try {
-
-        return await response.json();
-
-    }
-    catch (e) {
-
-        return {};
-
-    }
-
-}
-
-
-// ======================================
-// API Error
-// عرض تفاصيل خطأ API كاملة
-// ======================================
-
-function getAPIError(
-    result,
-    fallback
-) {
-
-    if (!result) {
-
-        return fallback;
-
-    }
-
-
-    if (result.error) {
-
-        if (
-            typeof result.error ===
-            "string"
-        ) {
-
-            return result.error;
-
-        }
-
-
-        if (
-            result.error.message
-        ) {
-
-            let message =
-                result.error.message;
-
-
-            if (
-                result.error.code
-            ) {
-
-                message +=
-                    " | Code: " +
-                    result.error.code;
-
-            }
-
-
-            return message;
-
-        }
-
-    }
-
-
-    if (
-        result.message
-    ) {
-
-        return String(
-            result.message
-        );
-
-    }
-
-
-    return fallback;
-
-}
-
-
-// ======================================
-// OpenAI/OpenRouter Answer
-// ======================================
-
-function extractOpenAIStyleAnswer(
-    result,
-    providerName
-) {
-
-    if (
-        result &&
-        result.choices &&
-        result.choices.length > 0
-    ) {
-
-        const choice =
-            result.choices[0];
-
-
-        if (
-            choice.message &&
-            typeof choice.message.content ===
-            "string"
-        ) {
-
-            return choice.message.content;
-
-        }
-
-    }
-
-
-    throw new Error(
-        "لم يصل رد صالح من " +
-        providerName +
-        "."
-    );
-
-}
-
-
-// ======================================
-// Gemini Answer
-// ======================================
-
-function extractGeminiAnswer(
-    result
-) {
-
-    if (
-        result &&
-        result.candidates &&
-        result.candidates.length > 0
-    ) {
-
-        const candidate =
-            result.candidates[0];
-
-
-        if (
-            candidate.content &&
-            Array.isArray(
-                candidate.content.parts
-            )
-        ) {
-
-            const answerParts =
-                candidate.content.parts
-                    .filter(
-                        function (
-                            part
-                        ) {
-
-                            if (
-                                !part ||
-                                typeof part.text !==
-                                    "string"
-                            ) {
-
-                                return false;
-
-                            }
-
-
-                            // ==============================
-                            // تجاهل أجزاء التفكير
-                            // ==============================
-
-                            if (
-                                part.thought ===
-                                true
-                            ) {
-
-                                return false;
-
-                            }
-
-
-                            return true;
-
-                        }
-                    )
-                    .map(
-                        function (
-                            part
-                        ) {
-
-                            return part.text;
-
-                        }
-                    );
-
-
-            if (
-                answerParts.length >
-                0
-            ) {
-
-                return answerParts.join(
-                    "\n"
-                ).trim();
-
-            }
-
-        }
-
-    }
-
-
-    throw new Error(
-        "لم يصل رد صالح من Gemini."
-    );
-
-}
-
-
-// =====================================================
-// Search Document Context
-// البحث النصي القديم - للإبقاء على الوظيفة
-// =====================================================
-
-async function searchDocumentContext(
-    documentId,
-    query
-) {
-
-    const searchTerm =
-        normalizeSearchText(
-            query
-        );
-
-
-    if (!searchTerm) {
-
-        return {
-
-            query:
-                "",
-
-            count:
-                0,
-
-            results:
-                []
-
-        };
-
-    }
-
-
-    const structureData =
-        await getDocumentStructure(
-            documentId
-        );
-
-
-    if (!structureData) {
-
-        throw new Error(
-            "لا توجد بنية محفوظة لهذا المستند."
-        );
-
-    }
-
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-
-    const headings =
-        Array.isArray(
-            structureData.headings
-        )
-            ? structureData.headings
-            : [];
-
-
-    const results =
-        [];
-
-
-    paragraphs.forEach(
-        function (
-            paragraph
-        ) {
-
-            if (
-                !paragraph ||
-                !paragraph.text
-            ) {
-
-                return;
-
-            }
-
-
-            const originalText =
-                String(
-                    paragraph.text
-                );
-
-
-            const normalizedParagraph =
-                normalizeSearchText(
-                    originalText
-                );
-
-
-            if (
-                !normalizedParagraph.includes(
-                    searchTerm
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            let nearestHeading =
-                null;
-
-
-            for (
-                let i =
-                    headings.length - 1;
-                i >= 0;
-                i--
-            ) {
-
-                const heading =
-                    headings[i];
-
-
-                if (
-                    heading &&
-                    heading.index <
-                        paragraph.index
-                ) {
-
-                    nearestHeading =
-                        heading;
-
-                    break;
-
-                }
-
-            }
-
-
-            const position =
-                normalizedParagraph.indexOf(
-                    searchTerm
-                );
-
-
-            const start =
-                Math.max(
-                    0,
-                    position - 100
-                );
-
-
-            const end =
-                Math.min(
-                    originalText.length,
-                    position +
-                    searchTerm.length +
-                    160
-                );
-
-
-            results.push({
-
-                paragraphIndex:
-                    paragraph.index,
-
-                paragraphId:
-                    paragraph.id,
-
-                text:
-                    originalText,
-
-                context:
-                    originalText.substring(
-                        start,
-                        end
-                    ),
-
-                heading:
-                    nearestHeading
-                        ? nearestHeading.text
-                        : "",
-
-                headingLevel:
-                    nearestHeading
-                        ? nearestHeading.style
-                        : ""
-
-            });
-
-        }
-    );
-
-
-    return {
-
-        query:
-            searchTerm,
-
-        count:
-            results.length,
-
-        results:
-            results
-
-    };
-
-}
-
-// ======================================
-// Search Query Tokens
-// تنظيف سؤال البحث من الكلمات العامة
-// ======================================
-
-function getSearchQueryTokens(
-    query
-) {
-
-    const tokens =
-        tokenizeDocumentText(
-            query
-        );
-
-    const stopWords =
-        new Set([
-
-            "ما",
-            "ماذا",
-            "من",
-            "هو",
-            "هي",
-            "هم",
-            "في",
-            "على",
-            "عن",
-            "الى",
-            "إلى",
-            "منه",
-            "بها",
-            "به",
-            "لها",
-            "له",
-            "هذا",
-            "هذه",
-            "ذلك",
-            "تلك",
-            "الذي",
-            "التي",
-            "الذين",
-            "بين",
-            "مع",
-            "ثم",
-            "او",
-            "أو",
-            "و",
-            "ف",
-            "ب",
-            "ك",
-            "ل",
-            "أن",
-            "إن",
-            "هل",
-            "كيف",
-            "لماذا",
-            "أي",
-            "اي",
-            "كان",
-            "كانت",
-            "يكون",
-            "تكون"
-        ]);
-
-
-    const filtered =
-        tokens.filter(
-            function (
-                token
-            ) {
-
-                return (
-                    token.length > 2 &&
-                    !stopWords.has(
-                        token
-                    )
-                );
-
-            }
-        );
-
-
-    // إذا لم يبق شيء نستخدم الكلمات الأصلية
-    return (
-        filtered.length > 0
-            ? filtered
-            : tokens
-    );
-
-}
-// =====================================================
-// Orama Experimental Engine
-// محرك Orama التجريبي
-// =====================================================
-
-let oramaDocumentDb =
-    null;
-
-let oramaDocumentId =
-    null;
-
-
-function getOramaEngine() {
-
-    if (
-        typeof require !==
-        "function"
-    ) {
-
-        throw new Error(
-            "Webpack require غير متاح في هذه البيئة."
-        );
-
-    }
-
-
-    return require(
-        "@orama/orama"
-    );
-
-}
- // =====================================================
-// Build Orama Document Index
-// بناء فهرس Orama التجريبي
-// يدعم العربية
-// =====================================================
-
-async function buildOramaDocumentIndex(
-    documentItem
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        return null;
-
-    }
-
-
-    // ==================================
-    // تحميل Orama
-    // ==================================
-
-    const {
-        create,
-        insertMultiple
-    } =
-        require(
-            "@orama/orama"
-        );
-
-
-    // ==================================
-    // تحميل مكونات Orama
-    // ==================================
-
-    const {
-        tokenizer
-    } =
-        require(
-            "@orama/orama/components"
-        );
-
-
-    // ==================================
-    // إنشاء tokenizer عربي
-    // ==================================
-
-    const arabicTokenizer =
-        await tokenizer.createTokenizer(
-            {
-                language:
-                    "arabic",
-
-                stemming:
-                    true
-            }
-        );
-
-
-    // ==================================
-    // تحميل بنية المستند الحالية
-    // ==================================
-
-    const structureData =
-        await ensureDocumentStructure(
-            documentItem
-        );
-
-
-    if (
-        !structureData
-    ) {
-
-        return null;
-
-    }
-
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-
-    const headings =
-        Array.isArray(
-            structureData.headings
-        )
-            ? structureData.headings
-            : [];
-
-
-    // ==================================
-    // إنشاء قاعدة Orama
-    // ==================================
-
-    const db =
-        create({
-
-            schema: {
-
-                paragraphIndex:
-                    "number",
-
-                paragraphId:
-                    "string",
-
-                text:
-                    "string",
-
-                heading:
-                    "string",
-
-                headingLevel:
-                    "string"
-
-            },
-
-            components: {
-
-                tokenizer:
-                    arabicTokenizer
-
-            }
-
-        });
-
-
-    // ==================================
-    // ترتيب العناوين
-    // ==================================
-
-    const headingList =
-        headings
-            .filter(
-                function (
-                    heading
-                ) {
-
-                    return (
-                        heading &&
-                        typeof heading.index !==
-                            "undefined"
-                    );
-
-                }
-            )
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return (
-                        Number(
-                            a.index
-                        ) -
-                        Number(
-                            b.index
-                        )
-                    );
-
-                }
-            );
-
-
-    // ==================================
-    // بناء سجلات الفقرات
-    // ==================================
-
-    const records =
-        [];
-
-
-    paragraphs.forEach(
-        function (
-            paragraph
-        ) {
-
-            if (
-                !paragraph
-            ) {
-
-                return;
-
-            }
-
-
-            const text =
-                String(
-                    paragraph.text ||
-                    ""
-                ).trim();
-
-
-            if (
-                !text
-            ) {
-
-                return;
-
-            }
-
-
-            // ==================================
-            // العثور على أقرب عنوان
-            // ==================================
-
-            let nearestHeading =
-                null;
-
-
-            for (
-                let i =
-                    headingList.length - 1;
-
-                i >= 0;
-
-                i--
-            ) {
-
-                const heading =
-                    headingList[i];
-
-
-                if (
-                    Number(
-                        heading.index
-                    ) <
-                    Number(
-                        paragraph.index
-                    )
-                ) {
-
-                    nearestHeading =
-                        heading;
-
-                    break;
-
-                }
-
-            }
-
-
-            records.push({
-
-                paragraphIndex:
-                    Number(
-                        paragraph.index
-                    ),
-
-                paragraphId:
-                    String(
-                        paragraph.id ||
-                        paragraph.index
-                    ),
-
-                text:
-                    text,
-
-                heading:
-                    nearestHeading
-                        ? String(
-                            nearestHeading.text ||
-                            ""
-                        )
-                        : "",
-
-                headingLevel:
-                    nearestHeading
-                        ? String(
-                            nearestHeading.style ||
-                            ""
-                        )
-                        : ""
-
-            });
-
-        }
-    );
-
-
-    // ==================================
-    // إدخال الفقرات
-    // ==================================
-
-    if (
-        records.length >
-        0
-    ) {
-
-        await insertMultiple(
-            db,
-            records
-        );
-
-                console.log(
-            "تم إدخال سجلات Orama:",
-            records.length
-        );
-
-    }
-
-
-    // ==================================
-    // حفظ الفهرس التجريبي
-    // ==================================
-
-    oramaDocumentDb =
-        db;
-
-
-    oramaDocumentId =
-        String(
-            documentItem.id
-        );
-
-
-    console.log(
-        "تم بناء فهرس Orama العربي:",
-        records.length,
-        "فقرة"
-    );
-
-
-    return db;
-
-}
-
-
-window.testOramaSearch =
-    async function (
-        query
-    ) {
-
-        console.log(
-            "بدء اختبار Orama:",
-            query
-        );
-
-
-        if (
-            !currentDocument
-        ) {
-
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
-
-            return [];
-
-        }
-
-
-        try {
-
-            const results =
-                await searchOramaDocument(
-                    currentDocument,
-                    query
-                );
-
-
-            console.log(
-                "======================================"
-            );
-
-            console.log(
-                "نتائج Orama:"
-            );
-
-            console.log(
-                "عدد النتائج:",
-                results.length
-            );
-
-            console.log(
-                "======================================"
-            );
-
-
-            results.forEach(
-                function (
-                    result,
-                    index
-                ) {
-
-                    console.log(
-                        "#" +
-                        (
-                            index + 1
-                        ),
-
-                        "score:",
-                        result.score,
-
-                        "heading:",
-                        result.heading,
-
-                        "paragraphIndex:",
-                        result.paragraphIndex,
-
-                        "text:",
-                        result.text
-                    );
-
-                }
-            );
-
-
-            return results;
-
-        }
-        catch (
-            error
-        ) {
-
-            console.error(
-                "فشل اختبار Orama:",
-                error
-            );
-
-            return [];
-
-        }
-
-    };
-// =====================================================
-// Orama Console Test
-// اختبار Orama من Console
-// =====================================================
-
-window.testOramaSearch =
-    async function (
-        query
-    ) {
-
-        try {
-
-            if (
-                !currentDocument
-            ) {
-
-                console.warn(
-                    "لا يوجد مستند نشط."
-                );
-
-                return [];
-
-            }
-
-
-            console.log(
-                "بدء اختبار Orama..."
-            );
-
-
-            const results =
-                await searchOramaDocument(
-                    currentDocument,
-                    query
-                );
-
-
-            console.log(
-                "===================================="
-            );
-
-            console.log(
-                "نتائج Orama"
-            );
-
-            console.log(
-                "السؤال:",
-                query
-            );
-
-            console.log(
-                "عدد النتائج:",
-                results.length
-            );
-
-            console.log(
-                "===================================="
-            );
-
-
-            results.forEach(
-                function (
-                    result,
-                    index
-                ) {
-
-                    console.log(
-                        "#" +
-                        (
-                            index + 1
-                        ),
-                        {
-                            score:
-                                result.score,
-
-                            heading:
-                                result.heading,
-
-                            paragraphIndex:
-                                result.paragraphIndex,
-
-                            paragraphId:
-                                result.paragraphId,
-
-                            text:
-                                String(
-                                    result.text ||
-                                    ""
-                                ).substring(
-                                    0,
-                                    300
-                                )
-
-                        }
-                    );
-
-                }
-            );
-
-
-            return results;
-
-        }
-        catch (
-            error
-        ) {
-
-            console.error(
-                "فشل اختبار Orama:",
-                error
-            );
-
-
-            return [];
-
-        }
-
-    };
-
-// ======================================
-// Heading Level Number
-// تحويل Heading1 / Heading2 / Heading3
-// إلى رقم للمقارنة بين مستويات العناوين
-// ======================================
-
-function getHeadingLevelNumber(
-    style
-) {
-
-    const match =
-        String(
-            style ||
-            ""
-        ).match(
-            /Heading\s*([1-9])/i
-        );
-
-
-    if (
-        match
-    ) {
-
-        return Number(
-            match[1]
-        );
-
-    }
-
-
-    return 9;
-
-}
-
-// =====================================================
-// Build Orama Retrieval Index
-// بناء فهرس الاسترجاع الرئيسي باستخدام Orama
-// =====================================================
-
-async function ensureOramaRetrievalIndex(
-    documentItem,
-    structureData
-) {
-
-    const {
-        create,
-        insertMultiple
-    } =
-        require(
-            "@orama/orama"
-        );
-
-
-    // ==================================
-    // إنشاء مفتاح ذاكرة للفهرس
-    // ==================================
-
-    const cacheKey =
-        [
-
-            String(
-                documentItem.id
-            ),
-
-            String(
-                documentItem.indexUpdatedAt ||
-                ""
-            ),
-
-            String(
-                (
-                    structureData.paragraphs ||
-                    []
-                ).length
-            ),
-
-            String(
-                (
-                    structureData.headings ||
-                    []
-                ).length
-            )
-
-        ].join(
-            "|"
-        );
-
-
-    // ==================================
-    // استخدام الفهرس الموجود
-    // ==================================
-
-    if (
-        oramaRetrievalDb &&
-        oramaRetrievalCacheKey ===
-            cacheKey
-    ) {
-
-        return oramaRetrievalDb;
-
-    }
-
-
-    // ==================================
-    // إنشاء قاعدة Orama عربية
-    // ==================================
-
-    const db =
-        create({
-
-            schema: {
-
-                id:
-                    "string",
-
-                paragraphIndex:
-                    "number",
-
-                text:
-                    "string",
-
-                heading:
-                    "string",
-
-                headingIndex:
-                    "number",
-
-                headingLevel:
-                    "string",
-
-                isHeading:
-                    "boolean"
-
-            },
-
-            language:
-                "arabic"
-
-        });
-
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-
-    const headings =
-        Array.isArray(
-            structureData.headings
-        )
-            ? structureData.headings
-                .filter(
-                    function (
-                        heading
-                    ) {
-
-                        return (
-                            heading &&
-                            typeof heading.index !==
-                                "undefined" &&
-                            String(
-                                heading.text ||
-                                ""
-                            ).trim()
-                        );
-
-                    }
-                )
-                .sort(
-                    function (
-                        a,
-                        b
-                    ) {
-
-                        return (
-                            Number(
-                                a.index
-                            ) -
-                            Number(
-                                b.index
-                            )
-                        );
-
-                    }
-                )
-            : [];
-
-
-    // ==================================
-    // خريطة العناوين
-    // ==================================
-
-    const headingMap =
-        new Map();
-
-
-    headings.forEach(
-        function (
-            heading
-        ) {
-
-            headingMap.set(
-                Number(
-                    heading.index
-                ),
-                heading
-            );
-
-        }
-    );
-
-
-    // ==================================
-    // تحديد عنوان الفقرة
-    // ==================================
-
-    function getParagraphHeading(
-        paragraphIndex
-    ) {
-
-        // الفقرة نفسها عنوان
-        if (
-            headingMap.has(
-                paragraphIndex
-            )
-        ) {
-
-            return headingMap.get(
-                paragraphIndex
-            );
-
-        }
-
-
-        // البحث عن أقرب عنوان سابق
-        for (
-            let i =
-                headings.length - 1;
-
-            i >= 0;
-
-            i--
-        ) {
-
-            const heading =
-                headings[i];
-
-
-            if (
-                Number(
-                    heading.index
-                ) <
-                paragraphIndex
-            ) {
-
-                return heading;
-
-            }
-
-        }
-
-
-        return null;
-
-    }
-
-
-    // ==================================
-    // سجلات Orama
-    // ==================================
-
-    const records =
-        [];
-
-
-    paragraphs.forEach(
-        function (
-            paragraph
-        ) {
-
-            if (
-                !paragraph
-            ) {
-
-                return;
-
-            }
-
-
-            const text =
-                String(
-                    paragraph.text ||
-                    ""
-                ).trim();
-
-
-            if (
-                !text
-            ) {
-
-                return;
-
-            }
-
-
-            const paragraphIndex =
-                Number(
-                    paragraph.index
-                );
-
-
-            const heading =
-                getParagraphHeading(
-                    paragraphIndex
-                );
-
-
-            const isHeading =
-                heading &&
-                Number(
-                    heading.index
-                ) ===
-                paragraphIndex;
-
-
-            records.push({
-
-                id:
-                    "p-" +
-                    String(
-                        paragraphIndex
-                    ),
-
-                paragraphIndex:
-                    paragraphIndex,
-
-                text:
-                    text,
-
-                heading:
-                    heading
-                        ? String(
-                            heading.text ||
-                            ""
-                        ).trim()
-                        : "",
-
-                headingIndex:
-                    heading
-                        ? Number(
-                            heading.index
-                        )
-                        : -1,
-
-                headingLevel:
-                    heading
-                        ? String(
-                            heading.style ||
-                            ""
-                        )
-                        : "",
-
-                isHeading:
-                    Boolean(
-                        isHeading
-                    )
-
-            });
-
-        }
-    );
-
-
-    // ==================================
-    // إدخال الفقرات
-    // ==================================
-
-    if (
-        records.length
-    ) {
-
-        insertMultiple(
-            db,
-            records
-        );
-
-    }
-
-
-    // ==================================
-    // حفظ الذاكرة
-    // ==================================
-
-    oramaRetrievalDb =
-        db;
-
-    oramaRetrievalCacheKey =
-        cacheKey;
-
-
-    console.log(
-        "تم بناء فهرس Orama للاسترجاع:",
-        records.length,
-        "فقرة"
-    );
-
-
-    return db;
-
-}
-// =====================================================
-// Search Indexed Document
-// البحث الذكي بالعائلات + الكلمات + أولوية العناوين والمطالب
-// =====================================================
-
-async function searchIndexedDocument(
-    documentId,
-    query,
-    options
-) {
-
-    // ==================================
-    // تطبيع الاستعلام
-    // ==================================
-
-    const searchTerm =
-        normalizeSearchText(
-            query
-        );
-
-
-    if (!searchTerm) {
-
-        return {
-
-            query:
-                "",
-
-            count:
-                0,
-
-            results:
-                []
-
-        };
-
-    }
-
-
-    // ==================================
-    // المستند
-    // ==================================
-
-    const documentItem =
-        documents.find(
-            function (
-                doc
-            ) {
-
-                return (
-                    doc &&
-                    String(doc.id) ===
-                    String(documentId)
-                );
-
-            }
-        ) ||
-        currentDocument;
-
-
-    if (!documentItem) {
-
-        throw new Error(
-            "لم يتم العثور على المستند."
-        );
-
-    }
-
-
-    // ==================================
-    // الفهرس
-    // ==================================
-
-    const indexData =
-        await ensureDocumentIndex(
-            documentItem
-        );
-
-
-    if (!indexData) {
-
-        throw new Error(
-            "لا يوجد فهرس صالح لهذا المستند."
-        );
-
-    }
-
-
-    const indexedTerms =
-        indexData.terms ||
-        {};
-
-
-    const indexedFamilies =
-        indexData.families ||
-        {};
-
-
-    // ==================================
-    // كلمات الاستعلام
-    // ==================================
-
-    const queryTokens =
-        getSearchQueryTokens(
-            searchTerm
-        );
-
-
-    if (
-        queryTokens.length ===
-        0
-    ) {
-
-        return {
-
-            query:
-                searchTerm,
-
-            count:
-                0,
-
-            results:
-                []
-
-        };
-
-    }
-
-
-    // ==================================
-    // عائلات الاستعلام
-    // ==================================
-
-    const indexedSurfaceSet =
-        new Set(
-            Object.keys(
-                indexedTerms
-            )
-        );
-
-
-    const queryFamilyKeys =
-        [];
-
-
-    queryTokens.forEach(
-        function (
-            token
-        ) {
-
-            const familyKey =
-                getConservativeFamilyKey(
-                    token,
-                    indexedSurfaceSet
-                );
-
-
-            if (
-                familyKey &&
-                !queryFamilyKeys.includes(
-                    familyKey
-                )
-            ) {
-
-                queryFamilyKeys.push(
-                    familyKey
-                );
-
-            }
-
-        }
-    );
-
-
-    const matchedFamilies =
-        queryFamilyKeys.filter(
-            function (
-                familyKey
-            ) {
-
-                return Boolean(
-                    indexedFamilies[
-                        familyKey
-                    ]
-                );
-
-            }
-        );
-
-
-    // ==================================
-    // الكلمات المطابقة حرفيًا
-    // ==================================
-
-    const matchedExactTerms =
-        queryTokens.filter(
-            function (
-                token
-            ) {
-
-                return Boolean(
-                    indexedTerms[
-                        token
-                    ]
-                );
-
-            }
-        );
-
-
-    // ==================================
-    // بنية المستند
-    // ==================================
-
-    const structureData =
-        await ensureDocumentStructure(
-            documentItem
-        );
-
-
-    if (!structureData) {
-
-        throw new Error(
-            "لا توجد بنية محفوظة لهذا المستند."
-        );
-
-    }
-
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-
-    const headings =
-        Array.isArray(
-            structureData.headings
-        )
-            ? structureData.headings
-            : [];
-
-
-    // ==================================
-    // خريطة الفقرات
-    // ==================================
-
-    const paragraphMap =
-        new Map();
-
-
-    paragraphs.forEach(
-        function (
-            paragraph
-        ) {
-
-            if (
-                paragraph &&
-                typeof paragraph.index !==
-                    "undefined"
-            ) {
-
-                paragraphMap.set(
-                    paragraph.index,
-                    paragraph
-                );
-
-            }
-
-        }
-    );
-
-
-    // ==================================
-    // الفقرات المرشحة
-    //
-    // key:
-    // family / term / __heading__
-    // ==================================
-
-    const candidateParagraphs =
-        new Map();
-
-
-    // ==================================
-    // دالة داخلية لإضافة مرشح
-    // ==================================
-
-    function addCandidateParagraph(
-        paragraphIndex,
-        key,
-        occurrence
-    ) {
-
-        if (
-            typeof paragraphIndex ===
-            "undefined"
-        ) {
-
-            return;
-
-        }
-
-
-        if (
-            !candidateParagraphs.has(
-                paragraphIndex
-            )
-        ) {
-
-            candidateParagraphs.set(
-                paragraphIndex,
-                new Map()
-            );
-
-        }
-
-
-        const entry =
-            candidateParagraphs.get(
-                paragraphIndex
-            );
-
-
-        if (
-            !entry.has(
-                key
-            )
-        ) {
-
-            entry.set(
-                key,
-                []
-            );
-
-        }
-
-
-        if (
-            occurrence
-        ) {
-
-            entry.get(
-                key
-            ).push(
-                occurrence
-            );
-
-        }
-
-    }
-
-
-    // ==================================
-    // المسار الأول:
-    // العائلات
-    // ==================================
-
-    matchedFamilies.forEach(
-        function (
-            familyKey
-        ) {
-
-            const family =
-                indexedFamilies[
-                    familyKey
-                ];
-
-
-            if (!family) {
-
-                return;
-
-            }
-
-
-            if (
-                Array.isArray(
-                    family.occurrences
-                )
-            ) {
-
-                family.occurrences.forEach(
-                    function (
-                        occurrence
-                    ) {
-
-                        if (
-                            !occurrence
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        addCandidateParagraph(
-                            occurrence.paragraphIndex,
-                            familyKey,
-                            occurrence
-                        );
-
-                    }
-                );
-
-            }
-
-        }
-    );
-
-
-    // ==================================
-    // المسار الثاني:
-    // المطابقات الحرفية
-    // ==================================
-
-    matchedExactTerms.forEach(
-        function (
-            term
-        ) {
-
-            const termData =
-                indexedTerms[
-                    term
-                ];
-
-
-            if (!termData) {
-
-                return;
-
-            }
-
-
-            if (
-                Array.isArray(
-                    termData.occurrences
-                )
-            ) {
-
-                termData.occurrences.forEach(
-                    function (
-                        occurrence
-                    ) {
-
-                        if (
-                            !occurrence
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        addCandidateParagraph(
-                            occurrence.paragraphIndex,
-                            term,
-                            occurrence
-                        );
-
-                    }
-                );
-
-            }
-
-        }
-    );
-
-
-    // =================================================
-    // المسار الثالث الجديد:
-    // البحث المباشر في عناوين المباحث والمطالب
-    // =================================================
-
-    const headingMatchedParagraphs =
-        new Map();
-
-
-    // كلمات مهمة من السؤال
-    const meaningfulQueryTokens =
-        queryTokens.filter(
-            function (
-                token
-            ) {
-
-                return (
-                    token &&
-                    token.length >=
-                    3
-                );
-
-            }
-        );
-
-
-    headings.forEach(
-        function (
-            heading
-        ) {
-
-            if (
-                !heading ||
-                typeof heading.index ===
-                    "undefined" ||
-                !heading.text
-            ) {
-
-                return;
-
-            }
-
-
-            const headingText =
-                normalizeSearchText(
-                    heading.text
-                );
-
-
-            if (!headingText) {
-
-                return;
-
-            }
-
-
-            // ==================================
-            // حساب عدد كلمات السؤال الموجودة
-            // في العنوان
-            // ==================================
-
-            let matchedHeadingTokens =
-                0;
-
-
-            meaningfulQueryTokens.forEach(
-                function (
-                    token
-                ) {
-
-                    if (
-                        headingText.includes(
-                            token
-                        )
-                    ) {
-
-                        matchedHeadingTokens +=
-                            1;
-
-                    }
-
-                }
-            );
-
-
-            const headingCoverage =
-                meaningfulQueryTokens.length >
-                0
-                    ? matchedHeadingTokens /
-                      meaningfulQueryTokens.length
-                    : 0;
-
-
-            // ==================================
-            // مطابقة مباشرة قوية
-            //
-            // لا يشترط ترتيب الكلمات
-            // ==================================
-
-            const headingExact =
-                headingText ===
-                searchTerm;
-
-
-            const headingContainsQuery =
-                headingText.includes(
-                    searchTerm
-                );
-
-
-            // ==================================
-            // عنوان يعكس محاور السؤال
-            //
-            // نحتاج على الأقل كلمتين
-            // أو تغطية 50%
-            // ==================================
-
-            const isStrongHeadingMatch =
-                headingExact ||
-                headingContainsQuery ||
-                (
-                    matchedHeadingTokens >=
-                        2 &&
-                    headingCoverage >=
-                        0.40
-                );
-
-
-            if (
-                !isStrongHeadingMatch
-            ) {
-
-                return;
-
-            }
-
-
-            // ==================================
-            // حفظ قوة تطابق العنوان
-            // ==================================
-
-            let headingScore =
-                0;
-
-
-            if (
-                headingExact
-            ) {
-
-                headingScore +=
-                    40;
-
-            }
-
-
-            if (
-                headingContainsQuery
-            ) {
-
-                headingScore +=
-                    25;
-
-            }
-
-
-            headingScore +=
-                matchedHeadingTokens *
-                6;
-
-
-            headingScore +=
-                headingCoverage *
-                20;
-
-
-            headingMatchedParagraphs.set(
-                heading.index,
-                {
-
-                    heading:
-                        heading,
-
-                    score:
-                        headingScore,
-
-                    matchedHeadingTokens:
-                        matchedHeadingTokens,
-
-                    headingCoverage:
-                        headingCoverage
-
-                }
-            );
-
-
-            // ==================================
-            // إضافة عنوان المطلب نفسه
-            // ==================================
-
-            addCandidateParagraph(
-                heading.index,
-                "__heading__",
-                {
-
-                    charStart:
-                        0,
-
-                    charEnd:
-                        headingText.length,
-
-                    tokenIndex:
-                        0,
-
-                    headingMatch:
-                        true
-
-                }
-            );
-
-
-            // ==================================
-            // إضافة الفقرات التي تليه
-            //
-            // لأنها تحمل محتوى المطلب
-            // ==================================
-
-            let addedFollowing =
-                0;
-
-
-            for (
-                let i =
-                    heading.index + 1;
-
-                i < paragraphs.length &&
-                addedFollowing < 3;
-
-                i++
-            ) {
-
-                const followingParagraph =
-                    paragraphs[i];
-
-
-                if (
-                    !followingParagraph
-                ) {
-
-                    continue;
-
-                }
-
-
-                const followingText =
-                    String(
-                        followingParagraph.text ||
-                        ""
-                    ).trim();
-
-
-                if (!followingText) {
-
-                    continue;
-
-                }
-
-
-                // لا نمر إلى المطلب التالي
-                if (
-                    followingParagraph.style &&
-                    /^Heading[1-9]$/i.test(
-                        followingParagraph.style
-                    )
-                ) {
-
-                    break;
-
-                }
-
-
-                addCandidateParagraph(
-                    followingParagraph.index,
-                    "__heading__",
-                    {
-
-                        headingMatch:
-                            true,
-
-                        sourceHeadingIndex:
-                            heading.index
-
-                    }
-                );
-
-
-                addedFollowing +=
-                    1;
-
-            }
-
-        }
-    );
-
-
-    // ==================================
-    // لا توجد أي نتيجة
-    // حتى بعد فحص العناوين
-    // ==================================
-
-    if (
-        candidateParagraphs.size ===
-        0
-    ) {
-
-        return {
-
-            query:
-                searchTerm,
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                matchedExactTerms,
-
-            matchedFamilies:
-                matchedFamilies,
-
-            totalQueryTerms:
-                queryTokens.length,
-
-            indexTokenCount:
-                indexData.tokenCount,
-
-            indexUniqueTerms:
-                indexData.uniqueTerms,
-
-            indexUniqueFamilies:
-                indexData.uniqueFamilies ||
-                0,
-
-            indexedOccurrences:
-                0
-
-        };
-
-    }
-
-
-    // ==================================
-    // إنشاء النتائج
-    // ==================================
-
-    const results =
-        [];
-
-
-    candidateParagraphs.forEach(
-        function (
-            matchedEntries,
-            paragraphIndex
-        ) {
-
-            const paragraph =
-                paragraphMap.get(
-                    paragraphIndex
-                );
-
-
-            if (
-                !paragraph ||
-                !paragraph.text
-            ) {
-
-                return;
-
-            }
-
-
-            const originalText =
-                String(
-                    paragraph.text
-                );
-
-
-            const normalizedText =
-                normalizeSearchText(
-                    originalText
-                );
-
-
-            // ==================================
-            // أقرب عنوان
-            // ==================================
-
-            let nearestHeading =
-                null;
-
-
-            for (
-                let i =
-                    headings.length - 1;
-
-                i >= 0;
-
-                i--
-            ) {
-
-                const heading =
-                    headings[i];
-
-
-                if (
-                    heading &&
-                    heading.index <
-                        paragraphIndex
-                ) {
-
-                    nearestHeading =
-                        heading;
-
-                    break;
-
-                }
-
-            }
-
-
-            // ==================================
-            // هل الفقرة مرتبطة بعنوان
-            // مطابق للسؤال؟
-            // ==================================
-
-            let headingMatch =
-                matchedEntries.has(
-                    "__heading__"
-                );
-
-
-            let headingScore =
-                0;
-
-
-            let matchedHeadingTokens =
-                0;
-
-
-            let headingCoverage =
-                0;
-
-
-            if (
-                nearestHeading
-            ) {
-
-                const headingData =
-                    headingMatchedParagraphs.get(
-                        nearestHeading.index
-                    );
-
-
-                if (
-                    headingData
-                ) {
-
-                    headingScore =
-                        headingData.score ||
-                        0;
-
-                    matchedHeadingTokens =
-                        headingData.matchedHeadingTokens ||
-                        0;
-
-                    headingCoverage =
-                        headingData.headingCoverage ||
-                        0;
-
-                }
-
-            }
-
-
-            // ==================================
-            // عدد العائلات المطابقة
-            // ==================================
-
-            let matchedFamilyCount =
-                0;
-
-
-            matchedFamilies.forEach(
-                function (
-                    familyKey
-                ) {
-
-                    if (
-                        matchedEntries.has(
-                            familyKey
-                        )
-                    ) {
-
-                        matchedFamilyCount +=
-                            1;
-
-                    }
-
-                }
-            );
-
-
-            // ==================================
-            // عدد ظهور العائلات
-            // ==================================
-
-            let matchedFamilyOccurrences =
-                0;
-
-
-            matchedFamilies.forEach(
-                function (
-                    familyKey
-                ) {
-
-                    const occurrences =
-                        matchedEntries.get(
-                            familyKey
-                        );
-
-
-                    if (
-                        Array.isArray(
-                            occurrences
-                        )
-                    ) {
-
-                        matchedFamilyOccurrences +=
-                            occurrences.length;
-
-                    }
-
-                }
-            );
-
-
-            // ==================================
-            // الكلمات الحرفية
-            // ==================================
-
-            let exactWordMatches =
-                0;
-
-
-            matchedExactTerms.forEach(
-                function (
-                    term
-                ) {
-
-                    if (
-                        matchedEntries.has(
-                            term
-                        )
-                    ) {
-
-                        exactWordMatches +=
-                            1;
-
-                    }
-
-                }
-            );
-
-
-            // ==================================
-            // تغطية السؤال
-            // ==================================
-
-            let queryCoverage =
-                0;
-
-
-            if (
-                matchedFamilies.length >
-                0
-            ) {
-
-                queryCoverage =
-                    matchedFamilyCount /
-                    matchedFamilies.length;
-
-            }
-
-
-            // ==================================
-            // القرب بين العائلات
-            // ==================================
-
-            let familyProximityScore =
-                0;
-
-
-            let familySpan =
-                null;
-
-
-            if (
-                matchedFamilies.length >
-                1
-            ) {
-
-                const events =
-                    [];
-
-
-                matchedFamilies.forEach(
-                    function (
-                        familyKey
-                    ) {
-
-                        const occurrences =
-                            matchedEntries.get(
-                                familyKey
-                            );
-
-
-                        if (
-                            !Array.isArray(
-                                occurrences
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        occurrences.forEach(
-                            function (
-                                occurrence
-                            ) {
-
-                                if (
-                                    occurrence &&
-                                    typeof occurrence.tokenIndex ===
-                                        "number"
-                                ) {
-
-                                    events.push({
-
-                                        position:
-                                            occurrence.tokenIndex,
-
-                                        family:
-                                            familyKey
-
-                                    });
-
-                                }
-
-                            }
-                        );
-
-                    }
-                );
-
-
-                events.sort(
-                    function (
-                        a,
-                        b
-                    ) {
-
-                        return (
-                            a.position -
-                            b.position
-                        );
-
-                    }
-                );
-
-
-                if (
-                    events.length
-                ) {
-
-                    let left =
-                        0;
-
-
-                    const familyCounts =
-                        new Map();
-
-
-                    let familiesInside =
-                        0;
-
-
-                    for (
-                        let right = 0;
-
-                        right < events.length;
-
-                        right++
-                    ) {
-
-                        const rightFamily =
-                            events[right].family;
-
-
-                        const oldCount =
-                            familyCounts.get(
-                                rightFamily
-                            ) ||
-                            0;
-
-
-                        familyCounts.set(
-                            rightFamily,
-                            oldCount + 1
-                        );
-
-
-                        if (
-                            oldCount ===
-                            0
-                        ) {
-
-                            familiesInside +=
-                                1;
-
-                        }
-
-
-                        while (
-                            familiesInside ===
-                                matchedFamilies.length &&
-                            left <=
-                                right
-                        ) {
-
-                            const currentSpan =
-                                events[right].position -
-                                events[left].position +
-                                1;
-
-
-                            if (
-                                familySpan ===
-                                    null ||
-                                currentSpan <
-                                    familySpan
-                            ) {
-
-                                familySpan =
-                                    currentSpan;
-
-                            }
-
-
-                            const leftFamily =
-                                events[left].family;
-
-
-                            const leftCount =
-                                familyCounts.get(
-                                    leftFamily
-                                );
-
-
-                            if (
-                                leftCount ===
-                                1
-                            ) {
-
-                                familyCounts.delete(
-                                    leftFamily
-                                );
-
-
-                                familiesInside -=
-                                    1;
-
-                            }
-                            else {
-
-                                familyCounts.set(
-                                    leftFamily,
-                                    leftCount - 1
-                                );
-
-                            }
-
-
-                            left +=
-                                1;
-
-                        }
-
-                    }
-
-                }
-
-
-                if (
-                    familySpan !==
-                        null
-                ) {
-
-                    familyProximityScore =
-                        8 /
-                        familySpan;
-
-                }
-
-            }
-
-
-            // ==================================
-            // عدد ظهور العائلة داخل الفقرة
-            // ==================================
-
-            let familyOccurrencesInParagraph =
-                0;
-
-
-            matchedEntries.forEach(
-                function (
-                    occurrences,
-                    key
-                ) {
-
-                    if (
-                        matchedFamilies.includes(
-                            key
-                        )
-                    ) {
-
-                        familyOccurrencesInParagraph +=
-                            occurrences.length;
-
-                    }
-
-                }
-            );
-
-
-            // ==================================
-            // الدرجة الأساسية
-            // ==================================
-
-            let score =
-                0;
-
-
-            // ==================================
-            // 1) تطابق العبارة كاملة
-            // ==================================
-
-            if (
-                normalizedText.includes(
-                    searchTerm
-                )
-            ) {
-
-                score +=
-                    12;
-
-            }
-
-
-            // ==================================
-            // 2) الكلمات الحرفية
-            // ==================================
-
-            score +=
-                exactWordMatches *
-                4;
-
-
-            // ==================================
-            // 3) تغطية العائلات
-            // ==================================
-
-            if (
-                matchedFamilies.length >
-                0
-            ) {
-
-                score +=
-                    queryCoverage *
-                    8;
-
-            }
-
-
-            // ==================================
-            // 4) قرب العائلات
-            // ==================================
-
-            score +=
-                familyProximityScore;
-
-
-            // ==================================
-            // 5) كثافة ظهور العائلات
-            // ==================================
-
-            score +=
-                Math.min(
-                    matchedFamilyOccurrences,
-                    8
-                ) *
-                0.75;
-
-
-            score +=
-                Math.min(
-                    familyOccurrencesInParagraph,
-                    6
-                ) *
-                0.75;
-
-
-            // ==================================
-            // 6) بداية الفقرة
-            // ==================================
-
-            if (
-                normalizedText.startsWith(
-                    searchTerm
-                )
-            ) {
-
-                score +=
-                    2;
-
-            }
-
-
-            // ==================================
-            // 7) عنوان مطابق
-            //
-            // هذا هو التحسين الأساسي
-            // ==================================
-
-            if (
-                headingMatch
-            ) {
-
-                score +=
-                    20;
-
-            }
-
-
-            if (
-                headingScore >
-                0
-            ) {
-
-                score +=
-                    headingScore;
-
-            }
-
-
-            // ==================================
-            // تطابق قوي لعنوان المطلب
-            // ==================================
-
-            if (
-                nearestHeading
-            ) {
-
-                const normalizedHeading =
-                    normalizeSearchText(
-                        nearestHeading.text
-                    );
-
-
-                if (
-                    normalizedHeading ===
-                    searchTerm
-                ) {
-
-                    score +=
-                        30;
-
-                }
-                else if (
-                    normalizedHeading.includes(
-                        searchTerm
-                    )
-                ) {
-
-                    score +=
-                        18;
-
-                }
-
-
-                if (
-                    matchedHeadingTokens >=
-                    2
-                ) {
-
-                    score +=
-                        matchedHeadingTokens *
-                        3;
-
-                }
-
-
-                score +=
-                    headingCoverage *
-                    10;
-
-            }
-
-
-            // ==================================
-            // موضع المطابقة
-            // ==================================
-
-            let searchPosition =
-                -1;
-
-
-            let matchedOccurrence =
-                null;
-
-
-            // ==================================
-            // البحث عن أول ظهور حقيقي
-            // ==================================
-
-            matchedEntries.forEach(
-                function (
-                    occurrences,
-                    key
-                ) {
-
-                    if (
-                        matchedOccurrence
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    if (
-                        key ===
-                        "__heading__"
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    if (
-                        !matchedFamilies.includes(
-                            key
-                        ) &&
-                        !matchedExactTerms.includes(
-                            key
-                        )
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    if (
-                        !Array.isArray(
-                            occurrences
-                        ) ||
-                        occurrences.length ===
-                            0
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    const occurrence =
-                        occurrences[0];
-
-
-                    if (
-                        occurrence &&
-                        typeof occurrence.charStart ===
-                            "number" &&
-                        occurrence.charStart >=
-                            0
-                    ) {
-
-                        matchedOccurrence =
-                            occurrence;
-
-
-                        searchPosition =
-                            occurrence.charStart;
-
-                    }
-
-                }
-            );
-
-
-            // ==================================
-            // احتياط
-            // ==================================
-
-            if (
-                searchPosition ===
-                -1
-            ) {
-
-                searchPosition =
-                    normalizedText.indexOf(
-                        searchTerm
-                    );
-
-            }
-
-
-            // ==================================
-            // بناء السياق
-            // ==================================
-
-            let context =
-                originalText;
-
-
-            if (
-                matchedOccurrence &&
-                typeof matchedOccurrence.charStart ===
-                    "number"
-            ) {
-
-                const charStart =
-                    matchedOccurrence.charStart;
-
-
-                const charEnd =
-                    typeof matchedOccurrence.charEnd ===
-                        "number"
-                            ? matchedOccurrence.charEnd
-                            : charStart +
-                            (
-                                matchedOccurrence.word
-                                    ? matchedOccurrence.word.length
-                                    : searchTerm.length
-                            );
-
-
-                const contextStart =
-                    Math.max(
-                        0,
-                        charStart -
-                        120
-                    );
-
-
-                const contextEnd =
-                    Math.min(
-                        normalizedText.length,
-                        charEnd +
-                        300
-                    );
-
-
-                context =
-                    normalizedText.substring(
-                        contextStart,
-                        contextEnd
-                    );
-
-            }
-            else if (
-                searchPosition !==
-                    -1
-            ) {
-
-                const start =
-                    Math.max(
-                        0,
-                        searchPosition -
-                        120
-                    );
-
-
-                const end =
-                    Math.min(
-                        normalizedText.length,
-                        searchPosition +
-                        searchTerm.length +
-                        300
-                    );
-
-
-                context =
-                    normalizedText.substring(
-                        start,
-                        end
-                    );
-
-            }
-            else {
-
-                context =
-                    originalText.substring(
-                        0,
-                        420
-                    );
-
-            }
-
-
-            // ==================================
-            // نوع المطابقة
-            // ==================================
-
-            let matchType =
-                "family";
-
-
-            if (
-                headingMatch
-            ) {
-
-                matchType =
-                    "heading";
-
-            }
-            else if (
-                normalizedText.includes(
-                    searchTerm
-                )
-            ) {
-
-                matchType =
-                    "exact";
-
-            }
-            else if (
-                exactWordMatches >
-                    0
-            ) {
-
-                matchType =
-                    "word";
-
-            }
-
-
-            // ==================================
-            // حفظ النتيجة
-            // ==================================
-
-            results.push({
-
-                paragraphIndex:
-                    paragraphIndex,
-
-                paragraphId:
-                    paragraph.id,
-
-                text:
-                    originalText,
-
-                context:
-                    context,
-
-                matchedOccurrence:
-                    matchedOccurrence,
-
-                heading:
-                    nearestHeading
-                        ? nearestHeading.text
-                        : "",
-
-                headingLevel:
-                    nearestHeading
-                        ? nearestHeading.style
-                        : "",
-
-                matchedTerms:
-                    matchedExactTerms,
-
-                matchedFamilies:
-                    matchedFamilies,
-
-                matchedFamilyCount:
-                    matchedFamilyCount,
-
-                familyOccurrencesInParagraph:
-                    familyOccurrencesInParagraph,
-
-                exactWordMatches:
-                    exactWordMatches,
-
-                totalQueryTerms:
-                    queryTokens.length,
-
-                headingMatch:
-                    headingMatch,
-
-                headingScore:
-                    headingScore,
-
-                headingCoverage:
-                    headingCoverage,
-
-                score:
-                    score,
-
-                matchType:
-                    matchType
-
-            });
-
-        }
-    );
-
-
-    // ==================================
-    // ترتيب النتائج
-    // ==================================
-
-    results.sort(
-        function (
-            a,
-            b
-        ) {
-
-            if (
-                b.score !==
-                a.score
-            ) {
-
-                return (
-                    b.score -
-                    a.score
-                );
-
-            }
-
-
-            if (
-                Boolean(
-                    b.headingMatch
-                ) !==
-                Boolean(
-                    a.headingMatch
-                )
-            ) {
-
-                return (
-                    b.headingMatch
-                        ? 1
-                        : -1
-                );
-
-            }
-
-
-            if (
-                b.matchedFamilyCount !==
-                a.matchedFamilyCount
-            ) {
-
-                return (
-                    b.matchedFamilyCount -
-                    a.matchedFamilyCount
-                );
-
-            }
-
-
-            if (
-                b.exactWordMatches !==
-                a.exactWordMatches
-            ) {
-
-                return (
-                    b.exactWordMatches -
-                    a.exactWordMatches
-                );
-
-            }
-
-
-            return (
-                a.paragraphIndex -
-                b.paragraphIndex
-            );
-
-        }
-    );
-
-
-    // ==================================
-    // عدد الظهورات المفهرسة
-    // ==================================
-
-    let indexedOccurrences =
-        0;
-
-
-    matchedFamilies.forEach(
-        function (
-            familyKey
-        ) {
-
-            const family =
-                indexedFamilies[
-                    familyKey
-                ];
-
-
-            if (
-                family
-            ) {
-
-                indexedOccurrences +=
-                    Number(
-                        family.count ||
-                        0
-                    );
-
-            }
-
-        }
-    );
-
-
-    // ==================================
-    // النتيجة النهائية
-    // ==================================
-
-    return {
-
-        query:
-            searchTerm,
-
-        count:
-            results.length,
-
-        results:
-            results,
-
-        matchedTerms:
-            matchedExactTerms,
-
-        matchedFamilies:
-            matchedFamilies,
-
-        totalQueryTerms:
-            queryTokens.length,
-
-        indexTokenCount:
-            indexData.tokenCount,
-
-        indexUniqueTerms:
-            indexData.uniqueTerms,
-
-        indexUniqueFamilies:
-            indexData.uniqueFamilies ||
-            0,
-
-        indexedOccurrences:
-            indexedOccurrences
-
-    };
-
-}
-// =====================================================
-// Debug Search Test
-// اختبار البحث من Console
-// =====================================================
-
-window.testIndexedSearch =
-    async function (
-        query
-    ) {
-
-        if (
-            !currentDocument
-        ) {
-
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
-
-            return null;
-
-        }
-
-
-        try {
-
-            const result =
-                await searchIndexedDocument(
-                    currentDocument.id,
-                    query,
-                    {
-                        profile:
-                            "effect",
-
-                        maxResults:
-                            10
-                    }
-                );
-
-
-            console.log(
-                "نتيجة البحث:",
-                result
-            );
-
-
-            console.table(
-                (
-                    result.results ||
-                    []
-                ).map(
-                    function (
-                        item,
-                        index
-                    ) {
-
-                        return {
-
-                            rank:
-                                index + 1,
-
-                            score:
-                                item.score,
-
-                            heading:
-                                item.heading,
-
-                            paragraphIndex:
-                                item.paragraphIndex,
-
-                            matchType:
-                                item.matchType,
-
-                            text:
-                                String(
-                                    item.text ||
-                                    ""
-                                ).substring(
-                                    0,
-                                    180
-                                )
-
-                        };
-
-                    }
-                )
-            );
-
-
-            return result;
-
-        }
-        catch (
-            error
-        ) {
-
-            console.error(
-                "فشل اختبار البحث:",
-                error
-            );
-
-            return null;
-
-        }
-
-    };
-// =====================================================
-// Common Text Length
-// تقدير طول الجزء المشترك بين مقطعين
-// =====================================================
-
-function getCommonTextLength(
-    textA,
-    textB
-) {
-
-    const a =
-        String(
-            textA || ""
-        );
-
-
-    const b =
-        String(
-            textB || ""
-        );
-
-
-    if (
-        !a ||
-        !b
-    ) {
-
-        return 0;
-
-    }
-
-
-    let best =
-        0;
-
-
-    // طول مقطع البحث
-    const minLength =
-        Math.min(
-            a.length,
-            b.length
-        );
-
-
-    // نبحث عن أطول سلسلة مشتركة
-    // بصورة محافظة
-    const maxWindow =
-        Math.min(
-            minLength,
-            300
-        );
-
-
-    for (
-        let length = maxWindow;
-        length >= 20;
-        length -= 10
-    ) {
-
-        let found =
-            false;
-
-
-        for (
-            let i = 0;
-            i + length <= a.length;
-            i += 10
-        ) {
-
-            const part =
-                a.substring(
-                    i,
-                    i + length
-                );
-
-
-            if (
-                b.includes(
-                    part
-                )
-            ) {
-
-                best =
-                    length;
-
-                found =
-                    true;
-
-                break;
-
-            }
-
-        }
-
-
-        if (
-            found
-        ) {
-
-            break;
-
-        }
-
-    }
-
-
-    return best;
-
-}
-// =====================================================
-// Build Retrieval Context
-// تحويل نتائج البحث إلى سياق ذكي للذكاء الاصطناعي
-// =====================================================
-
-function buildRetrievalContext(
-    searchResult,
-    options
-) {
-
-    // ==================================
-    // الإعدادات
-    // ==================================
-
-    const settings =
-        options || {};
-
-
-    const maxResults =
-        typeof settings.maxResults ===
-            "number"
-                ? settings.maxResults
-                : 4;
-
-
-    const maxChars =
-        typeof settings.maxChars ===
-            "number"
-                ? settings.maxChars
-                : 3500;
-
-
-    const includeNeighbors =
-        settings.includeNeighbors !== false;
-
-
-    // ==================================
-    // التحقق من النتائج
-    // ==================================
-
-    if (
-        !searchResult ||
-        !Array.isArray(
-            searchResult.results
-        )
-    ) {
-
-        return {
-
-            query:
-                searchResult &&
-                searchResult.query
-                    ? searchResult.query
-                    : "",
-
-            count:
-                0,
-
-            selectedCount:
-                0,
-
-            totalOccurrences:
-                0,
-
-            contexts:
-                [],
-
-            text:
-                ""
-
-        };
-
-    }
-
-
-    // ==================================
-    // ترتيب النتائج حسب الدرجة
-    // ==================================
-
-    const results =
-        searchResult.results
-            .filter(
-                function (
-                    result
-                ) {
-
-                    return (
-                        result &&
-                        typeof result.text ===
-                            "string"
-                    );
-
-                }
-            )
-            .slice()
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return (
-                        Number(
-                            b.score || 0
-                        ) -
-                        Number(
-                            a.score || 0
-                        )
-                    );
-
-                }
-            );
-
-
-    // ==================================
-    // النتائج المختارة
-    // ==================================
-
-    const selected =
-        [];
-
-
-    // ==================================
-    // منع تكرار الفقرة نفسها
-    // ==================================
-
-    const selectedParagraphIndexes =
-        new Set();
-
-
-    // ==================================
-    // الحد الأعلى للتشابه
-    // ==================================
-
-    const MAX_TEXT_OVERLAP =
-        0.75;
-
-
-    // ==================================
-    // اختيار أفضل النتائج
-    // ==================================
-
-    for (
-        let i = 0;
-        i < results.length;
-        i++
-    ) {
-
-        const candidate =
-            results[i];
-
-
-        // ==================================
-        // منع تكرار الفقرة نفسها
-        // ==================================
-
-        if (
-            selectedParagraphIndexes.has(
-                candidate.paragraphIndex
-            )
-        ) {
-
-            continue;
-
-        }
-
-
-        const candidateText =
-            String(
-                candidate.context ||
-                candidate.text ||
-                ""
-            )
-                .replace(
-                    /\s+/g,
-                    " "
-                )
-                .trim();
-
-
-        if (!candidateText) {
-
-            continue;
-
-        }
-
-
-        // ==================================
-        // فحص التشابه مع النتائج السابقة
-        // ==================================
-
-        let tooSimilar =
-            false;
-
-
-        for (
-            let j = 0;
-            j < selected.length;
-            j++
-        ) {
-
-            const selectedText =
-                String(
-                    selected[j].context ||
-                    selected[j].text ||
-                    ""
-                )
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
-
-            if (!selectedText) {
-
-                continue;
-
-            }
-
-
-            const shorterLength =
-                Math.min(
-                    candidateText.length,
-                    selectedText.length
-                );
-
-
-            const commonLength =
-                getCommonTextLength(
-                    candidateText,
-                    selectedText
-                );
-
-
-            const overlap =
-                shorterLength > 0
-                    ? commonLength /
-                      shorterLength
-                    : 0;
-
-
-            if (
-                overlap >=
-                MAX_TEXT_OVERLAP
-            ) {
-
-                tooSimilar =
-                    true;
-
-                break;
-
-            }
-
-        }
-
-
-        if (
-            tooSimilar
-        ) {
-
-            continue;
-
-        }
-
-
-        // ==================================
-        // إضافة النتيجة
-        // ==================================
-
-        selected.push(
-            candidate
-        );
-
-
-        selectedParagraphIndexes.add(
-            candidate.paragraphIndex
-        );
-
-
-        if (
-            selected.length >=
-            maxResults
-        ) {
-
-            break;
-
-        }
-
-    }
-
-
-    // ==================================
-    // بناء السياق
-    // ==================================
-
-    const contexts =
-        [];
-
-
-    let totalChars =
-        0;
-
-
-    selected.forEach(
-        function (
-            result,
-            index
-        ) {
-
-            // ==================================
-            // المقطع الرئيسي
-            // ==================================
-
-            let mainContext =
-                String(
-                    result.context ||
-                    result.text ||
-                    ""
-                )
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
-
-            if (!mainContext) {
-
-                return;
-
-            }
-
-
-            // ==================================
-            // الفقرة السابقة
-            // ==================================
-
-            let previousContext =
-                includeNeighbors
-                    ? String(
-                        result.previousParagraphText ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
-                    : "";
-
-
-            // ==================================
-            // الفقرة التالية
-            // ==================================
-
-            let nextContext =
-                includeNeighbors
-                    ? String(
-                        result.nextParagraphText ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
-                    : "";
-
-
-            // ==================================
-            // منع تكرار السابق إذا كان نتيجة مستقلة
-            // ==================================
-
-            if (
-                selectedParagraphIndexes.has(
-                    Number(
-                        result.paragraphIndex
-                    ) - 1
-                )
-            ) {
-
-                previousContext =
-                    "";
-
-            }
-
-
-            // ==================================
-            // منع تكرار التالي إذا كان نتيجة مستقلة
-            // ==================================
-
-            if (
-                selectedParagraphIndexes.has(
-                    Number(
-                        result.paragraphIndex
-                    ) + 1
-                )
-            ) {
-
-                nextContext =
-                    "";
-
-            }
-
-
-            // ==================================
-            // العنوان
-            // ==================================
-
-            const heading =
-                String(
-                    result.heading ||
-                    ""
-                )
-                    .trim();
-
-
-            // ==================================
-            // المساحة المتاحة
-            // ==================================
-
-            const remainingChars =
-                maxChars -
-                totalChars;
-
-
-            if (
-                remainingChars <=
-                0
-            ) {
-
-                return;
-
-            }
-
-
-            const reservedForMetadata =
-                250;
-
-
-            const availableChars =
-                Math.max(
-                    300,
-                    remainingChars -
-                    reservedForMetadata
-                );
-
-
-            // ==================================
-            // المقطع الرئيسي له الأولوية
-            // ==================================
-
-            let context =
-                mainContext;
-
-
-            // ==================================
-            // إضافة السابق عند توفر مساحة
-            // ==================================
-
-            let remainingForNeighbors =
-                availableChars -
-                context.length;
-
-
-            if (
-                includeNeighbors &&
-                previousContext &&
-                remainingForNeighbors > 150
-            ) {
-
-                const separatorLength =
-                    1;
-
-
-                const allowedPreviousLength =
-                    Math.max(
-                        0,
-                        remainingForNeighbors -
-                        separatorLength
-                    );
-
-
-                if (
-                    allowedPreviousLength >
-                    100
-                ) {
-
-                    const previousPart =
-                        previousContext.length >
-                        allowedPreviousLength
-                            ? previousContext.substring(
-                                Math.max(
-                                    0,
-                                    previousContext.length -
-                                    allowedPreviousLength
-                                )
-                            ) +
-                            "…"
-                            : previousContext;
-
-
-                    context =
-                        previousPart +
-                        " " +
-                        context;
-
-                }
-
-            }
-
-
-            // ==================================
-            // تحديث المساحة
-            // ==================================
-
-            remainingForNeighbors =
-                availableChars -
-                context.length;
-
-
-            // ==================================
-            // إضافة التالي عند توفر مساحة
-            // ==================================
-
-            if (
-                includeNeighbors &&
-                nextContext &&
-                remainingForNeighbors > 150
-            ) {
-
-                const separatorLength =
-                    1;
-
-
-                const allowedNextLength =
-                    Math.max(
-                        0,
-                        remainingForNeighbors -
-                        separatorLength
-                    );
-
-
-                if (
-                    allowedNextLength >
-                    100
-                ) {
-
-                    const nextPart =
-                        nextContext.length >
-                        allowedNextLength
-                            ? nextContext.substring(
-                                0,
-                                allowedNextLength
-                            ) +
-                            "…"
-                            : nextContext;
-
-
-                    context =
-                        context +
-                        " " +
-                        nextPart;
-
-                }
-
-            }
-
-
-            // ==================================
-            // سجل المقطع
-            // ==================================
-
-            const item = {
-
-                rank:
-                    index + 1,
-
-                paragraphIndex:
-                    result.paragraphIndex,
-
-                heading:
-                    heading,
-
-                score:
-                    Number(
-                        result.score ||
-                        0
-                    ),
-
-                matchType:
-                    result.matchType ||
-                    "family",
-
-                matchedFamilies:
-                    Array.isArray(
-                        result.matchedFamilies
-                    )
-                        ? result.matchedFamilies
-                        : [],
-
-                familyOccurrences:
-                    Number(
-                        result.familyOccurrencesInParagraph ||
-                        0
-                    ),
-
-                exactWordMatches:
-                    Number(
-                        result.exactWordMatches ||
-                        0
-                    ),
-
-                previousParagraph:
-                    previousContext,
-
-                mainParagraph:
-                    mainContext,
-
-                nextParagraph:
-                    nextContext,
-
-                context:
-                    context
-
-            };
-
-
-            contexts.push(
-                item
-            );
-
-
-            totalChars +=
-                context.length;
-
-        }
-    );
-
-
-    // ==================================
-    // بناء النص النهائي للنموذج
-    // لا نرسل بيانات الترتيب الداخلية
-    // ==================================
-
-    const textParts =
-        [];
-
-
-    contexts.forEach(
-        function (
-            item
-        ) {
-
-            let block =
-                "[مقطع " +
-                item.rank +
-                "]" +
-                "\n";
-
-
-            // ==================================
-            // العنوان
-            // ==================================
-
-            if (
-                item.heading
-            ) {
-
-                block +=
-                    "العنوان: " +
-                    item.heading +
-                    "\n";
-
-            }
-
-
-            // ==================================
-            // السياق السابق
-            // ==================================
-
-            if (
-                item.previousParagraph
-            ) {
-
-                block +=
-                    "السياق السابق: " +
-                    item.previousParagraph +
-                    "\n";
-
-            }
-
-
-            // ==================================
-            // المقطع المطابق
-            // ==================================
-
-            block +=
-                "المقطع المطابق: " +
-                item.mainParagraph;
-
-
-            // ==================================
-            // السياق التالي
-            // ==================================
-
-            if (
-                item.nextParagraph
-            ) {
-
-                block +=
-                    "\nالسياق التالي: " +
-                    item.nextParagraph;
-
-            }
-
-
-            textParts.push(
-                block
-            );
-
-        }
-    );
-
-
-    const finalText =
-        textParts.join(
-            "\n\n---\n\n"
-        );
-
-
-    // ==================================
-    // النتيجة النهائية
-    // ==================================
-
-    return {
-
-        query:
-            searchResult.query ||
-            "",
-
-        count:
-            searchResult.count ||
-            results.length,
-
-        selectedCount:
-            contexts.length,
-
-        totalOccurrences:
-            Number(
-                searchResult.indexedOccurrences ||
-                0
-            ),
-
-        contexts:
-            contexts,
-
-        text:
-            finalText
-
-    };
-
-}
-// =====================================================
-// Temporary/Debug Test
-// يبقى داخل التطبيق، لكنه لا يعتمد على window
-// =====================================================
-
-async function testCurrentDocumentIndex() {
-
-    if (!currentDocument) {
-
-        console.warn(
-            "لا يوجد مستند نشط."
-        );
-
-        return;
-
-    }
-
-
-    try {
-
-        const index =
-            await getDocumentIndex(
-                currentDocument.id
-            );
-
-
-        console.log(
-            "الفهرس الحقيقي للمستند:",
-            index
-        );
-
-
-        if (!index) {
-
-            console.warn(
-                "لا يوجد فهرس محفوظ لهذا المستند."
-            );
-
-
-            return;
-
-        }
-
-
-        console.log(
-            "عدد الكلمات:",
-            index.tokenCount
-        );
-
-
-        console.log(
-            "عدد الكلمات الفريدة:",
-            index.uniqueTerms
-        );
-
-
-        console.log(
-            "عدد العائلات:",
-            index.uniqueFamilies
-        );
-
-
-        console.log(
-            "عائلة استصلاح:",
-            index.families &&
-            index.families["استصلاح"]
-        );
-
-        // ======================================
-        // اختبار البحث في عائلة استصلاح
-        // ======================================
-
-        const testQueries = [
-            "استصلاح",
-            "الاستصلاح",
-            "بالاستصلاح",
-            "استصلاحيا"
-        ];
-
-        console.log(
-            "======================================"
-        );
-
-        console.log(
-            "اختبار صيغ عائلة استصلاح"
-        );
-
-        console.log(
-            "======================================"
-        );
-
-        for (
-            let i = 0;
-            i < testQueries.length;
-            i++
-        ) {
-
-            const query =
-                testQueries[i];
-
-            try {
-
-                const result =
-                    await searchIndexedDocument(
-                        currentDocument.id,
-                        query
-                    );
-
-                console.log(
-                    "الاستعلام:",
-                    query
-                );
-
-                console.log(
-                    "العائلة المطابقة:",
-                    result.matchedFamilies
-                );
-
-                console.log(
-                    "عدد الفقرات:",
-                    result.count
-                );
-
-                console.log(
-                    "عدد الظهورات:",
-                    result.indexedOccurrences
-                );
-
-            }
-            catch (error) {
-
-                console.error(
-                    "فشل البحث عن:",
-                    query,
-                    error
-                );
-
-            }
-
-        }
-
-
-    }
-    catch (error) {
-
-        console.error(
-            "فشل اختبار الفهرس:",
-            error
-        );
-
-    }
-
-}
-
-window.testOramaStandalone =
-    function (
-        query
-    ) {
-
-        try {
-
-            if (
-                !currentDocument
-            ) {
-
-                console.warn(
-                    "لا يوجد مستند نشط."
-                );
-
-                return;
-
-            }
-
-
-            const {
-                create,
-                insertMultiple,
-                search
-            } =
-                require(
-                    "@orama/orama"
-                );
-
-
-            // ==================================
-            // قراءة بنية المستند الموجودة أصلًا
-            // ==================================
-
-            ensureDocumentStructure(
-                currentDocument
-            )
-                .then(
-                    function (
-                        structureData
-                    ) {
-
-                        if (
-                            !structureData
-                        ) {
-
-                            console.warn(
-                                "لا توجد بنية للمستند."
-                            );
-
-                            return;
-
-                        }
-
-
-                        const paragraphs =
-                            Array.isArray(
-                                structureData.paragraphs
-                            )
-                                ? structureData.paragraphs
-                                : [];
-
-
-                        const headings =
-                            Array.isArray(
-                                structureData.headings
-                            )
-                                ? structureData.headings
-                                : [];
-
-
-                        // ==================================
-                        // إنشاء السجلات
-                        // ==================================
-
-                        const records =
-                            paragraphs
-                                .filter(
-                                    function (
-                                        paragraph
-                                    ) {
-
-                                        return (
-                                            paragraph &&
-                                            paragraph.text
-                                        );
-
-                                    }
-                                )
-                                .map(
-                                    function (
-                                        paragraph
-                                    ) {
-
-                                        let headingText =
-                                            "";
-
-
-                                        for (
-                                            let i =
-                                                headings.length - 1;
-
-                                            i >= 0;
-
-                                            i--
-                                        ) {
-
-                                            if (
-                                                Number(
-                                                    headings[i].index
-                                                ) <
-                                                Number(
-                                                    paragraph.index
-                                                )
-                                            ) {
-
-                                                headingText =
-                                                    String(
-                                                        headings[i].text ||
-                                                        ""
-                                                    );
-
-                                                break;
-
-                                            }
-
-                                        }
-
-
-                                        return {
-
-                                            id:
-                                                String(
-                                                    paragraph.index
-                                                ),
-
-                                            paragraphIndex:
-                                                Number(
-                                                    paragraph.index
-                                                ),
-
-                                            text:
-                                                String(
-                                                    paragraph.text
-                                                ),
-
-                                            heading:
-                                                headingText
-
-                                        };
-
-                                    }
-                                );
-
-
-                        console.log(
-                            "عدد السجلات التي ستدخل Orama:",
-                            records.length
-                        );
-
-
-                        if (
-                            records.length ===
-                            0
-                        ) {
-
-                            console.warn(
-                                "لم توجد فقرات صالحة لإدخالها إلى Orama."
-                            );
-
-                            return;
-
-                        }
-
-
-                        // ==================================
-                        // إنشاء قاعدة Orama عربية
-                        // ==================================
-
-                        const db =
-                            create({
-
-                                schema: {
-
-                                    id:
-                                        "string",
-
-                                    paragraphIndex:
-                                        "number",
-
-                                    text:
-                                        "string",
-
-                                    heading:
-                                        "string"
-
-                                },
-
-                                language:
-                                    "arabic"
-
-                            });
-
-
-                        // ==================================
-                        // إدخال البيانات
-                        // ==================================
-
-                        insertMultiple(
-                            db,
-                            records
-                        );
-
-
-                        console.log(
-                            "تم إدخال السجلات إلى Orama."
-                        );
-
-
-                        // ==================================
-                        // اختبار الاستعلام
-                        // ==================================
-
-                        const result =
-                            search(
-                                db,
-                                {
-
-                                    term:
-                                        String(
-                                            query
-                                        ),
-
-                                    properties: [
-
-                                        "text",
-
-                                        "heading"
-
-                                    ],
-
-                                    boost: {
-
-                                        heading:
-                                            5
-
-                                    },
-
-                                    limit:
-                                        10
-
-                                }
-                            );
-
-
-                        console.log(
-                            "===================================="
-                        );
-
-
-                        console.log(
-                            "Orama Standalone Test"
-                        );
-
-
-                        console.log(
-                            "السؤال:",
-                            query
-                        );
-
-
-                        console.log(
-                            "عدد النتائج:",
-                            result.count
-                        );
-
-
-                        result.hits.forEach(
-                            function (
-                                hit,
-                                index
-                            ) {
-
-                                console.log(
-                                    "#" +
-                                    (
-                                        index + 1
-                                    ),
-
-                                    {
-
-                                        score:
-                                            hit.score,
-
-                                        heading:
-                                            hit.document.heading,
-
-                                        paragraphIndex:
-                                            hit.document.paragraphIndex,
-
-                                        text:
-                                            String(
-                                                hit.document.text ||
-                                                ""
-                                            ).substring(
-                                                0,
-                                                300
-                                            )
-
-                                    }
-                                );
-
-                            }
-                        );
-
-
-                        return result;
-
-                    }
-                )
-                .catch(
-                    function (
-                        error
-                    ) {
-
-                        console.error(
-                            "فشل اختبار Orama:",
-                            error
-                        );
-
-                    }
-                );
-
-        }
-        catch (
-            error
-        ) {
-
-            console.error(
-                "تعذر تشغيل اختبار Orama:",
-                error
-            );
-
-        }
-
-    };
-
-    window.testOramaHeadingSearch =
-    function (
-        query
-    ) {
-
-        if (
-            !currentDocument
-        ) {
-
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
-
-            return;
-
-        }
-
-
-        ensureDocumentStructure(
-            currentDocument
-        )
-            .then(
-                function (
-                    structureData
-                ) {
-
-                    if (
-                        !structureData ||
-                        !Array.isArray(
-                            structureData.headings
-                        )
-                    ) {
-
-                        console.warn(
-                            "لا توجد عناوين محفوظة للمستند."
-                        );
-
-                        return;
-
-                    }
-
-
-                    const headings =
-                        structureData.headings
-                            .filter(
-                                function (
-                                    heading
-                                ) {
-
-                                    return (
-                                        heading &&
-                                        typeof heading.index !==
-                                            "undefined" &&
-                                        String(
-                                            heading.text ||
-                                            ""
-                                        ).trim()
-                                    );
-
-                                }
-                            );
-
-
-                    console.log(
-                        "عدد العناوين:",
-                        headings.length
-                    );
-
-
-                    // ==================================
-                    // إنشاء قاعدة Orama للعناوين
-                    // ==================================
-
-                    const {
-                        create,
-                        insertMultiple,
-                        search
-                    } =
-                        require(
-                            "@orama/orama"
-                        );
-
-
-                    const db =
-                        create({
-
-                            schema: {
-
-                                headingIndex:
-                                    "number",
-
-                                heading:
-                                    "string",
-
-                                style:
-                                    "string"
-
-                            },
-
-                            language:
-                                "arabic"
-
-                        });
-
-
-                    const records =
-                        headings.map(
-                            function (
-                                heading
-                            ) {
-
-                                return {
-
-                                    headingIndex:
-                                        Number(
-                                            heading.index
-                                        ),
-
-                                    heading:
-                                        String(
-                                            heading.text
-                                        ).trim(),
-
-                                    style:
-                                        String(
-                                            heading.style ||
-                                            ""
-                                        )
-
-                                };
-
-                            }
-                        );
-
-
-                    insertMultiple(
-                        db,
-                        records
-                    );
-
-
-                    console.log(
-                        "تم إدخال العناوين إلى Orama:",
-                        records.length
-                    );
-
-
-                    // ==================================
-                    // البحث
-                    // ==================================
-
-                    const result =
-                        search(
-                            db,
-                            {
-
-                                term:
-                                    String(
-                                        query
-                                    ),
-
-                                properties: [
-
-                                    "heading"
-
-                                ],
-
-                                tolerance:
-                                    2,
-
-                                limit:
-                                    10
-
-                            }
-                        );
-
-
-                    console.log(
-                        "======================================"
-                    );
-
-                    console.log(
-                        "نتائج بحث العناوين:"
-                    );
-
-                    console.log(
-                        "السؤال:",
-                        query
-                    );
-
-                    console.log(
-                        "عدد النتائج:",
-                        result.count
-                    );
-
-                    console.log(
-                        "======================================"
-                    );
-
-
-                    result.hits.forEach(
-                        function (
-                            hit,
-                            index
-                        ) {
-
-                            console.log(
-                                "#" +
-                                (
-                                    index + 1
-                                ),
-
-                                {
-
-                                    score:
-                                        hit.score,
-
-                                    headingIndex:
-                                        hit.document.headingIndex,
-
-                                    heading:
-                                        hit.document.heading,
-
-                                    style:
-                                        hit.document.style
-
-                                }
-                            );
-
-                        }
-                    );
-
-
-                    return result;
-
-                }
-            )
-            .catch(
-                function (
-                    error
-                ) {
-
-                    console.error(
-                        "فشل اختبار عناوين Orama:",
-                        error
-                    );
-
-                }
-            );
-
-    };
 // =====================================================
 // Search box
-// ملاحظة: البحث الحالي في أسماء المحادثات
-// ولا نغيّره في هذه المرحلة حتى لا نعبث بالواجهة
+// البحث الحالي = المحادثات
 // =====================================================
 
 if (searchBtn) {
@@ -15598,11 +12344,18 @@ if (searchBtn) {
             e.stopPropagation();
 
 
-            if (!searchPopup)
+            if (
+                !searchPopup
+            ) {
+
                 return;
 
+            }
 
-            if (projectsPopup) {
+
+            if (
+                projectsPopup
+            ) {
 
                 projectsPopup.classList.remove(
                     "open"
@@ -15611,7 +12364,9 @@ if (searchBtn) {
             }
 
 
-            if (chatPopup) {
+            if (
+                chatPopup
+            ) {
 
                 chatPopup.classList.remove(
                     "open"
@@ -15620,7 +12375,9 @@ if (searchBtn) {
             }
 
 
-            if (settingsWindow) {
+            if (
+                settingsWindow
+            ) {
 
                 settingsWindow.classList.remove(
                     "open"
@@ -15637,14 +12394,11 @@ if (searchBtn) {
             if (
                 searchPopup.classList.contains(
                     "open"
-                )
+                ) &&
+                searchInput
             ) {
 
-                if (searchInput) {
-
-                    searchInput.focus();
-
-                }
+                searchInput.focus();
 
             }
 
@@ -15652,375 +12406,9 @@ if (searchBtn) {
 
 }
 
-// =====================================================
-// Search Orama Headings
-// البحث في عناوين المطالب والمباحث أولًا
-// =====================================================
 
-async function searchOramaHeadings(
-    documentItem,
-    query
-) {
-
-    if (
-        !documentItem ||
-        !query
-    ) {
-
-        return [];
-
-    }
-
-
-    const {
-        create,
-        insertMultiple,
-        search
-    } =
-        require(
-            "@orama/orama"
-        );
-
-
-    // ==================================
-    // قراءة بنية المستند الحالية
-    // ==================================
-
-    const structureData =
-        await ensureDocumentStructure(
-            documentItem
-        );
-
-
-    if (
-        !structureData ||
-        !Array.isArray(
-            structureData.headings
-        )
-    ) {
-
-        return [];
-
-    }
-
-
-    const headings =
-        structureData.headings
-            .filter(
-                function (
-                    heading
-                ) {
-
-                    return (
-                        heading &&
-                        typeof heading.index !==
-                            "undefined" &&
-                        String(
-                            heading.text ||
-                            ""
-                        ).trim()
-                    );
-
-                }
-            )
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return (
-                        Number(
-                            a.index
-                        ) -
-                        Number(
-                            b.index
-                        )
-                    );
-
-                }
-            );
-
-
-    if (
-        headings.length ===
-        0
-    ) {
-
-        return [];
-
-    }
-
-
-    // ==================================
-    // بناء قاعدة Orama للعناوين فقط
-    // ==================================
-
-    const db =
-        create({
-
-            schema: {
-
-                headingIndex:
-                    "number",
-
-                heading:
-                    "string",
-
-                style:
-                    "string"
-
-            },
-
-            language:
-                "arabic"
-
-        });
-
-
-    const headingRecords =
-        headings.map(
-            function (
-                heading
-            ) {
-
-                return {
-
-                    headingIndex:
-                        Number(
-                            heading.index
-                        ),
-
-                    heading:
-                        String(
-                            heading.text
-                        ).trim(),
-
-                    style:
-                        String(
-                            heading.style ||
-                            ""
-                        )
-
-                };
-
-            }
-        );
-
-
-    insertMultiple(
-        db,
-        headingRecords
-    );
-
-
-    // ==================================
-    // البحث في العناوين
-    // ==================================
-
-    const result =
-        search(
-            db,
-            {
-
-                term:
-                    String(
-                        query
-                    ),
-
-                properties: [
-
-                    "heading"
-
-                ],
-
-                tolerance:
-                    2,
-
-                limit:
-                    10
-
-            }
-        );
-
-
-    // ==================================
-    // تحويل النتائج
-    // ==================================
-
-    return (
-        Array.isArray(
-            result.hits
-        )
-            ? result.hits.map(
-                function (
-                    hit
-                ) {
-
-                    return {
-
-                        score:
-                            Number(
-                                hit.score ||
-                                0
-                            ),
-
-                        headingIndex:
-                            hit.document.headingIndex,
-
-                        heading:
-                            hit.document.heading,
-
-                        style:
-                            hit.document.style
-
-                    };
-
-                }
-            )
-            : []
-    );
-
-}
-// =====================================================
-// Get Heading Paragraph Range
-// الحصول على نطاق فقرات المطلب
-// =====================================================
-
-function getHeadingParagraphRange(
-    structureData,
-    headingIndex
-) {
-
-    if (
-        !structureData ||
-        !Array.isArray(
-            structureData.paragraphs
-        ) ||
-        !Array.isArray(
-            structureData.headings
-        )
-    ) {
-
-        return [];
-
-    }
-
-
-    const paragraphs =
-        structureData.paragraphs;
-
-
-    const headings =
-        structureData.headings
-            .filter(
-                function (
-                    heading
-                ) {
-
-                    return (
-                        heading &&
-                        typeof heading.index !==
-                            "undefined"
-                    );
-
-                }
-            )
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return (
-                        Number(
-                            a.index
-                        ) -
-                        Number(
-                            b.index
-                        )
-                    );
-
-                }
-            );
-
-
-    const currentHeadingPosition =
-        headings.findIndex(
-            function (
-                heading
-            ) {
-
-                return (
-                    Number(
-                        heading.index
-                    ) ===
-                    Number(
-                        headingIndex
-                    )
-                );
-
-            }
-        );
-
-
-    if (
-        currentHeadingPosition ===
-        -1
-    ) {
-
-        return [];
-
-    }
-
-
-    const startIndex =
-        Number(
-            headings[
-                currentHeadingPosition
-            ].index
-        );
-
-
-    const nextHeading =
-        headings[
-            currentHeadingPosition + 1
-        ];
-
-
-    const endIndex =
-        nextHeading
-            ? Number(
-                nextHeading.index
-            ) - 1
-            : paragraphs.length - 1;
-
-
-    return paragraphs.filter(
-        function (
-            paragraph
-        ) {
-
-            const index =
-                Number(
-                    paragraph.index
-                );
-
-
-            return (
-                index >
-                startIndex &&
-                index <=
-                endIndex
-            );
-
-        }
-    );
-
-}
 // ======================================
 // Search Input
-// البحث الحالي = المحادثات
 // ======================================
 
 if (searchInput) {
@@ -16034,8 +12422,13 @@ if (searchInput) {
                     .toLowerCase();
 
 
-            if (!searchResults)
+            if (
+                !searchResults
+            ) {
+
                 return;
+
+            }
 
 
             searchResults.innerHTML =
@@ -16058,6 +12451,7 @@ if (searchInput) {
                 ) {
 
                     if (
+                        chat.title &&
                         chat.title
                             .toLowerCase()
                             .includes(
@@ -16129,2874 +12523,32 @@ if (searchInput) {
 
 }
 
+
 // =====================================================
-// Stream Groq AI
-// عرض إجابة Groq تدريجيًا
+// PART 2 compatibility: helper for context
 // =====================================================
 
-async function streamGroqAI(
-    text,
-    onChunk
-) {
-
-    const data =
-        getSavedSettings();
-
-
-    const key =
-        data.key ||
-        "";
-
-
-    const model =
-        data.model ||
-        "";
-
-
-    if (!key.trim()) {
-
-        throw new Error(
-            "لم يتم إدخال مفتاح Groq من الإعدادات."
-        );
-
-    }
-
-
-    if (!model.trim()) {
-
-        throw new Error(
-            "لم يتم تحديد نموذج Groq."
-        );
-
-    }
-
-
-    // ==================================
-    // استرجاع سياق المستند
-    // ==================================
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
-
-
-    // ==================================
-    // بناء تاريخ المحادثة
-    // ==================================
-
-    const conversationMessages =
-        [];
-
-
-    const historyLimit =
-        documentContext &&
-        documentContext.found
-            ? 2
-            : 4;
-
+async function getCurrentStructureForSearch() {
 
     if (
-        currentChat &&
-        Array.isArray(
-            currentChat.messages
-        )
+        !currentDocument
     ) {
 
-        const previousMessages =
-            currentChat.messages.slice(
-                -historyLimit
-            );
-
-
-        previousMessages.forEach(
-            function (
-                msg
-            ) {
-
-                if (
-                    !msg ||
-                    !msg.text
-                ) {
-
-                    return;
-
-                }
-
-
-                let messageText =
-                    String(
-                        msg.text
-                    ).trim();
-
-
-                const maxHistoryChars =
-                    documentContext &&
-                    documentContext.found
-                        ? 1000
-                        : 1500;
-
-
-                if (
-                    messageText.length >
-                    maxHistoryChars
-                ) {
-
-                    messageText =
-                        messageText.substring(
-                            0,
-                            maxHistoryChars
-                        ) +
-                        "…";
-
-                }
-
-
-                conversationMessages.push({
-
-                    role:
-                        msg.role ===
-                        "ai"
-                            ? "assistant"
-                            : "user",
-
-                    content:
-                        messageText
-
-                });
-
-            }
-        );
+        return null;
 
     }
 
 
-    // ==================================
-    // بناء محتوى السؤال
-    // ==================================
-
-    let userContent =
-        text;
-
-
-    if (
-        documentContext &&
-        documentContext.found
-    ) {
-
-        userContent =
-            [
-
-                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
-                "",
-
-                "=== سؤال المستخدم ===",
-                text,
-
-                "",
-
-                "=== بيانات المستند ===",
-                "اسم المستند: " +
-                    (
-                        currentDocument
-                            ? currentDocument.name
-                            : ""
-                    ),
-
-                "",
-
-                "=== المادة المستخرجة من المستند ===",
-                documentContext.text,
-
-                "",
-
-                "=== قواعد الإجابة ===",
-                "أجب عن سؤال المستخدم اعتمادًا على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
-                "استخرج الأفكار المرتبطة بالسؤال فقط.",
-                "ادمج الأفكار المتشابهة في فكرة واحدة ولا تكررها بصيغ مختلفة.",
-                "رتب الإجابة وفق محاور السؤال.",
-                "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المقاطع المستخرجة.",
-                "إذا لم تكف المقاطع للإجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
-                "لا تستخدم المعرفة العامة لسد النقص في المستند إلا إذا طلب المستخدم ذلك صراحة.",
-                "حافظ على العربية والأسلوب الأكاديمي.",
-                "لا تبدأ باعتذار أو تمهيد عام غير ضروري.",
-                "لا تذكر صياغة مشكلة الدراسة أو أهداف البحث أو منهجه إلا إذا طلب المستخدم ذلك صراحة.",
-                "ضع الإحالات [مقطع X] بعد الأفكار التي يدعمها المستند.",
-                "إذا تكررت الفكرة نفسها في أكثر من مقطع، اذكرها مرة واحدة واجمع الإحالات.",
-                "لا تكرر الإحالة نفسها دون فائدة.",
-                "قدّم إجابة كاملة ومترابطة بالقدر الذي يحتاجه السؤال."
-
-            ].join(
-                "\n"
-            );
-
-    }
-
-
-    // ==================================
-    // إضافة السؤال الحالي
-    // ==================================
-
-    conversationMessages.push({
-
-        role:
-            "user",
-
-        content:
-            userContent
-
-    });
-
-
-    // ==================================
-    // إرسال طلب Groq
-    // ==================================
-
-    const response =
-        await fetch(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            model,
-
-                        messages:
-                            conversationMessages,
-
-                        max_tokens:
-                            2500,
-
-                        temperature:
-                            0.2,
-
-                        stream:
-                            true
-
-                    })
-
-            }
-        );
-
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Groq."
-            )
-        );
-
-    }
-
-
-    if (
-        !response.body
-    ) {
-
-        throw new Error(
-            "المتصفح لا يدعم استقبال الرد المتدفق من Groq."
-        );
-
-    }
-
-
-    // ==================================
-    // قراءة SSE
-    // ==================================
-
-    const reader =
-        response.body.getReader();
-
-
-    const decoder =
-        new TextDecoder(
-            "utf-8"
-        );
-
-
-    let buffer =
-        "";
-
-
-    let fullAnswer =
-        "";
-
-
-    while (true) {
-
-        const chunk =
-            await reader.read();
-
-
-        if (
-            chunk.done
-        ) {
-
-            break;
-
-        }
-
-
-        buffer +=
-            decoder.decode(
-                chunk.value,
-                {
-                    stream:
-                        true
-                }
-            );
-
-
-        const events =
-            buffer.split(
-                "\n\n"
-            );
-
-
-        buffer =
-            events.pop() ||
-            "";
-
-
-        for (
-            let i = 0;
-            i < events.length;
-            i++
-        ) {
-
-            const event =
-                events[i];
-
-
-            const lines =
-                event.split(
-                    "\n"
-                );
-
-
-            for (
-                let j = 0;
-                j < lines.length;
-                j++
-            ) {
-
-                const line =
-                    lines[j].trim();
-
-
-                if (
-                    !line.startsWith(
-                        "data:"
-                    )
-                ) {
-
-                    continue;
-
-                }
-
-
-                const dataText =
-                    line.substring(
-                        5
-                    ).trim();
-
-
-                if (
-                    dataText ===
-                    "[DONE]"
-                ) {
-
-                    continue;
-
-                }
-
-
-                let parsed;
-
-
-                try {
-
-                    parsed =
-                        JSON.parse(
-                            dataText
-                        );
-
-                }
-                catch (
-                    error
-                ) {
-
-                    continue;
-
-                }
-
-
-                const delta =
-                    parsed &&
-                    parsed.choices &&
-                    parsed.choices[0] &&
-                    parsed.choices[0].delta
-                        ? parsed.choices[0].delta.content
-                        : "";
-
-
-                if (
-                    typeof delta !==
-                    "string" ||
-                    delta ===
-                    ""
-                ) {
-
-                    continue;
-
-                }
-
-
-                fullAnswer +=
-                    delta;
-
-
-                if (
-                    typeof onChunk ===
-                    "function"
-                ) {
-
-                    onChunk(
-                        delta,
-                        fullAnswer
-                    );
-
-                }
-
-            }
-
-        }
-
-    }
-
-
-    return fullAnswer.trim();
-
-}
-
-// =====================================================
-// Stream Gemini AI
-// عرض إجابة Gemini تدريجيًا
-// مع تنظيم أكاديمي واضح
-// =====================================================
-
-async function streamGeminiAI(
-    text,
-    onChunk
-) {
-
-    // ==================================
-    // الإعدادات
-    // ==================================
-
-    const data =
-        getSavedSettings();
-
-
-    const key =
-        data.key ||
-        "";
-
-
-    const model =
-        data.model ||
-        "";
-
-
-    if (!key.trim()) {
-
-        throw new Error(
-            "لم يتم إدخال مفتاح Gemini من الإعدادات."
-        );
-
-    }
-
-
-    if (!model.trim()) {
-
-        throw new Error(
-            "لم يتم تحديد نموذج Gemini من الإعدادات."
-        );
-
-    }
-
-
-    // ==================================
-    // استرجاع سياق المستند
-    // ==================================
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
-
-
-    // ==================================
-    // تعليمات النظام
-    // مختصرة مع الحفاظ على جودة الترتيب
-    // ==================================
-
-    const systemInstruction = [
-
-        "أنت مساعد بحث أكاديمي يعمل على مستندات Word.",
-
-        "اعتمد على المادة المستخرجة من المستند بوصفها المصدر الأساسي للإجابة.",
-
-        "أجب عن السؤال مباشرة وبأسلوب أكاديمي واضح.",
-
-        "رتب الإجابة وفق محاور السؤال، ولا تخلط بين أجزائه.",
-
-        "إذا كان السؤال يتضمن أكثر من جانب، فافصل بينها بعناوين أو فقرات واضحة.",
-
-        "ادمج الأفكار المتشابهة في صياغة واحدة.",
-
-        "لا تحول كل مقطع مستخرج إلى فقرة مستقلة؛ ابنِ إجابة تركيبية من المقاطع.",
-
-        "استبعد المعلومة الجانبية التي لا تجيب مباشرة عن السؤال.",
-
-        "إذا دعمت عدة مقاطع الفكرة نفسها، اجمع إحالاتها بعد الفكرة.",
-
-        "لا تكرر الفكرة نفسها لمجرد ورودها في أكثر من مقطع.",
-
-        "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المادة المستخرجة.",
-
-        "إذا لم تكف المادة المستخرجة للإجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
-
-        "لا تستخدم المعرفة العامة لسد النقص في المستند إلا إذا طلب المستخدم ذلك صراحة.",
-
-        "لا تذكر مشكلة الدراسة أو أهدافها أو منهجها أو أسئلتها إلا إذا طلب المستخدم ذلك صراحة.",
-
-        "ضع الإحالات بعد الأفكار التي يدعمها المستند بصيغة [مقطع X].",
-
-        "إذا كانت الإحالة تشمل أكثر من مقطع فاستخدم [مقطع X، مقطع Y].",
-
-        "لا تخترع أرقام المقاطع.",
-
-        "حافظ على لغة السؤال ولغة المستند.",
-
-        "استخدم العناوين والقوائم باعتدال عندما تساعد على وضوح الإجابة.",
-
-        "لا تبدأ باعتذار أو تمهيد غير ضروري.",
-
-        "لا تعيد صياغة سؤال المستخدم في بداية الإجابة.",
-
-        "قدّم خلاصة مترابطة ومباشرة، لا تلخيصًا منفصلًا لكل مقطع."
-
-    ].join(
-        "\n"
+    return await ensureDocumentStructure(
+        currentDocument
     );
 
-
-    // ==================================
-    // تاريخ المحادثة
-    // ==================================
-
-    const conversationMessages =
-        [];
-
-
-    const historyLimit =
-        documentContext &&
-        documentContext.found
-            ? 2
-            : 4;
-
-
-    if (
-        currentChat &&
-        Array.isArray(
-            currentChat.messages
-        )
-    ) {
-
-        const messagesWithoutCurrent =
-            currentChat.messages.slice(
-                0,
-                -1
-            );
-
-
-        const previousMessages =
-            messagesWithoutCurrent.slice(
-                -historyLimit
-            );
-
-
-        previousMessages.forEach(
-            function (
-                msg
-            ) {
-
-                if (
-                    !msg ||
-                    !msg.text
-                ) {
-
-                    return;
-
-                }
-
-
-                let messageText =
-                    String(
-                        msg.text
-                    ).trim();
-
-
-                const maxHistoryChars =
-                    documentContext &&
-                    documentContext.found
-                        ? 1000
-                        : 1500;
-
-
-                if (
-                    messageText.length >
-                    maxHistoryChars
-                ) {
-
-                    messageText =
-                        messageText.substring(
-                            0,
-                            maxHistoryChars
-                        ) +
-                        "…";
-
-                }
-
-
-                conversationMessages.push({
-
-                    role:
-                        msg.role ===
-                        "ai"
-                            ? "model"
-                            : "user",
-
-                    parts: [
-
-                        {
-                            text:
-                                messageText
-                        }
-
-                    ]
-
-                });
-
-            }
-        );
-
-    }
-
-
-    // ==================================
-    // بناء السؤال والمادة
-    // ==================================
-
-    let userContent =
-        text;
-
-
-    if (
-        documentContext &&
-        documentContext.found
-    ) {
-
-        userContent =
-            [
-
-                "=== سؤال المستخدم ===",
-
-                text,
-
-                "",
-
-                "=== اسم المستند ===",
-
-                (
-                    currentDocument
-                        ? currentDocument.name
-                        : ""
-                ),
-
-                "",
-
-                "=== المادة المستخرجة من المستند ===",
-
-                documentContext.text
-
-            ].join(
-                "\n"
-            );
-
-    }
-
-
-    // ==================================
-    // السؤال الحالي
-    // ==================================
-
-    conversationMessages.push({
-
-        role:
-            "user",
-
-        parts: [
-
-            {
-                text:
-                    userContent
-            }
-
-        ]
-
-    });
-
-
-    // ==================================
-    // اسم النموذج
-    // ==================================
-
-    const cleanModel =
-        normalizeGeminiModel(
-            model
-        );
-
-
-    // ==================================
-    // رابط Streaming
-    // ==================================
-
-    const url =
-        "https://generativelanguage.googleapis.com/v1beta/models/" +
-        encodeURIComponent(
-            cleanModel
-        ) +
-        ":streamGenerateContent?alt=sse";
-
-
-    // ==================================
-    // الطلب
-    // ==================================
-
-    const response =
-        await fetch(
-            url,
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "x-goog-api-key":
-                        key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        systemInstruction: {
-
-                            parts: [
-
-                                {
-                                    text:
-                                        systemInstruction
-                                }
-
-                            ]
-
-                        },
-
-                        contents:
-                            conversationMessages,
-
-                        generationConfig: {
-
-                            temperature:
-                                0.2
-
-                        }
-
-                    })
-
-            }
-        );
-
-
-    // ==================================
-    // الخطأ
-    // ==================================
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Gemini."
-            )
-        );
-
-    }
-
-
-    if (!response.body) {
-
-        throw new Error(
-            "المتصفح لا يدعم استقبال الرد المتدفق من Gemini."
-        );
-
-    }
-
-
-    // ==================================
-    // قارئ البث
-    // ==================================
-
-    const reader =
-        response.body.getReader();
-
-
-    const decoder =
-        new TextDecoder(
-            "utf-8"
-        );
-
-
-    let buffer =
-        "";
-
-
-    let fullAnswer =
-        "";
-
-
-    // ==================================
-    // معالجة SSE
-    // ==================================
-
-    function processSSELine(
-        line
-    ) {
-
-        const cleanLine =
-            String(
-                line ||
-                ""
-            ).trim();
-
-
-        if (
-            !cleanLine ||
-            !cleanLine.startsWith(
-                "data:"
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        const dataText =
-            cleanLine
-                .substring(
-                    5
-                )
-                .trim();
-
-
-        if (
-            !dataText ||
-            dataText ===
-                "[DONE]"
-        ) {
-
-            return;
-
-        }
-
-
-        let parsed;
-
-
-        try {
-
-            parsed =
-                JSON.parse(
-                    dataText
-                );
-
-        }
-        catch (
-            error
-        ) {
-
-            return;
-
-        }
-
-
-        if (
-            !parsed ||
-            !Array.isArray(
-                parsed.candidates
-            ) ||
-            !parsed.candidates[0]
-        ) {
-
-            return;
-
-        }
-
-
-        const candidate =
-            parsed.candidates[0];
-
-
-        if (
-            !candidate.content ||
-            !Array.isArray(
-                candidate.content.parts
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        candidate.content.parts.forEach(
-            function (
-                part
-            ) {
-
-                if (
-                    !part ||
-                    typeof part.text !==
-                        "string"
-                ) {
-
-                    return;
-
-                }
-
-
-                // لا تعرض أجزاء التفكير
-                if (
-                    part.thought ===
-                    true
-                ) {
-
-                    return;
-
-                }
-
-
-                const delta =
-                    part.text;
-
-
-                if (!delta) {
-
-                    return;
-
-                }
-
-
-                fullAnswer +=
-                    delta;
-
-
-                if (
-                    typeof onChunk ===
-                    "function"
-                ) {
-
-                    onChunk(
-                        delta,
-                        fullAnswer
-                    );
-
-                }
-
-            }
-        );
-
-    }
-
-
-    // ==================================
-    // استقبال البيانات
-    // ==================================
-
-    while (true) {
-
-        const streamResult =
-            await reader.read();
-
-
-        if (
-            streamResult.done
-        ) {
-
-            break;
-
-        }
-
-
-        buffer +=
-            decoder.decode(
-                streamResult.value,
-                {
-                    stream:
-                        true
-                }
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r\n/g,
-                "\n"
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r/g,
-                "\n"
-            );
-
-
-        let newlineIndex =
-            buffer.indexOf(
-                "\n"
-            );
-
-
-        while (
-            newlineIndex !==
-            -1
-        ) {
-
-            const line =
-                buffer.substring(
-                    0,
-                    newlineIndex
-                );
-
-
-            buffer =
-                buffer.substring(
-                    newlineIndex + 1
-                );
-
-
-            processSSELine(
-                line
-            );
-
-
-            newlineIndex =
-                buffer.indexOf(
-                    "\n"
-                );
-
-        }
-
-    }
-
-
-    // ==================================
-    // البيانات المتبقية
-    // ==================================
-
-    if (
-        buffer.trim()
-    ) {
-
-        processSSELine(
-            buffer
-        );
-
-    }
-
-
-    // ==================================
-    // التحقق من الإجابة
-    // ==================================
-
-    if (
-        !fullAnswer.trim()
-    ) {
-
-        throw new Error(
-            "لم يصل نص من Gemini عبر البث المتدفق."
-        );
-
-    }
-
-
-    return fullAnswer.trim();
-
-}
-// =====================================================
-// Stream OpenRouter AI
-// عرض إجابة OpenRouter تدريجيًا
-// =====================================================
-
-async function streamOpenRouterAI(
-    text,
-    onChunk
-) {
-
-    const data =
-        getSavedSettings();
-
-
-    const key =
-        data.key ||
-        "";
-
-
-    const model =
-        data.model ||
-        "";
-
-
-    if (!key.trim()) {
-
-        throw new Error(
-            "لم يتم إدخال مفتاح OpenRouter من الإعدادات."
-        );
-
-    }
-
-
-    if (!model.trim()) {
-
-        throw new Error(
-            "لم يتم تحديد نموذج OpenRouter."
-        );
-
-    }
-
-
-    // ==================================
-    // بناء سياق المستند
-    // ==================================
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
-
-
-    // ==================================
-    // بناء تاريخ المحادثة
-    // ==================================
-
-    const conversationMessages =
-        [];
-
-
-    const historyLimit =
-        documentContext &&
-        documentContext.found
-            ? 2
-            : 4;
-
-
-    if (
-        currentChat &&
-        Array.isArray(
-            currentChat.messages
-        )
-    ) {
-
-        const messagesWithoutCurrent =
-            currentChat.messages.slice(
-                0,
-                -1
-            );
-
-
-        const previousMessages =
-            messagesWithoutCurrent.slice(
-                -historyLimit
-            );
-
-
-        previousMessages.forEach(
-            function (
-                msg
-            ) {
-
-                if (
-                    !msg ||
-                    !msg.text
-                ) {
-
-                    return;
-
-                }
-
-
-                let messageText =
-                    String(
-                        msg.text
-                    ).trim();
-
-
-                const maxHistoryChars =
-                    documentContext &&
-                    documentContext.found
-                        ? 1000
-                        : 1500;
-
-
-                if (
-                    messageText.length >
-                    maxHistoryChars
-                ) {
-
-                    messageText =
-                        messageText.substring(
-                            0,
-                            maxHistoryChars
-                        ) +
-                        "…";
-
-                }
-
-
-                conversationMessages.push({
-
-                    role:
-                        msg.role ===
-                        "ai"
-                            ? "assistant"
-                            : "user",
-
-                    content:
-                        messageText
-
-                });
-
-            }
-        );
-
-    }
-
-
-    // ==================================
-    // بناء السؤال الحالي
-    // ==================================
-
-    let userContent =
-        text;
-
-
-    if (
-        documentContext &&
-        documentContext.found
-    ) {
-
-        userContent =
-            [
-
-                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
-                "",
-                "=== سؤال المستخدم ===",
-                text,
-                "",
-                "=== اسم المستند ===",
-                (
-                    currentDocument
-                        ? currentDocument.name
-                        : ""
-                ),
-                "",
-                "=== المادة المستخرجة من المستند ===",
-                documentContext.text
-
-            ].join(
-                "\n"
-            );
-
-    }
-
-
-    // ==================================
-    // السؤال الحالي
-    // ==================================
-
-    conversationMessages.push({
-
-        role:
-            "user",
-
-        content:
-            userContent
-
-    });
-
-
-    // ==================================
-    // إرسال الطلب
-    // ==================================
-
-    const response =
-        await fetch(
-            "https://openrouter.ai/api/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        key,
-
-                    "HTTP-Referer":
-                        window.location.href,
-
-                    "X-Title":
-                        "Research Tools"
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            model,
-
-                        messages:
-                            conversationMessages,
-
-                        max_tokens:
-                            2500,
-
-                        temperature:
-                            0.2,
-
-                        stream:
-                            true
-
-                    })
-
-            }
-        );
-
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenRouter."
-            )
-        );
-
-    }
-
-
-    if (!response.body) {
-
-        throw new Error(
-            "المتصفح لا يدعم استقبال الرد المتدفق من OpenRouter."
-        );
-
-    }
-
-
-    // ==================================
-    // قراءة SSE
-    // ==================================
-
-    const reader =
-        response.body.getReader();
-
-
-    const decoder =
-        new TextDecoder(
-            "utf-8"
-        );
-
-
-    let buffer =
-        "";
-
-
-    let fullAnswer =
-        "";
-
-
-    function processSSELine(
-        line
-    ) {
-
-        const cleanLine =
-            String(
-                line ||
-                ""
-            ).trim();
-
-
-        if (
-            !cleanLine ||
-            !cleanLine.startsWith(
-                "data:"
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        const dataText =
-            cleanLine.substring(
-                5
-            ).trim();
-
-
-        if (
-            !dataText ||
-            dataText ===
-                "[DONE]"
-        ) {
-
-            return;
-
-        }
-
-
-        let parsed;
-
-
-        try {
-
-            parsed =
-                JSON.parse(
-                    dataText
-                );
-
-        }
-        catch (
-            error
-        ) {
-
-            return;
-
-        }
-
-
-        const delta =
-            parsed &&
-            parsed.choices &&
-            parsed.choices[0] &&
-            parsed.choices[0].delta
-                ? parsed.choices[0].delta.content
-                : "";
-
-
-        if (
-            typeof delta !==
-                "string" ||
-            !delta
-        ) {
-
-            return;
-
-        }
-
-
-        fullAnswer +=
-            delta;
-
-
-        if (
-            typeof onChunk ===
-            "function"
-        ) {
-
-            onChunk(
-                delta,
-                fullAnswer
-            );
-
-        }
-
-    }
-
-
-    // ==================================
-    // استقبال البث
-    // ==================================
-
-    while (true) {
-
-        const streamResult =
-            await reader.read();
-
-
-        if (
-            streamResult.done
-        ) {
-
-            break;
-
-        }
-
-
-        buffer +=
-            decoder.decode(
-                streamResult.value,
-                {
-                    stream:
-                        true
-                }
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r\n/g,
-                "\n"
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r/g,
-                "\n"
-            );
-
-
-        let newlineIndex =
-            buffer.indexOf(
-                "\n"
-            );
-
-
-        while (
-            newlineIndex !==
-            -1
-        ) {
-
-            const line =
-                buffer.substring(
-                    0,
-                    newlineIndex
-                );
-
-
-            buffer =
-                buffer.substring(
-                    newlineIndex + 1
-                );
-
-
-            processSSELine(
-                line
-            );
-
-
-            newlineIndex =
-                buffer.indexOf(
-                    "\n"
-                );
-
-        }
-
-    }
-
-
-    if (
-        buffer.trim()
-    ) {
-
-        processSSELine(
-            buffer
-        );
-
-    }
-
-
-    if (
-        !fullAnswer.trim()
-    ) {
-
-        throw new Error(
-            "لم يصل نص من OpenRouter عبر البث المتدفق."
-        );
-
-    }
-
-
-    return fullAnswer.trim();
-
-}
-// =====================================================
-// Stream OpenAI AI
-// عرض إجابة OpenAI تدريجيًا
-// =====================================================
-
-async function streamOpenAI(
-    text,
-    onChunk
-) {
-
-    const data =
-        getSavedSettings();
-
-
-    const key =
-        data.key ||
-        "";
-
-
-    const model =
-        data.model ||
-        "";
-
-
-    if (!key.trim()) {
-
-        throw new Error(
-            "لم يتم إدخال مفتاح OpenAI من الإعدادات."
-        );
-
-    }
-
-
-    if (!model.trim()) {
-
-        throw new Error(
-            "لم يتم تحديد نموذج OpenAI."
-        );
-
-    }
-
-
-    // ==================================
-    // سياق المستند
-    // ==================================
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
-
-
-    // ==================================
-    // تاريخ المحادثة
-    // ==================================
-
-    const conversationMessages =
-        [];
-
-
-    const historyLimit =
-        documentContext &&
-        documentContext.found
-            ? 2
-            : 4;
-
-
-    if (
-        currentChat &&
-        Array.isArray(
-            currentChat.messages
-        )
-    ) {
-
-        const messagesWithoutCurrent =
-            currentChat.messages.slice(
-                0,
-                -1
-            );
-
-
-        const previousMessages =
-            messagesWithoutCurrent.slice(
-                -historyLimit
-            );
-
-
-        previousMessages.forEach(
-            function (
-                msg
-            ) {
-
-                if (
-                    !msg ||
-                    !msg.text
-                ) {
-
-                    return;
-
-                }
-
-
-                let messageText =
-                    String(
-                        msg.text
-                    ).trim();
-
-
-                const maxHistoryChars =
-                    documentContext &&
-                    documentContext.found
-                        ? 1000
-                        : 1500;
-
-
-                if (
-                    messageText.length >
-                    maxHistoryChars
-                ) {
-
-                    messageText =
-                        messageText.substring(
-                            0,
-                            maxHistoryChars
-                        ) +
-                        "…";
-
-                }
-
-
-                conversationMessages.push({
-
-                    role:
-                        msg.role ===
-                        "ai"
-                            ? "assistant"
-                            : "user",
-
-                    content:
-                        messageText
-
-                });
-
-            }
-        );
-
-    }
-
-
-    // ==================================
-    // السؤال الحالي
-    // ==================================
-
-    let userContent =
-        text;
-
-
-    if (
-        documentContext &&
-        documentContext.found
-    ) {
-
-        userContent =
-            [
-
-                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
-                "",
-                "=== سؤال المستخدم ===",
-                text,
-                "",
-                "=== اسم المستند ===",
-                (
-                    currentDocument
-                        ? currentDocument.name
-                        : ""
-                ),
-                "",
-                "=== المادة المستخرجة من المستند ===",
-                documentContext.text
-
-            ].join(
-                "\n"
-            );
-
-    }
-
-
-    conversationMessages.push({
-
-        role:
-            "user",
-
-        content:
-            userContent
-
-    });
-
-
-    // ==================================
-    // إرسال الطلب
-    // ==================================
-
-    const response =
-        await fetch(
-            "https://api.openai.com/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            model,
-
-                        messages:
-                            conversationMessages,
-
-                        max_tokens:
-                            2500,
-
-                        temperature:
-                            0.2,
-
-                        stream:
-                            true
-
-                    })
-
-            }
-        );
-
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenAI."
-            )
-        );
-
-    }
-
-
-    if (!response.body) {
-
-        throw new Error(
-            "المتصفح لا يدعم استقبال الرد المتدفق من OpenAI."
-        );
-
-    }
-
-
-    // ==================================
-    // قراءة SSE
-    // ==================================
-
-    const reader =
-        response.body.getReader();
-
-
-    const decoder =
-        new TextDecoder(
-            "utf-8"
-        );
-
-
-    let buffer =
-        "";
-
-
-    let fullAnswer =
-        "";
-
-
-    function processSSELine(
-        line
-    ) {
-
-        const cleanLine =
-            String(
-                line ||
-                ""
-            ).trim();
-
-
-        if (
-            !cleanLine ||
-            !cleanLine.startsWith(
-                "data:"
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        const dataText =
-            cleanLine.substring(
-                5
-            ).trim();
-
-
-        if (
-            !dataText ||
-            dataText ===
-                "[DONE]"
-        ) {
-
-            return;
-
-        }
-
-
-        let parsed;
-
-
-        try {
-
-            parsed =
-                JSON.parse(
-                    dataText
-                );
-
-        }
-        catch (
-            error
-        ) {
-
-            return;
-
-        }
-
-
-        const delta =
-            parsed &&
-            parsed.choices &&
-            parsed.choices[0] &&
-            parsed.choices[0].delta
-                ? parsed.choices[0].delta.content
-                : "";
-
-
-        if (
-            typeof delta !==
-                "string" ||
-            !delta
-        ) {
-
-            return;
-
-        }
-
-
-        fullAnswer +=
-            delta;
-
-
-        if (
-            typeof onChunk ===
-            "function"
-        ) {
-
-            onChunk(
-                delta,
-                fullAnswer
-            );
-
-        }
-
-    }
-
-
-    // ==================================
-    // استقبال البث
-    // ==================================
-
-    while (true) {
-
-        const streamResult =
-            await reader.read();
-
-
-        if (
-            streamResult.done
-        ) {
-
-            break;
-
-        }
-
-
-        buffer +=
-            decoder.decode(
-                streamResult.value,
-                {
-                    stream:
-                        true
-                }
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r\n/g,
-                "\n"
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r/g,
-                "\n"
-            );
-
-
-        let newlineIndex =
-            buffer.indexOf(
-                "\n"
-            );
-
-
-        while (
-            newlineIndex !==
-            -1
-        ) {
-
-            const line =
-                buffer.substring(
-                    0,
-                    newlineIndex
-                );
-
-
-            buffer =
-                buffer.substring(
-                    newlineIndex + 1
-                );
-
-
-            processSSELine(
-                line
-            );
-
-
-            newlineIndex =
-                buffer.indexOf(
-                    "\n"
-                );
-
-        }
-
-    }
-
-
-    if (
-        buffer.trim()
-    ) {
-
-        processSSELine(
-            buffer
-        );
-
-    }
-
-
-    if (
-        !fullAnswer.trim()
-    ) {
-
-        throw new Error(
-            "لم يصل نص من OpenAI عبر البث المتدفق."
-        );
-
-    }
-
-
-    return fullAnswer.trim();
-
-}
-// =====================================================
-// Send Message
-// إرسال الرسالة
-// Streaming موحد مع تحديث واجهة مخفف
-// =====================================================
-
-async function sendMessage() {
-
-    if (!input) {
-        return;
-    }
-
-
-    const text =
-        input.value.trim();
-
-
-    if (
-        text === ""
-    ) {
-        return;
-    }
-
-
-    // ==================================
-    // إنشاء محادثة
-    // ==================================
-
-    if (!currentChat) {
-
-        currentChat = {
-
-            id:
-                Date.now(),
-
-            title:
-                text.substring(
-                    0,
-                    30
-                ),
-
-            messages:
-                [],
-
-            isTemporary:
-                true,
-
-            projectId:
-                currentProject
-                    ? currentProject.id
-                    : null
-
-        };
-
-    }
-
-
-    // ==================================
-    // تثبيت المحادثة
-    // ==================================
-
-    if (
-        currentChat.isTemporary
-    ) {
-
-        currentChat.isTemporary =
-            false;
-
-
-        currentChat.projectId =
-            currentProject
-                ? currentProject.id
-                : null;
-
-
-        currentChat.title =
-            text.substring(
-                0,
-                30
-            );
-
-
-        const alreadyExists =
-            chats.some(
-                function (
-                    chat
-                ) {
-
-                    return (
-                        chat.id ===
-                        currentChat.id
-                    );
-
-                }
-            );
-
-
-        if (
-            !alreadyExists
-        ) {
-
-            chats.unshift(
-                currentChat
-            );
-
-        }
-
-
-        if (
-            currentProject &&
-            currentChat.projectId ===
-                currentProject.id
-        ) {
-
-            if (
-                !Array.isArray(
-                    currentProject.chatIds
-                )
-            ) {
-
-                currentProject.chatIds =
-                    [];
-
-            }
-
-
-            if (
-                !currentProject.chatIds.includes(
-                    currentChat.id
-                )
-            ) {
-
-                currentProject.chatIds.push(
-                    currentChat.id
-                );
-
-
-                currentProject.updatedAt =
-                    new Date().toISOString();
-
-
-                saveProjects();
-
-            }
-
-        }
-
-
-        saveChats();
-
-    }
-
-
-    // ==================================
-    // إضافة رسالة المستخدم
-    // ==================================
-
-    currentChat.messages.push({
-
-        role:
-            "user",
-
-        text:
-            text
-
-    });
-
-
-    saveChats();
-
-
-    renderChat();
-
-
-    renderChatList();
-
-
-    renderSidebarChats();
-
-
-    renderRecentChats();
-
-
-    // ==================================
-    // تنظيف الإدخال
-    // ==================================
-
-    input.value =
-        "";
-
-
-    input.style.height =
-        "auto";
-
-
-    // ==================================
-    // فقاعة الرد
-    // ==================================
-
-    const loading =
-        document.createElement(
-            "div"
-        );
-
-
-    loading.className =
-        "message ai-message";
-
-
-    loading.innerHTML =
-        "⏳ جاري التفكير...";
-
-
-    if (
-        chatArea
-    ) {
-
-        chatArea.appendChild(
-            loading
-        );
-
-
-        chatArea.scrollTop =
-            chatArea.scrollHeight;
-
-    }
-
-
-    // ==================================
-    // إعدادات المزود
-    // ==================================
-
-    const savedSettings =
-        getSavedSettings();
-
-
-    const selectedProvider =
-        String(
-            savedSettings.provider ||
-            "openrouter"
-        ).toLowerCase();
-
-
-    // ==================================
-    // حالة العرض المتدفق
-    // ==================================
-
-    let pendingRenderText =
-        "";
-
-
-    let renderTimer =
-        null;
-
-
-    let streamFinished =
-        false;
-
-
-    // ==================================
-    // تحديث الواجهة
-    // ==================================
-
-    function renderStreamingText() {
-
-        if (
-            !loading
-        ) {
-
-            return;
-
-        }
-
-
-        if (
-            pendingRenderText ===
-            ""
-        ) {
-
-            loading.innerHTML =
-                "⏳ جاري التفكير...";
-
-        }
-        else {
-
-            loading.innerHTML =
-                formatAIMessage(
-                    pendingRenderText,
-                    currentCitationSources
-                );
-
-        }
-
-
-        if (
-            chatArea
-        ) {
-
-            chatArea.scrollTop =
-                chatArea.scrollHeight;
-
-        }
-
-
-        renderTimer =
-            null;
-
-    }
-
-
-    // ==================================
-    // جدولة تحديث الواجهة
-    // ==================================
-
-    function scheduleRender(
-        fullText
-    ) {
-
-        pendingRenderText =
-            String(
-                fullText ||
-                ""
-            );
-
-
-        if (
-            renderTimer !==
-            null
-        ) {
-
-            return;
-
-        }
-
-
-        renderTimer =
-            setTimeout(
-                function () {
-
-                    renderStreamingText();
-
-                },
-                60
-            );
-
-    }
-
-
-    // ==================================
-    // تنفيذ الطلب
-    // ==================================
-
-    try {
-
-        let answer =
-            "";
-
-
-        // ==================================
-        // Groq
-        // ==================================
-
-        if (
-            selectedProvider ===
-            "groq"
-        ) {
-
-            answer =
-                await streamGroqAI(
-                    text,
-                    function (
-                        delta,
-                        fullText
-                    ) {
-
-                        scheduleRender(
-                            fullText
-                        );
-
-                    }
-                );
-
-        }
-
-
-        // ==================================
-        // Gemini
-        // ==================================
-
-        else if (
-            selectedProvider ===
-            "gemini"
-        ) {
-
-            answer =
-                await streamGeminiAI(
-                    text,
-                    function (
-                        delta,
-                        fullText
-                    ) {
-
-                        scheduleRender(
-                            fullText
-                        );
-
-                    }
-                );
-
-        }
-
-
-        // ==================================
-        // OpenRouter
-        // ==================================
-
-        else if (
-            selectedProvider ===
-            "openrouter"
-        ) {
-
-            answer =
-                await streamOpenRouterAI(
-                    text,
-                    function (
-                        delta,
-                        fullText
-                    ) {
-
-                        scheduleRender(
-                            fullText
-                        );
-
-                    }
-                );
-
-        }
-
-
-        // ==================================
-        // OpenAI
-        // ==================================
-
-        else if (
-            selectedProvider ===
-            "openai"
-        ) {
-
-            answer =
-                await streamOpenAI(
-                    text,
-                    function (
-                        delta,
-                        fullText
-                    ) {
-
-                        scheduleRender(
-                            fullText
-                        );
-
-                    }
-                );
-
-        }
-
-
-        // ==================================
-        // مزود غير معروف
-        // ==================================
-
-        else {
-
-            throw new Error(
-                "مزود الذكاء الاصطناعي غير معروف: " +
-                selectedProvider
-            );
-
-        }
-
-
-        streamFinished =
-            true;
-
-
-        // ==================================
-        // إلغاء أي تحديث مؤجل
-        // وعرض الرد النهائي كاملًا
-        // ==================================
-
-        if (
-            renderTimer !==
-            null
-        ) {
-
-            clearTimeout(
-                renderTimer
-            );
-
-
-            renderTimer =
-                null;
-
-        }
-
-
-        pendingRenderText =
-            String(
-                answer ||
-                ""
-            );
-
-
-        renderStreamingText();
-
-
-        // ==================================
-        // إزالة فقاعة التحميل
-        // ==================================
-
-        if (
-            loading &&
-            loading.parentNode
-        ) {
-
-            loading.remove();
-
-        }
-
-
-        // ==================================
-        // حفظ جواب AI مع مصادر الإحالات
-        // ==================================
-
-        currentChat.messages.push({
-
-            role:
-                "ai",
-
-            text:
-                String(
-                    answer ||
-                    ""
-                ),
-
-            citationSources:
-                Array.isArray(
-                    currentCitationSources
-                )
-                    ? currentCitationSources.map(
-                        function (
-                            source
-                        ) {
-
-                            return {
-
-                                rank:
-                                    source.rank,
-
-                                paragraphIndex:
-                                    source.paragraphIndex,
-
-                                heading:
-                                    source.heading ||
-                                    "",
-
-                                text:
-                                    source.text ||
-                                    ""
-
-                            };
-
-                        }
-                    )
-                    : []
-
-        });
-
-
-        saveChats();
-
-
-        renderChat();
-
-
-        renderChatList();
-
-
-        renderSidebarChats();
-
-
-        renderRecentChats();
-
-    }
-    catch (error) {
-
-        streamFinished =
-            true;
-
-
-        if (
-            renderTimer !==
-            null
-        ) {
-
-            clearTimeout(
-                renderTimer
-            );
-
-
-            renderTimer =
-                null;
-
-        }
-
-
-        if (
-            loading &&
-            loading.parentNode
-        ) {
-
-            loading.remove();
-
-        }
-
-
-        currentChat.messages.push({
-
-            role:
-                "ai",
-
-            text:
-                "خطأ: " +
-                (
-                    error &&
-                    error.message
-                        ? error.message
-                        : "حدث خطأ غير معروف"
-                )
-
-        });
-
-
-        saveChats();
-
-
-        renderChat();
-
-
-        renderChatList();
-
-
-        renderSidebarChats();
-
-
-        renderRecentChats();
-
-    }
-
 }
 
 
-// ======================================
-// Send Button
-// ======================================
-
-if (sendBtn) {
-
-    sendBtn.onclick =
-        function (e) {
-
-            e.preventDefault();
-
-
-            sendMessage();
-
-        };
-
-}
-
-
-// ======================================
-// Keyboard
-// ======================================
-
-if (input) {
-
-    input.onkeydown =
-        function (e) {
-
-            if (
-                e.key ===
-                    "Enter" &&
-                !e.shiftKey
-            ) {
-
-                e.preventDefault();
-
-
-                sendMessage();
-
-            }
-
-        };
-
-}
+// =====================================================
+// END MAIN FUNCTIONS
+// =====================================================
 
 
 // ======================================
@@ -19031,7 +12583,7 @@ loadSettings();
 
 // ======================================
 // Sidebar Pin
-// خارج Office.onReady كما كان
+// خارج Office.onReady
 // ======================================
 
 const sidebar =
