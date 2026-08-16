@@ -8987,10 +8987,6 @@ async function buildAIDocumentContext(
     query
 ) {
 
-    // ==================================
-    // لا يوجد مستند نشط
-    // ==================================
-
     if (!currentDocument) {
 
         return {
@@ -9071,9 +9067,127 @@ async function buildAIDocumentContext(
         }
 
 
-        // ======================================
-        // بناء سياق المستند بحجم مناسب للنموذج
-        // ======================================
+        // ==================================
+        // إعدادات المزود والنموذج
+        // ==================================
+
+        const settings =
+            getSavedSettings();
+
+
+        const retrievalLimits =
+            getRetrievalLimits(
+                settings.provider,
+                settings.model
+            );
+
+
+        let retrievalMaxResults =
+            retrievalLimits.maxResults;
+
+
+        let retrievalMaxChars =
+            retrievalLimits.maxChars;
+
+
+        // ==================================
+        // إعطاء المقارنة مساحة أكبر
+        // ==================================
+
+        if (
+            retrievalProfile.type ===
+            "comparison"
+        ) {
+
+            retrievalMaxResults =
+                Math.min(
+                    retrievalMaxResults + 1,
+                    6
+                );
+
+
+            retrievalMaxChars =
+                Math.min(
+                    retrievalMaxChars + 1000,
+                    7000
+                );
+
+        }
+
+
+        // ==================================
+        // حماية عامة من تضخم السياق
+        // ==================================
+
+        const MAX_RETRIEVAL_TOKENS =
+            2500;
+
+
+        const previewText =
+            searchResult.results
+                .slice(
+                    0,
+                    retrievalMaxResults
+                )
+                .map(
+                    function (
+                        result
+                    ) {
+
+                        return String(
+                            result.context ||
+                            result.text ||
+                            ""
+                        );
+
+                    }
+                )
+                .join(
+                    " "
+                );
+
+
+        const estimatedTokens =
+            estimateTokenCount(
+                previewText
+            );
+
+
+        if (
+            estimatedTokens >
+            MAX_RETRIEVAL_TOKENS
+        ) {
+
+            const reductionRatio =
+                MAX_RETRIEVAL_TOKENS /
+                estimatedTokens;
+
+
+            retrievalMaxResults =
+                Math.max(
+                    2,
+                    Math.floor(
+                        retrievalMaxResults *
+                        reductionRatio
+                    )
+                );
+
+
+            retrievalMaxChars =
+                Math.max(
+                    2500,
+                    Math.floor(
+                        retrievalMaxChars *
+                        reductionRatio
+                    )
+                );
+
+        }
+
+
+        // ==================================
+        // بناء السياق
+        // ==================================
 
         const retrieval =
             buildRetrievalContext(
@@ -9081,21 +9195,15 @@ async function buildAIDocumentContext(
                 {
 
                     maxResults:
-                        retrievalProfile.type ===
-                        "comparison"
-                            ? 5
-                            : 4,
+                        retrievalMaxResults,
 
                     maxChars:
-                        retrievalProfile.type ===
-                        "comparison"
-                            ? 5500
-                            : 4500
+                        retrievalMaxChars
 
                 }
             );
 
-        
+
         // ==================================
         // لا يوجد سياق فعلي
         // ==================================
@@ -9124,9 +9232,9 @@ async function buildAIDocumentContext(
         }
 
 
-        // ======================================
+        // ==================================
         // سجل الاسترجاع الموحد
-        // ======================================
+        // ==================================
 
         return {
 
