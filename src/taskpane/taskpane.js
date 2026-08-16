@@ -11223,9 +11223,14 @@ async function buildOramaDocumentIndex(
         0
     ) {
 
-        insertMultiple(
+        await insertMultiple(
             db,
             records
+        );
+
+                console.log(
+            "تم إدخال سجلات Orama:",
+            records.length
         );
 
     }
