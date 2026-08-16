@@ -13813,6 +13813,547 @@ async function streamGroqAI(
     return fullAnswer.trim();
 
 }
+
+// =====================================================
+// Stream Gemini AI
+// عرض إجابة Gemini تدريجيًا
+// =====================================================
+
+async function streamGeminiAI(
+    text,
+    onChunk
+) {
+
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    const model =
+        data.model ||
+        "";
+
+
+    if (!key.trim()) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح Gemini من الإعدادات."
+        );
+
+    }
+
+
+    if (!model.trim()) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج Gemini من الإعدادات."
+        );
+
+    }
+
+
+    // ==================================
+    // استرجاع سياق المستند
+    // ==================================
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    // ==================================
+    // بناء تاريخ المحادثة السابقة
+    // لا نكرر السؤال الحالي
+    // ==================================
+
+    const conversationMessages =
+        [];
+
+
+    const historyLimit =
+        documentContext &&
+        documentContext.found
+            ? 2
+            : 4;
+
+
+    if (
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+    ) {
+
+        const messages =
+            currentChat.messages.slice(
+                0,
+                -1
+            );
+
+
+        const previousMessages =
+            messages.slice(
+                -historyLimit
+            );
+
+
+        previousMessages.forEach(
+            function (
+                msg
+            ) {
+
+                if (
+                    !msg ||
+                    !msg.text
+                ) {
+
+                    return;
+
+                }
+
+
+                let messageText =
+                    String(
+                        msg.text
+                    ).trim();
+
+
+                const maxHistoryChars =
+                    documentContext &&
+                    documentContext.found
+                        ? 1000
+                        : 1500;
+
+
+                if (
+                    messageText.length >
+                    maxHistoryChars
+                ) {
+
+                    messageText =
+                        messageText.substring(
+                            0,
+                            maxHistoryChars
+                        ) +
+                        "…";
+
+                }
+
+
+                conversationMessages.push({
+
+                    role:
+                        msg.role ===
+                        "ai"
+                            ? "model"
+                            : "user",
+
+                    parts: [
+
+                        {
+
+                            text:
+                                messageText
+
+                        }
+
+                    ]
+
+                });
+
+            }
+        );
+
+    }
+
+
+    // ==================================
+    // بناء محتوى السؤال
+    // ==================================
+
+    let userContent =
+        text;
+
+
+    if (
+        documentContext &&
+        documentContext.found
+    ) {
+
+        userContent =
+            [
+
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
+                "",
+
+                "=== سؤال المستخدم ===",
+                text,
+
+                "",
+
+                "=== بيانات المستند ===",
+                "اسم المستند: " +
+                    (
+                        currentDocument
+                            ? currentDocument.name
+                            : ""
+                    ),
+
+                "",
+
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text,
+
+                "",
+
+                "=== قواعد الإجابة ===",
+                "أجب عن سؤال المستخدم اعتمادًا على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
+                "استخرج الأفكار المرتبطة بالسؤال فقط.",
+                "ادمج الأفكار المتشابهة في فكرة واحدة ولا تكررها بصيغ مختلفة.",
+                "رتب الإجابة وفق محاور السؤال.",
+                "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المقاطع المستخرجة.",
+                "إذا لم تكف المقاطع للإجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
+                "لا تستخدم المعرفة العامة لسد النقص في المستند إلا إذا طلب المستخدم ذلك صراحة.",
+                "حافظ على العربية والأسلوب الأكاديمي.",
+                "لا تبدأ باعتذار أو تمهيد عام غير ضروري.",
+                "لا تذكر صياغة مشكلة الدراسة أو أهداف البحث أو منهجه إلا إذا طلب المستخدم ذلك صراحة.",
+                "لا تذكر أي مقطع لا يجيب مباشرة عن السؤال.",
+                "إذا تكررت الفكرة نفسها في أكثر من مقطع، اذكرها مرة واحدة واجمع الإحالات.",
+                "ضع الإحالات [مقطع X] بعد الأفكار التي يدعمها المستند.",
+                "قدّم إجابة كاملة ومترابطة بالقدر الذي يحتاجه السؤال."
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    // ==================================
+    // السؤال الحالي
+    // ==================================
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        parts: [
+
+            {
+
+                text:
+                    userContent
+
+            }
+
+        ]
+
+    });
+
+
+    // ==================================
+    // تنظيف اسم النموذج
+    // ==================================
+
+    const cleanModel =
+        normalizeGeminiModel(
+            model
+        );
+
+
+    // ==================================
+    // رابط Streaming
+    // ==================================
+
+    const url =
+        "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(
+            cleanModel
+        ) +
+        ":streamGenerateContent?alt=sse";
+
+
+    // ==================================
+    // إرسال الطلب
+    // ==================================
+
+    const response =
+        await fetch(
+            url,
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "x-goog-api-key":
+                        key
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        contents:
+                            conversationMessages
+
+                    })
+
+            }
+        );
+
+
+    if (!response.ok) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ Gemini."
+            )
+        );
+
+    }
+
+
+    if (
+        !response.body
+    ) {
+
+        throw new Error(
+            "المتصفح لا يدعم استقبال الرد المتدفق من Gemini."
+        );
+
+    }
+
+
+    // ==================================
+    // قراءة البث
+    // ==================================
+
+    const reader =
+        response.body.getReader();
+
+
+    const decoder =
+        new TextDecoder(
+            "utf-8"
+        );
+
+
+    let buffer =
+        "";
+
+
+    let fullAnswer =
+        "";
+
+
+    while (true) {
+
+        const streamResult =
+            await reader.read();
+
+
+        if (
+            streamResult.done
+        ) {
+
+            break;
+
+        }
+
+
+        buffer +=
+            decoder.decode(
+                streamResult.value,
+                {
+                    stream:
+                        true
+                }
+            );
+
+
+        const events =
+            buffer.split(
+                "\n\n"
+            );
+
+
+        buffer =
+            events.pop() ||
+            "";
+
+
+        for (
+            let i = 0;
+            i < events.length;
+            i++
+        ) {
+
+            const event =
+                events[i];
+
+
+            const lines =
+                event.split(
+                    "\n"
+                );
+
+
+            for (
+                let j = 0;
+                j < lines.length;
+                j++
+            ) {
+
+                const line =
+                    lines[j].trim();
+
+
+                if (
+                    !line.startsWith(
+                        "data:"
+                    )
+                ) {
+
+                    continue;
+
+                }
+
+
+                const dataText =
+                    line.substring(
+                        5
+                    ).trim();
+
+
+                if (
+                    !dataText
+                ) {
+
+                    continue;
+
+                }
+
+
+                let parsed;
+
+
+                try {
+
+                    parsed =
+                        JSON.parse(
+                            dataText
+                        );
+
+                }
+                catch (
+                    error
+                ) {
+
+                    continue;
+
+                }
+
+
+                if (
+                    !parsed.candidates ||
+                    !parsed.candidates[0] ||
+                    !parsed.candidates[0].content ||
+                    !Array.isArray(
+                        parsed.candidates[0]
+                            .content.parts
+                    )
+                ) {
+
+                    continue;
+
+                }
+
+
+                const parts =
+                    parsed
+                        .candidates[0]
+                        .content
+                        .parts;
+
+
+                parts.forEach(
+                    function (
+                        part
+                    ) {
+
+                        // ==================================
+                        // تجاهل أجزاء التفكير
+                        // ==================================
+
+                        if (
+                            !part ||
+                            part.thought ===
+                                true
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            typeof part.text !==
+                            "string" ||
+                            !part.text
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        fullAnswer +=
+                            part.text;
+
+
+                        if (
+                            typeof onChunk ===
+                            "function"
+                        ) {
+
+                            onChunk(
+                                part.text,
+                                fullAnswer
+                            );
+
+                        }
+
+                    }
+                );
+
+            }
+
+        }
+
+    }
+
+
+    return fullAnswer.trim();
+
+}
 // =====================================================
 // Send Message
 // إرسال الرسالة
@@ -13911,7 +14452,9 @@ async function sendMessage() {
             );
 
 
-        if (!alreadyExists) {
+        if (
+            !alreadyExists
+        ) {
 
             chats.unshift(
                 currentChat
@@ -14005,7 +14548,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // رسالة الذكاء الاصطناعي المؤقتة
+    // رسالة AI المؤقتة
     // ==================================
 
     const loading =
@@ -14022,7 +14565,9 @@ async function sendMessage() {
         "⏳ جاري التفكير...";
 
 
-    if (chatArea) {
+    if (
+        chatArea
+    ) {
 
         chatArea.appendChild(
             loading
@@ -14051,7 +14596,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // الذكاء الاصطناعي
+    // تنفيذ الطلب
     // ==================================
 
     try {
@@ -14059,10 +14604,6 @@ async function sendMessage() {
         let answer =
             "";
 
-
-        // ==================================
-        // Groq = Streaming
-        // ==================================
 
         if (
             selectedProvider ===
@@ -14095,11 +14636,38 @@ async function sendMessage() {
                 );
 
         }
-        else {
+        else if (
+            selectedProvider ===
+            "gemini"
+        ) {
 
-            // ==================================
-            // بقية المزودات = المسار الحالي
-            // ==================================
+            answer =
+                await streamGeminiAI(
+                    text,
+                    function (
+                        delta,
+                        fullText
+                    ) {
+
+                        if (
+                            loading
+                        ) {
+
+                            loading.innerHTML =
+                                formatAIMessage(
+                                    fullText
+                                );
+
+                            chatArea.scrollTop =
+                                chatArea.scrollHeight;
+
+                        }
+
+                    }
+                );
+
+        }
+        else {
 
             answer =
                 await askAI(
@@ -14110,7 +14678,7 @@ async function sendMessage() {
 
 
         // ==================================
-        // إزالة التحميل
+        // إزالة رسالة الانتظار
         // ==================================
 
         if (
@@ -14123,7 +14691,7 @@ async function sendMessage() {
 
 
         // ==================================
-        // حفظ جواب AI
+        // حفظ الرد النهائي
         // ==================================
 
         currentChat.messages.push({
