@@ -13854,7 +13854,111 @@ async function searchIndexedDocument(
     };
 
 }
+// =====================================================
+// Debug Search Test
+// اختبار البحث من Console
+// =====================================================
 
+window.testIndexedSearch =
+    async function (
+        query
+    ) {
+
+        if (
+            !currentDocument
+        ) {
+
+            console.warn(
+                "لا يوجد مستند نشط."
+            );
+
+            return null;
+
+        }
+
+
+        try {
+
+            const result =
+                await searchIndexedDocument(
+                    currentDocument.id,
+                    query,
+                    {
+                        profile:
+                            "effect",
+
+                        maxResults:
+                            10
+                    }
+                );
+
+
+            console.log(
+                "نتيجة البحث:",
+                result
+            );
+
+
+            console.table(
+                (
+                    result.results ||
+                    []
+                ).map(
+                    function (
+                        item,
+                        index
+                    ) {
+
+                        return {
+
+                            rank:
+                                index + 1,
+
+                            score:
+                                item.score,
+
+                            heading:
+                                item.heading,
+
+                            paragraphIndex:
+                                item.paragraphIndex,
+
+                            matchType:
+                                item.matchType,
+
+                            text:
+                                String(
+                                    item.text ||
+                                    ""
+                                ).substring(
+                                    0,
+                                    180
+                                )
+
+                        };
+
+                    }
+                )
+            );
+
+
+            return result;
+
+        }
+        catch (
+            error
+        ) {
+
+            console.error(
+                "فشل اختبار البحث:",
+                error
+            );
+
+            return null;
+
+        }
+
+    };
 // =====================================================
 // Common Text Length
 // تقدير طول الجزء المشترك بين مقطعين
