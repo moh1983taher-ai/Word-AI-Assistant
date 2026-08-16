@@ -13340,9 +13340,482 @@ if (searchInput) {
 
 }
 
+// =====================================================
+// Stream Groq AI
+// عرض إجابة Groq تدريجيًا
+// =====================================================
 
+async function streamGroqAI(
+    text,
+    onChunk
+) {
+
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    const model =
+        data.model ||
+        "";
+
+
+    if (!key.trim()) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح Groq من الإعدادات."
+        );
+
+    }
+
+
+    if (!model.trim()) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج Groq."
+        );
+
+    }
+
+
+    // ==================================
+    // استرجاع سياق المستند
+    // ==================================
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    // ==================================
+    // بناء تاريخ المحادثة
+    // ==================================
+
+    const conversationMessages =
+        [];
+
+
+    const historyLimit =
+        documentContext &&
+        documentContext.found
+            ? 2
+            : 4;
+
+
+    if (
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+    ) {
+
+        const previousMessages =
+            currentChat.messages.slice(
+                -historyLimit
+            );
+
+
+        previousMessages.forEach(
+            function (
+                msg
+            ) {
+
+                if (
+                    !msg ||
+                    !msg.text
+                ) {
+
+                    return;
+
+                }
+
+
+                let messageText =
+                    String(
+                        msg.text
+                    ).trim();
+
+
+                const maxHistoryChars =
+                    documentContext &&
+                    documentContext.found
+                        ? 1000
+                        : 1500;
+
+
+                if (
+                    messageText.length >
+                    maxHistoryChars
+                ) {
+
+                    messageText =
+                        messageText.substring(
+                            0,
+                            maxHistoryChars
+                        ) +
+                        "…";
+
+                }
+
+
+                conversationMessages.push({
+
+                    role:
+                        msg.role ===
+                        "ai"
+                            ? "assistant"
+                            : "user",
+
+                    content:
+                        messageText
+
+                });
+
+            }
+        );
+
+    }
+
+
+    // ==================================
+    // بناء محتوى السؤال
+    // ==================================
+
+    let userContent =
+        text;
+
+
+    if (
+        documentContext &&
+        documentContext.found
+    ) {
+
+        userContent =
+            [
+
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
+                "",
+
+                "=== سؤال المستخدم ===",
+                text,
+
+                "",
+
+                "=== بيانات المستند ===",
+                "اسم المستند: " +
+                    (
+                        currentDocument
+                            ? currentDocument.name
+                            : ""
+                    ),
+
+                "",
+
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text,
+
+                "",
+
+                "=== قواعد الإجابة ===",
+                "أجب عن سؤال المستخدم اعتمادًا على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
+                "استخرج الأفكار المرتبطة بالسؤال فقط.",
+                "ادمج الأفكار المتشابهة في فكرة واحدة ولا تكررها بصيغ مختلفة.",
+                "رتب الإجابة وفق محاور السؤال.",
+                "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المقاطع المستخرجة.",
+                "إذا لم تكف المقاطع للإجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
+                "لا تستخدم المعرفة العامة لسد النقص في المستند إلا إذا طلب المستخدم ذلك صراحة.",
+                "حافظ على العربية والأسلوب الأكاديمي.",
+                "لا تبدأ باعتذار أو تمهيد عام غير ضروري.",
+                "لا تذكر صياغة مشكلة الدراسة أو أهداف البحث أو منهجه إلا إذا طلب المستخدم ذلك صراحة.",
+                "ضع الإحالات [مقطع X] بعد الأفكار التي يدعمها المستند.",
+                "إذا تكررت الفكرة نفسها في أكثر من مقطع، اذكرها مرة واحدة واجمع الإحالات.",
+                "لا تكرر الإحالة نفسها دون فائدة.",
+                "قدّم إجابة كاملة ومترابطة بالقدر الذي يحتاجه السؤال."
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    // ==================================
+    // إضافة السؤال الحالي
+    // ==================================
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        content:
+            userContent
+
+    });
+
+
+    // ==================================
+    // إرسال طلب Groq
+    // ==================================
+
+    const response =
+        await fetch(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "Authorization":
+                        "Bearer " +
+                        key
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        model:
+                            model,
+
+                        messages:
+                            conversationMessages,
+
+                        max_tokens:
+                            2500,
+
+                        temperature:
+                            0.2,
+
+                        stream:
+                            true
+
+                    })
+
+            }
+        );
+
+
+    if (!response.ok) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ Groq."
+            )
+        );
+
+    }
+
+
+    if (
+        !response.body
+    ) {
+
+        throw new Error(
+            "المتصفح لا يدعم استقبال الرد المتدفق من Groq."
+        );
+
+    }
+
+
+    // ==================================
+    // قراءة SSE
+    // ==================================
+
+    const reader =
+        response.body.getReader();
+
+
+    const decoder =
+        new TextDecoder(
+            "utf-8"
+        );
+
+
+    let buffer =
+        "";
+
+
+    let fullAnswer =
+        "";
+
+
+    while (true) {
+
+        const chunk =
+            await reader.read();
+
+
+        if (
+            chunk.done
+        ) {
+
+            break;
+
+        }
+
+
+        buffer +=
+            decoder.decode(
+                chunk.value,
+                {
+                    stream:
+                        true
+                }
+            );
+
+
+        const events =
+            buffer.split(
+                "\n\n"
+            );
+
+
+        buffer =
+            events.pop() ||
+            "";
+
+
+        for (
+            let i = 0;
+            i < events.length;
+            i++
+        ) {
+
+            const event =
+                events[i];
+
+
+            const lines =
+                event.split(
+                    "\n"
+                );
+
+
+            for (
+                let j = 0;
+                j < lines.length;
+                j++
+            ) {
+
+                const line =
+                    lines[j].trim();
+
+
+                if (
+                    !line.startsWith(
+                        "data:"
+                    )
+                ) {
+
+                    continue;
+
+                }
+
+
+                const dataText =
+                    line.substring(
+                        5
+                    ).trim();
+
+
+                if (
+                    dataText ===
+                    "[DONE]"
+                ) {
+
+                    continue;
+
+                }
+
+
+                let parsed;
+
+
+                try {
+
+                    parsed =
+                        JSON.parse(
+                            dataText
+                        );
+
+                }
+                catch (
+                    error
+                ) {
+
+                    continue;
+
+                }
+
+
+                const delta =
+                    parsed &&
+                    parsed.choices &&
+                    parsed.choices[0] &&
+                    parsed.choices[0].delta
+                        ? parsed.choices[0].delta.content
+                        : "";
+
+
+                if (
+                    typeof delta !==
+                    "string" ||
+                    delta ===
+                    ""
+                ) {
+
+                    continue;
+
+                }
+
+
+                fullAnswer +=
+                    delta;
+
+
+                if (
+                    typeof onChunk ===
+                    "function"
+                ) {
+
+                    onChunk(
+                        delta,
+                        fullAnswer
+                    );
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+    return fullAnswer.trim();
+
+}
 // =====================================================
 // Send Message
+// إرسال الرسالة
 // =====================================================
 
 async function sendMessage() {
@@ -13494,7 +13967,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // User Message
+    // رسالة المستخدم
     // ==================================
 
     currentChat.messages.push({
@@ -13532,7 +14005,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // Loading
+    // رسالة الذكاء الاصطناعي المؤقتة
     // ==================================
 
     const loading =
@@ -13563,23 +14036,95 @@ async function sendMessage() {
 
 
     // ==================================
-    // AI
+    // تحديد المزود
+    // ==================================
+
+    const savedSettings =
+        getSavedSettings();
+
+
+    const selectedProvider =
+        String(
+            savedSettings.provider ||
+            "openrouter"
+        ).toLowerCase();
+
+
+    // ==================================
+    // الذكاء الاصطناعي
     // ==================================
 
     try {
 
-        const answer =
-            await askAI(
-                text
-            );
+        let answer =
+            "";
 
 
-        if (loading) {
+        // ==================================
+        // Groq = Streaming
+        // ==================================
+
+        if (
+            selectedProvider ===
+            "groq"
+        ) {
+
+            answer =
+                await streamGroqAI(
+                    text,
+                    function (
+                        delta,
+                        fullText
+                    ) {
+
+                        if (
+                            loading
+                        ) {
+
+                            loading.innerHTML =
+                                formatAIMessage(
+                                    fullText
+                                );
+
+                            chatArea.scrollTop =
+                                chatArea.scrollHeight;
+
+                        }
+
+                    }
+                );
+
+        }
+        else {
+
+            // ==================================
+            // بقية المزودات = المسار الحالي
+            // ==================================
+
+            answer =
+                await askAI(
+                    text
+                );
+
+        }
+
+
+        // ==================================
+        // إزالة التحميل
+        // ==================================
+
+        if (
+            loading
+        ) {
 
             loading.remove();
 
         }
 
+
+        // ==================================
+        // حفظ جواب AI
+        // ==================================
 
         currentChat.messages.push({
 
@@ -13609,7 +14154,9 @@ async function sendMessage() {
     }
     catch (error) {
 
-        if (loading) {
+        if (
+            loading
+        ) {
 
             loading.remove();
 
