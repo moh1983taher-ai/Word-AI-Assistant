@@ -77,6 +77,64 @@ const sendBtn =
 
 const chatArea =
     document.getElementById("chat-area");
+// ======================================
+// Citation Click Handler
+// التعامل مع النقر على إحالات المقاطع
+// ======================================
+
+if (
+    chatArea
+) {
+
+    chatArea.addEventListener(
+        "click",
+        function (
+            event
+        ) {
+
+            const citation =
+                event.target.closest(
+                    ".document-citation"
+                );
+
+
+            if (!citation) {
+
+                return;
+
+            }
+
+
+            event.preventDefault();
+
+
+            event.stopPropagation();
+
+
+            const rank =
+                Number(
+                    citation.getAttribute(
+                        "data-citation-rank"
+                    )
+                );
+
+
+            if (
+                !Number.isNaN(
+                    rank
+                )
+            ) {
+
+                openCitationInWord(
+                    rank
+                );
+
+            }
+
+        }
+    );
+
+}
 
 const documentTitle =
     document.getElementById("document-title");
@@ -6005,29 +6063,105 @@ if (newChatBtn) {
 
 
 // ======================================
-// Render Chat
+// Format AI Message
+// تحويل Markdown + إحالات المقاطع
 // ======================================
 
 function formatAIMessage(
-    text
+    text,
+    citationSources
 ) {
 
-    if (!text)
+    if (!text) {
+
         return "";
+
+    }
+
+
+    const sources =
+        Array.isArray(
+            citationSources
+        )
+            ? citationSources
+            : currentCitationSources;
 
 
     try {
 
-        return marked.parse(
-            text,
-            {
-                breaks: true,
-                gfm: true
-            }
-        );
+        let html =
+            marked.parse(
+                String(
+                    text
+                ),
+                {
+                    breaks:
+                        true,
+
+                    gfm:
+                        true
+                }
+            );
+
+
+        // ==================================
+        // تحويل [مقطع X] إلى زر
+        // ==================================
+
+        html =
+            html.replace(
+                /\[مقطع\s*(\d+)\]/g,
+                function (
+                    match,
+                    rank
+                ) {
+
+                    const source =
+                        sources.find(
+                            function (
+                                item
+                            ) {
+
+                                return (
+                                    Number(
+                                        item.rank
+                                    ) ===
+                                    Number(
+                                        rank
+                                    )
+                                );
+
+                            }
+                        );
+
+
+                    if (!source) {
+
+                        return match;
+
+                    }
+
+
+                    return `
+                        <button
+                            type="button"
+                            class="document-citation"
+                            data-citation-rank="${Number(rank)}"
+                            title="الانتقال إلى المقطع ${Number(rank)}">
+                            [مقطع ${Number(rank)}]
+                        </button>
+                    `;
+
+                }
+            );
+
+
+        return html;
 
     }
-    catch (error) {
+    catch (
+        error
+    ) {
 
         console.error(
             "Markdown formatting error:",
@@ -6047,10 +6181,18 @@ function formatAIMessage(
 }
 
 
+// ======================================
+// Render Chat
+// عرض المحادثة
+// ======================================
+
 function renderChat() {
 
-    if (!chatArea)
+    if (!chatArea) {
+
         return;
+
+    }
 
 
     chatArea.innerHTML =
@@ -6060,9 +6202,7 @@ function renderChat() {
     if (!currentChat) {
 
         chatArea.innerHTML = `
-
             <div class="welcome">
-
                 <div class="ai-symbol">
                     ✦
                 </div>
@@ -6074,11 +6214,8 @@ function renderChat() {
                 <p>
                     ابدأ محادثة جديدة
                 </p>
-
             </div>
-
         `;
-
 
         return;
 
@@ -6099,11 +6236,16 @@ function renderChat() {
             div.className =
                 "message " +
                 (
-                    msg.role === "user"
+                    msg.role ===
+                    "user"
                         ? "user-message"
                         : "ai-message"
                 );
 
+
+            // ==================================
+            // رسالة المستخدم
+            // ==================================
 
             if (
                 msg.role ===
@@ -6111,14 +6253,28 @@ function renderChat() {
             ) {
 
                 div.textContent =
-                    msg.text || "";
+                    msg.text ||
+                    "";
 
             }
+
+
+            // ==================================
+            // رسالة الذكاء الاصطناعي
+            // ==================================
+
             else {
 
                 div.innerHTML =
                     formatAIMessage(
-                        msg.text || ""
+                        msg.text ||
+                        "",
+
+                        Array.isArray(
+                            msg.citationSources
+                        )
+                            ? msg.citationSources
+                            : []
                     );
 
             }
@@ -6136,7 +6292,240 @@ function renderChat() {
         chatArea.scrollHeight;
 
 }
+// ======================================
+// Open Citation In Word
+// الانتقال إلى المقطع الأصلي في Word
+// ======================================
 
+async function openCitationInWord(
+    rank
+) {
+
+    // ==================================
+    // البحث عن مصدر الإحالة
+    // ==================================
+
+    const source =
+        currentCitationSources.find(
+            function (
+                item
+            ) {
+
+                return (
+                    Number(
+                        item.rank
+                    ) ===
+                    Number(
+                        rank
+                    )
+                );
+
+            }
+        );
+
+
+    if (!source) {
+
+        console.warn(
+            "لم يتم العثور على مصدر الإحالة:",
+            rank
+        );
+
+        return;
+
+    }
+
+
+    // ==================================
+    // التأكد من Word API
+    // ==================================
+
+    if (
+        typeof Word ===
+        "undefined"
+    ) {
+
+        console.warn(
+            "Word API غير متاحة."
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        await Word.run(
+            async function (
+                context
+            ) {
+
+                // ==================================
+                // تحميل جميع فقرات المستند
+                // ==================================
+
+                const paragraphs =
+                    context.document
+                        .body
+                        .paragraphs;
+
+
+                paragraphs.load(
+                    "items/text"
+                );
+
+
+                await context.sync();
+
+
+                // ==================================
+                // البحث عن الفقرة حسب index
+                // ==================================
+
+                let targetParagraph =
+                    null;
+
+
+                const targetIndex =
+                    Number(
+                        source.paragraphIndex
+                    );
+
+
+                if (
+                    !Number.isNaN(
+                        targetIndex
+                    )
+                ) {
+
+                    // في أغلب الحالات يكون الترتيب
+                    // متوافقًا مع index المحفوظ
+                    if (
+                        paragraphs.items[
+                            targetIndex
+                        ]
+                    ) {
+
+                        targetParagraph =
+                            paragraphs.items[
+                                targetIndex
+                            ];
+
+                    }
+
+                }
+
+
+                // ==================================
+                // احتياط إضافي بالنص
+                // ==================================
+
+                if (
+                    !targetParagraph &&
+                    source.text
+                ) {
+
+                    const sourceText =
+                        String(
+                            source.text
+                        )
+                            .replace(
+                                /\s+/g,
+                                " "
+                            )
+                            .trim();
+
+
+                    for (
+                        let i = 0;
+                        i < paragraphs.items.length;
+                        i++
+                    ) {
+
+                        const paragraph =
+                            paragraphs.items[
+                                i
+                            ];
+
+
+                        const paragraphText =
+                            String(
+                                paragraph.text ||
+                                ""
+                            )
+                                .replace(
+                                    /\s+/g,
+                                    " "
+                                )
+                                .trim();
+
+
+                        if (
+                            paragraphText &&
+                            sourceText &&
+                            (
+                                paragraphText.includes(
+                                    sourceText
+                                ) ||
+                                sourceText.includes(
+                                    paragraphText
+                                )
+                            )
+                        ) {
+
+                            targetParagraph =
+                                paragraph;
+
+                            break;
+
+                        }
+
+                    }
+
+                }
+
+
+                // ==================================
+                // لم نجد المقطع
+                // ==================================
+
+                if (
+                    !targetParagraph
+                ) {
+
+                    throw new Error(
+                        "لم يتم العثور على المقطع الأصلي في المستند."
+                    );
+
+                }
+
+
+                // ==================================
+                // تحديد الفقرة
+                // ==================================
+
+                targetParagraph.select(
+                    "Select"
+                );
+
+
+                await context.sync();
+
+            }
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "تعذر الانتقال إلى المقطع الأصلي:",
+            error
+        );
+
+    }
+
+}
 
 // ======================================
 // Render Chat List
@@ -8952,17 +9341,18 @@ function estimateTokenCount(
 // =====================================================
 // Build AI Document Context
 // بناء سياق المستند للذكاء الاصطناعي
+// مع حفظ مصادر الإحالات
 // =====================================================
 
 async function buildAIDocumentContext(
     query
 ) {
 
-    // ==================================
-    // لا يوجد مستند نشط
-    // ==================================
-
     if (!currentDocument) {
+
+        currentCitationSources =
+            [];
+
 
         return {
 
@@ -8985,36 +9375,22 @@ async function buildAIDocumentContext(
 
     try {
 
-        // ==================================
-        // تحديد نوع السؤال
-        // ==================================
-
         const retrievalProfile =
             getRetrievalProfile(
                 query
             );
 
 
-        // ==================================
-        // البحث داخل المستند
-        // ==================================
-
         const searchResult =
             await searchIndexedDocument(
                 currentDocument.id,
                 query,
                 {
-
                     profile:
                         retrievalProfile.type
-
                 }
             );
 
-
-        // ==================================
-        // لا توجد نتائج
-        // ==================================
 
         if (
             !searchResult ||
@@ -9025,6 +9401,10 @@ async function buildAIDocumentContext(
                 0
         ) {
 
+            currentCitationSources =
+                [];
+
+
             return {
 
                 found:
@@ -9044,152 +9424,45 @@ async function buildAIDocumentContext(
         }
 
 
-        // ==================================
-        // إعدادات المزود والنموذج
-        // ==================================
-
         const settings =
             getSavedSettings();
 
 
-        const providerName =
-            String(
-                settings.provider ||
-                "openrouter"
-            ).toLowerCase();
-
-
         const retrievalLimits =
             getRetrievalLimits(
-                providerName,
-                settings.model || ""
+                settings.provider,
+                settings.model
             );
 
 
-        let retrievalMaxResults =
-            Number(
-                retrievalLimits.maxResults ||
-                4
-            );
+        let maxResults =
+            retrievalLimits.maxResults;
 
 
-        let retrievalMaxChars =
-            Number(
-                retrievalLimits.maxChars ||
-                3500
-            );
+        let maxChars =
+            retrievalLimits.maxChars;
 
-
-        // ==================================
-        // إعطاء المقارنة مساحة أكبر
-        // ==================================
 
         if (
             retrievalProfile.type ===
             "comparison"
         ) {
 
-            retrievalMaxResults =
+            maxResults =
                 Math.min(
-                    retrievalMaxResults + 1,
+                    maxResults + 1,
                     6
                 );
 
 
-            retrievalMaxChars =
+            maxChars =
                 Math.min(
-                    retrievalMaxChars + 1000,
+                    maxChars + 1000,
                     6500
                 );
 
         }
 
-
-        // ==================================
-        // تقدير أولي لحجم السياق
-        // ==================================
-
-        const previewText =
-            searchResult.results
-                .slice(
-                    0,
-                    retrievalMaxResults
-                )
-                .map(
-                    function (
-                        result
-                    ) {
-
-                        return String(
-                            result.context ||
-                            result.text ||
-                            ""
-                        );
-
-                    }
-                )
-                .join(
-                    " "
-                );
-
-
-        const estimatedTokens =
-            estimateTokenCount(
-                previewText
-            );
-
-
-        // ==================================
-        // سقف آمن للسياق
-        // Groq يحتاج سقفًا أكثر تحفظًا
-        // ==================================
-
-        const maxRetrievalTokens =
-            providerName ===
-            "groq"
-                ? 2200
-                : 3500;
-
-
-        // ==================================
-        // تقليل السياق تلقائيًا
-        // ==================================
-
-        if (
-            estimatedTokens >
-            maxRetrievalTokens
-        ) {
-
-            const reductionRatio =
-                maxRetrievalTokens /
-                estimatedTokens;
-
-
-            retrievalMaxResults =
-                Math.max(
-                    2,
-                    Math.floor(
-                        retrievalMaxResults *
-                        reductionRatio
-                    )
-                );
-
-
-            retrievalMaxChars =
-                Math.max(
-                    2200,
-                    Math.floor(
-                        retrievalMaxChars *
-                        reductionRatio
-                    )
-                );
-
-        }
-
-
-        // ==================================
-        // بناء السياق النهائي
-        // ==================================
 
         const retrieval =
             buildRetrievalContext(
@@ -9197,23 +9470,23 @@ async function buildAIDocumentContext(
                 {
 
                     maxResults:
-                        retrievalMaxResults,
+                        maxResults,
 
                     maxChars:
-                        retrievalMaxChars
+                        maxChars
 
                 }
             );
 
 
-        // ==================================
-        // لا يوجد سياق فعلي
-        // ==================================
-
         if (
             !retrieval ||
             !retrieval.text
         ) {
+
+            currentCitationSources =
+                [];
+
 
             return {
 
@@ -9235,8 +9508,41 @@ async function buildAIDocumentContext(
 
 
         // ==================================
-        // سجل الاسترجاع الموحد
+        // حفظ مصادر المقاطع
         // ==================================
+
+        currentCitationSources =
+            Array.isArray(
+                retrieval.contexts
+            )
+                ? retrieval.contexts.map(
+                    function (
+                        item
+                    ) {
+
+                        return {
+
+                            rank:
+                                item.rank,
+
+                            paragraphIndex:
+                                item.paragraphIndex,
+
+                            heading:
+                                item.heading ||
+                                "",
+
+                            text:
+                                item.context ||
+                                item.mainParagraph ||
+                                ""
+
+                        };
+
+                    }
+                )
+                : [];
+
 
         return {
 
@@ -9282,22 +9588,21 @@ async function buildAIDocumentContext(
                     : [],
 
             contexts:
-                Array.isArray(
-                    retrieval.contexts
-                )
-                    ? retrieval.contexts
-                    : [],
+                retrieval.contexts ||
+                [],
 
             text:
-                String(
-                    retrieval.text ||
-                    ""
-                )
+                retrieval.text ||
+                ""
 
         };
 
     }
     catch (error) {
+
+        currentCitationSources =
+            [];
+
 
         console.warn(
             "تعذر استرجاع سياق المستند:",
@@ -14488,8 +14793,1019 @@ async function streamGeminiAI(
 
 }
 // =====================================================
+// Stream OpenRouter AI
+// عرض إجابة OpenRouter تدريجيًا
+// =====================================================
+
+async function streamOpenRouterAI(
+    text,
+    onChunk
+) {
+
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    const model =
+        data.model ||
+        "";
+
+
+    if (!key.trim()) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح OpenRouter من الإعدادات."
+        );
+
+    }
+
+
+    if (!model.trim()) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج OpenRouter."
+        );
+
+    }
+
+
+    // ==================================
+    // بناء سياق المستند
+    // ==================================
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    // ==================================
+    // بناء تاريخ المحادثة
+    // ==================================
+
+    const conversationMessages =
+        [];
+
+
+    const historyLimit =
+        documentContext &&
+        documentContext.found
+            ? 2
+            : 4;
+
+
+    if (
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+    ) {
+
+        const messagesWithoutCurrent =
+            currentChat.messages.slice(
+                0,
+                -1
+            );
+
+
+        const previousMessages =
+            messagesWithoutCurrent.slice(
+                -historyLimit
+            );
+
+
+        previousMessages.forEach(
+            function (
+                msg
+            ) {
+
+                if (
+                    !msg ||
+                    !msg.text
+                ) {
+
+                    return;
+
+                }
+
+
+                let messageText =
+                    String(
+                        msg.text
+                    ).trim();
+
+
+                const maxHistoryChars =
+                    documentContext &&
+                    documentContext.found
+                        ? 1000
+                        : 1500;
+
+
+                if (
+                    messageText.length >
+                    maxHistoryChars
+                ) {
+
+                    messageText =
+                        messageText.substring(
+                            0,
+                            maxHistoryChars
+                        ) +
+                        "…";
+
+                }
+
+
+                conversationMessages.push({
+
+                    role:
+                        msg.role ===
+                        "ai"
+                            ? "assistant"
+                            : "user",
+
+                    content:
+                        messageText
+
+                });
+
+            }
+        );
+
+    }
+
+
+    // ==================================
+    // بناء السؤال الحالي
+    // ==================================
+
+    let userContent =
+        text;
+
+
+    if (
+        documentContext &&
+        documentContext.found
+    ) {
+
+        userContent =
+            [
+
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
+                "",
+                "=== سؤال المستخدم ===",
+                text,
+                "",
+                "=== اسم المستند ===",
+                (
+                    currentDocument
+                        ? currentDocument.name
+                        : ""
+                ),
+                "",
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    // ==================================
+    // السؤال الحالي
+    // ==================================
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        content:
+            userContent
+
+    });
+
+
+    // ==================================
+    // إرسال الطلب
+    // ==================================
+
+    const response =
+        await fetch(
+            "https://openrouter.ai/api/v1/chat/completions",
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "Authorization":
+                        "Bearer " +
+                        key,
+
+                    "HTTP-Referer":
+                        window.location.href,
+
+                    "X-Title":
+                        "Research Tools"
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        model:
+                            model,
+
+                        messages:
+                            conversationMessages,
+
+                        max_tokens:
+                            2500,
+
+                        temperature:
+                            0.2,
+
+                        stream:
+                            true
+
+                    })
+
+            }
+        );
+
+
+    if (!response.ok) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ OpenRouter."
+            )
+        );
+
+    }
+
+
+    if (!response.body) {
+
+        throw new Error(
+            "المتصفح لا يدعم استقبال الرد المتدفق من OpenRouter."
+        );
+
+    }
+
+
+    // ==================================
+    // قراءة SSE
+    // ==================================
+
+    const reader =
+        response.body.getReader();
+
+
+    const decoder =
+        new TextDecoder(
+            "utf-8"
+        );
+
+
+    let buffer =
+        "";
+
+
+    let fullAnswer =
+        "";
+
+
+    function processSSELine(
+        line
+    ) {
+
+        const cleanLine =
+            String(
+                line ||
+                ""
+            ).trim();
+
+
+        if (
+            !cleanLine ||
+            !cleanLine.startsWith(
+                "data:"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const dataText =
+            cleanLine.substring(
+                5
+            ).trim();
+
+
+        if (
+            !dataText ||
+            dataText ===
+                "[DONE]"
+        ) {
+
+            return;
+
+        }
+
+
+        let parsed;
+
+
+        try {
+
+            parsed =
+                JSON.parse(
+                    dataText
+                );
+
+        }
+        catch (
+            error
+        ) {
+
+            return;
+
+        }
+
+
+        const delta =
+            parsed &&
+            parsed.choices &&
+            parsed.choices[0] &&
+            parsed.choices[0].delta
+                ? parsed.choices[0].delta.content
+                : "";
+
+
+        if (
+            typeof delta !==
+                "string" ||
+            !delta
+        ) {
+
+            return;
+
+        }
+
+
+        fullAnswer +=
+            delta;
+
+
+        if (
+            typeof onChunk ===
+            "function"
+        ) {
+
+            onChunk(
+                delta,
+                fullAnswer
+            );
+
+        }
+
+    }
+
+
+    // ==================================
+    // استقبال البث
+    // ==================================
+
+    while (true) {
+
+        const streamResult =
+            await reader.read();
+
+
+        if (
+            streamResult.done
+        ) {
+
+            break;
+
+        }
+
+
+        buffer +=
+            decoder.decode(
+                streamResult.value,
+                {
+                    stream:
+                        true
+                }
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r\n/g,
+                "\n"
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r/g,
+                "\n"
+            );
+
+
+        let newlineIndex =
+            buffer.indexOf(
+                "\n"
+            );
+
+
+        while (
+            newlineIndex !==
+            -1
+        ) {
+
+            const line =
+                buffer.substring(
+                    0,
+                    newlineIndex
+                );
+
+
+            buffer =
+                buffer.substring(
+                    newlineIndex + 1
+                );
+
+
+            processSSELine(
+                line
+            );
+
+
+            newlineIndex =
+                buffer.indexOf(
+                    "\n"
+                );
+
+        }
+
+    }
+
+
+    if (
+        buffer.trim()
+    ) {
+
+        processSSELine(
+            buffer
+        );
+
+    }
+
+
+    if (
+        !fullAnswer.trim()
+    ) {
+
+        throw new Error(
+            "لم يصل نص من OpenRouter عبر البث المتدفق."
+        );
+
+    }
+
+
+    return fullAnswer.trim();
+
+}
+// =====================================================
+// Stream OpenAI AI
+// عرض إجابة OpenAI تدريجيًا
+// =====================================================
+
+async function streamOpenAI(
+    text,
+    onChunk
+) {
+
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    const model =
+        data.model ||
+        "";
+
+
+    if (!key.trim()) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح OpenAI من الإعدادات."
+        );
+
+    }
+
+
+    if (!model.trim()) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج OpenAI."
+        );
+
+    }
+
+
+    // ==================================
+    // سياق المستند
+    // ==================================
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    // ==================================
+    // تاريخ المحادثة
+    // ==================================
+
+    const conversationMessages =
+        [];
+
+
+    const historyLimit =
+        documentContext &&
+        documentContext.found
+            ? 2
+            : 4;
+
+
+    if (
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+    ) {
+
+        const messagesWithoutCurrent =
+            currentChat.messages.slice(
+                0,
+                -1
+            );
+
+
+        const previousMessages =
+            messagesWithoutCurrent.slice(
+                -historyLimit
+            );
+
+
+        previousMessages.forEach(
+            function (
+                msg
+            ) {
+
+                if (
+                    !msg ||
+                    !msg.text
+                ) {
+
+                    return;
+
+                }
+
+
+                let messageText =
+                    String(
+                        msg.text
+                    ).trim();
+
+
+                const maxHistoryChars =
+                    documentContext &&
+                    documentContext.found
+                        ? 1000
+                        : 1500;
+
+
+                if (
+                    messageText.length >
+                    maxHistoryChars
+                ) {
+
+                    messageText =
+                        messageText.substring(
+                            0,
+                            maxHistoryChars
+                        ) +
+                        "…";
+
+                }
+
+
+                conversationMessages.push({
+
+                    role:
+                        msg.role ===
+                        "ai"
+                            ? "assistant"
+                            : "user",
+
+                    content:
+                        messageText
+
+                });
+
+            }
+        );
+
+    }
+
+
+    // ==================================
+    // السؤال الحالي
+    // ==================================
+
+    let userContent =
+        text;
+
+
+    if (
+        documentContext &&
+        documentContext.found
+    ) {
+
+        userContent =
+            [
+
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
+                "",
+                "=== سؤال المستخدم ===",
+                text,
+                "",
+                "=== اسم المستند ===",
+                (
+                    currentDocument
+                        ? currentDocument.name
+                        : ""
+                ),
+                "",
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        content:
+            userContent
+
+    });
+
+
+    // ==================================
+    // إرسال الطلب
+    // ==================================
+
+    const response =
+        await fetch(
+            "https://api.openai.com/v1/chat/completions",
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "Authorization":
+                        "Bearer " +
+                        key
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        model:
+                            model,
+
+                        messages:
+                            conversationMessages,
+
+                        max_tokens:
+                            2500,
+
+                        temperature:
+                            0.2,
+
+                        stream:
+                            true
+
+                    })
+
+            }
+        );
+
+
+    if (!response.ok) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ OpenAI."
+            )
+        );
+
+    }
+
+
+    if (!response.body) {
+
+        throw new Error(
+            "المتصفح لا يدعم استقبال الرد المتدفق من OpenAI."
+        );
+
+    }
+
+
+    // ==================================
+    // قراءة SSE
+    // ==================================
+
+    const reader =
+        response.body.getReader();
+
+
+    const decoder =
+        new TextDecoder(
+            "utf-8"
+        );
+
+
+    let buffer =
+        "";
+
+
+    let fullAnswer =
+        "";
+
+
+    function processSSELine(
+        line
+    ) {
+
+        const cleanLine =
+            String(
+                line ||
+                ""
+            ).trim();
+
+
+        if (
+            !cleanLine ||
+            !cleanLine.startsWith(
+                "data:"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const dataText =
+            cleanLine.substring(
+                5
+            ).trim();
+
+
+        if (
+            !dataText ||
+            dataText ===
+                "[DONE]"
+        ) {
+
+            return;
+
+        }
+
+
+        let parsed;
+
+
+        try {
+
+            parsed =
+                JSON.parse(
+                    dataText
+                );
+
+        }
+        catch (
+            error
+        ) {
+
+            return;
+
+        }
+
+
+        const delta =
+            parsed &&
+            parsed.choices &&
+            parsed.choices[0] &&
+            parsed.choices[0].delta
+                ? parsed.choices[0].delta.content
+                : "";
+
+
+        if (
+            typeof delta !==
+                "string" ||
+            !delta
+        ) {
+
+            return;
+
+        }
+
+
+        fullAnswer +=
+            delta;
+
+
+        if (
+            typeof onChunk ===
+            "function"
+        ) {
+
+            onChunk(
+                delta,
+                fullAnswer
+            );
+
+        }
+
+    }
+
+
+    // ==================================
+    // استقبال البث
+    // ==================================
+
+    while (true) {
+
+        const streamResult =
+            await reader.read();
+
+
+        if (
+            streamResult.done
+        ) {
+
+            break;
+
+        }
+
+
+        buffer +=
+            decoder.decode(
+                streamResult.value,
+                {
+                    stream:
+                        true
+                }
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r\n/g,
+                "\n"
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r/g,
+                "\n"
+            );
+
+
+        let newlineIndex =
+            buffer.indexOf(
+                "\n"
+            );
+
+
+        while (
+            newlineIndex !==
+            -1
+        ) {
+
+            const line =
+                buffer.substring(
+                    0,
+                    newlineIndex
+                );
+
+
+            buffer =
+                buffer.substring(
+                    newlineIndex + 1
+                );
+
+
+            processSSELine(
+                line
+            );
+
+
+            newlineIndex =
+                buffer.indexOf(
+                    "\n"
+                );
+
+        }
+
+    }
+
+
+    if (
+        buffer.trim()
+    ) {
+
+        processSSELine(
+            buffer
+        );
+
+    }
+
+
+    if (
+        !fullAnswer.trim()
+    ) {
+
+        throw new Error(
+            "لم يصل نص من OpenAI عبر البث المتدفق."
+        );
+
+    }
+
+
+    return fullAnswer.trim();
+
+}
+// =====================================================
 // Send Message
 // إرسال الرسالة
+// Streaming موحد مع تحديث واجهة مخفف
 // =====================================================
 
 async function sendMessage() {
@@ -14511,7 +15827,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // إنشاء محادثة عند الحاجة
+    // إنشاء محادثة
     // ==================================
 
     if (!currentChat) {
@@ -14544,7 +15860,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // تثبيت المحادثة المؤقتة
+    // تثبيت المحادثة
     // ==================================
 
     if (
@@ -14670,7 +15986,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // تنظيف مربع الإدخال
+    // تنظيف الإدخال
     // ==================================
 
     input.value =
@@ -14682,7 +15998,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // إنشاء فقاعة إجابة AI
+    // فقاعة الرد
     // ==================================
 
     const loading =
@@ -14699,7 +16015,9 @@ async function sendMessage() {
         "⏳ جاري التفكير...";
 
 
-    if (chatArea) {
+    if (
+        chatArea
+    ) {
 
         chatArea.appendChild(
             loading
@@ -14713,7 +16031,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // تحديد المزود
+    // إعدادات المزود
     // ==================================
 
     const savedSettings =
@@ -14728,19 +16046,81 @@ async function sendMessage() {
 
 
     // ==================================
-    // تحديث فقاعة AI أثناء Streaming
+    // حالة العرض المتدفق
     // ==================================
 
-    function updateStreamingMessage(
-        fullText
-    ) {
+    let pendingRenderText =
+        "";
 
-        if (!loading) {
+
+    let renderTimer =
+        null;
+
+
+    let streamFinished =
+        false;
+
+
+    // ==================================
+    // تحديث الواجهة
+    // ==================================
+
+    function renderStreamingText() {
+
+        if (
+            !loading
+        ) {
+
             return;
+
         }
 
 
-        const safeText =
+        if (
+            pendingRenderText ===
+            ""
+        ) {
+
+            loading.innerHTML =
+                "⏳ جاري التفكير...";
+
+        }
+        else {
+
+            loading.innerHTML =
+                formatAIMessage(
+                    pendingRenderText,
+                    currentCitationSources
+                );
+
+        }
+
+
+        if (
+            chatArea
+        ) {
+
+            chatArea.scrollTop =
+                chatArea.scrollHeight;
+
+        }
+
+
+        renderTimer =
+            null;
+
+    }
+
+
+    // ==================================
+    // جدولة تحديث الواجهة
+    // ==================================
+
+    function scheduleRender(
+        fullText
+    ) {
+
+        pendingRenderText =
             String(
                 fullText ||
                 ""
@@ -14748,35 +16128,30 @@ async function sendMessage() {
 
 
         if (
-            !safeText
+            renderTimer !==
+            null
         ) {
-
-            loading.innerHTML =
-                "⏳ جاري التفكير...";
 
             return;
 
         }
 
 
-        loading.innerHTML =
-            formatAIMessage(
-                safeText
+        renderTimer =
+            setTimeout(
+                function () {
+
+                    renderStreamingText();
+
+                },
+                60
             );
-
-
-        if (chatArea) {
-
-            chatArea.scrollTop =
-                chatArea.scrollHeight;
-
-        }
 
     }
 
 
     // ==================================
-    // إرسال الطلب
+    // تنفيذ الطلب
     // ==================================
 
     try {
@@ -14786,7 +16161,7 @@ async function sendMessage() {
 
 
         // ==================================
-        // Groq - Streaming
+        // Groq
         // ==================================
 
         if (
@@ -14802,7 +16177,7 @@ async function sendMessage() {
                         fullText
                     ) {
 
-                        updateStreamingMessage(
+                        scheduleRender(
                             fullText
                         );
 
@@ -14813,7 +16188,7 @@ async function sendMessage() {
 
 
         // ==================================
-        // Gemini - Streaming
+        // Gemini
         // ==================================
 
         else if (
@@ -14829,7 +16204,7 @@ async function sendMessage() {
                         fullText
                     ) {
 
-                        updateStreamingMessage(
+                        scheduleRender(
                             fullText
                         );
 
@@ -14840,27 +16215,110 @@ async function sendMessage() {
 
 
         // ==================================
-        // OpenRouter / OpenAI
-        // المسار العادي
+        // OpenRouter
         // ==================================
 
-        else {
+        else if (
+            selectedProvider ===
+            "openrouter"
+        ) {
 
             answer =
-                await askAI(
-                    text
+                await streamOpenRouterAI(
+                    text,
+                    function (
+                        delta,
+                        fullText
+                    ) {
+
+                        scheduleRender(
+                            fullText
+                        );
+
+                    }
                 );
-
-
-            updateStreamingMessage(
-                answer
-            );
 
         }
 
 
         // ==================================
-        // إزالة حالة الانتظار
+        // OpenAI
+        // ==================================
+
+        else if (
+            selectedProvider ===
+            "openai"
+        ) {
+
+            answer =
+                await streamOpenAI(
+                    text,
+                    function (
+                        delta,
+                        fullText
+                    ) {
+
+                        scheduleRender(
+                            fullText
+                        );
+
+                    }
+                );
+
+        }
+
+
+        // ==================================
+        // مزود غير معروف
+        // ==================================
+
+        else {
+
+            throw new Error(
+                "مزود الذكاء الاصطناعي غير معروف: " +
+                selectedProvider
+            );
+
+        }
+
+
+        streamFinished =
+            true;
+
+
+        // ==================================
+        // إلغاء أي تحديث مؤجل
+        // وعرض الرد النهائي كاملًا
+        // ==================================
+
+        if (
+            renderTimer !==
+            null
+        ) {
+
+            clearTimeout(
+                renderTimer
+            );
+
+
+            renderTimer =
+                null;
+
+        }
+
+
+        pendingRenderText =
+            String(
+                answer ||
+                ""
+            );
+
+
+        renderStreamingText();
+
+
+        // ==================================
+        // إزالة فقاعة التحميل
         // ==================================
 
         if (
@@ -14874,7 +16332,7 @@ async function sendMessage() {
 
 
         // ==================================
-        // حفظ جواب الذكاء الاصطناعي
+        // حفظ جواب AI مع مصادر الإحالات
         // ==================================
 
         currentChat.messages.push({
@@ -14886,7 +16344,38 @@ async function sendMessage() {
                 String(
                     answer ||
                     ""
+                ),
+
+            citationSources:
+                Array.isArray(
+                    currentCitationSources
                 )
+                    ? currentCitationSources.map(
+                        function (
+                            source
+                        ) {
+
+                            return {
+
+                                rank:
+                                    source.rank,
+
+                                paragraphIndex:
+                                    source.paragraphIndex,
+
+                                heading:
+                                    source.heading ||
+                                    "",
+
+                                text:
+                                    source.text ||
+                                    ""
+
+                            };
+
+                        }
+                    )
+                    : []
 
         });
 
@@ -14908,9 +16397,25 @@ async function sendMessage() {
     }
     catch (error) {
 
-        // ==================================
-        // إزالة حالة الانتظار
-        // ==================================
+        streamFinished =
+            true;
+
+
+        if (
+            renderTimer !==
+            null
+        ) {
+
+            clearTimeout(
+                renderTimer
+            );
+
+
+            renderTimer =
+                null;
+
+        }
+
 
         if (
             loading &&
@@ -14922,27 +16427,19 @@ async function sendMessage() {
         }
 
 
-        // ==================================
-        // رسالة الخطأ
-        // ==================================
-
-        const errorText =
-            "خطأ: " +
-            (
-                error &&
-                error.message
-                    ? error.message
-                    : "حدث خطأ غير معروف"
-            );
-
-
         currentChat.messages.push({
 
             role:
                 "ai",
 
             text:
-                errorText
+                "خطأ: " +
+                (
+                    error &&
+                    error.message
+                        ? error.message
+                        : "حدث خطأ غير معروف"
+                )
 
         });
 
