@@ -14874,7 +14874,372 @@ if (searchBtn) {
 
 }
 
+// =====================================================
+// Search Orama Headings
+// البحث في عناوين المطالب والمباحث أولًا
+// =====================================================
 
+async function searchOramaHeadings(
+    documentItem,
+    query
+) {
+
+    if (
+        !documentItem ||
+        !query
+    ) {
+
+        return [];
+
+    }
+
+
+    const {
+        create,
+        insertMultiple,
+        search
+    } =
+        require(
+            "@orama/orama"
+        );
+
+
+    // ==================================
+    // قراءة بنية المستند الحالية
+    // ==================================
+
+    const structureData =
+        await ensureDocumentStructure(
+            documentItem
+        );
+
+
+    if (
+        !structureData ||
+        !Array.isArray(
+            structureData.headings
+        )
+    ) {
+
+        return [];
+
+    }
+
+
+    const headings =
+        structureData.headings
+            .filter(
+                function (
+                    heading
+                ) {
+
+                    return (
+                        heading &&
+                        typeof heading.index !==
+                            "undefined" &&
+                        String(
+                            heading.text ||
+                            ""
+                        ).trim()
+                    );
+
+                }
+            )
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    return (
+                        Number(
+                            a.index
+                        ) -
+                        Number(
+                            b.index
+                        )
+                    );
+
+                }
+            );
+
+
+    if (
+        headings.length ===
+        0
+    ) {
+
+        return [];
+
+    }
+
+
+    // ==================================
+    // بناء قاعدة Orama للعناوين فقط
+    // ==================================
+
+    const db =
+        create({
+
+            schema: {
+
+                headingIndex:
+                    "number",
+
+                heading:
+                    "string",
+
+                style:
+                    "string"
+
+            },
+
+            language:
+                "arabic"
+
+        });
+
+
+    const headingRecords =
+        headings.map(
+            function (
+                heading
+            ) {
+
+                return {
+
+                    headingIndex:
+                        Number(
+                            heading.index
+                        ),
+
+                    heading:
+                        String(
+                            heading.text
+                        ).trim(),
+
+                    style:
+                        String(
+                            heading.style ||
+                            ""
+                        )
+
+                };
+
+            }
+        );
+
+
+    insertMultiple(
+        db,
+        headingRecords
+    );
+
+
+    // ==================================
+    // البحث في العناوين
+    // ==================================
+
+    const result =
+        search(
+            db,
+            {
+
+                term:
+                    String(
+                        query
+                    ),
+
+                properties: [
+
+                    "heading"
+
+                ],
+
+                tolerance:
+                    2,
+
+                limit:
+                    10
+
+            }
+        );
+
+
+    // ==================================
+    // تحويل النتائج
+    // ==================================
+
+    return (
+        Array.isArray(
+            result.hits
+        )
+            ? result.hits.map(
+                function (
+                    hit
+                ) {
+
+                    return {
+
+                        score:
+                            Number(
+                                hit.score ||
+                                0
+                            ),
+
+                        headingIndex:
+                            hit.document.headingIndex,
+
+                        heading:
+                            hit.document.heading,
+
+                        style:
+                            hit.document.style
+
+                    };
+
+                }
+            )
+            : []
+    );
+
+}
+// =====================================================
+// Get Heading Paragraph Range
+// الحصول على نطاق فقرات المطلب
+// =====================================================
+
+function getHeadingParagraphRange(
+    structureData,
+    headingIndex
+) {
+
+    if (
+        !structureData ||
+        !Array.isArray(
+            structureData.paragraphs
+        ) ||
+        !Array.isArray(
+            structureData.headings
+        )
+    ) {
+
+        return [];
+
+    }
+
+
+    const paragraphs =
+        structureData.paragraphs;
+
+
+    const headings =
+        structureData.headings
+            .filter(
+                function (
+                    heading
+                ) {
+
+                    return (
+                        heading &&
+                        typeof heading.index !==
+                            "undefined"
+                    );
+
+                }
+            )
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    return (
+                        Number(
+                            a.index
+                        ) -
+                        Number(
+                            b.index
+                        )
+                    );
+
+                }
+            );
+
+
+    const currentHeadingPosition =
+        headings.findIndex(
+            function (
+                heading
+            ) {
+
+                return (
+                    Number(
+                        heading.index
+                    ) ===
+                    Number(
+                        headingIndex
+                    )
+                );
+
+            }
+        );
+
+
+    if (
+        currentHeadingPosition ===
+        -1
+    ) {
+
+        return [];
+
+    }
+
+
+    const startIndex =
+        Number(
+            headings[
+                currentHeadingPosition
+            ].index
+        );
+
+
+    const nextHeading =
+        headings[
+            currentHeadingPosition + 1
+        ];
+
+
+    const endIndex =
+        nextHeading
+            ? Number(
+                nextHeading.index
+            ) - 1
+            : paragraphs.length - 1;
+
+
+    return paragraphs.filter(
+        function (
+            paragraph
+        ) {
+
+            const index =
+                Number(
+                    paragraph.index
+                );
+
+
+            return (
+                index >
+                startIndex &&
+                index <=
+                endIndex
+            );
+
+        }
+    );
+
+}
 // ======================================
 // Search Input
 // البحث الحالي = المحادثات
