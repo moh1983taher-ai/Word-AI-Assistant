@@ -13864,13 +13864,10 @@ window.testIndexedSearch =
         query
     ) {
 
-        if (
-            !currentDocument
-        ) {
+        console.log(
+            "### TEST INDEXED SEARCH LOADED ###"
+        );
 
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
 
             return null;
 
