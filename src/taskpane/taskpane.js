@@ -10098,24 +10098,44 @@ function extractGeminiAnswer(
 
         if (
             candidate.content &&
-            candidate.content.parts &&
             Array.isArray(
                 candidate.content.parts
             )
         ) {
 
-            const textParts =
+            const answerParts =
                 candidate.content.parts
                     .filter(
                         function (
                             part
                         ) {
 
-                            return (
-                                part &&
-                                typeof part.text ===
-                                "string"
-                            );
+                            if (
+                                !part ||
+                                typeof part.text !==
+                                    "string"
+                            ) {
+
+                                return false;
+
+                            }
+
+
+                            // ==============================
+                            // تجاهل أجزاء التفكير
+                            // ==============================
+
+                            if (
+                                part.thought ===
+                                true
+                            ) {
+
+                                return false;
+
+                            }
+
+
+                            return true;
 
                         }
                     )
@@ -10131,13 +10151,13 @@ function extractGeminiAnswer(
 
 
             if (
-                textParts.length >
+                answerParts.length >
                 0
             ) {
 
-                return textParts.join(
+                return answerParts.join(
                     "\n"
-                );
+                ).trim();
 
             }
 
