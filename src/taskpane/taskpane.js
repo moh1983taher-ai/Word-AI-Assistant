@@ -6105,52 +6105,157 @@ function formatAIMessage(
 
 
         // ==================================
-        // تحويل [مقطع X] إلى زر
+        // تحويل الإحالات المفردة أو المتعددة
+        // إلى إحالات مستقلة قابلة للنقر
         // ==================================
 
         html =
             html.replace(
-                /\[مقطع\s*(\d+)\]/g,
+                /\[مقطع\s*([0-9٠-٩\s،,]+)\]/g,
                 function (
                     match,
-                    rank
+                    ranksText
                 ) {
 
-                    const source =
-                        sources.find(
-                            function (
-                                item
-                            ) {
+                    const normalized =
+                        String(
+                            ranksText
+                        )
+                            .replace(
+                                /٠/g,
+                                "0"
+                            )
+                            .replace(
+                                /١/g,
+                                "1"
+                            )
+                            .replace(
+                                /٢/g,
+                                "2"
+                            )
+                            .replace(
+                                /٣/g,
+                                "3"
+                            )
+                            .replace(
+                                /٤/g,
+                                "4"
+                            )
+                            .replace(
+                                /٥/g,
+                                "5"
+                            )
+                            .replace(
+                                /٦/g,
+                                "6"
+                            )
+                            .replace(
+                                /٧/g,
+                                "7"
+                            )
+                            .replace(
+                                /٨/g,
+                                "8"
+                            )
+                            .replace(
+                                /٩/g,
+                                "9"
+                            );
 
-                                return (
-                                    Number(
-                                        item.rank
-                                    ) ===
-                                    Number(
-                                        rank
-                                    )
-                                );
 
-                            }
-                        );
+                    const ranks =
+                        normalized
+                            .split(
+                                /[،,]+/
+                            )
+                            .map(
+                                function (
+                                    value
+                                ) {
+
+                                    return Number(
+                                        value.trim()
+                                    );
+
+                                }
+                            )
+                            .filter(
+                                function (
+                                    value
+                                ) {
+
+                                    return (
+                                        !Number.isNaN(
+                                            value
+                                        )
+                                    );
+
+                                }
+                            );
 
 
-                    if (!source) {
+                    if (
+                        ranks.length ===
+                        0
+                    ) {
 
                         return match;
 
                     }
 
 
-                    return `
-                        <button
-                            type="button"
-                            class="document-citation"
-                            data-citation-rank="${Number(rank)}"
-                            title="الانتقال إلى المقطع ${Number(rank)}">
-                            [مقطع ${Number(rank)}]
-                        </button>
-                    `;
+                    const citationButtons =
+                        ranks
+                            .map(
+                                function (
+                                    rank
+                                ) {
+
+                                    const source =
+                                        sources.find(
+                                            function (
+                                                item
+                                            ) {
+
+                                                return (
+                                                    Number(
+                                                        item.rank
+                                                    ) ===
+                                                    rank
+                                                );
+
+                                            }
+                                        );
+
+
+                                    if (!source) {
+
+                                        return (
+                                            "[مقطع " +
+                                            rank +
+                                            "]"
+                                        );
+
+                                    }
+
+
+                                    return `
+                                        <button
+                                            type="button"
+                                            class="document-citation"
+                                            data-citation-rank="${rank}"
+                                            title="الانتقال إلى المقطع ${rank}">
+                                            [مقطع ${rank}]
+                                        </button>
+                                    `;
+
+                                }
+                            );
+
+
+                    return citationButtons.join(
+                        " "
+                    );
 
                 }
             );
@@ -6301,10 +6406,6 @@ async function openCitationInWord(
     rank
 ) {
 
-    // ==================================
-    // البحث عن مصدر الإحالة
-    // ==================================
-
     const source =
         currentCitationSources.find(
             function (
@@ -6336,10 +6437,6 @@ async function openCitationInWord(
     }
 
 
-    // ==================================
-    // التأكد من Word API
-    // ==================================
-
     if (
         typeof Word ===
         "undefined"
@@ -6361,18 +6458,84 @@ async function openCitationInWord(
                 context
             ) {
 
+                const body =
+                    context.document.body;
+
+
                 // ==================================
-                // تحميل جميع فقرات المستند
+                // النص الأصلي للمقطع
                 // ==================================
 
-                const paragraphs =
-                    context.document
-                        .body
-                        .paragraphs;
+                let searchText =
+                    String(
+                        source.mainParagraph ||
+                        source.text ||
+                        ""
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim();
 
 
-                paragraphs.load(
-                    "items/text"
+                if (!searchText) {
+
+                    throw new Error(
+                        "لا يوجد نص صالح للمقطع."
+                    );
+
+                }
+
+
+                // ==================================
+                // استخدام بداية المقطع إذا كان طويلًا
+                // ==================================
+
+                if (
+                    searchText.length >
+                    180
+                ) {
+
+                    searchText =
+                        searchText.substring(
+                            0,
+                            180
+                        ).trim();
+
+                }
+
+
+                // ==================================
+                // البحث داخل مستند Word
+                // ==================================
+
+                const results =
+                    body.search(
+                        searchText,
+                        {
+
+                            matchCase:
+                                false,
+
+                            matchWholeWord:
+                                false,
+
+                            matchWildcards:
+                                false,
+
+                            ignorePunct:
+                                true,
+
+                            ignoreSpace:
+                                true
+
+                        }
+                    );
+
+
+                results.load(
+                    "items"
                 );
 
 
@@ -6380,132 +6543,88 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // البحث عن الفقرة حسب index
+                // لم نجد النص
                 // ==================================
 
-                let targetParagraph =
-                    null;
+                if (
+                    results.items.length ===
+                    0
+                ) {
+
+                    // محاولة ثانية باستخدام النص الأقصر
+                    const fallbackText =
+                        searchText.substring(
+                            0,
+                            80
+                        );
 
 
-                const targetIndex =
-                    Number(
-                        source.paragraphIndex
+                    const fallbackResults =
+                        body.search(
+                            fallbackText,
+                            {
+
+                                matchCase:
+                                    false,
+
+                                matchWholeWord:
+                                    false,
+
+                                matchWildcards:
+                                    false,
+
+                                ignorePunct:
+                                    true,
+
+                                ignoreSpace:
+                                    true
+
+                            }
+                        );
+
+
+                    fallbackResults.load(
+                        "items"
                     );
 
 
-                if (
-                    !Number.isNaN(
-                        targetIndex
-                    )
-                ) {
+                    await context.sync();
 
-                    // في أغلب الحالات يكون الترتيب
-                    // متوافقًا مع index المحفوظ
+
                     if (
-                        paragraphs.items[
-                            targetIndex
-                        ]
+                        fallbackResults.items.length ===
+                        0
                     ) {
 
-                        targetParagraph =
-                            paragraphs.items[
-                                targetIndex
-                            ];
+                        throw new Error(
+                            "لم يتم العثور على نص المقطع في المستند."
+                        );
 
                     }
 
-                }
 
-
-                // ==================================
-                // احتياط إضافي بالنص
-                // ==================================
-
-                if (
-                    !targetParagraph &&
-                    source.text
-                ) {
-
-                    const sourceText =
-                        String(
-                            source.text
-                        )
-                            .replace(
-                                /\s+/g,
-                                " "
-                            )
-                            .trim();
-
-
-                    for (
-                        let i = 0;
-                        i < paragraphs.items.length;
-                        i++
-                    ) {
-
-                        const paragraph =
-                            paragraphs.items[
-                                i
-                            ];
-
-
-                        const paragraphText =
-                            String(
-                                paragraph.text ||
-                                ""
-                            )
-                                .replace(
-                                    /\s+/g,
-                                    " "
-                                )
-                                .trim();
-
-
-                        if (
-                            paragraphText &&
-                            sourceText &&
-                            (
-                                paragraphText.includes(
-                                    sourceText
-                                ) ||
-                                sourceText.includes(
-                                    paragraphText
-                                )
-                            )
-                        ) {
-
-                            targetParagraph =
-                                paragraph;
-
-                            break;
-
-                        }
-
-                    }
-
-                }
-
-
-                // ==================================
-                // لم نجد المقطع
-                // ==================================
-
-                if (
-                    !targetParagraph
-                ) {
-
-                    throw new Error(
-                        "لم يتم العثور على المقطع الأصلي في المستند."
+                    fallbackResults.items[
+                        0
+                    ].select(
+                        "Select"
                     );
 
+
+                    await context.sync();
+
+
+                    return;
+
                 }
 
 
                 // ==================================
-                // تحديد الفقرة
+                // تحديد النتيجة الأولى
                 // ==================================
 
-                targetParagraph.select(
+                results.items[
+                    0
+                ].select(
                     "Select"
                 );
 
@@ -6519,7 +6638,7 @@ async function openCitationInWord(
     catch (error) {
 
         console.error(
-            "تعذر الانتقال إلى المقطع الأصلي:",
+            "تعذر الانتقال إلى المقطع:",
             error
         );
 
@@ -9530,6 +9649,10 @@ async function buildAIDocumentContext(
 
                             heading:
                                 item.heading ||
+                                "",
+
+                            mainParagraph:
+                                item.mainParagraph ||
                                 "",
 
                             text:
