@@ -8151,1391 +8151,50 @@ if (
 saveProjects();
 saveChats();
 
-        // ======================================
-        // New Project
-        // ======================================
-
-        if (newProjectBtn) {
-
-            newProjectBtn.onclick =
-                function (e) {
-
-                    e.stopPropagation();
-
-
-                    if (!projectsPopup)
-                        return;
-
-
-                    const oldBox =
-                        document.querySelector(
-                            ".project-create-box"
-                        );
-
-
-                    if (oldBox) {
-
-                        oldBox.remove();
-
-                    }
-
-
-                    const box =
-                        document.createElement(
-                            "div"
-                        );
-
-
-                    box.className =
-                        "project-create-box";
-
-
-                    box.innerHTML = `
-
-                        <div class="rename-dialog">
-
-                            <input
-                                class="new-project-name"
-                                placeholder="اسم المشروع">
-
-                            <button
-                                class="save-project"
-                                type="button">
-                                حفظ
-                            </button>
-
-                            <button
-                                class="cancel-project"
-                                type="button">
-                                إلغاء
-                            </button>
-
-                        </div>
-
-                    `;
-
-
-                    document.body.appendChild(
-                        box
-                    );
-
-
-                    const buttonRect =
-                        newProjectBtn.getBoundingClientRect();
-
-
-                    const boxHeight =
-                        120;
-
-                    const screenMargin =
-                        12;
-
-
-                    let left =
-                        buttonRect.left;
-
-
-                    let top =
-                        buttonRect.bottom +
-                        8;
-
-
-                    const actualBoxWidth =
-                        box.offsetWidth ||
-                        240;
-
-
-                    if (
-                        left +
-                        actualBoxWidth >
-                        window.innerWidth -
-                        screenMargin
-                    ) {
-
-                        left =
-                            window.innerWidth -
-                            actualBoxWidth -
-                            screenMargin;
-
-                    }
-
-
-                    if (
-                        left <
-                        screenMargin
-                    ) {
-
-                        left =
-                            screenMargin;
-
-                    }
-
-
-                    if (
-                        top +
-                        boxHeight >
-                        window.innerHeight -
-                        screenMargin
-                    ) {
-
-                        top =
-                            buttonRect.top -
-                            boxHeight -
-                            8;
-
-                    }
-
-
-                    box.style.position =
-                        "fixed";
-
-
-                    box.style.left =
-                        left +
-                        "px";
-
-
-                    box.style.top =
-                        top +
-                        "px";
-
-
-                    box.style.zIndex =
-                        "999999";
-
-
-                    const inputProject =
-                        box.querySelector(
-                            ".new-project-name"
-                        );
-
-
-                    if (inputProject) {
-
-                        inputProject.focus();
-
-                    }
-
-
-                    const saveProject =
-                        box.querySelector(
-                            ".save-project"
-                        );
-
-
-                    if (saveProject) {
-
-                        saveProject.onclick =
-                            function () {
-
-                                const name =
-                                    inputProject
-                                        ? inputProject.value.trim()
-                                        : "";
-
-
-                                if (
-                                    name !== ""
-                                ) {
-
-                                    const now =
-                                        new Date()
-                                            .toISOString();
-
-
-                                    const newProject = {
-
-                                        id:
-                                            Date.now(),
-
-                                        name:
-                                            name,
-
-                                        createdAt:
-                                            now,
-
-                                        updatedAt:
-                                            now,
-
-                                        documents:
-                                            [],
-
-                                        references:
-                                            [],
-
-                                        chatIds:
-                                            [],
-
-                                        settings: {
-
-                                            citationStyle:
-                                                "",
-
-                                            notes:
-                                                ""
-
-                                        }
-
-                                    };
-
-
-                                    projects.unshift(
-                                        newProject
-                                    );
-
-
-                                    saveProjects();
-
-
-                                    renderProjects();
-
-
-                                    renderExpandedProjects();
-
-                                }
-
-
-                                box.remove();
-
-                            };
-
-                    }
-
-
-                    const cancelProject =
-                        box.querySelector(
-                            ".cancel-project"
-                        );
-
-
-                    if (cancelProject) {
-
-                        cancelProject.onclick =
-                            function () {
-
-                                box.remove();
-
-                            };
-
-                    }
-
-
-                    box.onclick =
-                        function (e) {
-
-                            e.stopPropagation();
-
-                        };
-
-                };
-
-        }
-
 
 // ======================================
-// Attach Document To Project
+// END PART 2
 // ======================================
 
-function attachDocumentToProject(
-    project,
-    documentItem
+// ======================================
+// Word AI Assistant
+// PART 3 / 3
+// AI + Retrieval Context + Streaming + Send
+// ======================================
+
+
+// =====================================================
+// Gemini Model Normalization
+// =====================================================
+
+function normalizeGeminiModel(
+    model
 ) {
 
-    if (
-        !project ||
-        !documentItem
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        !Array.isArray(
-            project.documents
-        )
-    ) {
-
-        project.documents =
-            [];
-
-    }
-
-
-    if (
-        !project.documents.includes(
-            documentItem.id
-        )
-    ) {
-
-        project.documents.push(
-            documentItem.id
-        );
-
-
-        project.updatedAt =
-            new Date()
-                .toISOString();
-
-
-        saveProjects();
-
-    }
-
-}
-
-
-// ======================================
-// Set Active Project
-// ======================================
-
-function setCurrentProject(
-    project
-) {
-
-    if (!project) {
-
-        currentProject =
-            null;
-
-
-        renderDocuments();
-
-
-        return;
-
-    }
-
-
-    currentProject =
-        project;
-
-
-    renderDocuments();
-
-}
-
-
-// ======================================
-// Read Current Working Document
-// القراءة + الفهرسة + البنية
-// ======================================
-
-async function readCurrentWordDocument(
-    documentItem
-) {
-
-    if (!documentItem) {
-
-        throw new Error(
-            "لم يتم تحديد المستند."
-        );
-
-    }
-
-
-    updateDocumentReadStatus(
-        documentItem,
-        "reading"
+    return String(
+        model || ""
+    ).replace(
+        /^models\//,
+        ""
     );
 
-
-    try {
-
-        if (
-            !Office.context.requirements
-                .isSetSupported(
-                    "WordApiHiddenDocument",
-                    "1.3"
-                )
-        ) {
-
-            throw new Error(
-                "إصدار Word الحالي لا يدعم قراءة نسخة العمل."
-            );
-
-        }
-
-
-        const file =
-            await getWorkingWordFile(
-                documentItem.storageId
-            );
-
-
-        if (!file) {
-
-            throw new Error(
-                "لم يتم العثور على نسخة العمل."
-            );
-
-        }
-
-
-        const base64 =
-            await fileToBase64(
-                file
-            );
-
-
-        const text =
-            await Word.run(
-                async function (
-                    context
-                ) {
-
-                    const workingDocument =
-                        context.application
-                            .createDocument(
-                                base64
-                            );
-
-
-                    const body =
-                        workingDocument.body;
-
-
-                    body.load(
-                        "text"
-                    );
-
-
-                    await context.sync();
-
-
-                    return body.text ||
-                        "";
-
-                }
-            );
-
-
-        await saveDocumentText(
-            documentItem.id,
-            text
-        );
-
-
-        updateDocumentReadStatus(
-            documentItem,
-            "read"
-        );
-
-
-        updateDocumentIndexStatus(
-            documentItem,
-            "indexing"
-        );
-
-
-        const indexData =
-            await rebuildDocumentIndex(
-                documentItem.id,
-                text
-            );
-
-
-        const structureData =
-            await buildDocumentStructure(
-                documentItem
-            );
-
-
-        await saveDocumentStructure(
-            documentItem.id,
-            structureData
-        );
-
-
-        // ==============================
-        // تثبيت بيانات الفهرس
-        // ==============================
-
-        documentItem.indexStatus =
-            "indexed";
-
-
-        documentItem.indexTokenCount =
-            indexData.tokenCount ||
-            0;
-
-
-        documentItem.indexUniqueTerms =
-            indexData.uniqueTerms ||
-            0;
-
-
-        documentItem.indexUniqueFamilies =
-            indexData.uniqueFamilies ||
-            0;
-
-
-        documentItem.indexSchemaVersion =
-            INDEX_SCHEMA_VERSION;
-
-
-        documentItem.indexUpdatedAt =
-            indexData.updatedAt ||
-            new Date()
-                .toISOString();
-
-
-        saveDocuments();
-
-
-        // ==============================
-        // بناء Orama فعليًا
-        // ==============================
-
-        oramaRetrievalDb =
-            null;
-
-
-        oramaRetrievalCacheKey =
-            "";
-
-
-        oramaRetrievalRecords =
-            [];
-
-
-        await ensureOramaRetrievalIndex(
-            documentItem,
-            structureData
-        );
-
-
-        console.log(
-            "تمت قراءة المستند وبناء الفهرس بنجاح:",
-            {
-                documentId:
-                    documentItem.id,
-
-                tokenCount:
-                    indexData.tokenCount,
-
-                uniqueTerms:
-                    indexData.uniqueTerms,
-
-                uniqueFamilies:
-                    indexData.uniqueFamilies,
-
-                indexVersion:
-                    indexData.indexVersion,
-
-                oramaRecords:
-                    oramaRetrievalRecords.length
-            }
-        );
-
-
-        return text;
-
-    }
-    catch (error) {
-
-        updateDocumentReadStatus(
-            documentItem,
-            "error"
-        );
-
-
-        updateDocumentIndexStatus(
-            documentItem,
-            "error"
-        );
-
-
-        console.error(
-            "فشل قراءة/فهرسة المستند:",
-            error
-        );
-
-
-        throw error;
-
-    }
-
-}
-
-
-// ======================================
-// Set Active Document
-// ======================================
-
-function setCurrentDocument(
-    documentItem
-) {
-
-    if (!documentItem) {
-
-        currentDocument =
-            null;
-
-
-        currentCitationSources =
-            [];
-
-
-        if (documentTitle) {
-
-            documentTitle.textContent =
-                "لا يوجد مستند مفتوح";
-
-        }
-
-
-        renderDocuments();
-
-
-        return;
-
-    }
-
-
-    currentDocument =
-        documentItem;
-
-
-    currentCitationSources =
-        [];
-
-
-    if (documentTitle) {
-
-        documentTitle.textContent =
-            documentItem.name;
-
-    }
-
-
-    if (
-        documentItem.readStatus ===
-        "read"
-    ) {
-
-        ensureDocumentIndex(
-            documentItem
-        )
-            .then(
-                async function () {
-
-                    const structure =
-                        await ensureDocumentStructure(
-                            documentItem
-                        );
-
-
-                    if (structure) {
-
-                        await ensureOramaRetrievalIndex(
-                            documentItem,
-                            structure
-                        );
-
-                    }
-
-
-                    renderDocuments();
-
-                }
-            )
-            .catch(
-                function (error) {
-
-                    console.error(
-                        "تعذر تحديث فهرس المستند:",
-                        error
-                    );
-
-
-                    renderDocuments();
-
-                }
-            );
-
-
-        renderDocuments();
-
-
-        return;
-
-    }
-
-
-    readCurrentWordDocument(
-        documentItem
-    )
-        .then(
-            function (text) {
-
-                console.log(
-                    "محتوى نسخة العمل:",
-                    text
-                );
-
-
-                renderDocuments();
-
-            }
-        )
-        .catch(
-            function (error) {
-
-                console.error(
-                    "تعذر قراءة نسخة العمل:",
-                    error
-                );
-
-
-                renderDocuments();
-
-            }
-        );
-
-
-    renderDocuments();
-
-}
-
-
-// ======================================
-// Update Document Timestamp
-// ======================================
-
-function touchDocument(
-    documentItem
-) {
-
-    if (!documentItem)
-        return;
-
-
-    documentItem.updatedAt =
-        new Date()
-            .toISOString();
-
-}
-
-
-// ======================================
-// Add Document
-// ======================================
-
-if (
-    addDocumentBtn &&
-    wordDocumentPicker
-) {
-
-    addDocumentBtn.onclick =
-        function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            if (!currentProject) {
-
-                if (documentsList) {
-
-                    documentsList.innerHTML = `
-                        <div class="empty-document">
-                            اختر مشروعًا أولًا لإضافة مستند
-                        </div>
-                    `;
-
-                }
-
-
-                return;
-
-            }
-
-
-            wordDocumentPicker.value =
-                "";
-
-
-            wordDocumentPicker.click();
-
-        };
-
-
-    wordDocumentPicker.onchange =
-        async function () {
-
-            try {
-
-                const file =
-                    wordDocumentPicker.files &&
-                    wordDocumentPicker.files[0];
-
-
-                if (!file)
-                    return;
-
-
-                if (
-                    !/\.docx$/i.test(
-                        file.name
-                    )
-                ) {
-
-                    console.warn(
-                        "الملف المختار ليس DOCX."
-                    );
-
-
-                    return;
-
-                }
-
-
-                if (!currentProject)
-                    return;
-
-
-                const projectDocuments =
-                    getProjectDocuments(
-                        currentProject.id
-                    );
-
-
-                const nextOrder =
-                    projectDocuments.length +
-                    1;
-
-
-                const documentItem =
-                    createDocument(
-                        file,
-                        currentProject.id,
-                        nextOrder
-                    );
-
-
-                await saveWorkingWordFile(
-                    documentItem.storageId,
-                    file
-                );
-
-
-                attachDocumentToProject(
-                    currentProject,
-                    documentItem
-                );
-
-
-                setCurrentDocument(
-                    documentItem
-                );
-
-
-                renderDocuments();
-
-
-                console.log(
-                    "تم استيراد مستند Word:",
-                    {
-                        name:
-                            documentItem.name,
-
-                        fileName:
-                            documentItem.fileName,
-
-                        storageId:
-                            documentItem.storageId
-                    }
-                );
-
-            }
-            catch (error) {
-
-                console.error(
-                    "فشل استيراد مستند Word:",
-                    error
-                );
-
-
-                if (documentsList) {
-
-                    documentsList.innerHTML = `
-                        <div class="empty-document">
-                            تعذر استيراد المستند
-                        </div>
-                    `;
-
-                }
-
-            }
-
-        };
-
-}
-
-
-// ======================================
-// Format AI Message
-// ======================================
-
-function formatAIMessage(
-    text,
-    citationSources
-) {
-
-    if (!text) {
-
-        return "";
-
-    }
-
-
-    const sources =
-        Array.isArray(
-            citationSources
-        )
-            ? citationSources
-            : currentCitationSources;
-
-
-    try {
-
-        let html =
-            marked.parse(
-                String(
-                    text
-                ),
-                {
-
-                    breaks:
-                        true,
-
-                    gfm:
-                        true
-
-                }
-            );
-
-
-        html =
-            html.replace(
-                /\[مقطع\s*([0-9٠-٩\s،,]+)\]/g,
-                function (
-                    match,
-                    ranksText
-                ) {
-
-                    const normalized =
-                        String(
-                            ranksText
-                        )
-                            .replace(
-                                /٠/g,
-                                "0"
-                            )
-                            .replace(
-                                /١/g,
-                                "1"
-                            )
-                            .replace(
-                                /٢/g,
-                                "2"
-                            )
-                            .replace(
-                                /٣/g,
-                                "3"
-                            )
-                            .replace(
-                                /٤/g,
-                                "4"
-                            )
-                            .replace(
-                                /٥/g,
-                                "5"
-                            )
-                            .replace(
-                                /٦/g,
-                                "6"
-                            )
-                            .replace(
-                                /٧/g,
-                                "7"
-                            )
-                            .replace(
-                                /٨/g,
-                                "8"
-                            )
-                            .replace(
-                                /٩/g,
-                                "9"
-                            );
-
-
-                    const ranks =
-                        normalized
-                            .split(
-                                /[،,]+/
-                            )
-                            .map(
-                                function (
-                                    value
-                                ) {
-
-                                    return Number(
-                                        value.trim()
-                                    );
-
-                                }
-                            )
-                            .filter(
-                                function (
-                                    value
-                                ) {
-
-                                    return (
-                                        !Number.isNaN(
-                                            value
-                                        )
-                                    );
-
-                                }
-                            );
-
-
-                    if (
-                        ranks.length ===
-                        0
-                    ) {
-
-                        return match;
-
-                    }
-
-
-                    const citationButtons =
-                        ranks.map(
-                            function (
-                                rank
-                            ) {
-
-                                const source =
-                                    sources.find(
-                                        function (
-                                            item
-                                        ) {
-
-                                            return (
-                                                Number(
-                                                    item.rank
-                                                ) ===
-                                                rank
-                                            );
-
-                                        }
-                                    );
-
-
-                                if (!source) {
-
-                                    return (
-                                        "[مقطع " +
-                                        rank +
-                                        "]"
-                                    );
-
-                                }
-
-
-                                return `
-                                    <button
-                                        type="button"
-                                        class="document-citation"
-                                        data-citation-rank="${rank}"
-                                        title="الانتقال إلى المقطع ${rank}">
-                                        [مقطع ${rank}]
-                                    </button>
-                                `;
-
-                            }
-                        );
-
-
-                    return citationButtons.join(
-                        " "
-                    );
-
-                }
-            );
-
-
-        return html;
-
-    }
-    catch (error) {
-
-        console.error(
-            "Markdown formatting error:",
-            error
-        );
-
-
-        return String(
-            text
-        ).replace(
-            /\n/g,
-            "<br>"
-        );
-
-    }
-
-}
-
-
-// ======================================
-// Open Citation In Word
-// ======================================
-
-async function openCitationInWord(
-    rank
-) {
-
-    const source =
-        currentCitationSources.find(
-            function (
-                item
-            ) {
-
-                return (
-                    Number(
-                        item.rank
-                    ) ===
-                    Number(
-                        rank
-                    )
-                );
-
-            }
-        );
-
-
-    if (!source) {
-
-        console.warn(
-            "لم يتم العثور على مصدر الإحالة:",
-            rank
-        );
-
-
-        return;
-
-    }
-
-
-    if (
-        typeof Word ===
-        "undefined"
-    ) {
-
-        console.warn(
-            "Word API غير متاحة."
-        );
-
-
-        return;
-
-    }
-
-
-    try {
-
-        await Word.run(
-            async function (
-                context
-            ) {
-
-                const body =
-                    context.document.body;
-
-
-                let searchText =
-                    String(
-                        source.mainParagraph ||
-                        source.text ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim();
-
-
-                if (!searchText) {
-
-                    throw new Error(
-                        "لا يوجد نص صالح للمقطع."
-                    );
-
-                }
-
-
-                if (
-                    searchText.length >
-                    180
-                ) {
-
-                    searchText =
-                        searchText.substring(
-                            0,
-                            180
-                        ).trim();
-
-                }
-
-
-                let results =
-                    body.search(
-                        searchText,
-                        {
-
-                            matchCase:
-                                false,
-
-                            matchWholeWord:
-                                false,
-
-                            matchWildcards:
-                                false,
-
-                            ignorePunct:
-                                true,
-
-                            ignoreSpace:
-                                true
-
-                        }
-                    );
-
-
-                results.load(
-                    "items"
-                );
-
-
-                await context.sync();
-
-
-                if (
-                    results.items.length ===
-                    0
-                ) {
-
-                    const fallbackText =
-                        searchText.substring(
-                            0,
-                            80
-                        );
-
-
-                    const fallbackResults =
-                        body.search(
-                            fallbackText,
-                            {
-
-                                matchCase:
-                                    false,
-
-                                matchWholeWord:
-                                    false,
-
-                                matchWildcards:
-                                    false,
-
-                                ignorePunct:
-                                    true,
-
-                                ignoreSpace:
-                                    true
-
-                            }
-                        );
-
-
-                    fallbackResults.load(
-                        "items"
-                    );
-
-
-                    await context.sync();
-
-
-                    if (
-                        fallbackResults.items.length ===
-                        0
-                    ) {
-
-                        throw new Error(
-                            "لم يتم العثور على نص المقطع في المستند."
-                        );
-
-                    }
-
-
-                    fallbackResults.items[0].select(
-                        "Select"
-                    );
-
-
-                    await context.sync();
-
-
-                    return;
-
-                }
-
-
-                results.items[0].select(
-                    "Select"
-                );
-
-
-                await context.sync();
-
-            }
-        );
-
-    }
-    catch (error) {
-
-        console.error(
-            "تعذر الانتقال إلى المقطع:",
-            error
-        );
-
-    }
-
 }
 
 
 // =====================================================
-// AI SETTINGS
+// JSON
 // =====================================================
 
-function getSavedSettings() {
+async function readJSON(
+    response
+) {
 
     try {
 
-        return (
-            JSON.parse(
-                localStorage.getItem(
-                    "AI_SETTINGS"
-                )
-            ) || {}
-        );
+        return await response.json();
 
     }
-    catch (error) {
+    catch (e) {
 
         return {};
 
@@ -9544,1933 +8203,861 @@ function getSavedSettings() {
 }
 
 
-function saveAISettings(
-    data
+// =====================================================
+// API Error
+// =====================================================
+
+function getAPIError(
+    result,
+    fallback
 ) {
 
-    localStorage.setItem(
-        "AI_SETTINGS",
-        JSON.stringify(
-            data
-        )
-    );
+    if (!result) {
 
-}
-
-
-// ======================================
-// Provider Info
-// ======================================
-
-function updateProviderInfo() {
-
-    if (
-        !providerInfo ||
-        !provider
-    ) {
-
-        return;
+        return fallback;
 
     }
 
 
-    const value =
-        provider.value;
+    if (result.error) {
 
+        if (
+            typeof result.error ===
+            "string"
+        ) {
 
-    if (
-        value ===
-        "openrouter"
-    ) {
+            return result.error;
 
-        providerInfo.innerHTML =
-            "OpenRouter: سيتم جلب النماذج المجانية المتاحة من حسابك.";
-
-
-        return;
-
-    }
-
-
-    if (
-        value ===
-        "gemini"
-    ) {
-
-        providerInfo.innerHTML =
-            "Gemini: سيتم جلب النماذج التي تدعم generateContent.";
-
-
-        return;
-
-    }
-
-
-    if (
-        value ===
-        "groq"
-    ) {
-
-        providerInfo.innerHTML =
-            "Groq: سيتم جلب النماذج المتاحة من حسابك.";
-
-
-        return;
-
-    }
-
-
-    if (
-        value ===
-        "openai"
-    ) {
-
-        providerInfo.innerHTML =
-            "OpenAI: سيتم جلب النماذج المتاحة من حسابك.";
-
-
-        return;
-
-    }
-
-
-    providerInfo.innerHTML =
-        "سيتم تحديد رابط الاتصال حسب مزود الذكاء الاصطناعي.";
-
-}
-
-
-// ======================================
-// Load Settings
-// ======================================
-
-function loadSettings() {
-
-    const data =
-        getSavedSettings();
-
-
-    if (provider) {
-
-        provider.value =
-            data.provider ||
-            "openrouter";
-
-    }
-
-
-    if (apiKey) {
-
-        apiKey.value =
-            data.key ||
-            "";
-
-    }
-
-
-    if (modelSelect) {
-
-        const savedModel =
-            data.model ||
-            "";
-
-
-        modelSelect.innerHTML =
-            "";
-
-
-        const option =
-            document.createElement(
-                "option"
-            );
-
-
-        option.value =
-            savedModel;
-
-
-        option.textContent =
-            savedModel ||
-            "أدخل المفتاح ثم حدّث النماذج";
-
-
-        modelSelect.appendChild(
-            option
-        );
+        }
 
 
         if (
-            savedModel
+            result.error.message
         ) {
 
-            modelSelect.value =
-                savedModel;
+            let message =
+                result.error.message;
+
+
+            if (
+                result.error.code
+            ) {
+
+                message +=
+                    " | Code: " +
+                    result.error.code;
+
+            }
+
+
+            return message;
 
         }
 
     }
 
 
-    updateProviderInfo();
+    if (
+        result.message
+    ) {
+
+        return String(
+            result.message
+        );
+
+    }
+
+
+    return fallback;
 
 }
 
 
-// ======================================
-// Settings Button
-// ======================================
+// =====================================================
+// OpenAI / OpenRouter / Groq Answer
+// =====================================================
 
-if (settingsBtn) {
-
-    settingsBtn.onclick =
-        function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            if (projectsPopup) {
-
-                projectsPopup.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            if (chatPopup) {
-
-                chatPopup.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            if (searchPopup) {
-
-                searchPopup.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            if (settingsWindow) {
-
-                settingsWindow.classList.add(
-                    "open"
-                );
-
-            }
-
-
-            loadSettings();
-
-        };
-
-}
-
-
-// ======================================
-// Provider Change
-// ======================================
-
-if (provider) {
-
-    provider.onchange =
-        function () {
-
-            updateProviderInfo();
-
-
-            if (modelSelect) {
-
-                modelSelect.innerHTML = `
-                    <option value="">
-                        أدخل المفتاح ثم حدّث النماذج
-                    </option>
-                `;
-
-            }
-
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "";
-
-            }
-
-        };
-
-}
-
-
-// ======================================
-// Close Settings
-// ======================================
-
-if (closeSettings) {
-
-    closeSettings.onclick =
-        function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            if (settingsWindow) {
-
-                settingsWindow.classList.remove(
-                    "open"
-                );
-
-            }
-
-        };
-
-}
-
-
-// ======================================
-// Show / Hide Key
-// ======================================
-
-if (
-    showKey &&
-    apiKey
+function extractOpenAIStyleAnswer(
+    result,
+    providerName
 ) {
 
-    showKey.onclick =
-        function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            if (
-                apiKey.type ===
-                "password"
-            ) {
-
-                apiKey.type =
-                    "text";
-
-
-                showKey.innerHTML =
-                    "🙈";
-
-            }
-            else {
-
-                apiKey.type =
-                    "password";
-
-
-                showKey.innerHTML =
-                    "👁";
-
-            }
-
-        };
-
-}
-
-
-// ======================================
-// Save AI Settings
-// ======================================
-
-if (saveSettings) {
-
-    saveSettings.onclick =
-        function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            const settings = {
-
-                provider:
-                    provider
-                        ? provider.value
-                        : "openrouter",
-
-                key:
-                    apiKey
-                        ? apiKey.value.trim()
-                        : "",
-
-                model:
-                    modelSelect
-                        ? modelSelect.value.trim()
-                        : ""
-
-            };
-
-
-            if (!settings.key) {
-
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        "⚠ يرجى إدخال مفتاح API.";
-
-                }
-
-
-                return;
-
-            }
-
-
-            if (!settings.model) {
-
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        "⚠ يرجى تحديد نموذج الذكاء الاصطناعي.";
-
-                }
-
-
-                return;
-
-            }
-
-
-            saveAISettings(
-                settings
-            );
-
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "✓ تم حفظ إعدادات الذكاء الاصطناعي";
-
-            }
-
-        };
-
-}
-
-
-// ======================================
-// Load Models
-// ======================================
-
-async function loadModels() {
-
-    const selectedProvider =
-        provider
-            ? provider.value
-            : "openrouter";
-
-
     if (
-        selectedProvider ===
-        "openrouter"
+        result &&
+        result.choices &&
+        result.choices.length > 0
     ) {
 
-        await loadOpenRouterModels();
+        const choice =
+            result.choices[0];
 
 
-        return;
+        if (
+            choice.message &&
+            typeof choice.message.content ===
+            "string"
+        ) {
 
-    }
+            return choice.message.content;
 
-
-    if (
-        selectedProvider ===
-        "gemini"
-    ) {
-
-        await loadGeminiModels();
-
-
-        return;
-
-    }
-
-
-    if (
-        selectedProvider ===
-        "groq"
-    ) {
-
-        await loadGroqModels();
-
-
-        return;
-
-    }
-
-
-    if (
-        selectedProvider ===
-        "openai"
-    ) {
-
-        await loadOpenAIModels();
-
-
-        return;
+        }
 
     }
 
 
     throw new Error(
-        "مزود الذكاء الاصطناعي غير معروف."
+        "لم يصل رد صالح من " +
+        providerName +
+        "."
     );
 
 }
 
 
-// ======================================
-// Groq Models
-// ======================================
+// =====================================================
+// Gemini Answer
+// =====================================================
 
-async function loadGroqModels() {
+function extractGeminiAnswer(
+    result
+) {
 
-    const key =
-        apiKey
-            ? apiKey.value.trim()
-            : "";
+    if (
+        result &&
+        result.candidates &&
+        result.candidates.length > 0
+    ) {
 
-
-    if (!key) {
-
-        throw new Error(
-            "يرجى إدخال مفتاح Groq أولاً."
-        );
-
-    }
+        const candidate =
+            result.candidates[0];
 
 
-    if (settingsStatus) {
+        if (
+            candidate.content &&
+            Array.isArray(
+                candidate.content.parts
+            )
+        ) {
 
-        settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج Groq...";
+            const answerParts =
+                candidate.content.parts
+                    .filter(
+                        function (
+                            part
+                        ) {
 
-    }
+                            if (
+                                !part ||
+                                typeof part.text !==
+                                    "string"
+                            ) {
+
+                                return false;
+
+                            }
 
 
-    const response =
-        await fetch(
-            "https://api.groq.com/openai/v1/models",
-            {
+                            if (
+                                part.thought ===
+                                true
+                            ) {
 
-                method:
-                    "GET",
+                                return false;
 
-                headers: {
+                            }
 
-                    Authorization:
-                        "Bearer " +
-                        key,
 
-                    "Content-Type":
-                        "application/json"
+                            return true;
 
-                }
+                        }
+                    )
+                    .map(
+                        function (
+                            part
+                        ) {
+
+                            return part.text;
+
+                        }
+                    );
+
+
+            if (
+                answerParts.length >
+                0
+            ) {
+
+                return answerParts
+                    .join(
+                        "\n"
+                    )
+                    .trim();
 
             }
-        );
 
-
-    const result =
-        await readJSON(
-            response
-        );
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Groq."
-            )
-        );
+        }
 
     }
+
+
+    throw new Error(
+        "لم يصل رد صالح من Gemini."
+    );
+
+}
+
+
+// =====================================================
+// Build Retrieval Context
+// تحويل نتائج البحث إلى سياق مناسب للذكاء الاصطناعي
+// =====================================================
+
+function buildRetrievalContext(
+    searchResult,
+    options
+) {
+
+    const settings =
+        options || {};
+
+
+    const maxResults =
+        typeof settings.maxResults ===
+        "number"
+            ? settings.maxResults
+            : 4;
+
+
+    const maxChars =
+        typeof settings.maxChars ===
+        "number"
+            ? settings.maxChars
+            : 3500;
+
+
+    const includeNeighbors =
+        settings.includeNeighbors !== false;
 
 
     if (
-        !result.data ||
+        !searchResult ||
         !Array.isArray(
-            result.data
+            searchResult.results
         )
     ) {
 
-        throw new Error(
-            "لم تصل قائمة نماذج Groq."
-        );
+        return {
+
+            query:
+                searchResult &&
+                searchResult.query
+                    ? searchResult.query
+                    : "",
+
+            count:
+                0,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                0,
+
+            contexts:
+                [],
+
+            text:
+                ""
+
+        };
 
     }
 
 
-    const models =
-        result.data
+    const results =
+        searchResult.results
             .filter(
                 function (
-                    item
+                    result
                 ) {
 
                     return (
-                        item &&
-                        item.id &&
-                        item.active !==
-                            false
+                        result &&
+                        typeof result.text ===
+                            "string"
                     );
 
                 }
             )
+            .slice()
             .sort(
                 function (
                     a,
                     b
                 ) {
 
-                    return a.id.localeCompare(
-                        b.id
+                    return (
+                        Number(
+                            b.score ||
+                            0
+                        ) -
+                        Number(
+                            a.score ||
+                            0
+                        )
                     );
 
                 }
             );
 
 
-    populateModels(
-        models.map(
-            function (
-                item
-            ) {
-
-                return {
-
-                    id:
-                        item.id,
-
-                    name:
-                        item.id
-
-                };
-
-            }
-        )
-    );
+    const selected =
+        [];
 
 
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "✓ تم تحديث نماذج Groq: " +
-            models.length;
-
-    }
-
-}
+    const selectedParagraphIndexes =
+        new Set();
 
 
-// ======================================
-// OpenRouter Models
-// ======================================
-
-async function loadOpenRouterModels() {
-
-    const key =
-        apiKey
-            ? apiKey.value.trim()
-            : "";
+    const MAX_TEXT_OVERLAP =
+        0.75;
 
 
-    if (!key) {
-
-        throw new Error(
-            "يرجى إدخال مفتاح OpenRouter أولاً."
-        );
-
-    }
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج OpenRouter المجانية...";
-
-    }
-
-
-    const response =
-        await fetch(
-            "https://openrouter.ai/api/v1/models",
-            {
-
-                method:
-                    "GET",
-
-                headers: {
-
-                    Authorization:
-                        "Bearer " +
-                        key,
-
-                    "Content-Type":
-                        "application/json",
-
-                    "HTTP-Referer":
-                        window.location.href,
-
-                    "X-Title":
-                        "Research Tools"
-
-                }
-
-            }
-        );
-
-
-    const result =
-        await readJSON(
-            response
-        );
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenRouter."
-            )
-        );
-
-    }
-
-
-    if (
-        !result.data ||
-        !Array.isArray(
-            result.data
-        )
+    for (
+        let i = 0;
+        i < results.length;
+        i++
     ) {
 
-        throw new Error(
-            "لم تصل قائمة النماذج من OpenRouter."
-        );
-
-    }
+        const candidate =
+            results[i];
 
 
-    const freeModels =
-        result.data.filter(
-            function (
-                item
-            ) {
-
-                return (
-                    item &&
-                    item.id &&
-                    String(
-                        item.id
-                    ).endsWith(
-                        ":free"
-                    )
-                );
-
-            }
-        );
-
-
-    const models =
-        freeModels.map(
-            function (
-                item
-            ) {
-
-                return {
-
-                    id:
-                        item.id,
-
-                    name:
-                        (
-                            item.name ||
-                            item.id
-                        ) +
-                        " (مجاني)"
-
-                };
-
-            }
-        );
-
-
-    models.sort(
-        function (
-            a,
-            b
-        ) {
-
-            return String(
-                a.name
-            ).localeCompare(
-                String(
-                    b.name
-                ),
-                "ar"
+        const paragraphIndex =
+            Number(
+                candidate.paragraphIndex
             );
 
+
+        if (
+            selectedParagraphIndexes.has(
+                paragraphIndex
+            )
+        ) {
+
+            continue;
+
         }
-    );
 
 
-    populateModels(
-        models
-    );
+        const candidateText =
+            String(
+                candidate.context ||
+                candidate.text ||
+                ""
+            )
+                .replace(
+                    /\s+/g,
+                    " "
+                )
+                .trim();
 
 
-    if (settingsStatus) {
+        if (
+            !candidateText
+        ) {
 
-        settingsStatus.innerHTML =
-            "✓ تم تحديث النماذج المجانية: " +
-            models.length;
+            continue;
 
-    }
-
-}
+        }
 
 
-// ======================================
-// OpenAI Models
-// ======================================
-
-async function loadOpenAIModels() {
-
-    const key =
-        apiKey
-            ? apiKey.value.trim()
-            : "";
+        let tooSimilar =
+            false;
 
 
-    if (!key) {
+        for (
+            let j = 0;
+            j < selected.length;
+            j++
+        ) {
 
-        throw new Error(
-            "يرجى إدخال مفتاح OpenAI أولاً."
-        );
-
-    }
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج OpenAI...";
-
-    }
+            const selectedText =
+                String(
+                    selected[j].context ||
+                    selected[j].text ||
+                    ""
+                )
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
 
 
-    const response =
-        await fetch(
-            "https://api.openai.com/v1/models",
-            {
+            if (
+                !selectedText
+            ) {
 
-                method:
-                    "GET",
-
-                headers: {
-
-                    Authorization:
-                        "Bearer " +
-                        key,
-
-                    "Content-Type":
-                        "application/json"
-
-                }
+                continue;
 
             }
-        );
 
 
-    const result =
-        await readJSON(
-            response
-        );
+            const shorterLength =
+                Math.min(
+                    candidateText.length,
+                    selectedText.length
+                );
 
 
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenAI."
-            )
-        );
-
-    }
+            const commonLength =
+                getCommonTextLength(
+                    candidateText,
+                    selectedText
+                );
 
 
-    if (
-        !result.data ||
-        !Array.isArray(
-            result.data
-        )
-    ) {
-
-        throw new Error(
-            "لم تصل قائمة نماذج OpenAI."
-        );
-
-    }
+            const overlap =
+                shorterLength > 0
+                    ? commonLength /
+                      shorterLength
+                    : 0;
 
 
-    const models =
-        result.data.filter(
-            function (
-                item
+            if (
+                overlap >=
+                MAX_TEXT_OVERLAP
             ) {
+
+                tooSimilar =
+                    true;
+
+                break;
+
+            }
+
+        }
+
+
+        if (
+            tooSimilar
+        ) {
+
+            continue;
+
+        }
+
+
+        selected.push(
+            candidate
+        );
+
+
+        selectedParagraphIndexes.add(
+            paragraphIndex
+        );
+
+
+        if (
+            selected.length >=
+            maxResults
+        ) {
+
+            break;
+
+        }
+
+    }
+
+
+    const contexts =
+        [];
+
+
+    let totalChars =
+        0;
+
+
+    selected.forEach(
+        function (
+            result,
+            index
+        ) {
+
+            let mainContext =
+                String(
+                    result.context ||
+                    result.text ||
+                    ""
+                )
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim();
+
+
+            if (
+                !mainContext
+            ) {
+
+                return;
+
+            }
+
+
+            let previousContext =
+                includeNeighbors
+                    ? String(
+                        result.previousParagraphText ||
+                        ""
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim()
+                    : "";
+
+
+            let nextContext =
+                includeNeighbors
+                    ? String(
+                        result.nextParagraphText ||
+                        ""
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim()
+                    : "";
+
+
+            if (
+                selectedParagraphIndexes.has(
+                    Number(
+                        result.paragraphIndex
+                    ) - 1
+                )
+            ) {
+
+                previousContext =
+                    "";
+
+            }
+
+
+            if (
+                selectedParagraphIndexes.has(
+                    Number(
+                        result.paragraphIndex
+                    ) + 1
+                )
+            ) {
+
+                nextContext =
+                    "";
+
+            }
+
+
+            const heading =
+                String(
+                    result.heading ||
+                    result.majorHeading ||
+                    ""
+                )
+                    .trim();
+
+
+            const remainingChars =
+                maxChars -
+                totalChars;
+
+
+            if (
+                remainingChars <=
+                0
+            ) {
+
+                return;
+
+            }
+
+
+            const reservedForMetadata =
+                250;
+
+
+            const availableChars =
+                Math.max(
+                    300,
+                    remainingChars -
+                    reservedForMetadata
+                );
+
+
+            let context =
+                mainContext;
+
+
+            let remainingForNeighbors =
+                availableChars -
+                context.length;
+
+
+            if (
+                includeNeighbors &&
+                previousContext &&
+                remainingForNeighbors >
+                    150
+            ) {
+
+                const allowedPreviousLength =
+                    Math.max(
+                        0,
+                        remainingForNeighbors -
+                        1
+                    );
+
 
                 if (
-                    !item ||
-                    !item.id
+                    allowedPreviousLength >
+                    100
                 ) {
 
-                    return false;
+                    const previousPart =
+                        previousContext.length >
+                        allowedPreviousLength
+                            ? previousContext.substring(
+                                Math.max(
+                                    0,
+                                    previousContext.length -
+                                    allowedPreviousLength
+                                )
+                            ) +
+                            "…"
+                            : previousContext;
+
+
+                    context =
+                        previousPart +
+                        " " +
+                        context;
 
                 }
 
-
-                const id =
-                    item.id.toLowerCase();
+            }
 
 
-                return (
-                    id.startsWith("gpt-") ||
-                    id.startsWith("o1") ||
-                    id.startsWith("o3") ||
-                    id.startsWith("o4")
-                );
+            remainingForNeighbors =
+                availableChars -
+                context.length;
+
+
+            if (
+                includeNeighbors &&
+                nextContext &&
+                remainingForNeighbors >
+                    150
+            ) {
+
+                const allowedNextLength =
+                    Math.max(
+                        0,
+                        remainingForNeighbors -
+                        1
+                    );
+
+
+                if (
+                    allowedNextLength >
+                    100
+                ) {
+
+                    const nextPart =
+                        nextContext.length >
+                        allowedNextLength
+                            ? nextContext.substring(
+                                0,
+                                allowedNextLength
+                            ) +
+                            "…"
+                            : nextContext;
+
+
+                    context =
+                        context +
+                        " " +
+                        nextPart;
+
+                }
 
             }
-        );
 
 
-    models.sort(
-        function (
-            a,
-            b
-        ) {
+            const item = {
 
-            return a.id.localeCompare(
-                b.id
+                rank:
+                    index + 1,
+
+                paragraphIndex:
+                    Number(
+                        result.paragraphIndex
+                    ),
+
+                heading:
+                    heading,
+
+                score:
+                    Number(
+                        result.score ||
+                        0
+                    ),
+
+                matchType:
+                    result.matchType ||
+                    "orama",
+
+                matchedFamilies:
+                    Array.isArray(
+                        result.matchedFamilies
+                    )
+                        ? result.matchedFamilies
+                        : [],
+
+                familyOccurrences:
+                    Number(
+                        result.familyOccurrencesInParagraph ||
+                        0
+                    ),
+
+                exactWordMatches:
+                    Number(
+                        result.exactWordMatches ||
+                        0
+                    ),
+
+                previousParagraph:
+                    previousContext,
+
+                mainParagraph:
+                    mainContext,
+
+                nextParagraph:
+                    nextContext,
+
+                context:
+                    context
+
+            };
+
+
+            contexts.push(
+                item
             );
+
+
+            totalChars +=
+                context.length;
 
         }
     );
 
 
-    populateModels(
-        models.map(
-            function (
-                item
-            ) {
+    const textParts =
+        [];
 
-                return {
 
-                    id:
-                        item.id,
-
-                    name:
-                        item.id
-
-                };
-
-            }
-        )
-    );
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "✓ تم تحديث نماذج OpenAI: " +
-            models.length;
-
-    }
-
-}
-
-
-// ======================================
-// Gemini Models
-// ======================================
-
-async function loadGeminiModels() {
-
-    const key =
-        apiKey
-            ? apiKey.value.trim()
-            : "";
-
-
-    if (!key) {
-
-        throw new Error(
-            "يرجى إدخال مفتاح Gemini أولاً."
-        );
-
-    }
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج Gemini...";
-
-    }
-
-
-    const url =
-        "https://generativelanguage.googleapis.com/v1beta/models?key=" +
-        encodeURIComponent(
-            key
-        );
-
-
-    const response =
-        await fetch(
-            url,
-            {
-
-                method:
-                    "GET"
-
-            }
-        );
-
-
-    const result =
-        await readJSON(
-            response
-        );
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Gemini."
-            )
-        );
-
-    }
-
-
-    if (
-        !result.models ||
-        !Array.isArray(
-            result.models
-        )
-    ) {
-
-        throw new Error(
-            "لم تصل قائمة نماذج Gemini."
-        );
-
-    }
-
-
-    const models =
-        result.models.filter(
-            function (
-                item
-            ) {
-
-                return (
-                    item &&
-                    item.name &&
-                    Array.isArray(
-                        item.supportedGenerationMethods
-                    ) &&
-                    item.supportedGenerationMethods.includes(
-                        "generateContent"
-                    )
-                );
-
-            }
-        );
-
-
-    populateModels(
-        models.map(
-            function (
-                item
-            ) {
-
-                const cleanId =
-                    String(
-                        item.name
-                    ).replace(
-                        /^models\//,
-                        ""
-                    );
-
-
-                return {
-
-                    id:
-                        cleanId,
-
-                    name:
-                        item.displayName
-                            ? item.displayName +
-                              " — " +
-                              cleanId
-                            : cleanId
-
-                };
-
-            }
-        )
-    );
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "✓ تم تحديث نماذج Gemini: " +
-            models.length;
-
-    }
-
-}
-
-
-// ======================================
-// Populate Models
-// ======================================
-
-function populateModels(
-    models
-) {
-
-    if (!modelSelect)
-        return;
-
-
-    const saved =
-        getSavedSettings();
-
-
-    const savedModel =
-        saved.model ||
-        "";
-
-
-    modelSelect.innerHTML =
-        "";
-
-
-    if (
-        !models ||
-        models.length ===
-            0
-    ) {
-
-        const option =
-            document.createElement(
-                "option"
-            );
-
-
-        option.value =
-            "";
-
-
-        option.textContent =
-            "لا توجد نماذج متاحة";
-
-
-        modelSelect.appendChild(
-            option
-        );
-
-
-        return;
-
-    }
-
-
-    models.forEach(
+    contexts.forEach(
         function (
             item
         ) {
 
-            const option =
-                document.createElement(
-                    "option"
-                );
+            let block =
+                "[مقطع " +
+                item.rank +
+                "]\n";
 
 
-            option.value =
-                item.id;
+            if (
+                item.heading
+            ) {
+
+                block +=
+                    "العنوان: " +
+                    item.heading +
+                    "\n";
+
+            }
 
 
-            option.textContent =
-                item.name;
+            if (
+                item.previousParagraph
+            ) {
+
+                block +=
+                    "السياق السابق: " +
+                    item.previousParagraph +
+                    "\n";
+
+            }
 
 
-            modelSelect.appendChild(
-                option
+            block +=
+                "المقطع المطابق: " +
+                item.mainParagraph;
+
+
+            if (
+                item.nextParagraph
+            ) {
+
+                block +=
+                    "\nالسياق التالي: " +
+                    item.nextParagraph;
+
+            }
+
+
+            textParts.push(
+                block
             );
 
         }
     );
-
-
-    if (savedModel) {
-
-        const exists =
-            Array.from(
-                modelSelect.options
-            ).some(
-                function (
-                    option
-                ) {
-
-                    return (
-                        option.value ===
-                        savedModel
-                    );
-
-                }
-            );
-
-
-        if (exists) {
-
-            modelSelect.value =
-                savedModel;
-
-        }
-
-    }
-
-}
-
-
-// ======================================
-// Test AI Connection
-// ======================================
-
-async function testAIConnection() {
-
-    const data = {
-
-        provider:
-            provider
-                ? provider.value
-                : "openrouter",
-
-        key:
-            apiKey
-                ? apiKey.value.trim()
-                : "",
-
-        model:
-            modelSelect
-                ? modelSelect.value.trim()
-                : ""
-
-    };
-
-
-    if (!data.key) {
-
-        throw new Error(
-            "يرجى إدخال مفتاح API أولاً."
-        );
-
-    }
-
-
-    if (!data.model) {
-
-        throw new Error(
-            "يرجى تحديد نموذج الذكاء الاصطناعي أولاً."
-        );
-
-    }
-
-
-    if (
-        data.provider ===
-        "openrouter"
-    ) {
-
-        const response =
-            await fetch(
-                "https://openrouter.ai/api/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        Authorization:
-                            "Bearer " +
-                            data.key,
-
-                        "Content-Type":
-                            "application/json",
-
-                        "HTTP-Referer":
-                            window.location.href,
-
-                        "X-Title":
-                            "Research Tools"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                data.model,
-
-                            messages: [
-
-                                {
-
-                                    role:
-                                        "user",
-
-                                    content:
-                                        "أجب بكلمة واحدة فقط: متصل"
-
-                                }
-
-                            ],
-
-                            max_tokens:
-                                10
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ OpenRouter."
-                )
-            );
-
-        }
-
-
-        return "✓ تم الاتصال بـ OpenRouter بنجاح";
-
-    }
-
-
-    if (
-        data.provider ===
-        "openai"
-    ) {
-
-        const response =
-            await fetch(
-                "https://api.openai.com/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        Authorization:
-                            "Bearer " +
-                            data.key,
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                data.model,
-
-                            messages: [
-
-                                {
-
-                                    role:
-                                        "user",
-
-                                    content:
-                                        "أجب بكلمة واحدة فقط: متصل"
-
-                                }
-
-                            ],
-
-                            max_tokens:
-                                10
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ OpenAI."
-                )
-            );
-
-        }
-
-
-        return "✓ تم الاتصال بـ OpenAI بنجاح";
-
-    }
-
-
-    if (
-        data.provider ===
-        "gemini"
-    ) {
-
-        const model =
-            normalizeGeminiModel(
-                data.model
-            );
-
-
-        const url =
-            "https://generativelanguage.googleapis.com/v1beta/models/" +
-            encodeURIComponent(
-                model
-            ) +
-            ":generateContent?key=" +
-            encodeURIComponent(
-                data.key
-            );
-
-
-        const response =
-            await fetch(
-                url,
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            contents: [
-
-                                {
-
-                                    parts: [
-
-                                        {
-
-                                            text:
-                                                "أجب بكلمة واحدة فقط: متصل"
-
-                                        }
-
-                                    ]
-
-                                }
-
-                            ]
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Gemini."
-                )
-            );
-
-        }
-
-
-        return "✓ تم الاتصال بـ Gemini بنجاح";
-
-    }
-
-
-    if (
-        data.provider ===
-        "groq"
-    ) {
-
-        const response =
-            await fetch(
-                "https://api.groq.com/openai/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        Authorization:
-                            "Bearer " +
-                            data.key,
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                data.model,
-
-                            messages: [
-
-                                {
-
-                                    role:
-                                        "user",
-
-                                    content:
-                                        "أجب بكلمة واحدة فقط: متصل"
-
-                                }
-
-                            ],
-
-                            max_tokens:
-                                10
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Groq."
-                )
-            );
-
-        }
-
-
-        return "✓ تم الاتصال بـ Groq بنجاح";
-
-    }
-
-
-    throw new Error(
-        "مزود الذكاء الاصطناعي غير معروف."
-    );
-
-}
-
-
-// ======================================
-// Test Connection Button
-// ======================================
-
-if (testConnection) {
-
-    testConnection.onclick =
-        async function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            testConnection.disabled =
-                true;
-
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "⏳ جاري اختبار الاتصال...";
-
-            }
-
-
-            try {
-
-                const message =
-                    await testAIConnection();
-
-
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        message;
-
-                }
-
-            }
-            catch (error) {
-
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        "⚠ " +
-                        (
-                            error.message ||
-                            "تعذر الاتصال"
-                        );
-
-                }
-
-            }
-            finally {
-
-                testConnection.disabled =
-                    false;
-
-            }
-
-        };
-
-}
-
-
-// =====================================================
-// Detect Retrieval Profile
-// =====================================================
-
-function getRetrievalProfile(
-    query
-) {
-
-    const text =
-        normalizeSearchText(
-            query
-        );
-
-
-    const profile = {
-
-        type:
-            "general",
-
-        maxResults:
-            8,
-
-        maxChars:
-            8000
-
-    };
-
-
-    if (
-        /ماهو|ماهى|ماهي|ما هي|المقصود|معنى|تعريف|يقصد ب|المراد ب/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "definition";
-
-
-        profile.maxResults =
-            5;
-
-
-        profile.maxChars =
-            6000;
-
-
-        return profile;
-
-    }
-
-
-    if (
-        /اثر|تاثير|نتائج|ينتج عن|يترتب على|انعكاس/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "effect";
-
-
-        profile.maxResults =
-            8;
-
-
-        profile.maxChars =
-            9000;
-
-
-        return profile;
-
-    }
-
-
-    if (
-        /الفرق|الفروق|مقارنة|يقارن|ما الفرق|التمييز بين|يفترق/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "comparison";
-
-
-        profile.maxResults =
-            10;
-
-
-        profile.maxChars =
-            10000;
-
-
-        return profile;
-
-    }
-
-
-    if (
-        /لماذا|سبب|اسباب|علة|علل|لأن|لان|بسبب/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "causes";
-
-
-        profile.maxResults =
-            8;
-
-
-        profile.maxChars =
-            9000;
-
-
-        return profile;
-
-    }
-
-
-    if (
-        /اين|موضع|موضعه|الفصل|المبحث|المطلب|الصفحة/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "location";
-
-
-        profile.maxResults =
-            6;
-
-
-        profile.maxChars =
-            6000;
-
-
-        return profile;
-
-    }
-
-
-    return profile;
-
-}
-
-
-// =====================================================
-// Get Retrieval Limits
-// =====================================================
-
-function getRetrievalLimits(
-    providerName,
-    modelName
-) {
-
-    const providerValue =
-        String(
-            providerName ||
-            ""
-        ).toLowerCase();
-
-
-    if (
-        providerValue ===
-        "groq"
-    ) {
-
-        return {
-
-            maxResults:
-                4,
-
-            maxChars:
-                3500
-
-        };
-
-    }
-
-
-    if (
-        providerValue ===
-        "openrouter"
-    ) {
-
-        return {
-
-            maxResults:
-                5,
-
-            maxChars:
-                5000
-
-        };
-
-    }
-
-
-    if (
-        providerValue ===
-        "gemini"
-    ) {
-
-        return {
-
-            maxResults:
-                6,
-
-            maxChars:
-                6000
-
-        };
-
-    }
-
-
-    if (
-        providerValue ===
-        "openai"
-    ) {
-
-        return {
-
-            maxResults:
-                6,
-
-            maxChars:
-                6000
-
-        };
-
-    }
 
 
     return {
 
-        maxResults:
-            4,
+        query:
+            searchResult.query ||
+            "",
 
-        maxChars:
-            3500
+        count:
+            searchResult.count ||
+            results.length,
+
+        selectedCount:
+            contexts.length,
+
+        totalOccurrences:
+            Number(
+                searchResult.indexedOccurrences ||
+                0
+            ),
+
+        contexts:
+            contexts,
+
+        text:
+            textParts.join(
+                "\n\n---\n\n"
+            )
 
     };
-
-}
-
-
-// =====================================================
-// Estimate Token Count
-// =====================================================
-
-function estimateTokenCount(
-    text
-) {
-
-    return Math.ceil(
-        String(
-            text ||
-            ""
-        ).length /
-        4
-    );
 
 }
 
@@ -11483,7 +9070,9 @@ async function buildAIDocumentContext(
     query
 ) {
 
-    if (!currentDocument) {
+    if (
+        !currentDocument
+    ) {
 
         currentCitationSources =
             [];
@@ -11522,7 +9111,10 @@ async function buildAIDocumentContext(
                 query,
                 {
                     profile:
-                        retrievalProfile.type
+                        retrievalProfile.type,
+
+                    maxResults:
+                        retrievalProfile.maxResults
                 }
             );
 
@@ -11571,11 +9163,17 @@ async function buildAIDocumentContext(
 
 
         let maxResults =
-            retrievalLimits.maxResults;
+            Math.min(
+                retrievalProfile.maxResults,
+                retrievalLimits.maxResults
+            );
 
 
         let maxChars =
-            retrievalLimits.maxChars;
+            Math.min(
+                retrievalProfile.maxChars,
+                retrievalLimits.maxChars
+            );
 
 
         if (
@@ -11782,7 +9380,7 @@ async function askAI(
 
 
     const selectedProvider =
-        (
+        String(
             data.provider ||
             "openrouter"
         ).toLowerCase();
@@ -11798,7 +9396,9 @@ async function askAI(
         "";
 
 
-    if (!key.trim()) {
+    if (
+        !key.trim()
+    ) {
 
         throw new Error(
             "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
@@ -11807,7 +9407,9 @@ async function askAI(
     }
 
 
-    if (!model.trim()) {
+    if (
+        !model.trim()
+    ) {
 
         throw new Error(
             "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
@@ -11815,10 +9417,6 @@ async function askAI(
 
     }
 
-
-    // مهم:
-    // بناء سياق المستند قبل حساب historyLimit
-    // حتى لا يحدث الوصول إلى const قبل تهيئته.
 
     const documentContext =
         await buildAIDocumentContext(
@@ -11926,12 +9524,9 @@ async function askAI(
 
                 "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
                 "",
-
                 "=== سؤال المستخدم ===",
                 text,
-
                 "",
-
                 "=== بيانات المستند ===",
                 "اسم المستند: " +
                     (
@@ -11939,10 +9534,8 @@ async function askAI(
                             ? currentDocument.name
                             : ""
                     ),
-
                 "نوع الاسترجاع: " +
                     documentContext.profile,
-
                 "العائلات المطابقة: " +
                     (
                         documentContext.matchedFamilies &&
@@ -11952,32 +9545,30 @@ async function askAI(
                             )
                             : "لا توجد"
                     ),
-
                 "",
-
-                "=== المادة المستخرجة من المستند ===",
+                "=== بداية المادة المستخرجة من المستند ===",
                 documentContext.text,
-
+                "=== نهاية المادة المستخرجة من المستند ===",
                 "",
-
                 "=== قواعد الإجابة ===",
-                "أجب عن سؤال المستخدم اعتمادًا على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
-                "استخرج الأفكار المرتبطة بالسؤال فقط.",
-                "ادمج الأفكار المتشابهة في فكرة واحدة ولا تكررها بصيغ مختلفة.",
+                "اعتمد على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
+                "أجب عن السؤال نفسه لا عن مجرد كلمات السؤال.",
+                "إذا كان السؤال متعدد الجوانب فأجب عن جميع الجوانب التي تدعمها المادة.",
                 "رتب الإجابة وفق محاور السؤال.",
-                "إذا كان السؤال يتضمن أكثر من جانب، أجب عن جميع الجوانب التي تدعمها المقاطع.",
-                "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المقاطع المستخرجة.",
-                "إذا لم تتوفر في المقاطع إجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
-                "لا تستخدم المعرفة العامة لسد نقص المستند إلا إذا طلب المستخدم ذلك صراحة.",
-                "استبعد المقاطع التي لا تجيب مباشرة عن السؤال حتى لو احتوت كلمات البحث.",
-                "إذا تكررت الفكرة نفسها في أكثر من مقطع، اذكرها مرة واحدة واجمع الإحالات.",
-                "لا تذكر مشكلة الدراسة أو أهداف البحث أو منهجه أو أسئلته إلا إذا طلب المستخدم ذلك صراحة.",
-                "ضع الإحالة [مقطع رقم] بعد الفكرة التي يدعمها المقطع.",
-                "لا تخترع أرقام المقاطع أو الإحالات.",
+                "ادمج الأفكار المتشابهة ولا تكررها.",
+                "لا تحول كل مقطع إلى فقرة مستقلة.",
+                "استبعد أي مقطع لا يجيب مباشرة عن السؤال.",
+                "لا تضف معلومة غير موجودة في المادة المستخرجة.",
+                "إذا لم تتوفر إجابة عن جزء من السؤال فصرح بذلك بوضوح.",
+                "لا تستخدم المعرفة العامة لسد النقص إلا إذا طلب المستخدم ذلك صراحة.",
+                "لا تذكر مشكلة الدراسة أو أهدافها أو منهجها أو أسئلتها إلا إذا طلب المستخدم ذلك.",
+                "ضع الإحالة [مقطع X] بعد الفكرة التي يدعمها المقطع.",
+                "إذا دعمت عدة مقاطع الفكرة نفسها فاجمع الإحالات.",
+                "لا تخترع أرقام المقاطع.",
                 "حافظ على العربية والأسلوب الأكاديمي الواضح.",
                 "لا تبدأ باعتذار أو تمهيد عام غير ضروري.",
                 "لا تعيد صياغة سؤال المستخدم.",
-                "قدّم خلاصة تركيبية مترابطة من المادة المستخرجة."
+                "قدّم إجابة تركيبية مباشرة."
 
             ].join(
                 "\n"
@@ -11996,6 +9587,10 @@ async function askAI(
 
     });
 
+
+    // ==================================
+    // OpenRouter
+    // ==================================
 
     if (
         selectedProvider ===
@@ -12017,7 +9612,13 @@ async function askAI(
 
                         Authorization:
                             "Bearer " +
-                            key
+                            key,
+
+                        "HTTP-Referer":
+                            window.location.href,
+
+                        "X-Title":
+                            "Research Tools"
 
                     },
 
@@ -12069,6 +9670,10 @@ async function askAI(
 
     }
 
+
+    // ==================================
+    // OpenAI
+    // ==================================
 
     if (
         selectedProvider ===
@@ -12143,6 +9748,10 @@ async function askAI(
     }
 
 
+    // ==================================
+    // Gemini
+    // ==================================
+
     if (
         selectedProvider ===
         "gemini"
@@ -12182,10 +9791,8 @@ async function askAI(
                         parts: [
 
                             {
-
                                 text:
                                     msg.content
-
                             }
 
                         ]
@@ -12249,6 +9856,10 @@ async function askAI(
 
     }
 
+
+    // ==================================
+    // Groq
+    // ==================================
 
     if (
         selectedProvider ===
@@ -12332,228 +9943,2651 @@ async function askAI(
 
 
 // =====================================================
-// Search box
-// البحث الحالي = المحادثات
+// Stream Groq AI
 // =====================================================
 
-if (searchBtn) {
+async function streamGroqAI(
+    text,
+    onChunk
+) {
 
-    searchBtn.onclick =
-        function (e) {
+    const data =
+        getSavedSettings();
 
-            e.stopPropagation();
 
+    const key =
+        data.key ||
+        "";
 
-            if (
-                !searchPopup
-            ) {
 
-                return;
+    const model =
+        data.model ||
+        "";
 
-            }
-
-
-            if (
-                projectsPopup
-            ) {
-
-                projectsPopup.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            if (
-                chatPopup
-            ) {
-
-                chatPopup.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            if (
-                settingsWindow
-            ) {
-
-                settingsWindow.classList.remove(
-                    "open"
-                );
-
-            }
-
-
-            searchPopup.classList.toggle(
-                "open"
-            );
-
-
-            if (
-                searchPopup.classList.contains(
-                    "open"
-                ) &&
-                searchInput
-            ) {
-
-                searchInput.focus();
-
-            }
-
-        };
-
-}
-
-
-// ======================================
-// Search Input
-// ======================================
-
-if (searchInput) {
-
-    searchInput.oninput =
-        function () {
-
-            const keyword =
-                searchInput.value
-                    .trim()
-                    .toLowerCase();
-
-
-            if (
-                !searchResults
-            ) {
-
-                return;
-
-            }
-
-
-            searchResults.innerHTML =
-                "";
-
-
-            if (
-                keyword ===
-                ""
-            ) {
-
-                return;
-
-            }
-
-
-            chats.forEach(
-                function (
-                    chat
-                ) {
-
-                    if (
-                        chat.title &&
-                        chat.title
-                            .toLowerCase()
-                            .includes(
-                                keyword
-                            )
-                    ) {
-
-                        const item =
-                            document.createElement(
-                                "div"
-                            );
-
-
-                        item.className =
-                            "search-result-item";
-
-
-                        item.innerHTML = `
-                            <span class="chat-title">
-                                ${chatIcon}
-                                ${chat.title}
-                            </span>
-                        `;
-
-
-                        item.onclick =
-                            function () {
-
-                                currentChat =
-                                    chat;
-
-
-                                renderChat();
-
-
-                                if (
-                                    searchPopup
-                                ) {
-
-                                    searchPopup
-                                        .classList
-                                        .remove(
-                                            "open"
-                                        );
-
-                                }
-
-
-                                searchInput.value =
-                                    "";
-
-
-                                searchResults.innerHTML =
-                                    "";
-
-                            };
-
-
-                        searchResults.appendChild(
-                            item
-                        );
-
-                    }
-
-                }
-            );
-
-        };
-
-}
-
-
-// =====================================================
-// PART 2 compatibility: helper for context
-// =====================================================
-
-async function getCurrentStructureForSearch() {
 
     if (
-        !currentDocument
+        !key.trim()
     ) {
 
-        return null;
+        throw new Error(
+            "لم يتم إدخال مفتاح Groq من الإعدادات."
+        );
 
     }
 
 
-    return await ensureDocumentStructure(
-        currentDocument
-    );
+    if (
+        !model.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج Groq."
+        );
+
+    }
+
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    const conversationMessages =
+        [];
+
+
+    const historyLimit =
+        documentContext &&
+        documentContext.found
+            ? 2
+            : 4;
+
+
+    if (
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+    ) {
+
+        const messagesWithoutCurrent =
+            currentChat.messages.slice(
+                0,
+                -1
+            );
+
+
+        messagesWithoutCurrent
+            .slice(
+                -historyLimit
+            )
+            .forEach(
+                function (
+                    msg
+                ) {
+
+                    if (
+                        !msg ||
+                        !msg.text
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    let messageText =
+                        String(
+                            msg.text
+                        ).trim();
+
+
+                    if (
+                        messageText.length >
+                        (
+                            documentContext &&
+                            documentContext.found
+                                ? 1000
+                                : 1500
+                        )
+                    ) {
+
+                        messageText =
+                            messageText.substring(
+                                0,
+                                documentContext &&
+                                documentContext.found
+                                    ? 1000
+                                    : 1500
+                            ) +
+                            "…";
+
+                    }
+
+
+                    conversationMessages.push({
+
+                        role:
+                            msg.role ===
+                            "ai"
+                                ? "assistant"
+                                : "user",
+
+                        content:
+                            messageText
+
+                    });
+
+                }
+            );
+
+    }
+
+
+    let userContent =
+        text;
+
+
+    if (
+        documentContext &&
+        documentContext.found
+    ) {
+
+        userContent =
+            [
+
+                "أنت مساعد بحث أكاديمي يعمل على مستند Word.",
+                "اعتمد على المادة المستخرجة بوصفها المصدر الأساسي.",
+                "",
+                "=== السؤال ===",
+                text,
+                "",
+                "=== المادة المستخرجة ===",
+                documentContext.text,
+                "",
+                "=== التعليمات ===",
+                "أجب مباشرة وبأسلوب أكاديمي.",
+                "رتب الإجابة وفق محاور السؤال.",
+                "استبعد المقاطع الجانبية.",
+                "ادمج الأفكار المتكررة.",
+                "لا تخترع معلومة أو إحالة.",
+                "ضع الإحالات بصيغة [مقطع X].",
+                "إذا لم تكف المادة فصرح بذلك."
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        content:
+            userContent
+
+    });
+
+
+    const response =
+        await fetch(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    Authorization:
+                        "Bearer " +
+                        key
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        model:
+                            model,
+
+                        messages:
+                            conversationMessages,
+
+                        max_tokens:
+                            3000,
+
+                        temperature:
+                            0.2,
+
+                        stream:
+                            true
+
+                    })
+
+            }
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ Groq."
+            )
+        );
+
+    }
+
+
+    if (
+        !response.body
+    ) {
+
+        throw new Error(
+            "المتصفح لا يدعم استقبال الرد المتدفق من Groq."
+        );
+
+    }
+
+
+    const reader =
+        response.body.getReader();
+
+
+    const decoder =
+        new TextDecoder(
+            "utf-8"
+        );
+
+
+    let buffer =
+        "";
+
+
+    let fullAnswer =
+        "";
+
+
+    while (true) {
+
+        const chunk =
+            await reader.read();
+
+
+        if (
+            chunk.done
+        ) {
+
+            break;
+
+        }
+
+
+        buffer +=
+            decoder.decode(
+                chunk.value,
+                {
+                    stream:
+                        true
+                }
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r\n/g,
+                "\n"
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r/g,
+                "\n"
+            );
+
+
+        const events =
+            buffer.split(
+                "\n\n"
+            );
+
+
+        buffer =
+            events.pop() ||
+            "";
+
+
+        for (
+            let i = 0;
+            i < events.length;
+            i++
+        ) {
+
+            const lines =
+                events[i]
+                    .split(
+                        "\n"
+                    );
+
+
+            for (
+                let j = 0;
+                j < lines.length;
+                j++
+            ) {
+
+                const line =
+                    lines[j].trim();
+
+
+                if (
+                    !line.startsWith(
+                        "data:"
+                    )
+                ) {
+
+                    continue;
+
+                }
+
+
+                const dataText =
+                    line.substring(
+                        5
+                    ).trim();
+
+
+                if (
+                    !dataText ||
+                    dataText ===
+                    "[DONE]"
+                ) {
+
+                    continue;
+
+                }
+
+
+                let parsed;
+
+
+                try {
+
+                    parsed =
+                        JSON.parse(
+                            dataText
+                        );
+
+                }
+                catch (error) {
+
+                    continue;
+
+                }
+
+
+                const delta =
+                    parsed &&
+                    parsed.choices &&
+                    parsed.choices[0] &&
+                    parsed.choices[0].delta
+                        ? parsed.choices[0]
+                            .delta
+                            .content
+                        : "";
+
+
+                if (
+                    typeof delta !==
+                        "string" ||
+                    !delta
+                ) {
+
+                    continue;
+
+                }
+
+
+                fullAnswer +=
+                    delta;
+
+
+                if (
+                    typeof onChunk ===
+                    "function"
+                ) {
+
+                    onChunk(
+                        delta,
+                        fullAnswer
+                    );
+
+                }
+
+            }
+
+        }
+
+    }
+
+
+    return fullAnswer.trim();
 
 }
 
 
 // =====================================================
-// END MAIN FUNCTIONS
+// Stream OpenRouter AI
 // =====================================================
 
+async function streamOpenRouterAI(
+    text,
+    onChunk
+) {
 
-// ======================================
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    const model =
+        data.model ||
+        "";
+
+
+    if (
+        !key.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح OpenRouter من الإعدادات."
+        );
+
+    }
+
+
+    if (
+        !model.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج OpenRouter."
+        );
+
+    }
+
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    const conversationMessages =
+        [];
+
+
+    if (
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+    ) {
+
+        currentChat.messages
+            .slice(
+                0,
+                -1
+            )
+            .slice(
+                -(
+                    documentContext &&
+                    documentContext.found
+                        ? 2
+                        : 4
+                )
+            )
+            .forEach(
+                function (
+                    msg
+                ) {
+
+                    if (
+                        !msg ||
+                        !msg.text
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    let messageText =
+                        String(
+                            msg.text
+                        ).trim();
+
+
+                    if (
+                        messageText.length >
+                        (
+                            documentContext &&
+                            documentContext.found
+                                ? 1000
+                                : 1500
+                        )
+                    ) {
+
+                        messageText =
+                            messageText.substring(
+                                0,
+                                documentContext &&
+                                documentContext.found
+                                    ? 1000
+                                    : 1500
+                            ) +
+                            "…";
+
+                    }
+
+
+                    conversationMessages.push({
+
+                        role:
+                            msg.role ===
+                            "ai"
+                                ? "assistant"
+                                : "user",
+
+                        content:
+                            messageText
+
+                    });
+
+                }
+            );
+
+    }
+
+
+    let userContent =
+        text;
+
+
+    if (
+        documentContext &&
+        documentContext.found
+    ) {
+
+        userContent =
+            [
+
+                "أنت مساعد بحث أكاديمي يعمل على مستند Word.",
+                "اعتمد على المادة المستخرجة بوصفها المصدر الأساسي.",
+                "",
+                "=== السؤال ===",
+                text,
+                "",
+                "=== اسم المستند ===",
+                currentDocument
+                    ? currentDocument.name
+                    : "",
+                "",
+                "=== المادة المستخرجة ===",
+                documentContext.text,
+                "",
+                "=== التعليمات ===",
+                "أجب عن السؤال مباشرة.",
+                "رتب الإجابة وفق محاور السؤال.",
+                "استبعد المقاطع التي لا تجيب مباشرة.",
+                "ادمج الأفكار المتكررة.",
+                "لا تضف معلومات غير موجودة في المادة.",
+                "لا تخترع الإحالات.",
+                "ضع الإحالات [مقطع X].",
+                "إذا لم تكف المادة فصرح بذلك."
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        content:
+            userContent
+
+    });
+
+
+    const response =
+        await fetch(
+            "https://openrouter.ai/api/v1/chat/completions",
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    Authorization:
+                        "Bearer " +
+                        key,
+
+                    "HTTP-Referer":
+                        window.location.href,
+
+                    "X-Title":
+                        "Research Tools"
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        model:
+                            model,
+
+                        messages:
+                            conversationMessages,
+
+                        max_tokens:
+                            3000,
+
+                        temperature:
+                            0.2,
+
+                        stream:
+                            true
+
+                    })
+
+            }
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ OpenRouter."
+            )
+        );
+
+    }
+
+
+    if (
+        !response.body
+    ) {
+
+        throw new Error(
+            "المتصفح لا يدعم استقبال الرد المتدفق من OpenRouter."
+        );
+
+    }
+
+
+    const reader =
+        response.body.getReader();
+
+
+    const decoder =
+        new TextDecoder(
+            "utf-8"
+        );
+
+
+    let buffer =
+        "";
+
+
+    let fullAnswer =
+        "";
+
+
+    function processSSELine(
+        line
+    ) {
+
+        const cleanLine =
+            String(
+                line ||
+                ""
+            ).trim();
+
+
+        if (
+            !cleanLine ||
+            !cleanLine.startsWith(
+                "data:"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const dataText =
+            cleanLine.substring(
+                5
+            ).trim();
+
+
+        if (
+            !dataText ||
+            dataText ===
+            "[DONE]"
+        ) {
+
+            return;
+
+        }
+
+
+        let parsed;
+
+
+        try {
+
+            parsed =
+                JSON.parse(
+                    dataText
+                );
+
+        }
+        catch (error) {
+
+            return;
+
+        }
+
+
+        const delta =
+            parsed &&
+            parsed.choices &&
+            parsed.choices[0] &&
+            parsed.choices[0].delta
+                ? parsed.choices[0]
+                    .delta
+                    .content
+                : "";
+
+
+        if (
+            typeof delta !==
+                "string" ||
+            !delta
+        ) {
+
+            return;
+
+        }
+
+
+        fullAnswer +=
+            delta;
+
+
+        if (
+            typeof onChunk ===
+            "function"
+        ) {
+
+            onChunk(
+                delta,
+                fullAnswer
+            );
+
+        }
+
+    }
+
+
+    while (true) {
+
+        const streamResult =
+            await reader.read();
+
+
+        if (
+            streamResult.done
+        ) {
+
+            break;
+
+        }
+
+
+        buffer +=
+            decoder.decode(
+                streamResult.value,
+                {
+                    stream:
+                        true
+                }
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r\n/g,
+                "\n"
+            )
+            .replace(
+                /\r/g,
+                "\n"
+            );
+
+
+        let newlineIndex =
+            buffer.indexOf(
+                "\n"
+            );
+
+
+        while (
+            newlineIndex !==
+            -1
+        ) {
+
+            const line =
+                buffer.substring(
+                    0,
+                    newlineIndex
+                );
+
+
+            buffer =
+                buffer.substring(
+                    newlineIndex +
+                    1
+                );
+
+
+            processSSELine(
+                line
+            );
+
+
+            newlineIndex =
+                buffer.indexOf(
+                    "\n"
+                );
+
+        }
+
+    }
+
+
+    if (
+        buffer.trim()
+    ) {
+
+        processSSELine(
+            buffer
+        );
+
+    }
+
+
+    if (
+        !fullAnswer.trim()
+    ) {
+
+        throw new Error(
+            "لم يصل نص من OpenRouter عبر البث المتدفق."
+        );
+
+    }
+
+
+    return fullAnswer.trim();
+
+}
+
+
+// =====================================================
+// Stream OpenAI AI
+// =====================================================
+
+async function streamOpenAI(
+    text,
+    onChunk
+) {
+
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    const model =
+        data.model ||
+        "";
+
+
+    if (
+        !key.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح OpenAI من الإعدادات."
+        );
+
+    }
+
+
+    if (
+        !model.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج OpenAI."
+        );
+
+    }
+
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    const conversationMessages =
+        [];
+
+
+    if (
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+    ) {
+
+        currentChat.messages
+            .slice(
+                0,
+                -1
+            )
+            .slice(
+                -(
+                    documentContext &&
+                    documentContext.found
+                        ? 2
+                        : 4
+                )
+            )
+            .forEach(
+                function (
+                    msg
+                ) {
+
+                    if (
+                        !msg ||
+                        !msg.text
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    let messageText =
+                        String(
+                            msg.text
+                        ).trim();
+
+
+                    if (
+                        messageText.length >
+                        (
+                            documentContext &&
+                            documentContext.found
+                                ? 1000
+                                : 1500
+                        )
+                    ) {
+
+                        messageText =
+                            messageText.substring(
+                                0,
+                                documentContext &&
+                                documentContext.found
+                                    ? 1000
+                                    : 1500
+                            ) +
+                            "…";
+
+                    }
+
+
+                    conversationMessages.push({
+
+                        role:
+                            msg.role ===
+                            "ai"
+                                ? "assistant"
+                                : "user",
+
+                        content:
+                            messageText
+
+                    });
+
+                }
+            );
+
+    }
+
+
+    let userContent =
+        text;
+
+
+    if (
+        documentContext &&
+        documentContext.found
+    ) {
+
+        userContent =
+            [
+
+                "أنت مساعد بحث أكاديمي يعمل على مستند Word.",
+                "اعتمد على المادة المستخرجة بوصفها المصدر الأساسي.",
+                "",
+                "=== السؤال ===",
+                text,
+                "",
+                "=== اسم المستند ===",
+                currentDocument
+                    ? currentDocument.name
+                    : "",
+                "",
+                "=== المادة المستخرجة ===",
+                documentContext.text,
+                "",
+                "=== التعليمات ===",
+                "أجب عن السؤال مباشرة.",
+                "رتب الإجابة وفق محاور السؤال.",
+                "استبعد المقاطع التي لا تجيب مباشرة.",
+                "ادمج الأفكار المتكررة.",
+                "لا تضف معلومات غير موجودة في المادة.",
+                "لا تخترع الإحالات.",
+                "ضع الإحالات [مقطع X].",
+                "إذا لم تكف المادة فصرح بذلك."
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        content:
+            userContent
+
+    });
+
+
+    const response =
+        await fetch(
+            "https://api.openai.com/v1/chat/completions",
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    Authorization:
+                        "Bearer " +
+                        key
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        model:
+                            model,
+
+                        messages:
+                            conversationMessages,
+
+                        max_tokens:
+                            3000,
+
+                        temperature:
+                            0.2,
+
+                        stream:
+                            true
+
+                    })
+
+            }
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ OpenAI."
+            )
+        );
+
+    }
+
+
+    if (
+        !response.body
+    ) {
+
+        throw new Error(
+            "المتصفح لا يدعم استقبال الرد المتدفق من OpenAI."
+        );
+
+    }
+
+
+    const reader =
+        response.body.getReader();
+
+
+    const decoder =
+        new TextDecoder(
+            "utf-8"
+        );
+
+
+    let buffer =
+        "";
+
+
+    let fullAnswer =
+        "";
+
+
+    function processSSELine(
+        line
+    ) {
+
+        const cleanLine =
+            String(
+                line ||
+                ""
+            ).trim();
+
+
+        if (
+            !cleanLine ||
+            !cleanLine.startsWith(
+                "data:"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const dataText =
+            cleanLine.substring(
+                5
+            ).trim();
+
+
+        if (
+            !dataText ||
+            dataText ===
+            "[DONE]"
+        ) {
+
+            return;
+
+        }
+
+
+        let parsed;
+
+
+        try {
+
+            parsed =
+                JSON.parse(
+                    dataText
+                );
+
+        }
+        catch (error) {
+
+            return;
+
+        }
+
+
+        const delta =
+            parsed &&
+            parsed.choices &&
+            parsed.choices[0] &&
+            parsed.choices[0].delta
+                ? parsed.choices[0]
+                    .delta
+                    .content
+                : "";
+
+
+        if (
+            typeof delta !==
+                "string" ||
+            !delta
+        ) {
+
+            return;
+
+        }
+
+
+        fullAnswer +=
+            delta;
+
+
+        if (
+            typeof onChunk ===
+            "function"
+        ) {
+
+            onChunk(
+                delta,
+                fullAnswer
+            );
+
+        }
+
+    }
+
+
+    while (true) {
+
+        const streamResult =
+            await reader.read();
+
+
+        if (
+            streamResult.done
+        ) {
+
+            break;
+
+        }
+
+
+        buffer +=
+            decoder.decode(
+                streamResult.value,
+                {
+                    stream:
+                        true
+                }
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r\n/g,
+                "\n"
+            )
+            .replace(
+                /\r/g,
+                "\n"
+            );
+
+
+        let newlineIndex =
+            buffer.indexOf(
+                "\n"
+            );
+
+
+        while (
+            newlineIndex !==
+            -1
+        ) {
+
+            const line =
+                buffer.substring(
+                    0,
+                    newlineIndex
+                );
+
+
+            buffer =
+                buffer.substring(
+                    newlineIndex +
+                    1
+                );
+
+
+            processSSELine(
+                line
+            );
+
+
+            newlineIndex =
+                buffer.indexOf(
+                    "\n"
+                );
+
+        }
+
+    }
+
+
+    if (
+        buffer.trim()
+    ) {
+
+        processSSELine(
+            buffer
+        );
+
+    }
+
+
+    if (
+        !fullAnswer.trim()
+    ) {
+
+        throw new Error(
+            "لم يصل نص من OpenAI عبر البث المتدفق."
+        );
+
+    }
+
+
+    return fullAnswer.trim();
+
+}
+
+
+// =====================================================
+// Stream Gemini AI
+// =====================================================
+
+async function streamGeminiAI(
+    text,
+    onChunk
+) {
+
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    const model =
+        data.model ||
+        "";
+
+
+    if (
+        !key.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح Gemini من الإعدادات."
+        );
+
+    }
+
+
+    if (
+        !model.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج Gemini من الإعدادات."
+        );
+
+    }
+
+
+    const documentContext =
+        await buildAIDocumentContext(
+            text
+        );
+
+
+    const systemInstruction = [
+
+        "أنت مساعد بحث أكاديمي يعمل على مستندات Word.",
+        "اعتمد على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
+        "أجب عن السؤال مباشرة وبأسلوب أكاديمي واضح.",
+        "رتب الإجابة وفق محاور السؤال.",
+        "إذا كان السؤال متعدد الجوانب فأجب عن جميعها.",
+        "ادمج الأفكار المتشابهة في صياغة واحدة.",
+        "لا تحول كل مقطع إلى فقرة مستقلة.",
+        "استبعد المعلومة الجانبية التي لا تجيب مباشرة عن السؤال.",
+        "لا تضف معلومة غير موجودة في المادة المستخرجة.",
+        "إذا لم تكف المادة لجزء من السؤال فصرح بذلك.",
+        "لا تستخدم المعرفة العامة لسد النقص إلا إذا طلب المستخدم ذلك صراحة.",
+        "لا تذكر مشكلة الدراسة أو أهدافها أو منهجها إلا إذا طلب المستخدم ذلك.",
+        "ضع الإحالات بصيغة [مقطع X].",
+        "إذا دعمت عدة مقاطع الفكرة نفسها فاجمع الإحالات.",
+        "لا تخترع أرقام المقاطع.",
+        "لا تبدأ باعتذار أو تمهيد عام غير ضروري.",
+        "لا تعيد صياغة السؤال.",
+        "قدم خلاصة مترابطة لا تلخيصًا منفصلًا لكل مقطع."
+
+    ].join(
+        "\n"
+    );
+
+
+    const conversationMessages =
+        [];
+
+
+    if (
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+    ) {
+
+        currentChat.messages
+            .slice(
+                0,
+                -1
+            )
+            .slice(
+                -(
+                    documentContext &&
+                    documentContext.found
+                        ? 2
+                        : 4
+                )
+            )
+            .forEach(
+                function (
+                    msg
+                ) {
+
+                    if (
+                        !msg ||
+                        !msg.text
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    let messageText =
+                        String(
+                            msg.text
+                        ).trim();
+
+
+                    const maxHistoryChars =
+                        documentContext &&
+                        documentContext.found
+                            ? 1000
+                            : 1500;
+
+
+                    if (
+                        messageText.length >
+                        maxHistoryChars
+                    ) {
+
+                        messageText =
+                            messageText.substring(
+                                0,
+                                maxHistoryChars
+                            ) +
+                            "…";
+
+                    }
+
+
+                    conversationMessages.push({
+
+                        role:
+                            msg.role ===
+                            "ai"
+                                ? "model"
+                                : "user",
+
+                        parts: [
+
+                            {
+                                text:
+                                    messageText
+                            }
+
+                        ]
+
+                    });
+
+                }
+            );
+
+    }
+
+
+    let userContent =
+        text;
+
+
+    if (
+        documentContext &&
+        documentContext.found
+    ) {
+
+        userContent =
+            [
+
+                "=== سؤال المستخدم ===",
+                text,
+                "",
+                "=== اسم المستند ===",
+                currentDocument
+                    ? currentDocument.name
+                    : "",
+                "",
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    conversationMessages.push({
+
+        role:
+            "user",
+
+        parts: [
+
+            {
+                text:
+                    userContent
+            }
+
+        ]
+
+    });
+
+
+    const cleanModel =
+        normalizeGeminiModel(
+            model
+        );
+
+
+    const url =
+        "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(
+            cleanModel
+        ) +
+        ":streamGenerateContent?alt=sse";
+
+
+    const response =
+        await fetch(
+            url,
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "x-goog-api-key":
+                        key
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        systemInstruction: {
+
+                            parts: [
+
+                                {
+                                    text:
+                                        systemInstruction
+                                }
+
+                            ]
+
+                        },
+
+                        contents:
+                            conversationMessages,
+
+                        generationConfig: {
+
+                            temperature:
+                                0.2
+
+                        }
+
+                    })
+
+            }
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ Gemini."
+            )
+        );
+
+    }
+
+
+    if (
+        !response.body
+    ) {
+
+        throw new Error(
+            "المتصفح لا يدعم استقبال الرد المتدفق من Gemini."
+        );
+
+    }
+
+
+    const reader =
+        response.body.getReader();
+
+
+    const decoder =
+        new TextDecoder(
+            "utf-8"
+        );
+
+
+    let buffer =
+        "";
+
+
+    let fullAnswer =
+        "";
+
+
+    function processSSELine(
+        line
+    ) {
+
+        const cleanLine =
+            String(
+                line ||
+                ""
+            ).trim();
+
+
+        if (
+            !cleanLine ||
+            !cleanLine.startsWith(
+                "data:"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const dataText =
+            cleanLine.substring(
+                5
+            ).trim();
+
+
+        if (
+            !dataText ||
+            dataText ===
+            "[DONE]"
+        ) {
+
+            return;
+
+        }
+
+
+        let parsed;
+
+
+        try {
+
+            parsed =
+                JSON.parse(
+                    dataText
+                );
+
+        }
+        catch (error) {
+
+            return;
+
+        }
+
+
+        if (
+            !parsed ||
+            !Array.isArray(
+                parsed.candidates
+            ) ||
+            !parsed.candidates[0]
+        ) {
+
+            return;
+
+        }
+
+
+        const candidate =
+            parsed.candidates[0];
+
+
+        if (
+            !candidate.content ||
+            !Array.isArray(
+                candidate.content.parts
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        candidate.content.parts.forEach(
+            function (
+                part
+            ) {
+
+                if (
+                    !part ||
+                    typeof part.text !==
+                        "string"
+                ) {
+
+                    return;
+
+                }
+
+
+                if (
+                    part.thought ===
+                    true
+                ) {
+
+                    return;
+
+                }
+
+
+                const delta =
+                    part.text;
+
+
+                if (
+                    !delta
+                ) {
+
+                    return;
+
+                }
+
+
+                fullAnswer +=
+                    delta;
+
+
+                if (
+                    typeof onChunk ===
+                    "function"
+                ) {
+
+                    onChunk(
+                        delta,
+                        fullAnswer
+                    );
+
+                }
+
+            }
+        );
+
+    }
+
+
+    while (true) {
+
+        const streamResult =
+            await reader.read();
+
+
+        if (
+            streamResult.done
+        ) {
+
+            break;
+
+        }
+
+
+        buffer +=
+            decoder.decode(
+                streamResult.value,
+                {
+                    stream:
+                        true
+                }
+            );
+
+
+        buffer =
+            buffer.replace(
+                /\r\n/g,
+                "\n"
+            )
+            .replace(
+                /\r/g,
+                "\n"
+            );
+
+
+        let newlineIndex =
+            buffer.indexOf(
+                "\n"
+            );
+
+
+        while (
+            newlineIndex !==
+            -1
+        ) {
+
+            const line =
+                buffer.substring(
+                    0,
+                    newlineIndex
+                );
+
+
+            buffer =
+                buffer.substring(
+                    newlineIndex +
+                    1
+                );
+
+
+            processSSELine(
+                line
+            );
+
+
+            newlineIndex =
+                buffer.indexOf(
+                    "\n"
+                );
+
+        }
+
+    }
+
+
+    if (
+        buffer.trim()
+    ) {
+
+        processSSELine(
+            buffer
+        );
+
+    }
+
+
+    if (
+        !fullAnswer.trim()
+    ) {
+
+        throw new Error(
+            "لم يصل نص من Gemini عبر البث المتدفق."
+        );
+
+    }
+
+
+    return fullAnswer.trim();
+
+}
+
+
+// =====================================================
+// Send Message
+// =====================================================
+
+async function sendMessage() {
+
+    if (
+        !input
+    ) {
+
+        return;
+
+    }
+
+
+    const text =
+        input.value.trim();
+
+
+    if (
+        text ===
+        ""
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        !currentChat
+    ) {
+
+        currentChat = {
+
+            id:
+                Date.now(),
+
+            title:
+                text.substring(
+                    0,
+                    30
+                ),
+
+            messages:
+                [],
+
+            isTemporary:
+                true,
+
+            projectId:
+                currentProject
+                    ? currentProject.id
+                    : null
+
+        };
+
+    }
+
+
+    if (
+        currentChat.isTemporary
+    ) {
+
+        currentChat.isTemporary =
+            false;
+
+
+        currentChat.projectId =
+            currentProject
+                ? currentProject.id
+                : null;
+
+
+        currentChat.title =
+            text.substring(
+                0,
+                30
+            );
+
+
+        const alreadyExists =
+            chats.some(
+                function (
+                    chat
+                ) {
+
+                    return (
+                        chat.id ===
+                        currentChat.id
+                    );
+
+                }
+            );
+
+
+        if (
+            !alreadyExists
+        ) {
+
+            chats.unshift(
+                currentChat
+            );
+
+        }
+
+
+        if (
+            currentProject &&
+            currentChat.projectId ===
+                currentProject.id
+        ) {
+
+            if (
+                !Array.isArray(
+                    currentProject.chatIds
+                )
+            ) {
+
+                currentProject.chatIds =
+                    [];
+
+            }
+
+
+            if (
+                !currentProject.chatIds.includes(
+                    currentChat.id
+                )
+            ) {
+
+                currentProject.chatIds.push(
+                    currentChat.id
+                );
+
+
+                currentProject.updatedAt =
+                    new Date()
+                        .toISOString();
+
+
+                saveProjects();
+
+            }
+
+        }
+
+
+        saveChats();
+
+    }
+
+
+    currentChat.messages.push({
+
+        role:
+            "user",
+
+        text:
+            text
+
+    });
+
+
+    saveChats();
+
+
+    renderChat();
+
+
+    renderChatList();
+
+
+    renderSidebarChats();
+
+
+    renderRecentChats();
+
+
+    input.value =
+        "";
+
+
+    input.style.height =
+        "auto";
+
+
+    const loading =
+        document.createElement(
+            "div"
+        );
+
+
+    loading.className =
+        "message ai-message";
+
+
+    loading.innerHTML =
+        "⏳ جاري التفكير...";
+
+
+    if (
+        chatArea
+    ) {
+
+        chatArea.appendChild(
+            loading
+        );
+
+
+        chatArea.scrollTop =
+            chatArea.scrollHeight;
+
+    }
+
+
+    const savedSettings =
+        getSavedSettings();
+
+
+    const selectedProvider =
+        String(
+            savedSettings.provider ||
+            "openrouter"
+        ).toLowerCase();
+
+
+    let pendingRenderText =
+        "";
+
+
+    let renderTimer =
+        null;
+
+
+    function renderStreamingText() {
+
+        if (
+            !loading
+        ) {
+
+            return;
+
+        }
+
+
+        if (
+            pendingRenderText ===
+            ""
+        ) {
+
+            loading.innerHTML =
+                "⏳ جاري التفكير...";
+
+        }
+        else {
+
+            loading.innerHTML =
+                formatAIMessage(
+                    pendingRenderText,
+                    currentCitationSources
+                );
+
+        }
+
+
+        if (
+            chatArea
+        ) {
+
+            chatArea.scrollTop =
+                chatArea.scrollHeight;
+
+        }
+
+
+        renderTimer =
+            null;
+
+    }
+
+
+    function scheduleRender(
+        fullText
+    ) {
+
+        pendingRenderText =
+            String(
+                fullText ||
+                ""
+            );
+
+
+        if (
+            renderTimer !==
+            null
+        ) {
+
+            return;
+
+        }
+
+
+        renderTimer =
+            setTimeout(
+                function () {
+
+                    renderStreamingText();
+
+                },
+                60
+            );
+
+    }
+
+
+    try {
+
+        let answer =
+            "";
+
+
+        if (
+            selectedProvider ===
+            "groq"
+        ) {
+
+            answer =
+                await streamGroqAI(
+                    text,
+                    function (
+                        delta,
+                        fullText
+                    ) {
+
+                        scheduleRender(
+                            fullText
+                        );
+
+                    }
+                );
+
+        }
+        else if (
+            selectedProvider ===
+            "gemini"
+        ) {
+
+            answer =
+                await streamGeminiAI(
+                    text,
+                    function (
+                        delta,
+                        fullText
+                    ) {
+
+                        scheduleRender(
+                            fullText
+                        );
+
+                    }
+                );
+
+        }
+        else if (
+            selectedProvider ===
+            "openrouter"
+        ) {
+
+            answer =
+                await streamOpenRouterAI(
+                    text,
+                    function (
+                        delta,
+                        fullText
+                    ) {
+
+                        scheduleRender(
+                            fullText
+                        );
+
+                    }
+                );
+
+        }
+        else if (
+            selectedProvider ===
+            "openai"
+        ) {
+
+            answer =
+                await streamOpenAI(
+                    text,
+                    function (
+                        delta,
+                        fullText
+                    ) {
+
+                        scheduleRender(
+                            fullText
+                        );
+
+                    }
+                );
+
+        }
+        else {
+
+            throw new Error(
+                "مزود الذكاء الاصطناعي غير معروف: " +
+                selectedProvider
+            );
+
+        }
+
+
+        if (
+            renderTimer !==
+            null
+        ) {
+
+            clearTimeout(
+                renderTimer
+            );
+
+
+            renderTimer =
+                null;
+
+        }
+
+
+        pendingRenderText =
+            String(
+                answer ||
+                ""
+            );
+
+
+        renderStreamingText();
+
+
+        if (
+            loading &&
+            loading.parentNode
+        ) {
+
+            loading.remove();
+
+        }
+
+
+        currentChat.messages.push({
+
+            role:
+                "ai",
+
+            text:
+                String(
+                    answer ||
+                    ""
+                ),
+
+            citationSources:
+                Array.isArray(
+                    currentCitationSources
+                )
+                    ? currentCitationSources.map(
+                        function (
+                            source
+                        ) {
+
+                            return {
+
+                                rank:
+                                    source.rank,
+
+                                paragraphIndex:
+                                    source.paragraphIndex,
+
+                                heading:
+                                    source.heading ||
+                                    "",
+
+                                text:
+                                    source.text ||
+                                    ""
+
+                            };
+
+                        }
+                    )
+                    : []
+
+        });
+
+
+        saveChats();
+
+
+        renderChat();
+
+
+        renderChatList();
+
+
+        renderSidebarChats();
+
+
+        renderRecentChats();
+
+    }
+    catch (error) {
+
+        if (
+            renderTimer !==
+            null
+        ) {
+
+            clearTimeout(
+                renderTimer
+            );
+
+
+            renderTimer =
+                null;
+
+        }
+
+
+        if (
+            loading &&
+            loading.parentNode
+        ) {
+
+            loading.remove();
+
+        }
+
+
+        currentChat.messages.push({
+
+            role:
+                "ai",
+
+            text:
+                "خطأ: " +
+                (
+                    error &&
+                    error.message
+                        ? error.message
+                        : "حدث خطأ غير معروف"
+                )
+
+        });
+
+
+        saveChats();
+
+
+        renderChat();
+
+
+        renderChatList();
+
+
+        renderSidebarChats();
+
+
+        renderRecentChats();
+
+
+        console.error(
+            "فشل إرسال الرسالة:",
+            error
+        );
+
+    }
+
+}
+
+
+// =====================================================
+// Send Button
+// =====================================================
+
+if (
+    sendBtn
+) {
+
+    sendBtn.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            sendMessage();
+
+        };
+
+}
+
+
+// =====================================================
+// Keyboard
+// =====================================================
+
+if (
+    input
+) {
+
+    input.onkeydown =
+        function (e) {
+
+            if (
+                e.key ===
+                    "Enter" &&
+                !e.shiftKey
+            ) {
+
+                e.preventDefault();
+
+
+                sendMessage();
+
+            }
+
+        };
+
+}
+
+
+// =====================================================
 // Initial Render
-// ======================================
+// =====================================================
 
 initializeSidebarSections();
 
@@ -12610,7 +12644,9 @@ if (
         "true";
 
 
-    if (sidebarPinned) {
+    if (
+        sidebarPinned
+    ) {
 
         sidebar.classList.add(
             "pinned"
