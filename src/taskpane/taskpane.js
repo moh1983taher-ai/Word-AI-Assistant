@@ -9362,12 +9362,23 @@ async function askAI(
 
     // ======================================
     // بناء سياق المحادثة السابقة
-    // آخر 4 رسائل فقط
-    // مع حد أقصى لطول كل رسالة
     // ======================================
 
     const conversationMessages =
         [];
+
+
+    // ======================================
+    // عدد الرسائل السابقة
+    // أقل عند وجود مستند
+    // لأن سياق المستند سيُضاف من جديد
+    // ======================================
+
+    const historyLimit =
+        documentContext &&
+        documentContext.found
+            ? 2
+            : 4;
 
 
     if (
@@ -9379,7 +9390,7 @@ async function askAI(
 
         const previousMessages =
             currentChat.messages.slice(
-                -4
+                -historyLimit
             );
 
 
@@ -9404,19 +9415,26 @@ async function askAI(
                     ).trim();
 
 
-                const MAX_HISTORY_CHARS =
-                    1500;
+                // ==================================
+                // حد أقصى لطول الرسالة السابقة
+                // ==================================
+
+                const maxHistoryChars =
+                    documentContext &&
+                    documentContext.found
+                        ? 1000
+                        : 1500;
 
 
                 if (
                     messageText.length >
-                    MAX_HISTORY_CHARS
+                    maxHistoryChars
                 ) {
 
                     messageText =
                         messageText.substring(
                             0,
-                            MAX_HISTORY_CHARS
+                            maxHistoryChars
                         ) +
                         "…";
 
@@ -9426,7 +9444,8 @@ async function askAI(
                 conversationMessages.push({
 
                     role:
-                        msg.role === "ai"
+                        msg.role ===
+                        "ai"
                             ? "assistant"
                             : "user",
 
