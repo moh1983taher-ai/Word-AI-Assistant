@@ -1986,7 +1986,97 @@ body.expanded-sidebar-open .sidebar-hover-zone {
     max-width: 100%;
 }
 
+ /* ======================================
+   إحالات المقاطع — الشكل الأكاديمي
+   ====================================== */
 
+.ai-message .document-citation {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    margin: 0 3px;
+    padding: 1px 7px;
+
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+
+    background: #fafafa;
+    color: #555;
+
+    font: inherit;
+    font-size: 0.88em;
+    font-weight: 600;
+
+    line-height: 1.5;
+
+    white-space: nowrap;
+
+    cursor: pointer;
+
+    text-decoration: none;
+
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.15s ease;
+}
+
+
+/* ======================================
+   عند مرور المؤشر
+   ====================================== */
+
+.ai-message .document-citation:hover {
+    background: #f0f0f0;
+    border-color: #bdbdbd;
+
+    color: #222;
+
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.08);
+
+    transform:
+        translateY(-1px);
+}
+
+
+/* ======================================
+   عند الضغط
+   ====================================== */
+
+.ai-message .document-citation:active {
+    background: #e8e8e8;
+
+    transform:
+        translateY(0);
+}
+
+
+/* ======================================
+   عند التركيز بلوحة المفاتيح
+   ====================================== */
+
+.ai-message .document-citation:focus {
+    outline: none;
+
+    border-color: #999;
+
+    box-shadow:
+        0 0 0 2px rgba(120, 120, 120, 0.18);
+}
+
+
+/* ======================================
+   إحالات متعددة متجاورة
+   ====================================== */
+
+.ai-message .document-citation + .document-citation {
+    margin-right: 2px;
+    margin-left: 2px;
+}
 /* =========================================================
 18. INPUT AREA
 ========================================================= */
