@@ -14459,6 +14459,352 @@ async function testCurrentDocumentIndex() {
 
 }
 
+window.testOramaStandalone =
+    function (
+        query
+    ) {
+
+        try {
+
+            if (
+                !currentDocument
+            ) {
+
+                console.warn(
+                    "لا يوجد مستند نشط."
+                );
+
+                return;
+
+            }
+
+
+            const {
+                create,
+                insertMultiple,
+                search
+            } =
+                require(
+                    "@orama/orama"
+                );
+
+
+            // ==================================
+            // قراءة بنية المستند الموجودة أصلًا
+            // ==================================
+
+            ensureDocumentStructure(
+                currentDocument
+            )
+                .then(
+                    function (
+                        structureData
+                    ) {
+
+                        if (
+                            !structureData
+                        ) {
+
+                            console.warn(
+                                "لا توجد بنية للمستند."
+                            );
+
+                            return;
+
+                        }
+
+
+                        const paragraphs =
+                            Array.isArray(
+                                structureData.paragraphs
+                            )
+                                ? structureData.paragraphs
+                                : [];
+
+
+                        const headings =
+                            Array.isArray(
+                                structureData.headings
+                            )
+                                ? structureData.headings
+                                : [];
+
+
+                        // ==================================
+                        // إنشاء السجلات
+                        // ==================================
+
+                        const records =
+                            paragraphs
+                                .filter(
+                                    function (
+                                        paragraph
+                                    ) {
+
+                                        return (
+                                            paragraph &&
+                                            paragraph.text
+                                        );
+
+                                    }
+                                )
+                                .map(
+                                    function (
+                                        paragraph
+                                    ) {
+
+                                        let headingText =
+                                            "";
+
+
+                                        for (
+                                            let i =
+                                                headings.length - 1;
+
+                                            i >= 0;
+
+                                            i--
+                                        ) {
+
+                                            if (
+                                                Number(
+                                                    headings[i].index
+                                                ) <
+                                                Number(
+                                                    paragraph.index
+                                                )
+                                            ) {
+
+                                                headingText =
+                                                    String(
+                                                        headings[i].text ||
+                                                        ""
+                                                    );
+
+                                                break;
+
+                                            }
+
+                                        }
+
+
+                                        return {
+
+                                            id:
+                                                String(
+                                                    paragraph.index
+                                                ),
+
+                                            paragraphIndex:
+                                                Number(
+                                                    paragraph.index
+                                                ),
+
+                                            text:
+                                                String(
+                                                    paragraph.text
+                                                ),
+
+                                            heading:
+                                                headingText
+
+                                        };
+
+                                    }
+                                );
+
+
+                        console.log(
+                            "عدد السجلات التي ستدخل Orama:",
+                            records.length
+                        );
+
+
+                        if (
+                            records.length ===
+                            0
+                        ) {
+
+                            console.warn(
+                                "لم توجد فقرات صالحة لإدخالها إلى Orama."
+                            );
+
+                            return;
+
+                        }
+
+
+                        // ==================================
+                        // إنشاء قاعدة Orama عربية
+                        // ==================================
+
+                        const db =
+                            create({
+
+                                schema: {
+
+                                    id:
+                                        "string",
+
+                                    paragraphIndex:
+                                        "number",
+
+                                    text:
+                                        "string",
+
+                                    heading:
+                                        "string"
+
+                                },
+
+                                language:
+                                    "arabic"
+
+                            });
+
+
+                        // ==================================
+                        // إدخال البيانات
+                        // ==================================
+
+                        insertMultiple(
+                            db,
+                            records
+                        );
+
+
+                        console.log(
+                            "تم إدخال السجلات إلى Orama."
+                        );
+
+
+                        // ==================================
+                        // اختبار الاستعلام
+                        // ==================================
+
+                        const result =
+                            search(
+                                db,
+                                {
+
+                                    term:
+                                        String(
+                                            query
+                                        ),
+
+                                    properties: [
+
+                                        "text",
+
+                                        "heading"
+
+                                    ],
+
+                                    boost: {
+
+                                        heading:
+                                            5
+
+                                    },
+
+                                    limit:
+                                        10
+
+                                }
+                            );
+
+
+                        console.log(
+                            "===================================="
+                        );
+
+
+                        console.log(
+                            "Orama Standalone Test"
+                        );
+
+
+                        console.log(
+                            "السؤال:",
+                            query
+                        );
+
+
+                        console.log(
+                            "عدد النتائج:",
+                            result.count
+                        );
+
+
+                        result.hits.forEach(
+                            function (
+                                hit,
+                                index
+                            ) {
+
+                                console.log(
+                                    "#" +
+                                    (
+                                        index + 1
+                                    ),
+
+                                    {
+
+                                        score:
+                                            hit.score,
+
+                                        heading:
+                                            hit.document.heading,
+
+                                        paragraphIndex:
+                                            hit.document.paragraphIndex,
+
+                                        text:
+                                            String(
+                                                hit.document.text ||
+                                                ""
+                                            ).substring(
+                                                0,
+                                                300
+                                            )
+
+                                    }
+                                );
+
+                            }
+                        );
+
+
+                        return result;
+
+                    }
+                )
+                .catch(
+                    function (
+                        error
+                    ) {
+
+                        console.error(
+                            "فشل اختبار Orama:",
+                            error
+                        );
+
+                    }
+                );
+
+        }
+        catch (
+            error
+        ) {
+
+            console.error(
+                "تعذر تشغيل اختبار Orama:",
+                error
+            );
+
+        }
+
+    };
 
 // =====================================================
 // Search box
