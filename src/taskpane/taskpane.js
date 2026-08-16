@@ -10929,9 +10929,10 @@ function getOramaEngine() {
     );
 
 }
-// =====================================================
+ // =====================================================
 // Build Orama Document Index
-// بناء فهرس Orama التجريبي من بنية المستند الحالية
+// بناء فهرس Orama التجريبي
+// يدعم العربية
 // =====================================================
 
 async function buildOramaDocumentIndex(
@@ -10948,7 +10949,7 @@ async function buildOramaDocumentIndex(
 
 
     // ==================================
-    // تحميل مكتبة Orama
+    // تحميل Orama
     // ==================================
 
     const {
@@ -10961,7 +10962,35 @@ async function buildOramaDocumentIndex(
 
 
     // ==================================
-    // بنية المستند الموجودة أصلًا
+    // تحميل مكونات Orama
+    // ==================================
+
+    const {
+        tokenizer
+    } =
+        require(
+            "@orama/orama/components"
+        );
+
+
+    // ==================================
+    // إنشاء tokenizer عربي
+    // ==================================
+
+    const arabicTokenizer =
+        await tokenizer.createTokenizer(
+            {
+                language:
+                    "arabic",
+
+                stemming:
+                    true
+            }
+        );
+
+
+    // ==================================
+    // تحميل بنية المستند الحالية
     // ==================================
 
     const structureData =
@@ -11000,7 +11029,7 @@ async function buildOramaDocumentIndex(
     // ==================================
 
     const db =
-        await create({
+        create({
 
             schema: {
 
@@ -11019,13 +11048,20 @@ async function buildOramaDocumentIndex(
                 headingLevel:
                     "string"
 
+            },
+
+            components: {
+
+                tokenizer:
+                    arabicTokenizer
+
             }
 
         });
 
 
     // ==================================
-    // خريطة العناوين
+    // ترتيب العناوين
     // ==================================
 
     const headingList =
@@ -11179,14 +11215,15 @@ async function buildOramaDocumentIndex(
 
 
     // ==================================
-    // إدخال البيانات إلى Orama
+    // إدخال الفقرات
     // ==================================
 
     if (
-        records.length
+        records.length >
+        0
     ) {
 
-        await insertMultiple(
+        insertMultiple(
             db,
             records
         );
@@ -11195,7 +11232,7 @@ async function buildOramaDocumentIndex(
 
 
     // ==================================
-    // حفظ الفهرس في الذاكرة
+    // حفظ الفهرس التجريبي
     // ==================================
 
     oramaDocumentDb =
@@ -11208,140 +11245,18 @@ async function buildOramaDocumentIndex(
         );
 
 
+    console.log(
+        "تم بناء فهرس Orama العربي:",
+        records.length,
+        "فقرة"
+    );
+
+
     return db;
 
 }
 
-async function searchOramaDocument(
-    documentItem,
-    query
-) {
 
-    if (
-        !documentItem ||
-        !query
-    ) {
-
-        return [];
-
-    }
-
-
-    // ==================================
-    // إنشاء الفهرس عند الحاجة
-    // ==================================
-
-    if (
-        !oramaDocumentDb ||
-        String(
-            oramaDocumentId
-        ) !==
-        String(
-            documentItem.id
-        )
-    ) {
-
-        await buildOramaDocumentIndex(
-            documentItem
-        );
-
-    }
-
-
-    if (
-        !oramaDocumentDb
-    ) {
-
-        return [];
-
-    }
-
-
-    const {
-        search
-    } =
-        require(
-            "@orama/orama"
-        );
-
-
-    const result =
-        await search(
-            oramaDocumentDb,
-            {
-
-                term:
-                    String(
-                        query
-                    ),
-
-                properties: [
-
-                    "text",
-                    "heading"
-
-                ],
-
-                boost: {
-
-                    heading:
-                        4,
-
-                    text:
-                        1
-
-                },
-
-                tolerance:
-                    1,
-
-                limit:
-                    8
-
-            }
-        );
-
-
-    return (
-        Array.isArray(
-            result.hits
-        )
-            ? result.hits.map(
-                function (
-                    hit
-                ) {
-
-                    return {
-
-                        score:
-                            Number(
-                                hit.score ||
-                                0
-                            ),
-
-                        paragraphIndex:
-                            hit.document.paragraphIndex,
-
-                        paragraphId:
-                            hit.document.paragraphId,
-
-                        text:
-                            hit.document.text,
-
-                        heading:
-                            hit.document.heading,
-
-                        headingLevel:
-                            hit.document.headingLevel
-
-                    };
-
-                }
-            )
-            : []
-    );
-
-}
 window.testOramaSearch =
     async function (
         query
