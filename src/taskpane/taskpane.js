@@ -14105,7 +14105,21 @@ async function streamGeminiAI(
                     JSON.stringify({
 
                         contents:
-                            conversationMessages
+                            conversationMessages,
+
+                        generationConfig: {
+
+                            thinkingConfig: {
+
+                                thinkingBudget:
+                                    0
+
+                            },
+
+                            temperature:
+                                0.2
+
+                        }
 
                     })
 
