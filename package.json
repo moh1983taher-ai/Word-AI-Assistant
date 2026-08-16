@@ -26,6 +26,7 @@
     "watch": "webpack --mode development --watch"
   },
   "dependencies": {
+    "@orama/orama": "^3.1.18",
     "core-js": "^3.36.0",
     "regenerator-runtime": "^0.14.1"
   },

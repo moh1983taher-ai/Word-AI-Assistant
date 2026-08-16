@@ -10899,6 +10899,450 @@ function getSearchQueryTokens(
 
 }
 // =====================================================
+// Orama Experimental Engine
+// محرك Orama التجريبي
+// =====================================================
+
+let oramaDocumentDb =
+    null;
+
+let oramaDocumentId =
+    null;
+
+
+function getOramaEngine() {
+
+    if (
+        typeof require !==
+        "function"
+    ) {
+
+        throw new Error(
+            "Webpack require غير متاح في هذه البيئة."
+        );
+
+    }
+
+
+    return require(
+        "@orama/orama"
+    );
+
+}
+// =====================================================
+// Build Orama Document Index
+// بناء فهرس Orama التجريبي من بنية المستند الحالية
+// =====================================================
+
+async function buildOramaDocumentIndex(
+    documentItem
+) {
+
+    if (
+        !documentItem
+    ) {
+
+        return null;
+
+    }
+
+
+    // ==================================
+    // تحميل مكتبة Orama
+    // ==================================
+
+    const {
+        create,
+        insertMultiple
+    } =
+        require(
+            "@orama/orama"
+        );
+
+
+    // ==================================
+    // بنية المستند الموجودة أصلًا
+    // ==================================
+
+    const structureData =
+        await ensureDocumentStructure(
+            documentItem
+        );
+
+
+    if (
+        !structureData
+    ) {
+
+        return null;
+
+    }
+
+
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
+
+
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+            : [];
+
+
+    // ==================================
+    // إنشاء قاعدة Orama
+    // ==================================
+
+    const db =
+        await create({
+
+            schema: {
+
+                paragraphIndex:
+                    "number",
+
+                paragraphId:
+                    "string",
+
+                text:
+                    "string",
+
+                heading:
+                    "string",
+
+                headingLevel:
+                    "string"
+
+            }
+
+        });
+
+
+    // ==================================
+    // خريطة العناوين
+    // ==================================
+
+    const headingList =
+        headings
+            .filter(
+                function (
+                    heading
+                ) {
+
+                    return (
+                        heading &&
+                        typeof heading.index !==
+                            "undefined"
+                    );
+
+                }
+            )
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    return (
+                        Number(
+                            a.index
+                        ) -
+                        Number(
+                            b.index
+                        )
+                    );
+
+                }
+            );
+
+
+    // ==================================
+    // بناء سجلات الفقرات
+    // ==================================
+
+    const records =
+        [];
+
+
+    paragraphs.forEach(
+        function (
+            paragraph
+        ) {
+
+            if (
+                !paragraph
+            ) {
+
+                return;
+
+            }
+
+
+            const text =
+                String(
+                    paragraph.text ||
+                    ""
+                ).trim();
+
+
+            if (
+                !text
+            ) {
+
+                return;
+
+            }
+
+
+            // ==================================
+            // العثور على أقرب عنوان
+            // ==================================
+
+            let nearestHeading =
+                null;
+
+
+            for (
+                let i =
+                    headingList.length - 1;
+
+                i >= 0;
+
+                i--
+            ) {
+
+                const heading =
+                    headingList[i];
+
+
+                if (
+                    Number(
+                        heading.index
+                    ) <
+                    Number(
+                        paragraph.index
+                    )
+                ) {
+
+                    nearestHeading =
+                        heading;
+
+                    break;
+
+                }
+
+            }
+
+
+            records.push({
+
+                paragraphIndex:
+                    Number(
+                        paragraph.index
+                    ),
+
+                paragraphId:
+                    String(
+                        paragraph.id ||
+                        paragraph.index
+                    ),
+
+                text:
+                    text,
+
+                heading:
+                    nearestHeading
+                        ? String(
+                            nearestHeading.text ||
+                            ""
+                        )
+                        : "",
+
+                headingLevel:
+                    nearestHeading
+                        ? String(
+                            nearestHeading.style ||
+                            ""
+                        )
+                        : ""
+
+            });
+
+        }
+    );
+
+
+    // ==================================
+    // إدخال البيانات إلى Orama
+    // ==================================
+
+    if (
+        records.length
+    ) {
+
+        await insertMultiple(
+            db,
+            records
+        );
+
+    }
+
+
+    // ==================================
+    // حفظ الفهرس في الذاكرة
+    // ==================================
+
+    oramaDocumentDb =
+        db;
+
+
+    oramaDocumentId =
+        String(
+            documentItem.id
+        );
+
+
+    return db;
+
+}
+
+async function searchOramaDocument(
+    documentItem,
+    query
+) {
+
+    if (
+        !documentItem ||
+        !query
+    ) {
+
+        return [];
+
+    }
+
+
+    // ==================================
+    // إنشاء الفهرس عند الحاجة
+    // ==================================
+
+    if (
+        !oramaDocumentDb ||
+        String(
+            oramaDocumentId
+        ) !==
+        String(
+            documentItem.id
+        )
+    ) {
+
+        await buildOramaDocumentIndex(
+            documentItem
+        );
+
+    }
+
+
+    if (
+        !oramaDocumentDb
+    ) {
+
+        return [];
+
+    }
+
+
+    const {
+        search
+    } =
+        require(
+            "@orama/orama"
+        );
+
+
+    const result =
+        await search(
+            oramaDocumentDb,
+            {
+
+                term:
+                    String(
+                        query
+                    ),
+
+                properties: [
+
+                    "text",
+                    "heading"
+
+                ],
+
+                boost: {
+
+                    heading:
+                        4,
+
+                    text:
+                        1
+
+                },
+
+                tolerance:
+                    1,
+
+                limit:
+                    8
+
+            }
+        );
+
+
+    return (
+        Array.isArray(
+            result.hits
+        )
+            ? result.hits.map(
+                function (
+                    hit
+                ) {
+
+                    return {
+
+                        score:
+                            Number(
+                                hit.score ||
+                                0
+                            ),
+
+                        paragraphIndex:
+                            hit.document.paragraphIndex,
+
+                        paragraphId:
+                            hit.document.paragraphId,
+
+                        text:
+                            hit.document.text,
+
+                        heading:
+                            hit.document.heading,
+
+                        headingLevel:
+                            hit.document.headingLevel
+
+                    };
+
+                }
+            )
+            : []
+    );
+
+}
+// =====================================================
 // Search Indexed Document
 // البحث الذكي بالعائلات + الكلمات + أولوية العناوين والمطالب
 // =====================================================
