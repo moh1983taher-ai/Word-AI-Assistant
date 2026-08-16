@@ -13824,6 +13824,10 @@ async function streamGeminiAI(
     onChunk
 ) {
 
+    // ==================================
+    // الإعدادات
+    // ==================================
+
     const data =
         getSavedSettings();
 
@@ -13868,7 +13872,6 @@ async function streamGeminiAI(
 
     // ==================================
     // بناء تاريخ المحادثة السابقة
-    // لا نكرر السؤال الحالي
     // ==================================
 
     const conversationMessages =
@@ -13889,7 +13892,9 @@ async function streamGeminiAI(
         )
     ) {
 
-        const messages =
+        // السؤال الحالي موجود بالفعل
+        // في آخر رسالة، لذلك نستبعده
+        const messagesWithoutCurrent =
             currentChat.messages.slice(
                 0,
                 -1
@@ -13897,7 +13902,7 @@ async function streamGeminiAI(
 
 
         const previousMessages =
-            messages.slice(
+            messagesWithoutCurrent.slice(
                 -historyLimit
             );
 
@@ -13973,7 +13978,7 @@ async function streamGeminiAI(
 
 
     // ==================================
-    // بناء محتوى السؤال
+    // بناء محتوى السؤال الحالي
     // ==================================
 
     let userContent =
@@ -14025,6 +14030,7 @@ async function streamGeminiAI(
                 "لا تذكر أي مقطع لا يجيب مباشرة عن السؤال.",
                 "إذا تكررت الفكرة نفسها في أكثر من مقطع، اذكرها مرة واحدة واجمع الإحالات.",
                 "ضع الإحالات [مقطع X] بعد الأفكار التي يدعمها المستند.",
+                "لا تخترع إحالات.",
                 "قدّم إجابة كاملة ومترابطة بالقدر الذي يحتاجه السؤال."
 
             ].join(
@@ -14035,7 +14041,7 @@ async function streamGeminiAI(
 
 
     // ==================================
-    // السؤال الحالي
+    // إضافة السؤال الحالي
     // ==================================
 
     conversationMessages.push({
@@ -14068,7 +14074,7 @@ async function streamGeminiAI(
 
 
     // ==================================
-    // رابط Streaming
+    // رابط Gemini Streaming
     // ==================================
 
     const url =
@@ -14108,13 +14114,6 @@ async function streamGeminiAI(
                             conversationMessages,
 
                         generationConfig: {
-
-                            thinkingConfig: {
-
-                                thinkingBudget:
-                                    0
-
-                            },
 
                             temperature:
                                 0.2
@@ -14157,7 +14156,7 @@ async function streamGeminiAI(
 
 
     // ==================================
-    // قراءة البث
+    // قارئ البث
     // ==================================
 
     const reader =
@@ -14177,6 +14176,173 @@ async function streamGeminiAI(
     let fullAnswer =
         "";
 
+
+    // ==================================
+    // معالجة سطر SSE
+    // ==================================
+
+    function processSSELine(
+        line
+    ) {
+
+        const cleanLine =
+            String(
+                line ||
+                ""
+            ).trim();
+
+
+        if (
+            !cleanLine ||
+            !cleanLine.startsWith(
+                "data:"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const dataText =
+            cleanLine
+                .substring(
+                    5
+                )
+                .trim();
+
+
+        if (
+            !dataText ||
+            dataText ===
+                "[DONE]"
+        ) {
+
+            return;
+
+        }
+
+
+        let parsed;
+
+
+        try {
+
+            parsed =
+                JSON.parse(
+                    dataText
+                );
+
+        }
+        catch (
+            error
+        ) {
+
+            // قد يصل JSON ناقصًا داخل السطر
+            // في هذه الحالة نتجاهله،
+            // وسيُعالج الحدث الكامل لاحقًا
+            return;
+
+        }
+
+
+        if (
+            !parsed ||
+            !Array.isArray(
+                parsed.candidates
+            ) ||
+            !parsed.candidates[0]
+        ) {
+
+            return;
+
+        }
+
+
+        const candidate =
+            parsed.candidates[0];
+
+
+        if (
+            !candidate.content ||
+            !Array.isArray(
+                candidate.content.parts
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        candidate.content.parts.forEach(
+            function (
+                part
+            ) {
+
+                if (
+                    !part ||
+                    typeof part.text !==
+                        "string"
+                ) {
+
+                    return;
+
+                }
+
+
+                // ==================================
+                // عدم عرض أجزاء التفكير
+                // ==================================
+
+                if (
+                    part.thought ===
+                    true
+                ) {
+
+                    return;
+
+                }
+
+
+                const delta =
+                    part.text;
+
+
+                if (
+                    !delta
+                ) {
+
+                    return;
+
+                }
+
+
+                fullAnswer +=
+                    delta;
+
+
+                if (
+                    typeof onChunk ===
+                    "function"
+                ) {
+
+                    onChunk(
+                        delta,
+                        fullAnswer
+                    );
+
+                }
+
+            }
+        );
+
+    }
+
+
+    // ==================================
+    // قراءة SSE سطرًا بسطر
+    // ==================================
 
     while (true) {
 
@@ -14203,164 +14369,86 @@ async function streamGeminiAI(
             );
 
 
-        const events =
-            buffer.split(
-                "\n\n"
+        // توحيد فواصل الأسطر
+        buffer =
+            buffer.replace(
+                /\r\n/g,
+                "\n"
             );
 
 
         buffer =
-            events.pop() ||
-            "";
+            buffer.replace(
+                /\r/g,
+                "\n"
+            );
 
 
-        for (
-            let i = 0;
-            i < events.length;
-            i++
+        let newlineIndex =
+            buffer.indexOf(
+                "\n"
+            );
+
+
+        while (
+            newlineIndex !==
+            -1
         ) {
 
-            const event =
-                events[i];
+            const line =
+                buffer.substring(
+                    0,
+                    newlineIndex
+                );
 
 
-            const lines =
-                event.split(
+            buffer =
+                buffer.substring(
+                    newlineIndex + 1
+                );
+
+
+            processSSELine(
+                line
+            );
+
+
+            newlineIndex =
+                buffer.indexOf(
                     "\n"
                 );
 
-
-            for (
-                let j = 0;
-                j < lines.length;
-                j++
-            ) {
-
-                const line =
-                    lines[j].trim();
-
-
-                if (
-                    !line.startsWith(
-                        "data:"
-                    )
-                ) {
-
-                    continue;
-
-                }
-
-
-                const dataText =
-                    line.substring(
-                        5
-                    ).trim();
-
-
-                if (
-                    !dataText
-                ) {
-
-                    continue;
-
-                }
-
-
-                let parsed;
-
-
-                try {
-
-                    parsed =
-                        JSON.parse(
-                            dataText
-                        );
-
-                }
-                catch (
-                    error
-                ) {
-
-                    continue;
-
-                }
-
-
-                if (
-                    !parsed.candidates ||
-                    !parsed.candidates[0] ||
-                    !parsed.candidates[0].content ||
-                    !Array.isArray(
-                        parsed.candidates[0]
-                            .content.parts
-                    )
-                ) {
-
-                    continue;
-
-                }
-
-
-                const parts =
-                    parsed
-                        .candidates[0]
-                        .content
-                        .parts;
-
-
-                parts.forEach(
-                    function (
-                        part
-                    ) {
-
-                        // ==================================
-                        // تجاهل أجزاء التفكير
-                        // ==================================
-
-                        if (
-                            !part ||
-                            part.thought ===
-                                true
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        if (
-                            typeof part.text !==
-                            "string" ||
-                            !part.text
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        fullAnswer +=
-                            part.text;
-
-
-                        if (
-                            typeof onChunk ===
-                            "function"
-                        ) {
-
-                            onChunk(
-                                part.text,
-                                fullAnswer
-                            );
-
-                        }
-
-                    }
-                );
-
-            }
-
         }
+
+    }
+
+
+    // ==================================
+    // معالجة أي بيانات متبقية
+    // ==================================
+
+    if (
+        buffer.trim()
+    ) {
+
+        processSSELine(
+            buffer
+        );
+
+    }
+
+
+    // ==================================
+    // لا يوجد رد نصي
+    // ==================================
+
+    if (
+        !fullAnswer.trim()
+    ) {
+
+        throw new Error(
+            "لم يصل نص من Gemini عبر البث المتدفق."
+        );
 
     }
 
@@ -14375,8 +14463,9 @@ async function streamGeminiAI(
 
 async function sendMessage() {
 
-    if (!input)
+    if (!input) {
         return;
+    }
 
 
     const text =
@@ -14384,17 +14473,14 @@ async function sendMessage() {
 
 
     if (
-        text ===
-        ""
+        text === ""
     ) {
-
         return;
-
     }
 
 
     // ==================================
-    // إنشاء محادثة
+    // إنشاء محادثة عند الحاجة
     // ==================================
 
     if (!currentChat) {
@@ -14427,7 +14513,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // حفظ المحادثة المؤقتة
+    // تثبيت المحادثة المؤقتة
     // ==================================
 
     if (
@@ -14507,8 +14593,7 @@ async function sendMessage() {
 
 
                 currentProject.updatedAt =
-                    new Date()
-                        .toISOString();
+                    new Date().toISOString();
 
 
                 saveProjects();
@@ -14524,7 +14609,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // رسالة المستخدم
+    // إضافة رسالة المستخدم
     // ==================================
 
     currentChat.messages.push({
@@ -14553,6 +14638,10 @@ async function sendMessage() {
     renderRecentChats();
 
 
+    // ==================================
+    // تنظيف مربع الإدخال
+    // ==================================
+
     input.value =
         "";
 
@@ -14562,7 +14651,7 @@ async function sendMessage() {
 
 
     // ==================================
-    // رسالة AI المؤقتة
+    // إنشاء فقاعة إجابة AI
     // ==================================
 
     const loading =
@@ -14579,9 +14668,7 @@ async function sendMessage() {
         "⏳ جاري التفكير...";
 
 
-    if (
-        chatArea
-    ) {
+    if (chatArea) {
 
         chatArea.appendChild(
             loading
@@ -14610,7 +14697,55 @@ async function sendMessage() {
 
 
     // ==================================
-    // تنفيذ الطلب
+    // تحديث فقاعة AI أثناء Streaming
+    // ==================================
+
+    function updateStreamingMessage(
+        fullText
+    ) {
+
+        if (!loading) {
+            return;
+        }
+
+
+        const safeText =
+            String(
+                fullText ||
+                ""
+            );
+
+
+        if (
+            !safeText
+        ) {
+
+            loading.innerHTML =
+                "⏳ جاري التفكير...";
+
+            return;
+
+        }
+
+
+        loading.innerHTML =
+            formatAIMessage(
+                safeText
+            );
+
+
+        if (chatArea) {
+
+            chatArea.scrollTop =
+                chatArea.scrollHeight;
+
+        }
+
+    }
+
+
+    // ==================================
+    // إرسال الطلب
     // ==================================
 
     try {
@@ -14618,6 +14753,10 @@ async function sendMessage() {
         let answer =
             "";
 
+
+        // ==================================
+        // Groq - Streaming
+        // ==================================
 
         if (
             selectedProvider ===
@@ -14632,24 +14771,20 @@ async function sendMessage() {
                         fullText
                     ) {
 
-                        if (
-                            loading
-                        ) {
-
-                            loading.innerHTML =
-                                formatAIMessage(
-                                    fullText
-                                );
-
-                            chatArea.scrollTop =
-                                chatArea.scrollHeight;
-
-                        }
+                        updateStreamingMessage(
+                            fullText
+                        );
 
                     }
                 );
 
         }
+
+
+        // ==================================
+        // Gemini - Streaming
+        // ==================================
+
         else if (
             selectedProvider ===
             "gemini"
@@ -14663,24 +14798,21 @@ async function sendMessage() {
                         fullText
                     ) {
 
-                        if (
-                            loading
-                        ) {
-
-                            loading.innerHTML =
-                                formatAIMessage(
-                                    fullText
-                                );
-
-                            chatArea.scrollTop =
-                                chatArea.scrollHeight;
-
-                        }
+                        updateStreamingMessage(
+                            fullText
+                        );
 
                     }
                 );
 
         }
+
+
+        // ==================================
+        // OpenRouter / OpenAI
+        // المسار العادي
+        // ==================================
+
         else {
 
             answer =
@@ -14688,15 +14820,21 @@ async function sendMessage() {
                     text
                 );
 
+
+            updateStreamingMessage(
+                answer
+            );
+
         }
 
 
         // ==================================
-        // إزالة رسالة الانتظار
+        // إزالة حالة الانتظار
         // ==================================
 
         if (
-            loading
+            loading &&
+            loading.parentNode
         ) {
 
             loading.remove();
@@ -14705,7 +14843,7 @@ async function sendMessage() {
 
 
         // ==================================
-        // حفظ الرد النهائي
+        // حفظ جواب الذكاء الاصطناعي
         // ==================================
 
         currentChat.messages.push({
@@ -14714,7 +14852,10 @@ async function sendMessage() {
                 "ai",
 
             text:
-                answer || ""
+                String(
+                    answer ||
+                    ""
+                )
 
         });
 
@@ -14736,13 +14877,32 @@ async function sendMessage() {
     }
     catch (error) {
 
+        // ==================================
+        // إزالة حالة الانتظار
+        // ==================================
+
         if (
-            loading
+            loading &&
+            loading.parentNode
         ) {
 
             loading.remove();
 
         }
+
+
+        // ==================================
+        // رسالة الخطأ
+        // ==================================
+
+        const errorText =
+            "خطأ: " +
+            (
+                error &&
+                error.message
+                    ? error.message
+                    : "حدث خطأ غير معروف"
+            );
 
 
         currentChat.messages.push({
@@ -14751,11 +14911,7 @@ async function sendMessage() {
                 "ai",
 
             text:
-                "خطأ: " +
-                (
-                    error.message ||
-                    "حدث خطأ غير معروف"
-                )
+                errorText
 
         });
 
