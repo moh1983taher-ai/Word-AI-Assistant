@@ -14806,6 +14806,257 @@ window.testOramaStandalone =
 
     };
 
+    window.testOramaHeadingSearch =
+    function (
+        query
+    ) {
+
+        if (
+            !currentDocument
+        ) {
+
+            console.warn(
+                "لا يوجد مستند نشط."
+            );
+
+            return;
+
+        }
+
+
+        ensureDocumentStructure(
+            currentDocument
+        )
+            .then(
+                function (
+                    structureData
+                ) {
+
+                    if (
+                        !structureData ||
+                        !Array.isArray(
+                            structureData.headings
+                        )
+                    ) {
+
+                        console.warn(
+                            "لا توجد عناوين محفوظة للمستند."
+                        );
+
+                        return;
+
+                    }
+
+
+                    const headings =
+                        structureData.headings
+                            .filter(
+                                function (
+                                    heading
+                                ) {
+
+                                    return (
+                                        heading &&
+                                        typeof heading.index !==
+                                            "undefined" &&
+                                        String(
+                                            heading.text ||
+                                            ""
+                                        ).trim()
+                                    );
+
+                                }
+                            );
+
+
+                    console.log(
+                        "عدد العناوين:",
+                        headings.length
+                    );
+
+
+                    // ==================================
+                    // إنشاء قاعدة Orama للعناوين
+                    // ==================================
+
+                    const {
+                        create,
+                        insertMultiple,
+                        search
+                    } =
+                        require(
+                            "@orama/orama"
+                        );
+
+
+                    const db =
+                        create({
+
+                            schema: {
+
+                                headingIndex:
+                                    "number",
+
+                                heading:
+                                    "string",
+
+                                style:
+                                    "string"
+
+                            },
+
+                            language:
+                                "arabic"
+
+                        });
+
+
+                    const records =
+                        headings.map(
+                            function (
+                                heading
+                            ) {
+
+                                return {
+
+                                    headingIndex:
+                                        Number(
+                                            heading.index
+                                        ),
+
+                                    heading:
+                                        String(
+                                            heading.text
+                                        ).trim(),
+
+                                    style:
+                                        String(
+                                            heading.style ||
+                                            ""
+                                        )
+
+                                };
+
+                            }
+                        );
+
+
+                    insertMultiple(
+                        db,
+                        records
+                    );
+
+
+                    console.log(
+                        "تم إدخال العناوين إلى Orama:",
+                        records.length
+                    );
+
+
+                    // ==================================
+                    // البحث
+                    // ==================================
+
+                    const result =
+                        search(
+                            db,
+                            {
+
+                                term:
+                                    String(
+                                        query
+                                    ),
+
+                                properties: [
+
+                                    "heading"
+
+                                ],
+
+                                tolerance:
+                                    2,
+
+                                limit:
+                                    10
+
+                            }
+                        );
+
+
+                    console.log(
+                        "======================================"
+                    );
+
+                    console.log(
+                        "نتائج بحث العناوين:"
+                    );
+
+                    console.log(
+                        "السؤال:",
+                        query
+                    );
+
+                    console.log(
+                        "عدد النتائج:",
+                        result.count
+                    );
+
+                    console.log(
+                        "======================================"
+                    );
+
+
+                    result.hits.forEach(
+                        function (
+                            hit,
+                            index
+                        ) {
+
+                            console.log(
+                                "#" +
+                                (
+                                    index + 1
+                                ),
+
+                                {
+
+                                    score:
+                                        hit.score,
+
+                                    headingIndex:
+                                        hit.document.headingIndex,
+
+                                    heading:
+                                        hit.document.heading,
+
+                                    style:
+                                        hit.document.style
+
+                                }
+                            );
+
+                        }
+                    );
+
+
+                    return result;
+
+                }
+            )
+            .catch(
+                function (
+                    error
+                ) {
+
+                    console.error(
+                        "فشل اختبار عناوين Orama:",
+                        error
+                    );
+
+                }
+            );
+
+    };
 // =====================================================
 // Search box
 // ملاحظة: البحث الحالي في أسماء المحادثات
