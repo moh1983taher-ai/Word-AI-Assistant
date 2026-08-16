@@ -11342,6 +11342,221 @@ async function searchOramaDocument(
     );
 
 }
+window.testOramaSearch =
+    async function (
+        query
+    ) {
+
+        console.log(
+            "بدء اختبار Orama:",
+            query
+        );
+
+
+        if (
+            !currentDocument
+        ) {
+
+            console.warn(
+                "لا يوجد مستند نشط."
+            );
+
+            return [];
+
+        }
+
+
+        try {
+
+            const results =
+                await searchOramaDocument(
+                    currentDocument,
+                    query
+                );
+
+
+            console.log(
+                "======================================"
+            );
+
+            console.log(
+                "نتائج Orama:"
+            );
+
+            console.log(
+                "عدد النتائج:",
+                results.length
+            );
+
+            console.log(
+                "======================================"
+            );
+
+
+            results.forEach(
+                function (
+                    result,
+                    index
+                ) {
+
+                    console.log(
+                        "#" +
+                        (
+                            index + 1
+                        ),
+
+                        "score:",
+                        result.score,
+
+                        "heading:",
+                        result.heading,
+
+                        "paragraphIndex:",
+                        result.paragraphIndex,
+
+                        "text:",
+                        result.text
+                    );
+
+                }
+            );
+
+
+            return results;
+
+        }
+        catch (
+            error
+        ) {
+
+            console.error(
+                "فشل اختبار Orama:",
+                error
+            );
+
+            return [];
+
+        }
+
+    };
+// =====================================================
+// Orama Console Test
+// اختبار Orama من Console
+// =====================================================
+
+window.testOramaSearch =
+    async function (
+        query
+    ) {
+
+        try {
+
+            if (
+                !currentDocument
+            ) {
+
+                console.warn(
+                    "لا يوجد مستند نشط."
+                );
+
+                return [];
+
+            }
+
+
+            console.log(
+                "بدء اختبار Orama..."
+            );
+
+
+            const results =
+                await searchOramaDocument(
+                    currentDocument,
+                    query
+                );
+
+
+            console.log(
+                "===================================="
+            );
+
+            console.log(
+                "نتائج Orama"
+            );
+
+            console.log(
+                "السؤال:",
+                query
+            );
+
+            console.log(
+                "عدد النتائج:",
+                results.length
+            );
+
+            console.log(
+                "===================================="
+            );
+
+
+            results.forEach(
+                function (
+                    result,
+                    index
+                ) {
+
+                    console.log(
+                        "#" +
+                        (
+                            index + 1
+                        ),
+                        {
+                            score:
+                                result.score,
+
+                            heading:
+                                result.heading,
+
+                            paragraphIndex:
+                                result.paragraphIndex,
+
+                            paragraphId:
+                                result.paragraphId,
+
+                            text:
+                                String(
+                                    result.text ||
+                                    ""
+                                ).substring(
+                                    0,
+                                    300
+                                )
+
+                        }
+                    );
+
+                }
+            );
+
+
+            return results;
+
+        }
+        catch (
+            error
+        ) {
+
+            console.error(
+                "فشل اختبار Orama:",
+                error
+            );
+
+
+            return [];
+
+        }
+
+    };
 // =====================================================
 // Search Indexed Document
 // البحث الذكي بالعائلات + الكلمات + أولوية العناوين والمطالب
