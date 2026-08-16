@@ -303,7 +303,16 @@ projects =
 let currentProject = null;
 let currentDocument = null;
 
+// ======================================
+// Orama Retrieval Cache
+// ذاكرة محرك البحث
+// ======================================
 
+let oramaRetrievalDb =
+    null;
+
+let oramaRetrievalCacheKey =
+    "";
 // ======================================
 // Documents System
 // ======================================
@@ -11477,6 +11486,420 @@ window.testOramaSearch =
         }
 
     };
+
+// ======================================
+// Heading Level Number
+// تحويل Heading1 / Heading2 / Heading3
+// إلى رقم للمقارنة بين مستويات العناوين
+// ======================================
+
+function getHeadingLevelNumber(
+    style
+) {
+
+    const match =
+        String(
+            style ||
+            ""
+        ).match(
+            /Heading\s*([1-9])/i
+        );
+
+
+    if (
+        match
+    ) {
+
+        return Number(
+            match[1]
+        );
+
+    }
+
+
+    return 9;
+
+}
+
+// =====================================================
+// Build Orama Retrieval Index
+// بناء فهرس الاسترجاع الرئيسي باستخدام Orama
+// =====================================================
+
+async function ensureOramaRetrievalIndex(
+    documentItem,
+    structureData
+) {
+
+    const {
+        create,
+        insertMultiple
+    } =
+        require(
+            "@orama/orama"
+        );
+
+
+    // ==================================
+    // إنشاء مفتاح ذاكرة للفهرس
+    // ==================================
+
+    const cacheKey =
+        [
+
+            String(
+                documentItem.id
+            ),
+
+            String(
+                documentItem.indexUpdatedAt ||
+                ""
+            ),
+
+            String(
+                (
+                    structureData.paragraphs ||
+                    []
+                ).length
+            ),
+
+            String(
+                (
+                    structureData.headings ||
+                    []
+                ).length
+            )
+
+        ].join(
+            "|"
+        );
+
+
+    // ==================================
+    // استخدام الفهرس الموجود
+    // ==================================
+
+    if (
+        oramaRetrievalDb &&
+        oramaRetrievalCacheKey ===
+            cacheKey
+    ) {
+
+        return oramaRetrievalDb;
+
+    }
+
+
+    // ==================================
+    // إنشاء قاعدة Orama عربية
+    // ==================================
+
+    const db =
+        create({
+
+            schema: {
+
+                id:
+                    "string",
+
+                paragraphIndex:
+                    "number",
+
+                text:
+                    "string",
+
+                heading:
+                    "string",
+
+                headingIndex:
+                    "number",
+
+                headingLevel:
+                    "string",
+
+                isHeading:
+                    "boolean"
+
+            },
+
+            language:
+                "arabic"
+
+        });
+
+
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
+
+
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+                .filter(
+                    function (
+                        heading
+                    ) {
+
+                        return (
+                            heading &&
+                            typeof heading.index !==
+                                "undefined" &&
+                            String(
+                                heading.text ||
+                                ""
+                            ).trim()
+                        );
+
+                    }
+                )
+                .sort(
+                    function (
+                        a,
+                        b
+                    ) {
+
+                        return (
+                            Number(
+                                a.index
+                            ) -
+                            Number(
+                                b.index
+                            )
+                        );
+
+                    }
+                )
+            : [];
+
+
+    // ==================================
+    // خريطة العناوين
+    // ==================================
+
+    const headingMap =
+        new Map();
+
+
+    headings.forEach(
+        function (
+            heading
+        ) {
+
+            headingMap.set(
+                Number(
+                    heading.index
+                ),
+                heading
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // تحديد عنوان الفقرة
+    // ==================================
+
+    function getParagraphHeading(
+        paragraphIndex
+    ) {
+
+        // الفقرة نفسها عنوان
+        if (
+            headingMap.has(
+                paragraphIndex
+            )
+        ) {
+
+            return headingMap.get(
+                paragraphIndex
+            );
+
+        }
+
+
+        // البحث عن أقرب عنوان سابق
+        for (
+            let i =
+                headings.length - 1;
+
+            i >= 0;
+
+            i--
+        ) {
+
+            const heading =
+                headings[i];
+
+
+            if (
+                Number(
+                    heading.index
+                ) <
+                paragraphIndex
+            ) {
+
+                return heading;
+
+            }
+
+        }
+
+
+        return null;
+
+    }
+
+
+    // ==================================
+    // سجلات Orama
+    // ==================================
+
+    const records =
+        [];
+
+
+    paragraphs.forEach(
+        function (
+            paragraph
+        ) {
+
+            if (
+                !paragraph
+            ) {
+
+                return;
+
+            }
+
+
+            const text =
+                String(
+                    paragraph.text ||
+                    ""
+                ).trim();
+
+
+            if (
+                !text
+            ) {
+
+                return;
+
+            }
+
+
+            const paragraphIndex =
+                Number(
+                    paragraph.index
+                );
+
+
+            const heading =
+                getParagraphHeading(
+                    paragraphIndex
+                );
+
+
+            const isHeading =
+                heading &&
+                Number(
+                    heading.index
+                ) ===
+                paragraphIndex;
+
+
+            records.push({
+
+                id:
+                    "p-" +
+                    String(
+                        paragraphIndex
+                    ),
+
+                paragraphIndex:
+                    paragraphIndex,
+
+                text:
+                    text,
+
+                heading:
+                    heading
+                        ? String(
+                            heading.text ||
+                            ""
+                        ).trim()
+                        : "",
+
+                headingIndex:
+                    heading
+                        ? Number(
+                            heading.index
+                        )
+                        : -1,
+
+                headingLevel:
+                    heading
+                        ? String(
+                            heading.style ||
+                            ""
+                        )
+                        : "",
+
+                isHeading:
+                    Boolean(
+                        isHeading
+                    )
+
+            });
+
+        }
+    );
+
+
+    // ==================================
+    // إدخال الفقرات
+    // ==================================
+
+    if (
+        records.length
+    ) {
+
+        insertMultiple(
+            db,
+            records
+        );
+
+    }
+
+
+    // ==================================
+    // حفظ الذاكرة
+    // ==================================
+
+    oramaRetrievalDb =
+        db;
+
+    oramaRetrievalCacheKey =
+        cacheKey;
+
+
+    console.log(
+        "تم بناء فهرس Orama للاسترجاع:",
+        records.length,
+        "فقرة"
+    );
+
+
+    return db;
+
+}
 // =====================================================
 // Search Indexed Document
 // البحث الذكي بالعائلات + الكلمات + أولوية العناوين والمطالب
