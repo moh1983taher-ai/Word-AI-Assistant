@@ -8114,33 +8114,21 @@ async function searchIndexedDocument(
 
             // ==================================
             // تغطية المفاهيم الأساسية
-            // قاعدة عامة لجميع أنواع الأسئلة
             // ==================================
 
-            const conceptCoverage =
-                contentTokens.length >
-                0
-
-                    ? directMatchedContentTokens.length /
-                    contentTokens.length
-
-                    : 0;
-
-
             score +=
-                conceptCoverage *
+                directContentCoverage *
                 18;
 
 
             // ==================================
             // تعزيز اجتماع جميع المفاهيم
-            // داخل الفقرة نفسها
             // ==================================
 
             if (
                 contentTokens.length >=
                     2 &&
-                conceptCoverage >=
+                directContentCoverage >=
                     1
             ) {
 
@@ -8148,12 +8136,6 @@ async function searchIndexedDocument(
                     20;
 
             }
-
-
-            // ==================================
-            // تعزيز التغطية الجزئية المتعددة
-            // ==================================
-
             else if (
                 directMatchedContentTokens.length >=
                 2
@@ -8163,6 +8145,7 @@ async function searchIndexedDocument(
                     10;
 
             }
+
 
             // ==================================
             // العائلات
@@ -8219,6 +8202,9 @@ async function searchIndexedDocument(
 
             score +=
                 profileScore;
+
+
+
 
 
             // ==================================
