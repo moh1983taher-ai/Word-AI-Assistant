@@ -7736,13 +7736,18 @@ function getCommonTextLength(
 
 // =====================================================
 // Build Retrieval Context
-// تحويل نتائج Orama إلى سياق ذكي
+// تحويل نتائج البحث إلى سياق ذكي للذكاء الاصطناعي
+// مع تنويع النتائج وربط الإحالات بالمقاطع الأصلية
 // =====================================================
 
-async function buildRetrievalContext(
+function buildRetrievalContext(
     searchResult,
     options
 ) {
+
+    // ==================================
+    // الإعدادات
+    // ==================================
 
     const settings =
         options || {};
@@ -7763,9 +7768,12 @@ async function buildRetrievalContext(
 
 
     const includeNeighbors =
-        settings.includeNeighbors !==
-            false;
+        settings.includeNeighbors !== false;
 
+
+    // ==================================
+    // التحقق من النتائج
+    // ==================================
 
     if (
         !searchResult ||
@@ -7774,63 +7782,6 @@ async function buildRetrievalContext(
         )
     ) {
 
-            let structureData = null;
-
-    if (currentDocument) {
-
-        try {
-
-            structureData =
-                await ensureDocumentStructure(
-                    currentDocument
-                );
-
-        }
-        catch (error) {
-
-            console.warn(
-                "تعذر تحميل بنية المستند للسياق:",
-                error
-            );
-
-        }
-
-    }
-
-    const paragraphMap =
-        new Map();
-
-    if (
-        structureData &&
-        Array.isArray(
-            structureData.paragraphs
-        )
-    ) {
-
-        structureData.paragraphs.forEach(
-            function (
-                paragraph
-            ) {
-
-                if (
-                    paragraph &&
-                    typeof paragraph.index !==
-                        "undefined"
-                ) {
-
-                    paragraphMap.set(
-                        Number(
-                            paragraph.index
-                        ),
-                        paragraph
-                    );
-
-                }
-
-            }
-        );
-
-    }
         return {
 
             query:
@@ -7857,132 +7808,919 @@ async function buildRetrievalContext(
         };
 
     }
+
+
     // ==================================
-    // خريطة فقرات المستند
+    // نوع السؤال
     // ==================================
 
-    const paragraphMap =
-        new Map();
+    const retrievalProfile =
+        searchResult.profile ||
+        settings.profile ||
+        "general";
 
 
-    if (
-        currentDocument
-    ) {
+    // ==================================
+    // ترتيب النتائج الأساسية
+    // ==================================
 
-        try {
+    const results =
+        searchResult.results
+            .filter(
+                function (
+                    result
+                ) {
 
-            const structureData =
-                await ensureDocumentStructure(
-                    currentDocument
-                );
+                    return (
+                        result &&
+                        typeof result.text ===
+                            "string"
+                    );
+
+                }
+            )
+            .slice()
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    // ----------------------------------
+                    // الدرجة العامة
+                    // ----------------------------------
+
+                    const scoreA =
+                        Number(
+                            a.score ||
+                            0
+                        );
 
 
-            if (
-                structureData &&
-                Array.isArray(
-                    structureData.paragraphs
-                )
-            ) {
+                    const scoreB =
+                        Number(
+                            b.score ||
+                            0
+                        );
 
-                structureData.paragraphs.forEach(
-                    function (
-                        paragraph
+
+                    if (
+                        scoreB !==
+                        scoreA
                     ) {
 
+                        return (
+                            scoreB -
+                            scoreA
+                        );
+
+                    }
+
+
+                    // ----------------------------------
+                    // المقارنة
+                    // ----------------------------------
+
+                    if (
+                        retrievalProfile ===
+                        "comparison"
+                    ) {
+
+                        const comparisonA =
+                            Number(
+                                a.comparisonCoverage ||
+                                0
+                            );
+
+
+                        const comparisonB =
+                            Number(
+                                b.comparisonCoverage ||
+                                0
+                            );
+
+
                         if (
-                            paragraph &&
-                            typeof paragraph.index !==
-                                "undefined"
+                            comparisonB !==
+                            comparisonA
                         ) {
 
-                            paragraphMap.set(
-                                Number(
-                                    paragraph.index
-                                ),
-                                paragraph
+                            return (
+                                comparisonB -
+                                comparisonA
+                            );
+
+                        }
+
+
+                        const relationA =
+                            Number(
+                                a.relationScore ||
+                                0
+                            );
+
+
+                        const relationB =
+                            Number(
+                                b.relationScore ||
+                                0
+                            );
+
+
+                        if (
+                            relationB !==
+                            relationA
+                        ) {
+
+                            return (
+                                relationB -
+                                relationA
                             );
 
                         }
 
                     }
+
+
+                    return (
+                        Number(
+                            a.paragraphIndex ||
+                            0
+                        ) -
+                        Number(
+                            b.paragraphIndex ||
+                            0
+                        )
+                    );
+
+                }
+            );
+
+
+    if (
+        results.length ===
+        0
+    ) {
+
+        return {
+
+            query:
+                searchResult.query ||
+                "",
+
+            count:
+                0,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                Number(
+                    searchResult.indexedOccurrences ||
+                    0
+                ),
+
+            contexts:
+                [],
+
+            text:
+                ""
+
+        };
+
+    }
+
+
+    // ==================================
+    // النتائج المختارة
+    // ==================================
+
+    const selected =
+        [];
+
+
+    // ==================================
+    // الفقرات المختارة
+    // ==================================
+
+    const selectedParagraphIndexes =
+        new Set();
+
+
+    // ==================================
+    // أنواع النتائج المستخدمة
+    // ==================================
+
+    const selectedMatchTypes =
+        new Map();
+
+
+    // ==================================
+    // العناوين المختارة
+    // ==================================
+
+    const selectedHeadings =
+        new Set();
+
+
+    // ==================================
+    // العائلات الأساسية التي ظهرت
+    // ==================================
+
+    const selectedFamilies =
+        new Set();
+
+
+    // ==================================
+    // فحص تشابه النص
+    // ==================================
+
+    function getNormalizedContextText(
+        result
+    ) {
+
+        return String(
+            result.context ||
+            result.text ||
+            ""
+        )
+            .replace(
+                /\s+/g,
+                " "
+            )
+            .trim();
+
+    }
+
+
+    // ==================================
+    // حساب نسبة التشابه
+    // ==================================
+
+    function calculateOverlap(
+        textA,
+        textB
+    ) {
+
+        const a =
+            String(
+                textA ||
+                ""
+            )
+                .replace(
+                    /\s+/g,
+                    " "
+                )
+                .trim();
+
+
+        const b =
+            String(
+                textB ||
+                ""
+            )
+                .replace(
+                    /\s+/g,
+                    " "
+                )
+                .trim();
+
+
+        if (
+            !a ||
+            !b
+        ) {
+
+            return 0;
+
+        }
+
+
+        const shorter =
+            Math.min(
+                a.length,
+                b.length
+            );
+
+
+        if (
+            shorter <=
+            0
+        ) {
+
+            return 0;
+
+        }
+
+
+        const commonLength =
+            getCommonTextLength(
+                a,
+                b
+            );
+
+
+        return (
+            commonLength /
+            shorter
+        );
+
+    }
+
+
+    // ==================================
+    // هل النتيجة مشابهة جدًا؟
+    // ==================================
+
+    function isTooSimilar(
+        candidate
+    ) {
+
+        const candidateText =
+            getNormalizedContextText(
+                candidate
+            );
+
+
+        if (!candidateText) {
+
+            return true;
+
+        }
+
+
+        for (
+            let i = 0;
+
+            i <
+                selected.length;
+
+            i++
+        ) {
+
+            const selectedText =
+                getNormalizedContextText(
+                    selected[i]
                 );
+
+
+            const overlap =
+                calculateOverlap(
+                    candidateText,
+                    selectedText
+                );
+
+
+            if (
+                overlap >=
+                0.75
+            ) {
+
+                return true;
 
             }
 
         }
-        catch (error) {
 
-            console.warn(
-                "تعذر تحميل بنية الفقرات للسياق:",
-                error
+
+        return false;
+
+    }
+
+
+    // ==================================
+    // وزن التنوع
+    // ==================================
+
+    function getCandidateDiversityScore(
+        candidate
+    ) {
+
+        let diversityScore =
+            0;
+
+
+        // ----------------------------------
+        // المقارنة:
+        // نرفع النتائج التي تجمع المفاهيم
+        // ----------------------------------
+
+        if (
+            retrievalProfile ===
+            "comparison"
+        ) {
+
+            diversityScore +=
+                Number(
+                    candidate.comparisonCoverage ||
+                    0
+                ) *
+                35;
+
+
+            diversityScore +=
+                Number(
+                    candidate.relationScore ||
+                    0
+                ) *
+                0.5;
+
+        }
+
+
+        // ----------------------------------
+        // نفضل نوع مطابقة مختلفًا
+        // عندما بدأنا بتكرار النوع نفسه
+        // ----------------------------------
+
+        const matchType =
+            String(
+                candidate.matchType ||
+                "family"
             );
+
+
+        const currentCount =
+            selectedMatchTypes.get(
+                matchType
+            ) ||
+            0;
+
+
+        if (
+            currentCount ===
+            0
+        ) {
+
+            diversityScore +=
+                8;
+
+        }
+        else if (
+            currentCount ===
+            1
+        ) {
+
+            diversityScore +=
+                3;
+
+        }
+        else {
+
+            diversityScore -=
+                6;
+
+        }
+
+
+        // ----------------------------------
+        // نفضل عنوانًا جديدًا عند التكرار
+        // ----------------------------------
+
+        const heading =
+            String(
+                candidate.heading ||
+                ""
+            ).trim();
+
+
+        if (
+            heading &&
+            !selectedHeadings.has(
+                heading
+            )
+        ) {
+
+            diversityScore +=
+                4;
+
+        }
+
+
+        // ----------------------------------
+        // نفضل تغطية عائلات لم تظهر بعد
+        // ----------------------------------
+
+        const families =
+            Array.isArray(
+                candidate.matchedFamilies
+            )
+                ? candidate.matchedFamilies
+                : [];
+
+
+        let newFamilies =
+            0;
+
+
+        families.forEach(
+            function (
+                family
+            ) {
+
+                if (
+                    family &&
+                    !selectedFamilies.has(
+                        family
+                    )
+                ) {
+
+                    newFamilies +=
+                        1;
+
+                }
+
+            }
+        );
+
+
+        diversityScore +=
+            newFamilies *
+            4;
+
+
+        return diversityScore;
+
+    }
+
+
+    // ==================================
+    // اختيار أفضل النتائج
+    // ----------------------------------
+    // نستخدم مرحلتين:
+    //
+    // 1. اختيار صارم يمنع التكرار
+    // 2. إذا لم نصل للعدد المطلوب
+    //    نسمح ببعض النتائج الأقل تنوعًا
+    // ==================================
+
+    const MAX_TEXT_OVERLAP =
+        0.75;
+
+
+    // ==================================
+    // المرحلة الأولى
+    // ==================================
+
+    for (
+        let i = 0;
+
+        i <
+            results.length;
+
+        i++
+    ) {
+
+        const candidate =
+            results[i];
+
+
+        // ----------------------------------
+        // منع الفقرة نفسها
+        // ----------------------------------
+
+        if (
+            selectedParagraphIndexes.has(
+                candidate.paragraphIndex
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        // ----------------------------------
+        // منع التشابه الكبير
+        // ----------------------------------
+
+        if (
+            isTooSimilar(
+                candidate
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        // ----------------------------------
+        // بناء درجة الاختيار
+        // ----------------------------------
+
+        const selectionScore =
+            Number(
+                candidate.score ||
+                0
+            ) +
+            getCandidateDiversityScore(
+                candidate
+            );
+
+
+        candidate.__retrievalSelectionScore =
+            selectionScore;
+
+
+        selected.push(
+            candidate
+        );
+
+
+        selectedParagraphIndexes.add(
+            candidate.paragraphIndex
+        );
+
+
+        const type =
+            String(
+                candidate.matchType ||
+                "family"
+            );
+
+
+        selectedMatchTypes.set(
+            type,
+            (
+                selectedMatchTypes.get(
+                    type
+                ) ||
+                0
+            ) +
+            1
+        );
+
+
+        const heading =
+            String(
+                candidate.heading ||
+                ""
+            ).trim();
+
+
+        if (
+            heading
+        ) {
+
+            selectedHeadings.add(
+                heading
+            );
+
+        }
+
+
+        const families =
+            Array.isArray(
+                candidate.matchedFamilies
+            )
+                ? candidate.matchedFamilies
+                : [];
+
+
+        families.forEach(
+            function (
+                family
+            ) {
+
+                if (
+                    family
+                ) {
+
+                    selectedFamilies.add(
+                        family
+                    );
+
+                }
+
+            }
+        );
+
+
+        if (
+            selected.length >=
+            maxResults
+        ) {
+
+            break;
 
         }
 
     }
 
+
     // ==================================
-    // ترتيب النتائج
+    // المرحلة الثانية
+    // استكمال العدد عند الحاجة
     // ==================================
 
-    const results =
-    searchResult.results
-        .filter(
-            function (
-                result
+    if (
+        selected.length <
+        maxResults
+    ) {
+
+        for (
+            let i = 0;
+
+            i <
+                results.length;
+
+            i++
+        ) {
+
+            const candidate =
+                results[i];
+
+
+            if (
+                selectedParagraphIndexes.has(
+                    candidate.paragraphIndex
+                )
             ) {
 
-                return (
-                    result &&
-                    typeof result.text ===
-                        "string"
-                );
+                continue;
 
             }
-        )
-        .slice()
-        .sort(
-            function (
-                a,
-                b
+
+
+            const candidateText =
+                getNormalizedContextText(
+                    candidate
+                );
+
+
+            if (!candidateText) {
+
+                continue;
+
+            }
+
+
+            let tooSimilar =
+                false;
+
+
+            for (
+                let j = 0;
+
+                j <
+                    selected.length;
+
+                j++
             ) {
 
-                const scoreA =
+                const selectedText =
+                    getNormalizedContextText(
+                        selected[j]
+                    );
+
+
+                const overlap =
+                    calculateOverlap(
+                        candidateText,
+                        selectedText
+                    );
+
+
+                if (
+                    overlap >=
+                    MAX_TEXT_OVERLAP
+                ) {
+
+                    tooSimilar =
+                        true;
+
+                    break;
+
+                }
+
+            }
+
+
+            if (
+                tooSimilar
+            ) {
+
+                continue;
+
+            }
+
+
+            selected.push(
+                candidate
+            );
+
+
+            selectedParagraphIndexes.add(
+                candidate.paragraphIndex
+            );
+
+
+            const type =
+                String(
+                    candidate.matchType ||
+                    "family"
+                );
+
+
+            selectedMatchTypes.set(
+                type,
+                (
+                    selectedMatchTypes.get(
+                        type
+                    ) ||
+                    0
+                ) +
+                1
+            );
+
+
+            if (
+                selected.length >=
+                maxResults
+            ) {
+
+                break;
+
+            }
+
+        }
+
+    }
+
+
+    // ==================================
+    // إذا بقي الاختيار فارغًا
+    // نأخذ أفضل نتيجة
+    // ==================================
+
+    if (
+        selected.length ===
+        0 &&
+        results.length >
+        0
+    ) {
+
+        selected.push(
+            results[0]
+        );
+
+    }
+
+
+    // ==================================
+    // إعادة ترتيب المختار حسب القوة
+    // ==================================
+
+    selected.sort(
+        function (
+            a,
+            b
+        ) {
+
+            // ----------------------------------
+            // المقارنة:
+            // النتيجة التي تحقق العلاقة أولًا
+            // ----------------------------------
+
+            if (
+                retrievalProfile ===
+                "comparison"
+            ) {
+
+                const comparisonA =
                     Number(
-                        a.score ||
+                        a.comparisonCoverage ||
                         0
                     );
 
-                const scoreB =
+
+                const comparisonB =
                     Number(
-                        b.score ||
+                        b.comparisonCoverage ||
                         0
                     );
 
 
                 if (
-                    scoreB !==
-                    scoreA
+                    comparisonB !==
+                    comparisonA
                 ) {
 
                     return (
-                        scoreB -
-                        scoreA
+                        comparisonB -
+                        comparisonA
                     );
 
                 }
 
-
-                // ==================================
-                // عند التعادل:
-                // نفضل نتيجة تجمع مفاهيم المقارنة
-                // ==================================
 
                 const relationA =
                     Number(
                         a.relationScore ||
                         0
                     );
+
 
                 const relationB =
                     Number(
@@ -8003,208 +8741,27 @@ async function buildRetrievalContext(
 
                 }
 
-
-                const coverageA =
-                    Number(
-                        a.queryCoverage ||
-                        0
-                    );
-
-                const coverageB =
-                    Number(
-                        b.queryCoverage ||
-                        0
-                    );
-
-
-                if (
-                    coverageB !==
-                    coverageA
-                ) {
-
-                    return (
-                        coverageB -
-                        coverageA
-                    );
-
-                }
-
-
-                return (
-                    Number(
-                        a.paragraphIndex ||
-                        0
-                    ) -
-                    Number(
-                        b.paragraphIndex ||
-                        0
-                    )
-                );
-
             }
-        );
 
 
-    // ==================================
-    // اختيار النتائج
-    // ==================================
-
-    const selected =
-        [];
-
-
-    const selectedParagraphIndexes =
-        new Set();
-
-
-    const MAX_TEXT_OVERLAP =
-        0.75;
-
-
-    for (
-        let i = 0;
-        i < results.length;
-        i++
-    ) {
-
-        const candidate =
-            results[i];
-
-
-        if (
-            selectedParagraphIndexes.has(
+            return (
                 Number(
-                    candidate.paragraphIndex
+                    b.score ||
+                    0
+                ) -
+                Number(
+                    a.score ||
+                    0
                 )
-            )
-        ) {
-
-            continue;
+            );
 
         }
+    );
 
 
-        const candidateText =
-            String(
-                candidate.context ||
-                candidate.text ||
-                ""
-            )
-                .replace(
-                    /\s+/g,
-                    " "
-                )
-                .trim();
-
-
-        if (!candidateText) {
-
-            continue;
-
-        }
-
-
-        let tooSimilar =
-            false;
-
-
-        for (
-            let j = 0;
-            j < selected.length;
-            j++
-        ) {
-
-            const selectedText =
-                String(
-                    selected[j].context ||
-                    selected[j].text ||
-                    ""
-                )
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
-
-            if (!selectedText) {
-
-                continue;
-
-            }
-
-
-            const shorterLength =
-                Math.min(
-                    candidateText.length,
-                    selectedText.length
-                );
-
-
-            const commonLength =
-                getCommonTextLength(
-                    candidateText,
-                    selectedText
-                );
-
-
-            const overlap =
-                shorterLength > 0
-                    ? commonLength /
-                      shorterLength
-                    : 0;
-
-
-            if (
-                overlap >=
-                MAX_TEXT_OVERLAP
-            ) {
-
-                tooSimilar =
-                    true;
-
-                break;
-
-            }
-
-        }
-
-
-        if (tooSimilar) {
-
-            continue;
-
-        }
-
-
-        selected.push(
-            candidate
-        );
-
-
-        selectedParagraphIndexes.add(
-            Number(
-                candidate.paragraphIndex
-            )
-        );
-
-
-        if (
-            selected.length >=
-            maxResults
-        ) {
-
-            break;
-
-        }
-
-    }
-
-
-
-    // =================================================
-    // بناء السياقات
-    // =================================================
+    // ==================================
+    // بناء السياق
+    // ==================================
 
     const contexts =
         [];
@@ -8214,19 +8771,15 @@ async function buildRetrievalContext(
         0;
 
 
-    // -------------------------------------------------
-    // جلب بنية المستند بطريقة متزامنة مع async wrapper
-    // -------------------------------------------------
-    // buildRetrievalContext نفسها بقيت synchronous
-    // لذلك نستخدم البيانات الموجودة داخل النتائج أولًا.
-    // ويتم إكمال previous/next من نتائج Orama إن وجدت.
-    // -------------------------------------------------
-
     selected.forEach(
         function (
             result,
             index
         ) {
+
+            // ==================================
+            // المقطع الرئيسي
+            // ==================================
 
             let mainContext =
                 String(
@@ -8248,96 +8801,54 @@ async function buildRetrievalContext(
             }
 
 
+            // ==================================
+            // السياق السابق
+            // ==================================
+
             let previousContext =
-                "";
+                includeNeighbors
+                    ? String(
+                        result.previousParagraphText ||
+                        ""
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim()
+
+                    : "";
+
+
+            // ==================================
+            // السياق التالي
+            // ==================================
 
             let nextContext =
-                "";
-
-
-            // ==================================
-            // الفقرة السابقة من المستند الحقيقي
-            // ==================================
-
-            if (
-                includeNeighbors &&
-                paragraphMap.size > 0
-            ) {
-
-                const previousParagraph =
-                    paragraphMap.get(
-                        Number(
-                            result.paragraphIndex
-                        ) - 1
-                    );
-
-
-                if (
-                    previousParagraph &&
-                    previousParagraph.text
-                ) {
-
-                    previousContext =
-                        String(
-                            previousParagraph.text
+                includeNeighbors
+                    ? String(
+                        result.nextParagraphText ||
+                        ""
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
                         )
-                            .replace(
-                                /\s+/g,
-                                " "
-                            )
-                            .trim();
+                        .trim()
 
-                }
-
-            }
+                    : "";
 
 
             // ==================================
-            // الفقرة التالية من المستند الحقيقي
-            // ==================================
-
-            if (
-                includeNeighbors &&
-                paragraphMap.size > 0
-            ) {
-
-                const nextParagraph =
-                    paragraphMap.get(
-                        Number(
-                            result.paragraphIndex
-                        ) + 1
-                    );
-
-
-                if (
-                    nextParagraph &&
-                    nextParagraph.text
-                ) {
-
-                    nextContext =
-                        String(
-                            nextParagraph.text
-                        )
-                            .replace(
-                                /\s+/g,
-                                " "
-                            )
-                            .trim();
-
-                }
-
-            }
-
-
-            // ==================================
-            // منع التكرار
+            // منع تكرار الجوار
             // ==================================
 
             if (
                 selectedParagraphIndexes.has(
                     Number(
                         result.paragraphIndex
-                    ) - 1
+                    ) -
+                    1
                 )
             ) {
 
@@ -8351,7 +8862,8 @@ async function buildRetrievalContext(
                 selectedParagraphIndexes.has(
                     Number(
                         result.paragraphIndex
-                    ) + 1
+                    ) +
+                    1
                 )
             ) {
 
@@ -8361,6 +8873,10 @@ async function buildRetrievalContext(
             }
 
 
+            // ==================================
+            // العنوان
+            // ==================================
+
             const heading =
                 String(
                     result.heading ||
@@ -8368,6 +8884,10 @@ async function buildRetrievalContext(
                 )
                     .trim();
 
+
+            // ==================================
+            // المساحة المتبقية
+            // ==================================
 
             const remainingChars =
                 maxChars -
@@ -8396,18 +8916,22 @@ async function buildRetrievalContext(
                 );
 
 
+            // ==================================
+            // المقطع الأساسي له الأولوية
+            // ==================================
+
             let context =
                 mainContext;
 
+
+            // ==================================
+            // إضافة السياق السابق
+            // ==================================
 
             let remainingForNeighbors =
                 availableChars -
                 context.length;
 
-
-            // ==================================
-            // السابق
-            // ==================================
 
             if (
                 includeNeighbors &&
@@ -8431,7 +8955,8 @@ async function buildRetrievalContext(
 
                     const previousPart =
                         previousContext.length >
-                            allowedPreviousLength
+                        allowedPreviousLength
+
                             ? previousContext.substring(
                                 Math.max(
                                     0,
@@ -8440,6 +8965,7 @@ async function buildRetrievalContext(
                                 )
                             ) +
                             "…"
+
                             : previousContext;
 
 
@@ -8453,14 +8979,14 @@ async function buildRetrievalContext(
             }
 
 
+            // ==================================
+            // إضافة السياق التالي
+            // ==================================
+
             remainingForNeighbors =
                 availableChars -
                 context.length;
 
-
-            // ==================================
-            // التالي
-            // ==================================
 
             if (
                 includeNeighbors &&
@@ -8484,12 +9010,14 @@ async function buildRetrievalContext(
 
                     const nextPart =
                         nextContext.length >
-                            allowedNextLength
+                        allowedNextLength
+
                             ? nextContext.substring(
                                 0,
                                 allowedNextLength
                             ) +
                             "…"
+
                             : nextContext;
 
 
@@ -8504,7 +9032,7 @@ async function buildRetrievalContext(
 
 
             // ==================================
-            // العنصر النهائي
+            // سجل الإحالة
             // ==================================
 
             const item = {
@@ -8513,15 +9041,7 @@ async function buildRetrievalContext(
                     index + 1,
 
                 paragraphIndex:
-                    Number(
-                        result.paragraphIndex
-                    ),
-
-                paragraphId:
-                    String(
-                        result.paragraphId ||
-                        result.paragraphIndex
-                    ),
+                    result.paragraphIndex,
 
                 heading:
                     heading,
@@ -8529,6 +9049,40 @@ async function buildRetrievalContext(
                 score:
                     Number(
                         result.score ||
+                        0
+                    ),
+
+                oramaScore:
+                    Number(
+                        result.oramaScore ||
+                        0
+                    ),
+
+                profile:
+                    result.profile ||
+                    retrievalProfile,
+
+                profileScore:
+                    Number(
+                        result.profileScore ||
+                        0
+                    ),
+
+                relationScore:
+                    Number(
+                        result.relationScore ||
+                        0
+                    ),
+
+                conceptCoverage:
+                    Number(
+                        result.conceptCoverage ||
+                        0
+                    ),
+
+                comparisonCoverage:
+                    Number(
+                        result.comparisonCoverage ||
                         0
                     ),
 
@@ -8541,13 +9095,6 @@ async function buildRetrievalContext(
                         result.matchedFamilies
                     )
                         ? result.matchedFamilies
-                        : [],
-
-                matchedTerms:
-                    Array.isArray(
-                        result.matchedTerms
-                    )
-                        ? result.matchedTerms
                         : [],
 
                 familyOccurrences:
@@ -8572,10 +9119,7 @@ async function buildRetrievalContext(
                     nextContext,
 
                 context:
-                    context,
-
-                source:
-                    result
+                    context
 
             };
 
@@ -8592,9 +9136,9 @@ async function buildRetrievalContext(
     );
 
 
-    // =================================================
-    // بناء النص المرسل إلى الذكاء الاصطناعي
-    // =================================================
+    // ==================================
+    // بناء النص النهائي للذكاء الاصطناعي
+    // ==================================
 
     const textParts =
         [];
@@ -8612,6 +9156,10 @@ async function buildRetrievalContext(
                 "\n";
 
 
+            // ==================================
+            // العنوان
+            // ==================================
+
             if (
                 item.heading
             ) {
@@ -8623,6 +9171,10 @@ async function buildRetrievalContext(
 
             }
 
+
+            // ==================================
+            // السياق السابق
+            // ==================================
 
             if (
                 item.previousParagraph
@@ -8636,10 +9188,18 @@ async function buildRetrievalContext(
             }
 
 
+            // ==================================
+            // المقطع الأساسي
+            // ==================================
+
             block +=
                 "المقطع المطابق: " +
                 item.mainParagraph;
 
+
+            // ==================================
+            // السياق التالي
+            // ==================================
 
             if (
                 item.nextParagraph
@@ -8665,6 +9225,10 @@ async function buildRetrievalContext(
             "\n\n---\n\n"
         );
 
+
+    // ==================================
+    // النتيجة النهائية
+    // ==================================
 
     return {
 
