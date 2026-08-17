@@ -3985,10 +3985,10 @@ async function searchOramaDocument(
 
 
             // ==================================
-            // العائلة الصرفية
+            // العائلة الصرفية داخل الفقرة
             // ==================================
 
-            const matchedFamilies =
+            const matchedParagraphFamilies =
                 [];
 
 
@@ -5293,6 +5293,7 @@ async function searchIndexedDocument(
         }
     );
 
+    
 
     // ==================================
     // دمج النتائج حسب الفقرة
