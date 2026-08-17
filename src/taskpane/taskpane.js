@@ -6988,7 +6988,18 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // 3) المصطلحات الموضوعية
+    // 3) المصطلحات الموضوعية + الصيغ العربية
+    //
+    // مثال:
+    // والاستحسان
+    // ↓
+    // والاستحسان
+    // الاستحسان
+    //
+    // بالقياس
+    // ↓
+    // بالقياس
+    // القياس
     // ==================================
 
     weightedTerms.forEach(
@@ -7006,26 +7017,6 @@ async function searchIndexedDocument(
             }
 
 
-            const termResult =
-                runOramaSearch(
-                    item.term,
-                    false,
-                    100
-                );
-
-
-            if (
-                !termResult ||
-                !Array.isArray(
-                    termResult.hits
-                )
-            ) {
-
-                return;
-
-            }
-
-
             const termWeight =
                 Number(
                     item.weight ||
@@ -7033,26 +7024,128 @@ async function searchIndexedDocument(
                 );
 
 
-            termResult.hits.forEach(
+            // ==================================
+            // الصيغ التي استخرجها المحلل
+            // ==================================
+
+            const variants =
+                Array.isArray(
+                    item.variants
+                ) &&
+                item.variants.length >
+                    0
+
+                    ? item.variants
+
+                    : [
+                        item.term
+                    ];
+
+
+            // ==================================
+            // منع البحث المكرر
+            // ==================================
+
+            const searchedVariants =
+                [];
+
+
+            variants.forEach(
                 function (
-                    hit
+                    variant,
+                    variantIndex
                 ) {
 
-                    rawHits.push({
+                    const cleanVariant =
+                        String(
+                            variant ||
+                            ""
+                        ).trim();
 
-                        hit:
-                            hit,
 
-                        source:
-                            "term",
+                    if (
+                        !cleanVariant ||
+                        searchedVariants.includes(
+                            cleanVariant
+                        )
+                    ) {
 
-                        searchTerm:
-                            item.term,
+                        return;
 
-                        queryWeight:
-                            termWeight
+                    }
 
-                    });
+
+                    searchedVariants.push(
+                        cleanVariant
+                    );
+
+
+                    const variantResult =
+                        runOramaSearch(
+                            cleanVariant,
+                            false,
+                            100
+                        );
+
+
+                    if (
+                        !variantResult ||
+                        !Array.isArray(
+                            variantResult.hits
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    // ==================================
+                    // الصيغة الأصلية أقوى قليلًا
+                    // من الصيغة المطَبَّعة
+                    // ==================================
+
+                    let variantWeight =
+                        termWeight;
+
+
+                    if (
+                        variantIndex >
+                        0
+                    ) {
+
+                        variantWeight *=
+                            0.92;
+
+                    }
+
+
+                    variantResult.hits.forEach(
+                        function (
+                            hit
+                        ) {
+
+                            rawHits.push({
+
+                                hit:
+                                    hit,
+
+                                source:
+                                    variantIndex ===
+                                    0
+                                        ? "term"
+                                        : "variant",
+
+                                searchTerm:
+                                    cleanVariant,
+
+                                queryWeight:
+                                    variantWeight
+
+                            });
+
+                        }
+                    );
 
                 }
             );
