@@ -4584,8 +4584,7 @@ async function searchOramaDocument(
     );
 
     // ==================================
-    // الاحتفاظ بأفضل المرشحين فقط
-    // قبل بناء السياق للذكاء الاصطناعي
+    // حد المرشحين الأولي
     // ==================================
 
     const candidateLimit =
@@ -4595,13 +4594,9 @@ async function searchOramaDocument(
                 ? 20
                 : 25;
 
-
-    const filteredResults =
-        results.slice(
-            0,
-            candidateLimit
-        );
-
+    results.splice(
+        candidateLimit
+    );
 
     return results;
 
@@ -6321,7 +6316,7 @@ async function searchIndexedDocument(
             results.length,
 
         results:
-            filteredResults,
+            results,
 
         matchedTerms:
             matchedTerms,
