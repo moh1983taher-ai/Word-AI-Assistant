@@ -7812,6 +7812,25 @@ async function searchIndexedDocument(
 
 
             // ==================================
+            // تغطية مفاهيم السؤال
+            //
+            // قاعدة عامة:
+            // كلما اجتمعت مفاهيم السؤال الأساسية
+            // في الفقرة نفسها ارتفعت قيمة الفقرة.
+            //
+            // لا يعتمد هذا على كون السؤال:
+            // تعريفًا أو أثرًا أو مقارنة.
+            // ==================================
+
+            const conceptCoverage =
+                contentTokens.length >
+                0
+
+                    ? directMatchedContentTokens.length /
+                    contentTokens.length
+
+                    : 0;
+            // ==================================
             // الكلمات الأساسية المباشرة
             // ==================================
 
@@ -8085,7 +8104,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // تغطية المصطلحات
+            // تغطية المصطلحات الموزونة
             // ==================================
 
             score +=
@@ -8094,13 +8113,56 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // تغطية المفاهيم
+            // تغطية المفاهيم الأساسية
+            // قاعدة عامة لجميع أنواع الأسئلة
             // ==================================
 
-            score +=
-                directContentCoverage *
-                10;
+            const conceptCoverage =
+                contentTokens.length >
+                0
 
+                    ? directMatchedContentTokens.length /
+                    contentTokens.length
+
+                    : 0;
+
+
+            score +=
+                conceptCoverage *
+                18;
+
+
+            // ==================================
+            // تعزيز اجتماع جميع المفاهيم
+            // داخل الفقرة نفسها
+            // ==================================
+
+            if (
+                contentTokens.length >=
+                    2 &&
+                conceptCoverage >=
+                    1
+            ) {
+
+                score +=
+                    20;
+
+            }
+
+
+            // ==================================
+            // تعزيز التغطية الجزئية المتعددة
+            // ==================================
+
+            else if (
+                directMatchedContentTokens.length >=
+                2
+            ) {
+
+                score +=
+                    10;
+
+            }
 
             // ==================================
             // العائلات
@@ -8403,7 +8465,7 @@ async function searchIndexedDocument(
                     0,
 
                 conceptCoverage:
-                    weightedCoverage,
+                    conceptCoverage,
 
                 comparisonCoverage:
                     weightedCoverage,
