@@ -7,6 +7,68 @@
 
 Office.onReady(function () {
 
+// ======================================
+// Application State
+// الحالة العامة للتطبيق
+// ======================================
+
+const AppState = {
+
+    wordConnected:
+        true,
+
+    currentDocument:
+        null,
+
+    currentChat:
+        null,
+
+    currentProject:
+        null,
+
+    aiSettings: {
+
+        provider:
+            "openrouter",
+
+        key:
+            "",
+
+        model:
+            ""
+
+    },
+
+    currentCitationSources:
+        [],
+
+    searchState: {
+
+        query:
+            "",
+
+        results:
+            [],
+
+        isSearching:
+            false
+
+    },
+
+    streaming: {
+
+        active:
+            false,
+
+        provider:
+            "",
+
+        text:
+            ""
+
+    }
+
+};
 
 // ======================================
 // Elements
