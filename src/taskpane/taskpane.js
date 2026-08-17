@@ -5687,6 +5687,66 @@ async function searchIndexedDocument(
 
     }
 
+    // ==================================
+    // العائلات الموجودة فعليًا في المستند
+    // من بين عائلات الاستعلام
+    // ==================================
+
+    const matchedFamilies =
+        queryFamilies.filter(
+            function (
+                family
+            ) {
+
+                return rawHits.some(
+                    function (
+                        hit
+                    ) {
+
+                        if (
+                            !hit ||
+                            !hit.document
+                        ) {
+
+                            return false;
+
+                        }
+
+
+                        const text =
+                            String(
+                                hit.document.text ||
+                                ""
+                            );
+
+
+                        const tokens =
+                            tokenizeDocumentText(
+                                text
+                            );
+
+
+                        return tokens.some(
+                            function (
+                                token
+                            ) {
+
+                                return (
+                                    getConservativeFamilyKey(
+                                        token,
+                                        null
+                                    ) ===
+                                    family
+                                );
+
+                            }
+                        );
+
+                    }
+                );
+
+            }
+        );
 
     // ==================================
     // بناء النتائج النهائية
