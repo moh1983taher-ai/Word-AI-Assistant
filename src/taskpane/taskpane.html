@@ -865,12 +865,26 @@
         search
     } from "https://cdn.jsdelivr.net/npm/@orama/orama@3.1.18/+esm";
 
+    import {
+        pluginQPS
+    } from "https://cdn.jsdelivr.net/npm/@orama/plugin-qps@3.1.18/+esm";
+
+
     window.Orama = {
+
         create,
         insert,
         insertMultiple,
-        search
+        search,
+
+        pluginQPS
+
     };
+
+
+    console.log(
+        "تم تحميل Orama + QPS بنجاح."
+    );
 </script>
 
 
