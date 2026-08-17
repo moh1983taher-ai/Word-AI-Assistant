@@ -4773,15 +4773,15 @@ function getHeadingParagraphRange(
 // المحرك العام للاسترجاع
 //
 // Orama + QPS
-// + البحث بالعبارة والكلمات
+// + العبارة الكاملة
+// + كلمات السؤال
 // + العائلات الصرفية
 // + أولوية العناوين
-// + قرب كلمات السؤال
-// + ترجيح خفيف حسب نوع السؤال
+// + قرب الكلمات
 //
-// ملاحظة:
-// هذه الدالة لا تحاول الإجابة عن السؤال.
-// وظيفتها استخراج أفضل المرشحين للذكاء الاصطناعي.
+// وظيفة المحرك:
+// استخراج أفضل المرشحين وترتيبهم فقط.
+// لا يحاول الإجابة عن السؤال.
 // =====================================================
 
 async function searchIndexedDocument(
@@ -4799,12 +4799,11 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // نوع الاسترجاع
-    // يستخدم للترجيح فقط
-    // ولا يستخدم لحذف النتائج
+    // نوع السؤال
+    // عامل ترجيح خفيف فقط
     // ==================================
 
-    const profileData =
+    const profileInfo =
         getRetrievalProfile(
             query
         );
@@ -4813,9 +4812,9 @@ async function searchIndexedDocument(
     const retrievalProfile =
         settings.profile ||
         (
-            profileData &&
-            profileData.type
-                ? profileData.type
+            profileInfo &&
+            profileInfo.type
+                ? profileInfo.type
                 : "general"
         );
 
@@ -4830,13 +4829,7 @@ async function searchIndexedDocument(
         );
 
 
-    // ==================================
-    // نتيجة فارغة
-    // ==================================
-
-    if (
-        !searchTerm
-    ) {
+    if (!searchTerm) {
 
         return {
 
@@ -4879,7 +4872,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // العثور على المستند
+    // المستند
     // ==================================
 
     const documentItem =
@@ -4903,9 +4896,7 @@ async function searchIndexedDocument(
         currentDocument;
 
 
-    if (
-        !documentItem
-    ) {
+    if (!documentItem) {
 
         throw new Error(
             "لم يتم العثور على المستند."
@@ -4924,9 +4915,7 @@ async function searchIndexedDocument(
         );
 
 
-    if (
-        !structureData
-    ) {
+    if (!structureData) {
 
         throw new Error(
             "لا توجد بنية محفوظة لهذا المستند."
@@ -4936,7 +4925,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // فهرس Orama + QPS
+    // فهرس Orama
     // ==================================
 
     const db =
@@ -4946,9 +4935,7 @@ async function searchIndexedDocument(
         );
 
 
-    if (
-        !db
-    ) {
+    if (!db) {
 
         throw new Error(
             "تعذر إنشاء فهرس Orama."
@@ -5056,7 +5043,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // تشغيل بحث Orama
+    // بحث Orama
     // ==================================
 
     function runOramaSearch(
@@ -5064,9 +5051,7 @@ async function searchIndexedDocument(
         exact
     ) {
 
-        if (
-            !term
-        ) {
+        if (!term) {
 
             return {
 
@@ -5186,7 +5171,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // جميع نتائج البحث الخام
+    // نتائج البحث الخام
     // ==================================
 
     const rawHits =
@@ -5194,7 +5179,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // البحث في العبارة الكاملة
+    // العبارة الكاملة
     // ==================================
 
     const fullQueryResult =
@@ -5227,7 +5212,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // البحث في كل كلمة مهمة
+    // كل كلمة مهمة
     // ==================================
 
     queryTokens.forEach(
@@ -5235,7 +5220,7 @@ async function searchIndexedDocument(
             token
         ) {
 
-            const result =
+            const tokenResult =
                 runOramaSearch(
                     token,
                     false
@@ -5243,13 +5228,13 @@ async function searchIndexedDocument(
 
 
             if (
-                result &&
+                tokenResult &&
                 Array.isArray(
-                    result.hits
+                    tokenResult.hits
                 )
             ) {
 
-                result.hits.forEach(
+                tokenResult.hits.forEach(
                     function (
                         hit
                     ) {
@@ -5269,9 +5254,10 @@ async function searchIndexedDocument(
 
     // ==================================
     // الكلمات المطابقة فعليًا
+    // اسم فريد لا يتكرر داخل الدالة
     // ==================================
 
-    const matchedTerms =
+    const searchMatchedTerms =
         queryTokens.filter(
             function (
                 token
@@ -5298,14 +5284,14 @@ async function searchIndexedDocument(
                         }
 
 
-                        const text =
+                        const hitText =
                             normalizeSearchText(
                                 hit.document.text ||
                                 ""
                             );
 
 
-                        const heading =
+                        const hitHeading =
                             normalizeSearchText(
                                 hit.document.heading ||
                                 ""
@@ -5313,10 +5299,10 @@ async function searchIndexedDocument(
 
 
                         return (
-                            text.includes(
+                            hitText.includes(
                                 normalizedToken
                             ) ||
-                            heading.includes(
+                            hitHeading.includes(
                                 normalizedToken
                             )
                         );
@@ -5330,9 +5316,10 @@ async function searchIndexedDocument(
 
     // ==================================
     // العائلات المطابقة فعليًا
+    // اسم فريد لا يتكرر داخل الدالة
     // ==================================
 
-    const matchedFamilies =
+    const searchMatchedFamilies =
         queryFamilies.filter(
             function (
                 family
@@ -5353,20 +5340,20 @@ async function searchIndexedDocument(
                         }
 
 
-                        const text =
+                        const hitText =
                             String(
                                 hit.document.text ||
                                 ""
                             );
 
 
-                        const tokens =
+                        const hitTokens =
                             tokenizeDocumentText(
-                                text
+                                hitText
                             );
 
 
-                        return tokens.some(
+                        return hitTokens.some(
                             function (
                                 token
                             ) {
@@ -5393,7 +5380,7 @@ async function searchIndexedDocument(
     // دمج النتائج حسب الفقرة
     // ==================================
 
-    const merged =
+    const mergedResults =
         new Map();
 
 
@@ -5437,7 +5424,7 @@ async function searchIndexedDocument(
 
 
             const existing =
-                merged.get(
+                mergedResults.get(
                     paragraphIndex
                 );
 
@@ -5446,7 +5433,7 @@ async function searchIndexedDocument(
                 !existing
             ) {
 
-                merged.set(
+                mergedResults.set(
                     paragraphIndex,
                     {
 
@@ -5475,7 +5462,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // ترتيب العناوين
+    // العناوين
     // ==================================
 
     const headings =
@@ -5522,7 +5509,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // أقرب عنوان للفقرة
+    // أقرب عنوان
     // ==================================
 
     function getNearestHeading(
@@ -5571,8 +5558,8 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // ترجيح خفيف بحسب نوع السؤال
-    // لا يحذف النتائج
+    // درجة عامة لنوع السؤال
+    // ترجيح خفيف فقط
     // ==================================
 
     function getProfileScore(
@@ -5592,7 +5579,7 @@ async function searchIndexedDocument(
             );
 
 
-        let score =
+        let profileScore =
             0;
 
 
@@ -5608,7 +5595,7 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     6;
 
             }
@@ -5621,14 +5608,12 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     6;
 
             }
 
         }
-
-
         else if (
             retrievalProfile ===
             "effect"
@@ -5641,7 +5626,7 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     6;
 
             }
@@ -5654,14 +5639,12 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     6;
 
             }
 
         }
-
-
         else if (
             retrievalProfile ===
             "comparison"
@@ -5674,7 +5657,7 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     6;
 
             }
@@ -5687,14 +5670,12 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     8;
 
             }
 
         }
-
-
         else if (
             retrievalProfile ===
             "causes"
@@ -5707,14 +5688,12 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     6;
 
             }
 
         }
-
-
         else if (
             retrievalProfile ===
             "location"
@@ -5727,7 +5706,7 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     5;
 
             }
@@ -5740,7 +5719,7 @@ async function searchIndexedDocument(
                     )
             ) {
 
-                score +=
+                profileScore +=
                     8;
 
             }
@@ -5748,16 +5727,16 @@ async function searchIndexedDocument(
         }
 
 
-        return score;
+        return profileScore;
 
     }
 
 
     // ==================================
-    // حساب قرب كلمات السؤال
+    // قرب كلمات السؤال
     // ==================================
 
-    function calculateProximity(
+    function calculateQueryProximity(
         normalizedText
     ) {
 
@@ -5845,17 +5824,17 @@ async function searchIndexedDocument(
     // النتائج النهائية
     // ==================================
 
-    const results =
+    const finalResults =
         [];
 
 
-    merged.forEach(
+    mergedResults.forEach(
         function (
-            item
+            mergedItem
         ) {
 
             const paragraph =
-                item.document;
+                mergedItem.document;
 
 
             const originalText =
@@ -5892,8 +5871,7 @@ async function searchIndexedDocument(
                     ? String(
                         nearestHeading.text ||
                         ""
-                    )
-                        .trim()
+                    ).trim()
                     : "";
 
 
@@ -5904,10 +5882,10 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // الكلمات الموجودة في الفقرة
+            // كلمات السؤال داخل الفقرة
             // ==================================
 
-            const matchedParagraphTokens =
+            const paragraphMatchedTerms =
                 queryTokens.filter(
                     function (
                         token
@@ -5933,7 +5911,7 @@ async function searchIndexedDocument(
 
 
             const matchedTokenCount =
-                matchedParagraphTokens.length;
+                paragraphMatchedTerms.length;
 
 
             const queryCoverage =
@@ -5947,7 +5925,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // العائلات الموجودة في الفقرة
+            // عائلات الفقرة
             // ==================================
 
             const paragraphTokens =
@@ -5989,8 +5967,12 @@ async function searchIndexedDocument(
             );
 
 
-            const matchedParagraphFamilies =
-                matchedFamilies.filter(
+            // ==================================
+            // العائلات التي أصابها السؤال
+            // ==================================
+
+            const paragraphMatchedFamilies =
+                searchMatchedFamilies.filter(
                     function (
                         family
                     ) {
@@ -6004,21 +5986,21 @@ async function searchIndexedDocument(
 
 
             const matchedFamilyCount =
-                matchedParagraphFamilies.length;
+                paragraphMatchedFamilies.length;
 
 
             const familyCoverage =
-                matchedFamilies.length >
+                searchMatchedFamilies.length >
                 0
 
                     ? matchedFamilyCount /
-                      matchedFamilies.length
+                      searchMatchedFamilies.length
 
                     : 0;
 
 
             // ==================================
-            // تطابق العبارة كاملة
+            // العبارة الكاملة
             // ==================================
 
             const exactPhrase =
@@ -6032,7 +6014,7 @@ async function searchIndexedDocument(
             // ==================================
 
             const proximityScore =
-                calculateProximity(
+                calculateQueryProximity(
                     normalizedText
                 );
 
@@ -6045,46 +6027,40 @@ async function searchIndexedDocument(
                 0;
 
 
-            if (
-                headingText
-            ) {
-
-                queryTokens.forEach(
-                    function (
-                        token
-                    ) {
-
-                        const normalizedToken =
-                            normalizeSearchText(
-                                token
-                            );
-
-
-                        if (
-                            normalizedHeading.includes(
-                                normalizedToken
-                            )
-                        ) {
-
-                            headingScore +=
-                                4;
-
-                        }
-
-                    }
-                );
-
-
-                if (
-                    normalizedHeading.includes(
-                        searchTerm
-                    )
+            queryTokens.forEach(
+                function (
+                    token
                 ) {
 
-                    headingScore +=
-                        18;
+                    const normalizedToken =
+                        normalizeSearchText(
+                            token
+                        );
+
+
+                    if (
+                        normalizedHeading.includes(
+                            normalizedToken
+                        )
+                    ) {
+
+                        headingScore +=
+                            4;
+
+                    }
 
                 }
+            );
+
+
+            if (
+                normalizedHeading.includes(
+                    searchTerm
+                )
+            ) {
+
+                headingScore +=
+                    18;
 
             }
 
@@ -6093,7 +6069,7 @@ async function searchIndexedDocument(
             // تغطية العنوان
             // ==================================
 
-            const headingMatchedCount =
+            const headingMatchedTerms =
                 queryTokens.filter(
                     function (
                         token
@@ -6113,14 +6089,14 @@ async function searchIndexedDocument(
                 queryTokens.length >
                 0
 
-                    ? headingMatchedCount /
+                    ? headingMatchedTerms /
                       queryTokens.length
 
                     : 0;
 
 
             // ==================================
-            // درجة نوع السؤال
+            // نوع السؤال
             // ==================================
 
             const profileScore =
@@ -6131,17 +6107,17 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // الدرجة الأساسية
+            // الدرجة النهائية
             // ==================================
 
             let score =
                 Number(
-                    item.oramaScore ||
+                    mergedItem.oramaScore ||
                     0
                 );
 
 
-            // Orama هو الأساس
+            // Orama
             score +=
                 queryCoverage *
                 18;
@@ -6188,7 +6164,7 @@ async function searchIndexedDocument(
             }
 
 
-            // تعدد المفاهيم
+            // أكثر من مفهوم
             if (
                 matchedFamilyCount >=
                 2
@@ -6212,13 +6188,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // فلترة عامة جدًا فقط
-            //
-            // نمنع النتائج التي لا تحتوي
-            // أي صلة تقريبًا بالسؤال.
-            //
-            // لا توجد فلترة خاصة بالمقارنة
-            // أو التعريف أو الأثر.
+            // فلترة عامة فقط
             // ==================================
 
             if (
@@ -6236,7 +6206,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // نوع المطابقة
+            // نوع التطابق
             // ==================================
 
             let matchType =
@@ -6253,7 +6223,7 @@ async function searchIndexedDocument(
             }
             else if (
                 headingScore >=
-                    8
+                8
             ) {
 
                 matchType =
@@ -6262,7 +6232,7 @@ async function searchIndexedDocument(
             }
             else if (
                 matchedFamilyCount >
-                    0
+                0
             ) {
 
                 matchType =
@@ -6272,7 +6242,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // السياق الأولي
+            // السياق
             // ==================================
 
             let context =
@@ -6284,7 +6254,7 @@ async function searchIndexedDocument(
 
 
             let firstToken =
-                null;
+                "";
 
 
             for (
@@ -6296,7 +6266,7 @@ async function searchIndexedDocument(
                 i++
             ) {
 
-                const token =
+                const normalizedToken =
                     normalizeSearchText(
                         queryTokens[i]
                     );
@@ -6304,7 +6274,7 @@ async function searchIndexedDocument(
 
                 const position =
                     normalizedText.indexOf(
-                        token
+                        normalizedToken
                     );
 
 
@@ -6317,7 +6287,7 @@ async function searchIndexedDocument(
                         position;
 
                     firstToken =
-                        token;
+                        normalizedToken;
 
                     break;
 
@@ -6362,7 +6332,7 @@ async function searchIndexedDocument(
             // حفظ النتيجة
             // ==================================
 
-            results.push({
+            finalResults.push({
 
                 paragraphIndex:
                     paragraph.paragraphIndex,
@@ -6392,7 +6362,7 @@ async function searchIndexedDocument(
 
                 oramaScore:
                     Number(
-                        item.oramaScore ||
+                        mergedItem.oramaScore ||
                         0
                     ),
 
@@ -6415,10 +6385,10 @@ async function searchIndexedDocument(
                     matchType,
 
                 matchedTerms:
-                    matchedParagraphTokens,
+                    paragraphMatchedTerms,
 
                 matchedFamilies:
-                    matchedParagraphFamilies,
+                    paragraphMatchedFamilies,
 
                 matchedFamilyCount:
                     matchedFamilyCount,
@@ -6448,10 +6418,10 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // ترتيب النتائج
+    // الترتيب
     // ==================================
 
-    results.sort(
+    finalResults.sort(
         function (
             a,
             b
@@ -6555,7 +6525,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // عدد المرشحين
+    // حد المرشحين
     // ==================================
 
     const candidateLimit =
@@ -6568,11 +6538,11 @@ async function searchIndexedDocument(
 
 
     if (
-        results.length >
+        finalResults.length >
         candidateLimit
     ) {
 
-        results.splice(
+        finalResults.splice(
             candidateLimit
         );
 
@@ -6624,7 +6594,7 @@ async function searchIndexedDocument(
 
     const occurrenceFamilies =
         new Set(
-            matchedFamilies
+            searchMatchedFamilies
         );
 
 
@@ -6668,16 +6638,16 @@ async function searchIndexedDocument(
             retrievalProfile,
 
         count:
-            results.length,
+            finalResults.length,
 
         results:
-            results,
+            finalResults,
 
         matchedTerms:
-            matchedTerms,
+            searchMatchedTerms,
 
         matchedFamilies:
-            matchedFamilies,
+            searchMatchedFamilies,
 
         totalQueryTerms:
             queryTokens.length,
