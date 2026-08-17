@@ -6832,12 +6832,26 @@ async function buildAIDocumentContext(
         currentCitationSources =
             [];
 
-
-        console.warn(
-            "تعذر استرجاع سياق المستند:",
+        console.error(
+            "❌ خطأ buildAIDocumentContext:",
             error
         );
 
+        console.error(
+            "رسالة الخطأ:",
+            error &&
+            error.message
+                ? error.message
+                : error
+        );
+
+        console.error(
+            "Stack:",
+            error &&
+            error.stack
+                ? error.stack
+                : "لا يوجد Stack"
+        );
 
         return {
 
@@ -6851,7 +6865,13 @@ async function buildAIDocumentContext(
                 "general",
 
             text:
-                ""
+                "",
+
+            error:
+                error &&
+                error.message
+                    ? error.message
+                    : String(error)
 
         };
 
