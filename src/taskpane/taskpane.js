@@ -1,15 +1,15 @@
 /*
- * Word AI Assistant - Orama-Only Version
- * 
- * محرك البحث الوحيد: Orama (يدعم العربية)
- * جميع ميزات البحث والاسترجاع تعتمد على Orama
+ * Word AI Assistant - Orama Version
+ * ======================================
+ * تم استبدال محرك البحث اليدوي بـ Orama
+ * مع الحفاظ على جميع وظائف الواجهة
  */
 
 Office.onReady(function () {
 
-    // =====================================================
-    // DOM ELEMENTS
-    // =====================================================
+    // ======================================
+    // Elements
+    // ======================================
 
     const projectsBtn = document.getElementById("projects-btn");
     const projectsPopup = document.getElementById("projects-popup");
@@ -54,9 +54,9 @@ Office.onReady(function () {
         sidebarToggleBtn.parentNode.insertBefore(sidebarTogglePlaceholder, sidebarToggleBtn);
     }
 
-    // =====================================================
-    // STATE
-    // =====================================================
+    // ======================================
+    // State
+    // ======================================
 
     let projects = [];
     let documents = [];
@@ -71,9 +71,9 @@ Office.onReady(function () {
     let oramaRetrievalCacheKey = "";
     let oramaRetrievalDocumentId = null;
 
-    // =====================================================
-    // CONSTANTS
-    // =====================================================
+    // ======================================
+    // Constants
+    // ======================================
 
     const DOCUMENT_DB_NAME = "WORD_AI_DOCUMENT_STORAGE";
     const DOCUMENT_DB_VERSION = 4;
@@ -82,9 +82,9 @@ Office.onReady(function () {
     const DOCUMENT_STRUCTURE_STORE_NAME = "structures";
     const ORAMA_SCHEMA_VERSION = 1;
 
-    // =====================================================
-    // ICONS
-    // =====================================================
+    // ======================================
+    // Icons
+    // ======================================
 
     const projectIcon = `
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -98,9 +98,9 @@ Office.onReady(function () {
         </svg>
     `;
 
-    // =====================================================
-    // HELPER FUNCTIONS
-    // =====================================================
+    // ======================================
+    // Storage Helpers
+    // ======================================
 
     function readStorageArray(key) {
         try {
@@ -149,9 +149,9 @@ Office.onReady(function () {
         }
     }
 
-    // =====================================================
-    // STORAGE FUNCTIONS
-    // =====================================================
+    // ======================================
+    // Storage Functions
+    // ======================================
 
     function saveProjects() {
         localStorage.setItem("WORD_AI_PROJECTS", JSON.stringify(projects));
@@ -165,9 +165,9 @@ Office.onReady(function () {
         localStorage.setItem("WORD_AI_CHATS", JSON.stringify(chats));
     }
 
-    // =====================================================
-    // LOAD DATA
-    // =====================================================
+    // ======================================
+    // Load Data
+    // ======================================
 
     projects = readStorageArray("WORD_AI_PROJECTS")
         .filter(function (item) { return item && typeof item === "object"; })
@@ -211,9 +211,9 @@ Office.onReady(function () {
     saveDocuments();
     saveChats();
 
-    // =====================================================
-    // INDEXEDDB FUNCTIONS
-    // =====================================================
+    // ======================================
+    // IndexedDB Functions
+    // ======================================
 
     function openDocumentDatabase() {
         return new Promise(function (resolve, reject) {
@@ -235,9 +235,9 @@ Office.onReady(function () {
         });
     }
 
-    // =====================================================
-    // WORKING FILE OPERATIONS
-    // =====================================================
+    // ======================================
+    // Working File Operations
+    // ======================================
 
     async function saveWorkingWordFile(fileId, file) {
         const db = await openDocumentDatabase();
@@ -273,9 +273,9 @@ Office.onReady(function () {
         });
     }
 
-    // =====================================================
-    // DOCUMENT TEXT OPERATIONS
-    // =====================================================
+    // ======================================
+    // Document Text Operations
+    // ======================================
 
     async function saveDocumentText(documentId, text) {
         const db = await openDocumentDatabase();
@@ -304,9 +304,9 @@ Office.onReady(function () {
         });
     }
 
-    // =====================================================
-    // DOCUMENT STRUCTURE OPERATIONS
-    // =====================================================
+    // ======================================
+    // Document Structure Operations
+    // ======================================
 
     async function saveDocumentStructure(documentId, structureData) {
         const db = await openDocumentDatabase();
@@ -330,9 +330,9 @@ Office.onReady(function () {
         });
     }
 
-    // =====================================================
-    // FILE HELPERS
-    // =====================================================
+    // ======================================
+    // File Helpers
+    // ======================================
 
     function fileToBase64(file) {
         return new Promise(function (resolve, reject) {
@@ -351,9 +351,9 @@ Office.onReady(function () {
         });
     }
 
-    // =====================================================
-    // TEXT NORMALIZATION (للـ Orama فقط، لا نحتاج للعائلات)
-    // =====================================================
+    // ======================================
+    // Text Normalization
+    // ======================================
 
     function normalizeSearchText(text) {
         return String(text || "")
@@ -368,30 +368,30 @@ Office.onReady(function () {
             .toLowerCase();
     }
 
-    // =====================================================
-    // ORAMA LOADER
-    // =====================================================
+    // ======================================
+    // Orama Loader
+    // ======================================
 
     function loadOrama() {
         try {
             return require("@orama/orama");
         } catch (error) {
-            throw new Error("تعذر تحميل Orama من الحزمة @orama/orama: " + error.message);
+            throw new Error("تعذر تحميل Orama: " + error.message);
         }
     }
 
-    // =====================================================
-    // HEADING LEVEL NUMBER
-    // =====================================================
+    // ======================================
+    // Heading Level Number
+    // ======================================
 
     function getHeadingLevelNumber(style) {
         const match = String(style || "").match(/Heading\s*([1-9])/i);
         return match ? Number(match[1]) : 9;
     }
 
-    // =====================================================
-    // BUILD ORAMA RETRIEVAL INDEX
-    // =====================================================
+    // ======================================
+    // Build Orama Retrieval Index
+    // ======================================
 
     async function buildOramaRetrievalIndex(documentItem, structureData) {
         const { create, insertMultiple } = loadOrama();
@@ -494,9 +494,9 @@ Office.onReady(function () {
         return db;
     }
 
-    // =====================================================
-    // SEARCH WITH ORAMA
-    // =====================================================
+    // ======================================
+    // Search with Orama
+    // ======================================
 
     async function searchOramaDocument(documentItem, query, limit) {
         if (!documentItem || !query) return [];
@@ -504,7 +504,6 @@ Office.onReady(function () {
         const cleanQuery = String(query || "").trim();
         if (!cleanQuery) return [];
 
-        // التأكد من وجود الفهرس
         if (!oramaRetrievalDb || oramaRetrievalDocumentId !== String(documentItem.id)) {
             const structureData = await ensureDocumentStructure(documentItem);
             await buildOramaRetrievalIndex(documentItem, structureData);
@@ -520,7 +519,7 @@ Office.onReady(function () {
             properties: ["text", "heading"],
             limit: Math.max(1, Number(limit || 10)),
             tolerance: 1,
-            boost: { heading: 5 } // إعطاء وزن أعلى للعناوين
+            boost: { heading: 5 }
         });
 
         if (!result || !Array.isArray(result.hits)) return [];
@@ -541,9 +540,9 @@ Office.onReady(function () {
         });
     }
 
-    // =====================================================
-    // DOCUMENT STRUCTURE BUILDING
-    // =====================================================
+    // ======================================
+    // Document Structure Building
+    // ======================================
 
     async function buildDocumentStructure(documentItem) {
         if (!documentItem) throw new Error("لم يتم تحديد المستند.");
@@ -611,9 +610,9 @@ Office.onReady(function () {
         return structure;
     }
 
-    // =====================================================
-    // DOCUMENT STATUS UPDATES
-    // =====================================================
+    // ======================================
+    // Document Status Updates
+    // ======================================
 
     function updateDocumentReadStatus(documentItem, status) {
         if (!documentItem) return;
@@ -630,9 +629,9 @@ Office.onReady(function () {
         saveDocuments();
     }
 
-    // =====================================================
-    // GET PROJECT DOCUMENTS
-    // =====================================================
+    // ======================================
+    // Project Documents Helpers
+    // ======================================
 
     function getProjectDocuments(projectId) {
         if (!projectId) return [];
@@ -667,7 +666,6 @@ Office.onReady(function () {
         if (documentTitle) documentTitle.textContent = documentItem.name;
 
         if (documentItem.readStatus === "read") {
-            // تأكد من وجود فهرس Orama
             ensureDocumentStructure(documentItem)
                 .then(function (structureData) {
                     return buildOramaRetrievalIndex(documentItem, structureData);
@@ -718,9 +716,9 @@ Office.onReady(function () {
         return item;
     }
 
-    // =====================================================
-    // READ CURRENT WORD DOCUMENT
-    // =====================================================
+    // ======================================
+    // Read Current Word Document
+    // ======================================
 
     async function readCurrentWordDocument(documentItem) {
         if (!documentItem) throw new Error("لم يتم تحديد المستند.");
@@ -746,14 +744,13 @@ Office.onReady(function () {
             await saveDocumentText(documentItem.id, text);
             updateDocumentReadStatus(documentItem, "read");
 
-            // بناء البنية والفهرسة
             updateDocumentIndexStatus(documentItem, "indexing");
             const structureData = await buildDocumentStructure(documentItem);
             await saveDocumentStructure(documentItem.id, structureData);
             await buildOramaRetrievalIndex(documentItem, structureData);
             updateDocumentIndexStatus(documentItem, "indexed");
 
-            console.log("تمت قراءة المستند وفهرسته بنجاح:", {
+            console.log("تمت قراءة المستند وفهرسته باستخدام Orama بنجاح:", {
                 documentId: documentItem.id,
                 paragraphs: structureData.paragraphCount,
                 headings: structureData.headingCount
@@ -768,9 +765,9 @@ Office.onReady(function () {
         }
     }
 
-    // =====================================================
-    // RETRIEVAL PROFILE AND CONTEXT BUILDING
-    // =====================================================
+    // ======================================
+    // Retrieval Profile and Context Building
+    // ======================================
 
     function getRetrievalProfile(query) {
         const text = normalizeSearchText(query);
@@ -826,13 +823,11 @@ Office.onReady(function () {
         const settings = options || {};
         const maxResults = typeof settings.maxResults === "number" ? settings.maxResults : 4;
         const maxChars = typeof settings.maxChars === "number" ? settings.maxChars : 3500;
-        const includeNeighbors = settings.includeNeighbors !== false;
 
         if (!Array.isArray(searchResults) || searchResults.length === 0) {
             return { contexts: [], text: "", selectedCount: 0 };
         }
 
-        // ترتيب حسب الدرجة
         const sorted = searchResults.slice().sort(function (a, b) { return (b.score || 0) - (a.score || 0); });
 
         const selected = [];
@@ -876,7 +871,6 @@ Office.onReady(function () {
             if (remaining <= 0) return;
             const available = Math.max(300, remaining - 250);
 
-            // اختصار النص إذا لزم
             let context = mainText;
             if (context.length > available) {
                 context = context.substring(0, available) + "…";
@@ -908,35 +902,58 @@ Office.onReady(function () {
         };
     }
 
-    // =====================================================
-    // BUILD AI DOCUMENT CONTEXT
-    // =====================================================
+    // ======================================
+    // Build AI Document Context
+    // ======================================
 
     async function buildAIDocumentContext(question) {
         if (!currentDocument) {
             currentCitationSources = [];
-            return { found: false, query: String(question || ""), text: "", sources: [], resultCount: 0, selectedCount: 0 };
+            return {
+                found: false,
+                query: String(question || ""),
+                text: "",
+                sources: [],
+                resultCount: 0,
+                selectedCount: 0
+            };
         }
 
         const cleanQuestion = String(question || "").trim();
         if (!cleanQuestion) {
             currentCitationSources = [];
-            return { found: false, query: "", text: "", sources: [], resultCount: 0, selectedCount: 0 };
+            return {
+                found: false,
+                query: "",
+                text: "",
+                sources: [],
+                resultCount: 0,
+                selectedCount: 0
+            };
         }
 
-        const profile = getRetrievalProfile(cleanQuestion);
-        const maxResults = profile.maxResults || 8;
+        const retrievalProfile = getRetrievalProfile(cleanQuestion);
+        const maxResults = retrievalProfile.maxResults || 8;
 
-        // البحث باستخدام Orama
         const results = await searchOramaDocument(currentDocument, cleanQuestion, maxResults * 2);
 
         if (!results || results.length === 0) {
             currentCitationSources = [];
-            return { found: false, query: cleanQuestion, profile: profile.type, text: "", sources: [], resultCount: 0, selectedCount: 0 };
+            return {
+                found: false,
+                query: cleanQuestion,
+                profile: retrievalProfile.type,
+                text: "",
+                sources: [],
+                resultCount: 0,
+                selectedCount: 0
+            };
         }
 
-        // بناء السياق
-        const retrieval = buildRetrievalContext(results, { maxResults: maxResults, maxChars: 8000 });
+        const retrieval = buildRetrievalContext(results, {
+            maxResults: maxResults,
+            maxChars: 8000
+        });
 
         currentCitationSources = retrieval.contexts.map(function (item) {
             return {
@@ -951,7 +968,7 @@ Office.onReady(function () {
         return {
             found: retrieval.selectedCount > 0,
             query: cleanQuestion,
-            profile: profile.type,
+            profile: retrievalProfile.type,
             text: retrieval.text,
             sources: currentCitationSources,
             resultCount: results.length,
@@ -959,9 +976,9 @@ Office.onReady(function () {
         };
     }
 
-    // =====================================================
-    // FORMAT AI MESSAGE
-    // =====================================================
+    // ======================================
+    // Format AI Message
+    // ======================================
 
     function formatAIMessage(text, citationSources) {
         if (!text) return "";
@@ -969,7 +986,6 @@ Office.onReady(function () {
         const sources = Array.isArray(citationSources) ? citationSources : currentCitationSources;
 
         try {
-            // استخدام marked لتحويل Markdown (افترض أن marked متاحة)
             let html = marked.parse(String(text), { breaks: true, gfm: true });
 
             html = html.replace(/\[مقطع\s*([0-9٠-٩\s،,]+)\]/g, function (match, ranksText) {
@@ -1000,9 +1016,9 @@ Office.onReady(function () {
         }
     }
 
-    // =====================================================
-    // OPEN CITATION IN WORD
-    // =====================================================
+    // ======================================
+    // Open Citation In Word
+    // ======================================
 
     async function openCitationInWord(rank) {
         const source = currentCitationSources.find(function (item) {
@@ -1063,25 +1079,648 @@ Office.onReady(function () {
         }
     }
 
-    // =====================================================
-    // RENDER FUNCTIONS (مختصرة مع الاحتفاظ بالوظائف)
-    // =====================================================
+    // ======================================
+    // Render Functions (UI)
+    // ======================================
 
-    // لاحظ أن دوال render موجودة في النسخة الكاملة، سأذكرها هنا باختصار
-    // لكنني سأفترض أنها موجودة كما في الكود السابق، ولن أعيد كتابتها بالكامل.
-    // سأضع توقيعاتها فقط للاختصار.
+    // ---- Render Documents ----
+    function renderDocuments() {
+        if (!documentsList) return;
+        documentsList.innerHTML = "";
+        if (!currentProject) {
+            documentsList.innerHTML = `<div class="empty-document">اختر مشروعًا لعرض مستنداته</div>`;
+            return;
+        }
 
-    function renderProjects() { /* الكود موجود في النسخة السابقة */ }
-    function renderExpandedProjects() { /* الكود موجود */ }
-    function renderDocuments() { /* الكود موجود */ }
-    function renderSidebarChats() { /* الكود موجود */ }
-    function renderChat() { /* الكود موجود */ }
-    function renderChatList() { /* الكود موجود */ }
-    function renderRecentChats() { /* الكود موجود */ }
+        const projectDocuments = getProjectDocuments(currentProject.id);
+        if (projectDocuments.length === 0) {
+            documentsList.innerHTML = `<div class="empty-document">لا توجد مستندات</div>`;
+            return;
+        }
 
-    // =====================================================
-    // CHAT MANAGEMENT
-    // =====================================================
+        projectDocuments.forEach(function (documentItem, index) {
+            const item = document.createElement("div");
+            item.className = "document-item";
+            if (currentDocument && currentDocument.id === documentItem.id) {
+                item.classList.add("active-document");
+            }
+
+            const title = document.createElement("span");
+            title.className = "document-title";
+            title.textContent = documentItem.name;
+
+            const status = document.createElement("span");
+            status.className = "document-read-status";
+            if (documentItem.indexStatus === "indexed") {
+                status.textContent = "✓ مفهرس · " + documentItem.indexTokenCount + " كلمة · " + documentItem.indexUniqueTerms + " فريدة";
+            } else if (documentItem.indexStatus === "indexing") {
+                status.textContent = "جارٍ الفهرسة...";
+            } else if (documentItem.indexStatus === "error") {
+                status.textContent = "⚠ فشل الفهرسة";
+            } else if (documentItem.readStatus === "reading") {
+                status.textContent = "جارٍ القراءة...";
+            } else if (documentItem.readStatus === "read") {
+                status.textContent = "✓ تمت القراءة";
+            } else {
+                status.textContent = "جديد";
+            }
+
+            title.onclick = function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrentDocument(documentItem);
+            };
+
+            const menuButton = document.createElement("button");
+            menuButton.className = "document-menu";
+            menuButton.type = "button";
+            menuButton.title = "خيارات المستند";
+            menuButton.textContent = "⋮";
+
+            const options = document.createElement("div");
+            options.className = "document-options-menu";
+            options.innerHTML = `
+                <div class="rename-document">✏ إعادة تسمية</div>
+                <div class="move-document-up">↑ نقل إلى أعلى</div>
+                <div class="move-document-down">↓ نقل إلى أسفل</div>
+                <div class="delete-document">🗑 حذف</div>
+            `;
+
+            if (index === 0) {
+                const moveUp = options.querySelector(".move-document-up");
+                if (moveUp) moveUp.style.display = "none";
+            }
+            if (index === projectDocuments.length - 1) {
+                const moveDown = options.querySelector(".move-document-down");
+                if (moveDown) moveDown.style.display = "none";
+            }
+
+            menuButton.onclick = function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                document.querySelectorAll(".document-options-menu.open").forEach(function (menu) {
+                    if (menu !== options) menu.classList.remove("open");
+                });
+                options.classList.toggle("open");
+            };
+
+            // Rename
+            const renameButton = options.querySelector(".rename-document");
+            if (renameButton) {
+                renameButton.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    options.classList.remove("open");
+                    const oldName = documentItem.name;
+                    const inputRename = document.createElement("input");
+                    inputRename.className = "edit-document-title";
+                    inputRename.value = oldName;
+                    title.replaceWith(inputRename);
+                    inputRename.focus();
+                    inputRename.setSelectionRange(inputRename.value.length, inputRename.value.length);
+
+                    function finishRename(saveChange) {
+                        const newName = inputRename.value.trim();
+                        if (saveChange && newName) {
+                            documentItem.name = newName;
+                            documentItem.updatedAt = new Date().toISOString();
+                            saveDocuments();
+                        } else {
+                            documentItem.name = oldName;
+                        }
+                        renderDocuments();
+                    }
+
+                    inputRename.onkeydown = function (event) {
+                        if (event.key === "Enter") { event.preventDefault(); finishRename(true); }
+                        if (event.key === "Escape") { event.preventDefault(); finishRename(false); }
+                    };
+                };
+            }
+
+            // Move Up
+            const moveUpButton = options.querySelector(".move-document-up");
+            if (moveUpButton) {
+                moveUpButton.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (index <= 0) return;
+                    const prev = projectDocuments[index - 1];
+                    const tmp = documentItem.order;
+                    documentItem.order = prev.order;
+                    prev.order = tmp;
+                    documentItem.updatedAt = new Date().toISOString();
+                    prev.updatedAt = new Date().toISOString();
+                    saveDocuments();
+                    options.classList.remove("open");
+                    renderDocuments();
+                };
+            }
+
+            // Move Down
+            const moveDownButton = options.querySelector(".move-document-down");
+            if (moveDownButton) {
+                moveDownButton.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (index >= projectDocuments.length - 1) return;
+                    const next = projectDocuments[index + 1];
+                    const tmp = documentItem.order;
+                    documentItem.order = next.order;
+                    next.order = tmp;
+                    documentItem.updatedAt = new Date().toISOString();
+                    next.updatedAt = new Date().toISOString();
+                    saveDocuments();
+                    options.classList.remove("open");
+                    renderDocuments();
+                };
+            }
+
+            // Delete
+            const deleteButton = options.querySelector(".delete-document");
+            if (deleteButton) {
+                deleteButton.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    options.classList.remove("open");
+
+                    const confirmBox = document.createElement("div");
+                    confirmBox.className = "document-delete-confirm";
+                    confirmBox.innerHTML = `
+                        <div class="document-delete-dialog">
+                            <div class="document-delete-message">هل تريد حذف المستند؟</div>
+                            <div class="document-delete-name">${documentItem.name}</div>
+                            <div class="document-delete-buttons">
+                                <button type="button" class="confirm-document-delete">حذف</button>
+                                <button type="button" class="cancel-document-delete">إلغاء</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(confirmBox);
+
+                    const confirmDelete = confirmBox.querySelector(".confirm-document-delete");
+                    if (confirmDelete) {
+                        confirmDelete.onclick = async function () {
+                            documents = documents.filter(function (doc) {
+                                return doc.id !== documentItem.id;
+                            });
+
+                            if (currentProject && Array.isArray(currentProject.documents)) {
+                                currentProject.documents = currentProject.documents.filter(function (id) {
+                                    return id !== documentItem.id;
+                                });
+                                currentProject.updatedAt = new Date().toISOString();
+                                saveProjects();
+                            }
+
+                            try {
+                                await deleteWorkingWordFile(documentItem.storageId);
+                            } catch (storageError) {
+                                console.warn("تعذر حذف نسخة العمل:", storageError);
+                            }
+
+                            if (currentDocument && currentDocument.id === documentItem.id) {
+                                currentDocument = null;
+                                currentCitationSources = [];
+                                if (documentTitle) documentTitle.textContent = "لا يوجد مستند مفتوح";
+                            }
+
+                            const remaining = getProjectDocuments(currentProject ? currentProject.id : null);
+                            remaining.forEach(function (doc, newIndex) { doc.order = newIndex + 1; });
+
+                            oramaRetrievalDb = null;
+                            oramaRetrievalCacheKey = "";
+                            oramaRetrievalDocumentId = null;
+
+                            saveDocuments();
+                            confirmBox.remove();
+                            renderDocuments();
+                        };
+                    }
+
+                    const cancelDelete = confirmBox.querySelector(".cancel-document-delete");
+                    if (cancelDelete) {
+                        cancelDelete.onclick = function () { confirmBox.remove(); };
+                    }
+
+                    confirmBox.onclick = function (event) {
+                        if (event.target === confirmBox) confirmBox.remove();
+                    };
+                };
+            }
+
+            item.appendChild(title);
+            item.appendChild(status);
+            item.appendChild(menuButton);
+            item.appendChild(options);
+            documentsList.appendChild(item);
+        });
+    }
+
+    // ---- Render Projects ----
+    function renderProjects() {
+        if (!projectsList) return;
+        projectsList.innerHTML = "";
+        if (projects.length === 0) {
+            projectsList.innerHTML = `<div class="empty-project">لا توجد مشاريع</div>`;
+            return;
+        }
+
+        projects.forEach(function (project) {
+            const item = document.createElement("div");
+            item.className = "project-item";
+            item.innerHTML = `
+                <span class="project-title">${projectIcon} ${project.name}</span>
+                <button class="project-menu" type="button">⋮</button>
+                <div class="project-options-menu">
+                    <div class="rename-project">✏ إعادة تسمية</div>
+                    <div class="delete-project">🗑 حذف</div>
+                </div>
+            `;
+
+            item.onclick = function (e) {
+                if (e.target.closest(".project-menu") || e.target.closest(".project-options-menu")) return;
+                e.stopPropagation();
+                setCurrentProject(project);
+                if (projectsPopup) projectsPopup.classList.remove("open");
+            };
+
+            const menu = item.querySelector(".project-menu");
+            if (menu) {
+                menu.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    document.querySelectorAll(".project-options-menu.open").forEach(function (m) {
+                        m.classList.remove("open");
+                    });
+                    const options = item.querySelector(".project-options-menu");
+                    if (!options) return;
+                    options.classList.add("open");
+                    const rect = menu.getBoundingClientRect();
+                    const menuWidth = 140;
+                    const menuHeight = options.offsetHeight || 80;
+                    const margin = 8;
+                    let left = rect.left - menuWidth - margin;
+                    let top = rect.bottom + margin;
+                    if (left < margin) left = rect.right + margin;
+                    if (left + menuWidth > window.innerWidth - margin) left = window.innerWidth - menuWidth - margin;
+                    if (top + menuHeight > window.innerHeight - margin) top = rect.top - menuHeight - margin;
+                    if (top < margin) top = margin;
+                    options.style.position = "fixed";
+                    options.style.left = left + "px";
+                    options.style.top = top + "px";
+                    options.style.right = "auto";
+                    options.style.bottom = "auto";
+                    options.style.zIndex = "999999";
+                };
+            }
+
+            // Rename Project
+            const renameProject = item.querySelector(".rename-project");
+            if (renameProject) {
+                renameProject.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const options = item.querySelector(".project-options-menu");
+                    if (options) options.classList.remove("open");
+                    const titleElement = item.querySelector(".project-title");
+                    if (!titleElement) return;
+                    const oldName = project.name;
+                    titleElement.innerHTML = `<input class="edit-project-title" value="${oldName}">`;
+                    const edit = titleElement.querySelector(".edit-project-title");
+                    if (!edit) return;
+                    edit.focus();
+                    edit.setSelectionRange(edit.value.length, edit.value.length);
+                    edit.onkeydown = function (event) {
+                        if (event.key === "Enter") {
+                            event.preventDefault();
+                            const value = edit.value.trim();
+                            project.name = value || oldName;
+                            project.updatedAt = new Date().toISOString();
+                            saveProjects();
+                            renderProjects();
+                            renderExpandedProjects();
+                        }
+                        if (event.key === "Escape") {
+                            event.preventDefault();
+                            project.name = oldName;
+                            renderProjects();
+                        }
+                    };
+                };
+            }
+
+            // Delete Project
+            const deleteProject = item.querySelector(".delete-project");
+            if (deleteProject) {
+                deleteProject.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const options = item.querySelector(".project-options-menu");
+                    if (options) options.classList.remove("open");
+                    const confirmBox = document.createElement("div");
+                    confirmBox.className = "project-delete-confirm";
+                    confirmBox.innerHTML = `
+                        <div class="confirm-dialog">
+                            <p>هل تريد حذف المشروع:<br><strong>${project.name}</strong>؟</p>
+                            <button class="confirm-project-delete" type="button">حذف</button>
+                            <button class="cancel-project-delete" type="button">إلغاء</button>
+                        </div>
+                    `;
+                    document.body.appendChild(confirmBox);
+
+                    const confirmDelete = confirmBox.querySelector(".confirm-project-delete");
+                    if (confirmDelete) {
+                        confirmDelete.onclick = async function () {
+                            const projectDocumentIds = Array.isArray(project.documents) ? project.documents : [];
+                            for (let i = 0; i < projectDocumentIds.length; i++) {
+                                const doc = documents.find(function (d) { return d.id === projectDocumentIds[i]; });
+                                if (doc) {
+                                    try {
+                                        await deleteWorkingWordFile(doc.storageId);
+                                    } catch (error) {
+                                        console.warn("تعذر حذف نسخة العمل:", error);
+                                    }
+                                }
+                            }
+                            documents = documents.filter(function (doc) {
+                                return !projectDocumentIds.includes(doc.id);
+                            });
+                            projects = projects.filter(function (p) { return p.id !== project.id; });
+                            if (currentProject && currentProject.id === project.id) {
+                                currentProject = null;
+                                currentDocument = null;
+                                currentCitationSources = [];
+                                if (documentTitle) documentTitle.textContent = "لا يوجد مستند مفتوح";
+                            }
+                            oramaRetrievalDb = null;
+                            oramaRetrievalCacheKey = "";
+                            oramaRetrievalDocumentId = null;
+                            saveDocuments();
+                            saveProjects();
+                            renderProjects();
+                            renderExpandedProjects();
+                            renderDocuments();
+                            confirmBox.remove();
+                        };
+                    }
+
+                    const cancelDelete = confirmBox.querySelector(".cancel-project-delete");
+                    if (cancelDelete) {
+                        cancelDelete.onclick = function () { confirmBox.remove(); };
+                    }
+                };
+            }
+
+            projectsList.appendChild(item);
+        });
+    }
+
+    // ---- Render Expanded Projects ----
+    function renderExpandedProjects() {
+        const list = document.getElementById("expanded-projects-list");
+        if (!list) return;
+        list.innerHTML = "";
+        projects.forEach(function (project) {
+            const item = document.createElement("div");
+            item.className = "expanded-project-item";
+            item.innerHTML = `<span>${projectIcon} ${project.name}</span>`;
+            item.onclick = function (e) {
+                e.stopPropagation();
+                setCurrentProject(project);
+            };
+            list.appendChild(item);
+        });
+    }
+
+    // ---- Render Sidebar Chats ----
+    function renderSidebarChats() {
+        const list = document.getElementById("new-chat-list");
+        if (!list) return;
+        list.innerHTML = "";
+        if (chats.length === 0) {
+            list.innerHTML = `<div class="empty-chat">لا توجد محادثات</div>`;
+            return;
+        }
+
+        chats.slice(0, 8).forEach(function (chat) {
+            const item = document.createElement("div");
+            item.className = "recent-chat-item";
+            item.innerHTML = `<span class="chat-title">${chatIcon} ${chat.title}</span>`;
+            item.onclick = function (e) {
+                e.stopPropagation();
+                currentChat = chat;
+                renderChat();
+                if (projectsPopup) projectsPopup.classList.remove("open");
+                if (chatPopup) chatPopup.classList.remove("open");
+                if (searchPopup) searchPopup.classList.remove("open");
+            };
+            list.appendChild(item);
+        });
+    }
+
+    // ---- Render Chat ----
+    function renderChat() {
+        if (!chatArea) return;
+        chatArea.innerHTML = "";
+        if (!currentChat) {
+            chatArea.innerHTML = `
+                <div class="welcome">
+                    <div class="ai-symbol">✦</div>
+                    <h2>مرحبًا بك</h2>
+                    <p>ابدأ محادثة جديدة</p>
+                </div>
+            `;
+            return;
+        }
+
+        currentChat.messages.forEach(function (msg) {
+            const div = document.createElement("div");
+            div.className = "message " + (msg.role === "user" ? "user-message" : "ai-message");
+            if (msg.role === "user") {
+                div.textContent = msg.text || "";
+            } else {
+                div.innerHTML = formatAIMessage(msg.text || "", Array.isArray(msg.citationSources) ? msg.citationSources : []);
+            }
+            chatArea.appendChild(div);
+        });
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    // ---- Render Chat List ----
+    function renderChatList() {
+        const list = document.getElementById("chat-list");
+        if (!list) return;
+        list.innerHTML = "";
+        if (chats.length === 0) {
+            list.innerHTML = "<div class='empty-chat'>لا توجد محادثات</div>";
+            return;
+        }
+
+        chats.forEach(function (chat) {
+            const item = document.createElement("div");
+            item.className = "chat-history-item";
+            item.innerHTML = `
+                <span class="chat-title">${chatIcon} ${chat.title}</span>
+                <button class="chat-menu" type="button">⋮</button>
+                <div class="chat-options-menu">
+                    <div class="rename-chat">✏ إعادة تسمية</div>
+                    <div class="delete-chat">🗑 حذف</div>
+                </div>
+            `;
+
+            const title = item.querySelector(".chat-title");
+            if (title) {
+                title.onclick = function (e) {
+                    e.stopPropagation();
+                    currentChat = chat;
+                    renderChat();
+                    if (expandedSidebar) expandedSidebar.classList.remove("open");
+                };
+            }
+
+            const menu = item.querySelector(".chat-menu");
+            if (menu) {
+                menu.onclick = function (e) {
+                    e.stopPropagation();
+                    document.querySelectorAll(".chat-options-menu").forEach(function (m) { m.classList.remove("open"); });
+                    const options = item.querySelector(".chat-options-menu");
+                    if (!options) return;
+                    options.classList.add("open");
+                    const rect = menu.getBoundingClientRect();
+                    options.style.position = "fixed";
+                    options.style.left = Math.max(8, rect.left - 140 - 8) + "px";
+                    options.style.top = rect.bottom + 8 + "px";
+                    options.style.zIndex = "999999";
+                };
+            }
+
+            // Rename Chat
+            const renameBtn = item.querySelector(".rename-chat");
+            if (renameBtn) {
+                renameBtn.onclick = function (e) {
+                    e.stopPropagation();
+                    const options = item.querySelector(".chat-options-menu");
+                    if (options) options.classList.remove("open");
+                    const titleSpan = item.querySelector(".chat-title");
+                    if (!titleSpan) return;
+                    const oldName = chat.title;
+                    titleSpan.innerHTML = `<input class="edit-chat-title" value="${oldName}">`;
+                    const editInput = titleSpan.querySelector(".edit-chat-title");
+                    if (!editInput) return;
+                    editInput.focus();
+                    editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+                    editInput.onkeydown = function (event) {
+                        if (event.key === "Enter") {
+                            const value = editInput.value.trim();
+                            chat.title = value !== "" ? value : oldName;
+                            saveChats();
+                            renderChatList();
+                            renderSidebarChats();
+                            renderRecentChats();
+                        }
+                        if (event.key === "Escape") {
+                            chat.title = oldName;
+                            renderChatList();
+                        }
+                    };
+                };
+            }
+
+            // Delete Chat
+            const deleteBtn = item.querySelector(".delete-chat");
+            if (deleteBtn) {
+                deleteBtn.onclick = function (e) {
+                    e.stopPropagation();
+                    const options = item.querySelector(".chat-options-menu");
+                    if (options) options.classList.remove("open");
+                    const confirmBox = document.createElement("div");
+                    confirmBox.className = "delete-confirm";
+                    confirmBox.innerHTML = `
+                        <div class="confirm-dialog">
+                            <p>هل تريد حذف المحادثة:<br><strong>${chat.title}</strong>؟</p>
+                            <button class="confirm-delete" type="button">حذف</button>
+                            <button class="cancel-delete" type="button">إلغاء</button>
+                        </div>
+                    `;
+                    document.body.appendChild(confirmBox);
+
+                    const confirmDelete = confirmBox.querySelector(".confirm-delete");
+                    if (confirmDelete) {
+                        confirmDelete.onclick = function () {
+                            chats = chats.filter(function (c) { return c.id !== chat.id; });
+                            if (currentChat && currentChat.id === chat.id) {
+                                currentChat = null;
+                                renderChat();
+                            }
+                            saveChats();
+                            renderChatList();
+                            renderSidebarChats();
+                            renderRecentChats();
+                            confirmBox.remove();
+                        };
+                    }
+
+                    const cancelDelete = confirmBox.querySelector(".cancel-delete");
+                    if (cancelDelete) {
+                        cancelDelete.onclick = function () { confirmBox.remove(); };
+                    }
+                };
+            }
+
+            list.appendChild(item);
+        });
+    }
+
+    // ---- Render Recent Chats ----
+    function renderRecentChats() {
+        if (!recentChatList) return;
+        recentChatList.innerHTML = "";
+        if (chats.length === 0) {
+            recentChatList.innerHTML = "<div class='empty-chat'>لا توجد محادثات</div>";
+            return;
+        }
+
+        chats.slice(0, 8).forEach(function (chat) {
+            const div = document.createElement("div");
+            div.className = "recent-chat-item";
+            div.innerHTML = `<span class="chat-title">${chatIcon} ${chat.title}</span>`;
+            div.onclick = function () {
+                currentChat = chat;
+                renderChat();
+                if (chatPopup) chatPopup.classList.remove("open");
+            };
+            recentChatList.appendChild(div);
+        });
+    }
+
+    // ======================================
+    // Sidebar Sections Initialization
+    // ======================================
+
+    function initializeSidebarSections() {
+        const headers = document.querySelectorAll(".section-title[data-target], .section-toggle[data-target]");
+        headers.forEach(function (header) {
+            const targetId = header.getAttribute("data-target");
+            if (!targetId) return;
+            const target = document.getElementById(targetId);
+            if (!target) return;
+            target.classList.remove("open");
+            header.classList.remove("open");
+
+            header.onclick = function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const isOpen = target.classList.contains("open");
+                target.classList.toggle("open", !isOpen);
+                header.classList.toggle("open", !isOpen);
+            };
+        });
+    }
+
+    // ======================================
+    // Chat Management
+    // ======================================
 
     function createNewChat() {
         currentChat = {
@@ -1098,31 +1737,461 @@ Office.onReady(function () {
         renderChat();
     }
 
-    // =====================================================
-    // AI STREAM FUNCTIONS (مختصرة)
-    // =====================================================
+    // ======================================
+    // AI Stream Functions
+    // ======================================
 
     async function streamGroqAI(text, onChunk) {
-        // نفس الدالة من النسخة السابقة ولكنها تستخدم buildAIDocumentContext
-        // سأضع التنفيذ الكامل في النهاية.
-        // ... (الكود موجود)
+        const data = getSavedSettings();
+        const key = data.key || "";
+        const model = data.model || "";
+        if (!key.trim()) throw new Error("لم يتم إدخال مفتاح Groq من الإعدادات.");
+        if (!model.trim()) throw new Error("لم يتم تحديد نموذج Groq.");
+
+        const documentContext = await buildAIDocumentContext(text);
+        const conversationMessages = [];
+        const historyLimit = documentContext && documentContext.found ? 2 : 4;
+
+        if (currentChat && Array.isArray(currentChat.messages)) {
+            const previousMessages = currentChat.messages.slice(-historyLimit);
+            previousMessages.forEach(function (msg) {
+                if (!msg || !msg.text) return;
+                let messageText = String(msg.text).trim();
+                const maxHistoryChars = documentContext && documentContext.found ? 1000 : 1500;
+                if (messageText.length > maxHistoryChars) messageText = messageText.substring(0, maxHistoryChars) + "…";
+                conversationMessages.push({ role: msg.role === "ai" ? "assistant" : "user", content: messageText });
+            });
+        }
+
+        let userContent = text;
+        if (documentContext && documentContext.found) {
+            userContent = [
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
+                "",
+                "=== سؤال المستخدم ===",
+                text,
+                "",
+                "=== بيانات المستند ===",
+                "اسم المستند: " + (currentDocument ? currentDocument.name : ""),
+                "",
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text,
+                "",
+                "=== قواعد الإجابة ===",
+                "أجب عن سؤال المستخدم اعتمادًا على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
+                "استخرج الأفكار المرتبطة بالسؤال فقط.",
+                "ادمج الأفكار المتشابهة في فكرة واحدة ولا تكررها بصيغ مختلفة.",
+                "رتب الإجابة وفق محاور السؤال.",
+                "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المقاطع المستخرجة.",
+                "إذا لم تكف المقاطع للإجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
+                "لا تستخدم المعرفة العامة لسد النقص في المستند إلا إذا طلب المستخدم ذلك صراحة.",
+                "حافظ على العربية والأسلوب الأكاديمي.",
+                "لا تبدأ باعتذار أو تمهيد عام غير ضروري.",
+                "ضع الإحالات [مقطع X] بعد الأفكار التي يدعمها المستند.",
+                "إذا تكررت الفكرة نفسها في أكثر من مقطع، اذكرها مرة واحدة واجمع الإحالات.",
+                "لا تكرر الإحالة نفسها دون فائدة.",
+                "قدّم إجابة كاملة ومترابطة بالقدر الذي يحتاجه السؤال."
+            ].join("\n");
+        }
+
+        conversationMessages.push({ role: "user", content: userContent });
+
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+            body: JSON.stringify({
+                model: model,
+                messages: conversationMessages,
+                max_tokens: 2500,
+                temperature: 0.2,
+                stream: true
+            })
+        });
+
+        if (!response.ok) {
+            const result = await readJSON(response);
+            throw new Error(getAPIError(result, "فشل الاتصال بـ Groq."));
+        }
+        if (!response.body) throw new Error("المتصفح لا يدعم استقبال الرد المتدفق من Groq.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let fullAnswer = "";
+
+        while (true) {
+            const chunk = await reader.read();
+            if (chunk.done) break;
+            buffer += decoder.decode(chunk.value, { stream: true });
+            const events = buffer.split("\n\n");
+            buffer = events.pop() || "";
+
+            for (let i = 0; i < events.length; i++) {
+                const lines = events[i].split("\n");
+                for (let j = 0; j < lines.length; j++) {
+                    const line = lines[j].trim();
+                    if (!line.startsWith("data:")) continue;
+                    const dataText = line.substring(5).trim();
+                    if (dataText === "[DONE]") continue;
+                    try {
+                        const parsed = JSON.parse(dataText);
+                        const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta ?
+                            parsed.choices[0].delta.content : "";
+                        if (typeof delta === "string" && delta !== "") {
+                            fullAnswer += delta;
+                            if (typeof onChunk === "function") onChunk(delta, fullAnswer);
+                        }
+                    } catch (error) { continue; }
+                }
+            }
+        }
+
+        return fullAnswer.trim();
     }
 
     async function streamGeminiAI(text, onChunk) {
-        // ... (الكود موجود)
+        const data = getSavedSettings();
+        const key = data.key || "";
+        const model = data.model || "";
+        if (!key.trim()) throw new Error("لم يتم إدخال مفتاح Gemini من الإعدادات.");
+        if (!model.trim()) throw new Error("لم يتم تحديد نموذج Gemini من الإعدادات.");
+
+        const documentContext = await buildAIDocumentContext(text);
+
+        const systemInstruction = [
+            "أنت مساعد بحث أكاديمي يعمل على مستندات Word.",
+            "اعتمد على المادة المستخرجة من المستند بوصفها المصدر الأساسي للإجابة.",
+            "أجب عن السؤال مباشرة وبأسلوب أكاديمي واضح.",
+            "رتب الإجابة وفق محاور السؤال، ولا تخلط بين أجزائه.",
+            "إذا كان السؤال يتضمن أكثر من جانب، فافصل بينها بعناوين أو فقرات واضحة.",
+            "ادمج الأفكار المتشابهة في صياغة واحدة.",
+            "لا تحول كل مقطع مستخرج إلى فقرة مستقلة؛ ابنِ إجابة تركيبية من المقاطع.",
+            "استبعد المعلومة الجانبية التي لا تجيب مباشرة عن السؤال.",
+            "إذا دعمت عدة مقاطع الفكرة نفسها، اجمع إحالاتها بعد الفكرة.",
+            "لا تكرر الفكرة نفسها لمجرد ورودها في أكثر من مقطع.",
+            "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المادة المستخرجة.",
+            "إذا لم تكف المادة المستخرجة للإجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
+            "لا تستخدم المعرفة العامة لسد النقص في المستند إلا إذا طلب المستخدم ذلك صراحة.",
+            "لا تذكر مشكلة الدراسة أو أهدافها أو منهجها أو أسئلتها إلا إذا طلب المستخدم ذلك صراحة.",
+            "ضع الإحالات بعد الأفكار التي يدعمها المستند بصيغة [مقطع X].",
+            "إذا كانت الإحالة تشمل أكثر من مقطع فاستخدم [مقطع X، مقطع Y].",
+            "لا تخترع أرقام المقاطع.",
+            "حافظ على لغة السؤال ولغة المستند.",
+            "استخدم العناوين والقوائم باعتدال عندما تساعد على وضوح الإجابة.",
+            "لا تبدأ باعتذار أو تمهيد غير ضروري.",
+            "لا تعيد صياغة سؤال المستخدم في بداية الإجابة.",
+            "قدّم خلاصة مترابطة ومباشرة، لا تلخيصًا منفصلًا لكل مقطع."
+        ].join("\n");
+
+        const conversationMessages = [];
+        const historyLimit = documentContext && documentContext.found ? 2 : 4;
+
+        if (currentChat && Array.isArray(currentChat.messages)) {
+            const previousMessages = currentChat.messages.slice(-historyLimit);
+            previousMessages.forEach(function (msg) {
+                if (!msg || !msg.text) return;
+                let messageText = String(msg.text).trim();
+                const maxHistoryChars = documentContext && documentContext.found ? 1000 : 1500;
+                if (messageText.length > maxHistoryChars) messageText = messageText.substring(0, maxHistoryChars) + "…";
+                conversationMessages.push({
+                    role: msg.role === "ai" ? "model" : "user",
+                    parts: [{ text: messageText }]
+                });
+            });
+        }
+
+        let userContent = text;
+        if (documentContext && documentContext.found) {
+            userContent = [
+                "=== سؤال المستخدم ===",
+                text,
+                "",
+                "=== اسم المستند ===",
+                (currentDocument ? currentDocument.name : ""),
+                "",
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text
+            ].join("\n");
+        }
+
+        conversationMessages.push({ role: "user", parts: [{ text: userContent }] });
+
+        const cleanModel = normalizeGeminiModel(model);
+        const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+            encodeURIComponent(cleanModel) +
+            ":streamGenerateContent?alt=sse";
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+            body: JSON.stringify({
+                systemInstruction: { parts: [{ text: systemInstruction }] },
+                contents: conversationMessages,
+                generationConfig: { temperature: 0.2 }
+            })
+        });
+
+        if (!response.ok) {
+            const result = await readJSON(response);
+            throw new Error(getAPIError(result, "فشل الاتصال بـ Gemini."));
+        }
+        if (!response.body) throw new Error("المتصفح لا يدعم استقبال الرد المتدفق من Gemini.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let fullAnswer = "";
+
+        function processSSELine(line) {
+            const cleanLine = String(line || "").trim();
+            if (!cleanLine || !cleanLine.startsWith("data:")) return;
+            const dataText = cleanLine.substring(5).trim();
+            if (!dataText || dataText === "[DONE]") return;
+
+            try {
+                const parsed = JSON.parse(dataText);
+                if (!parsed || !Array.isArray(parsed.candidates) || !parsed.candidates[0]) return;
+                const candidate = parsed.candidates[0];
+                if (!candidate.content || !Array.isArray(candidate.content.parts)) return;
+
+                candidate.content.parts.forEach(function (part) {
+                    if (!part || typeof part.text !== "string" || part.thought === true) return;
+                    const delta = part.text;
+                    if (!delta) return;
+                    fullAnswer += delta;
+                    if (typeof onChunk === "function") onChunk(delta, fullAnswer);
+                });
+            } catch (error) { return; }
+        }
+
+        while (true) {
+            const streamResult = await reader.read();
+            if (streamResult.done) break;
+            buffer += decoder.decode(streamResult.value, { stream: true });
+            buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+            let newlineIndex = buffer.indexOf("\n");
+            while (newlineIndex !== -1) {
+                const line = buffer.substring(0, newlineIndex);
+                buffer = buffer.substring(newlineIndex + 1);
+                processSSELine(line);
+                newlineIndex = buffer.indexOf("\n");
+            }
+        }
+
+        if (buffer.trim()) processSSELine(buffer);
+        if (!fullAnswer.trim()) throw new Error("لم يصل نص من Gemini عبر البث المتدفق.");
+        return fullAnswer.trim();
     }
 
     async function streamOpenRouterAI(text, onChunk) {
-        // ... (الكود موجود)
+        const data = getSavedSettings();
+        const key = data.key || "";
+        const model = data.model || "";
+        if (!key.trim()) throw new Error("لم يتم إدخال مفتاح OpenRouter من الإعدادات.");
+        if (!model.trim()) throw new Error("لم يتم تحديد نموذج OpenRouter.");
+
+        const documentContext = await buildAIDocumentContext(text);
+        const conversationMessages = [];
+        const historyLimit = documentContext && documentContext.found ? 2 : 4;
+
+        if (currentChat && Array.isArray(currentChat.messages)) {
+            const previousMessages = currentChat.messages.slice(-historyLimit);
+            previousMessages.forEach(function (msg) {
+                if (!msg || !msg.text) return;
+                let messageText = String(msg.text).trim();
+                const maxHistoryChars = documentContext && documentContext.found ? 1000 : 1500;
+                if (messageText.length > maxHistoryChars) messageText = messageText.substring(0, maxHistoryChars) + "…";
+                conversationMessages.push({ role: msg.role === "ai" ? "assistant" : "user", content: messageText });
+            });
+        }
+
+        let userContent = text;
+        if (documentContext && documentContext.found) {
+            userContent = [
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
+                "",
+                "=== سؤال المستخدم ===",
+                text,
+                "",
+                "=== اسم المستند ===",
+                (currentDocument ? currentDocument.name : ""),
+                "",
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text
+            ].join("\n");
+        }
+
+        conversationMessages.push({ role: "user", content: userContent });
+
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + key,
+                "HTTP-Referer": window.location.href,
+                "X-Title": "Research Tools"
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: conversationMessages,
+                max_tokens: 2500,
+                temperature: 0.2,
+                stream: true
+            })
+        });
+
+        if (!response.ok) {
+            const result = await readJSON(response);
+            throw new Error(getAPIError(result, "فشل الاتصال بـ OpenRouter."));
+        }
+        if (!response.body) throw new Error("المتصفح لا يدعم استقبال الرد المتدفق من OpenRouter.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let fullAnswer = "";
+
+        function processSSELine(line) {
+            const cleanLine = String(line || "").trim();
+            if (!cleanLine || !cleanLine.startsWith("data:")) return;
+            const dataText = cleanLine.substring(5).trim();
+            if (!dataText || dataText === "[DONE]") return;
+
+            try {
+                const parsed = JSON.parse(dataText);
+                const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta ?
+                    parsed.choices[0].delta.content : "";
+                if (typeof delta === "string" && delta) {
+                    fullAnswer += delta;
+                    if (typeof onChunk === "function") onChunk(delta, fullAnswer);
+                }
+            } catch (error) { return; }
+        }
+
+        while (true) {
+            const streamResult = await reader.read();
+            if (streamResult.done) break;
+            buffer += decoder.decode(streamResult.value, { stream: true });
+            buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+            let newlineIndex = buffer.indexOf("\n");
+            while (newlineIndex !== -1) {
+                const line = buffer.substring(0, newlineIndex);
+                buffer = buffer.substring(newlineIndex + 1);
+                processSSELine(line);
+                newlineIndex = buffer.indexOf("\n");
+            }
+        }
+
+        if (buffer.trim()) processSSELine(buffer);
+        if (!fullAnswer.trim()) throw new Error("لم يصل نص من OpenRouter عبر البث المتدفق.");
+        return fullAnswer.trim();
     }
 
     async function streamOpenAI(text, onChunk) {
-        // ... (الكود موجود)
+        const data = getSavedSettings();
+        const key = data.key || "";
+        const model = data.model || "";
+        if (!key.trim()) throw new Error("لم يتم إدخال مفتاح OpenAI من الإعدادات.");
+        if (!model.trim()) throw new Error("لم يتم تحديد نموذج OpenAI.");
+
+        const documentContext = await buildAIDocumentContext(text);
+        const conversationMessages = [];
+        const historyLimit = documentContext && documentContext.found ? 2 : 4;
+
+        if (currentChat && Array.isArray(currentChat.messages)) {
+            const previousMessages = currentChat.messages.slice(-historyLimit);
+            previousMessages.forEach(function (msg) {
+                if (!msg || !msg.text) return;
+                let messageText = String(msg.text).trim();
+                const maxHistoryChars = documentContext && documentContext.found ? 1000 : 1500;
+                if (messageText.length > maxHistoryChars) messageText = messageText.substring(0, maxHistoryChars) + "…";
+                conversationMessages.push({ role: msg.role === "ai" ? "assistant" : "user", content: messageText });
+            });
+        }
+
+        let userContent = text;
+        if (documentContext && documentContext.found) {
+            userContent = [
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
+                "",
+                "=== سؤال المستخدم ===",
+                text,
+                "",
+                "=== اسم المستند ===",
+                (currentDocument ? currentDocument.name : ""),
+                "",
+                "=== المادة المستخرجة من المستند ===",
+                documentContext.text
+            ].join("\n");
+        }
+
+        conversationMessages.push({ role: "user", content: userContent });
+
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+            body: JSON.stringify({
+                model: model,
+                messages: conversationMessages,
+                max_tokens: 2500,
+                temperature: 0.2,
+                stream: true
+            })
+        });
+
+        if (!response.ok) {
+            const result = await readJSON(response);
+            throw new Error(getAPIError(result, "فشل الاتصال بـ OpenAI."));
+        }
+        if (!response.body) throw new Error("المتصفح لا يدعم استقبال الرد المتدفق من OpenAI.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let fullAnswer = "";
+
+        function processSSELine(line) {
+            const cleanLine = String(line || "").trim();
+            if (!cleanLine || !cleanLine.startsWith("data:")) return;
+            const dataText = cleanLine.substring(5).trim();
+            if (!dataText || dataText === "[DONE]") return;
+
+            try {
+                const parsed = JSON.parse(dataText);
+                const delta = parsed && parsed.choices && parsed.choices[0] && parsed.choices[0].delta ?
+                    parsed.choices[0].delta.content : "";
+                if (typeof delta === "string" && delta) {
+                    fullAnswer += delta;
+                    if (typeof onChunk === "function") onChunk(delta, fullAnswer);
+                }
+            } catch (error) { return; }
+        }
+
+        while (true) {
+            const streamResult = await reader.read();
+            if (streamResult.done) break;
+            buffer += decoder.decode(streamResult.value, { stream: true });
+            buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+            let newlineIndex = buffer.indexOf("\n");
+            while (newlineIndex !== -1) {
+                const line = buffer.substring(0, newlineIndex);
+                buffer = buffer.substring(newlineIndex + 1);
+                processSSELine(line);
+                newlineIndex = buffer.indexOf("\n");
+            }
+        }
+
+        if (buffer.trim()) processSSELine(buffer);
+        if (!fullAnswer.trim()) throw new Error("لم يصل نص من OpenAI عبر البث المتدفق.");
+        return fullAnswer.trim();
     }
 
-    // =====================================================
-    // SEND MESSAGE
-    // =====================================================
+    // ======================================
+    // Send Message
+    // ======================================
 
     async function sendMessage() {
         if (!input) return;
@@ -1253,9 +2322,9 @@ Office.onReady(function () {
         }
     }
 
-    // =====================================================
-    // BUTTON HANDLERS (مختصرة)
-    // =====================================================
+    // ======================================
+    // Buttons & Event Handlers
+    // ======================================
 
     if (sendBtn) {
         sendBtn.onclick = function (e) { e.preventDefault(); sendMessage(); };
@@ -1282,13 +2351,630 @@ Office.onReady(function () {
         };
     }
 
-    // ... باقي الأزرار (المشاريع، الإضافات، الإعدادات، البحث) كما في النسخة السابقة
+    if (chatBtn) {
+        chatBtn.onclick = function (e) {
+            e.stopPropagation();
+            if (!chatPopup) return;
+            if (projectsPopup) projectsPopup.classList.remove("open");
+            if (searchPopup) searchPopup.classList.remove("open");
+            if (settingsWindow) settingsWindow.classList.remove("open");
+            if (chatPopup.classList.contains("open")) {
+                chatPopup.classList.remove("open");
+                return;
+            }
+            renderChatList();
+            chatPopup.classList.add("open");
+        };
+    }
 
-    // =====================================================
-    // INITIALIZATION
-    // =====================================================
+    if (projectsBtn) {
+        projectsBtn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!projectsPopup) return;
+            if (chatPopup) chatPopup.classList.remove("open");
+            if (searchPopup) searchPopup.classList.remove("open");
+            if (settingsWindow) settingsWindow.classList.remove("open");
+            projectsPopup.classList.toggle("open");
+            renderProjects();
+        };
+    }
 
-    // استدعاء دوال التهيئة
+    if (newProjectBtn) {
+        newProjectBtn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const oldBox = document.querySelector(".project-create-box");
+            if (oldBox) oldBox.remove();
+
+            const box = document.createElement("div");
+            box.className = "project-create-box";
+            box.innerHTML = `
+                <div class="rename-dialog">
+                    <input class="new-project-name" placeholder="اسم المشروع">
+                    <button class="save-project" type="button">حفظ</button>
+                    <button class="cancel-project" type="button">إلغاء</button>
+                </div>
+            `;
+            document.body.appendChild(box);
+
+            const buttonRect = newProjectBtn.getBoundingClientRect();
+            const screenMargin = 12;
+            let left = buttonRect.left;
+            let top = buttonRect.bottom + 8;
+            const actualBoxWidth = box.offsetWidth || 240;
+            const boxHeight = box.offsetHeight || 120;
+
+            if (left + actualBoxWidth > window.innerWidth - screenMargin) {
+                left = window.innerWidth - actualBoxWidth - screenMargin;
+            }
+            if (left < screenMargin) left = screenMargin;
+            if (top + boxHeight > window.innerHeight - screenMargin) {
+                top = buttonRect.top - boxHeight - 8;
+            }
+
+            box.style.position = "fixed";
+            box.style.left = left + "px";
+            box.style.top = top + "px";
+            box.style.zIndex = "999999";
+
+            const inputProject = box.querySelector(".new-project-name");
+            if (inputProject) inputProject.focus();
+
+            const saveProjectButton = box.querySelector(".save-project");
+            if (saveProjectButton) {
+                saveProjectButton.onclick = function () {
+                    const name = inputProject ? inputProject.value.trim() : "";
+                    if (name) {
+                        const now = new Date().toISOString();
+                        const newProject = {
+                            id: Date.now(),
+                            name: name,
+                            createdAt: now,
+                            updatedAt: now,
+                            documents: [],
+                            references: [],
+                            chatIds: [],
+                            settings: { citationStyle: "", notes: "" }
+                        };
+                        projects.unshift(newProject);
+                        saveProjects();
+                        renderProjects();
+                        renderExpandedProjects();
+                    }
+                    box.remove();
+                };
+            }
+
+            const cancelProject = box.querySelector(".cancel-project");
+            if (cancelProject) {
+                cancelProject.onclick = function () { box.remove(); };
+            }
+
+            box.onclick = function (event) { event.stopPropagation(); };
+        };
+    }
+
+    if (addDocumentBtn && wordDocumentPicker) {
+        addDocumentBtn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!currentProject) {
+                if (documentsList) {
+                    documentsList.innerHTML = `<div class="empty-document">اختر مشروعًا أولًا لإضافة مستند</div>`;
+                }
+                return;
+            }
+            wordDocumentPicker.value = "";
+            wordDocumentPicker.click();
+        };
+
+        wordDocumentPicker.onchange = async function () {
+            try {
+                const file = wordDocumentPicker.files && wordDocumentPicker.files[0];
+                if (!file) return;
+                if (!/\.docx$/i.test(file.name)) {
+                    console.warn("الملف المختار ليس DOCX.");
+                    return;
+                }
+                if (!currentProject) return;
+
+                const projectDocuments = getProjectDocuments(currentProject.id);
+                const nextOrder = projectDocuments.length + 1;
+                const documentItem = createDocument(file, currentProject.id, nextOrder);
+                await saveWorkingWordFile(documentItem.storageId, file);
+                attachDocumentToProject(currentProject, documentItem);
+                setCurrentDocument(documentItem);
+                renderDocuments();
+                console.log("تم استيراد مستند Word:", {
+                    name: documentItem.name,
+                    fileName: documentItem.fileName,
+                    storageId: documentItem.storageId
+                });
+            } catch (error) {
+                console.error("فشل استيراد مستند Word:", error);
+                if (documentsList) {
+                    documentsList.innerHTML = `<div class="empty-document">تعذر استيراد المستند</div>`;
+                }
+            }
+        };
+    }
+
+    if (sidebarToggleBtn && expandedSidebar && expandedSidebarToggleSlot) {
+        sidebarToggleBtn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const isOpening = !expandedSidebar.classList.contains("open");
+
+            if (isOpening) {
+                expandedSidebar.classList.add("open");
+                document.body.classList.add("expanded-sidebar-open");
+                sidebarToggleBtn.title = "إخفاء القائمة";
+                sidebarToggleBtn.classList.add("sidebar-open");
+                expandedSidebarToggleSlot.appendChild(sidebarToggleBtn);
+            } else {
+                expandedSidebar.classList.remove("open");
+                document.body.classList.remove("expanded-sidebar-open");
+                sidebarToggleBtn.title = "إظهار القائمة";
+                sidebarToggleBtn.classList.remove("sidebar-open");
+                if (sidebarTogglePlaceholder.parentNode) {
+                    sidebarTogglePlaceholder.parentNode.insertBefore(
+                        sidebarToggleBtn,
+                        sidebarTogglePlaceholder.nextSibling
+                    );
+                }
+            }
+        };
+    }
+
+    // ======================================
+    // Settings Handlers
+    // ======================================
+
+    function loadSettings() {
+        const data = getSavedSettings();
+        if (provider) provider.value = data.provider || "openrouter";
+        if (apiKey) apiKey.value = data.key || "";
+        if (modelSelect) {
+            const savedModel = data.model || "";
+            modelSelect.innerHTML = "";
+            if (savedModel !== "") {
+                const option = document.createElement("option");
+                option.value = savedModel;
+                option.textContent = savedModel;
+                modelSelect.appendChild(option);
+                modelSelect.value = savedModel;
+            } else {
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "أدخل المفتاح ثم حدّث النماذج";
+                modelSelect.appendChild(option);
+            }
+        }
+        updateProviderInfo();
+    }
+
+    function updateProviderInfo() {
+        if (!providerInfo || !provider) return;
+        const value = provider.value;
+        if (value === "openrouter") {
+            providerInfo.innerHTML = "OpenRouter: سيتم جلب النماذج المجانية المتاحة من حسابك.";
+        } else if (value === "gemini") {
+            providerInfo.innerHTML = "Gemini: سيتم جلب النماذج التي تدعم generateContent.";
+        } else if (value === "groq") {
+            providerInfo.innerHTML = "Groq: سيتم جلب النماذج المتاحة من حسابك.";
+        } else if (value === "openai") {
+            providerInfo.innerHTML = "OpenAI: سيتم جلب النماذج المتاحة من حسابك.";
+        } else {
+            providerInfo.innerHTML = "سيتم تحديد رابط الاتصال حسب مزود الذكاء الاصطناعي.";
+        }
+    }
+
+    if (settingsBtn) {
+        settingsBtn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (projectsPopup) projectsPopup.classList.remove("open");
+            if (chatPopup) chatPopup.classList.remove("open");
+            if (searchPopup) searchPopup.classList.remove("open");
+            if (settingsWindow) settingsWindow.classList.add("open");
+            loadSettings();
+        };
+    }
+
+    if (closeSettings) {
+        closeSettings.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (settingsWindow) settingsWindow.classList.remove("open");
+        };
+    }
+
+    if (showKey && apiKey) {
+        showKey.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (apiKey.type === "password") {
+                apiKey.type = "text";
+                showKey.innerHTML = "🙈";
+            } else {
+                apiKey.type = "password";
+                showKey.innerHTML = "👁";
+            }
+        };
+    }
+
+    if (provider) {
+        provider.onchange = function () {
+            updateProviderInfo();
+            if (modelSelect) {
+                modelSelect.innerHTML = `<option value="">أدخل المفتاح ثم حدّث النماذج</option>`;
+            }
+            if (settingsStatus) settingsStatus.innerHTML = "";
+        };
+    }
+
+    if (saveSettings) {
+        saveSettings.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const settings = {
+                provider: provider ? provider.value : "openrouter",
+                key: apiKey ? apiKey.value.trim() : "",
+                model: modelSelect ? modelSelect.value.trim() : ""
+            };
+
+            if (!settings.key) {
+                if (settingsStatus) settingsStatus.innerHTML = "⚠ يرجى إدخال مفتاح API.";
+                return;
+            }
+            if (!settings.model) {
+                if (settingsStatus) settingsStatus.innerHTML = "⚠ يرجى تحديد نموذج الذكاء الاصطناعي.";
+                return;
+            }
+
+            saveAISettings(settings);
+            if (settingsStatus) settingsStatus.innerHTML = "✓ تم حفظ إعدادات الذكاء الاصطناعي";
+        };
+    }
+
+    // ======================================
+    // Load Models (Settings)
+    // ======================================
+
+    async function loadModels() {
+        const selectedProvider = provider ? provider.value : "openrouter";
+        const key = apiKey ? apiKey.value.trim() : "";
+
+        if (!key) {
+            if (settingsStatus) settingsStatus.innerHTML = "⚠ يرجى إدخال مفتاح API أولاً.";
+            return;
+        }
+
+        try {
+            if (settingsStatus) settingsStatus.innerHTML = "⏳ جاري تحميل النماذج...";
+
+            let models = [];
+
+            if (selectedProvider === "openrouter") {
+                models = await loadOpenRouterModels(key);
+            } else if (selectedProvider === "gemini") {
+                models = await loadGeminiModels(key);
+            } else if (selectedProvider === "groq") {
+                models = await loadGroqModels(key);
+            } else if (selectedProvider === "openai") {
+                models = await loadOpenAIModels(key);
+            } else {
+                throw new Error("مزود الذكاء الاصطناعي غير معروف.");
+            }
+
+            populateModels(models);
+            if (settingsStatus) settingsStatus.innerHTML = "✓ تم تحديث النماذج: " + models.length;
+        } catch (error) {
+            if (settingsStatus) settingsStatus.innerHTML = "⚠ " + (error.message || "تعذر تحديث النماذج");
+        }
+    }
+
+    async function loadOpenRouterModels(key) {
+        const response = await fetch("https://openrouter.ai/api/v1/models", {
+            method: "GET",
+            headers: {
+                "Authorization": "Bearer " + key,
+                "Content-Type": "application/json",
+                "HTTP-Referer": window.location.href,
+                "X-Title": "Research Tools"
+            }
+        });
+        const result = await readJSON(response);
+        if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بـ OpenRouter."));
+        if (!result.data || !Array.isArray(result.data)) throw new Error("لم تصل قائمة النماذج من OpenRouter.");
+
+        const freeModels = result.data.filter(function (item) {
+            return item && item.id && String(item.id).endsWith(":free");
+        });
+
+        return freeModels.map(function (item) {
+            return { id: item.id, name: (item.name || item.id) + " (مجاني)" };
+        }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "ar"); });
+    }
+
+    async function loadGeminiModels(key) {
+        const url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + encodeURIComponent(key);
+        const response = await fetch(url, { method: "GET" });
+        const result = await readJSON(response);
+        if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بـ Gemini."));
+        if (!result.models || !Array.isArray(result.models)) throw new Error("لم تصل قائمة نماذج Gemini.");
+
+        return result.models.filter(function (item) {
+            return item && item.name && item.supportedGenerationMethods &&
+                item.supportedGenerationMethods.includes("generateContent");
+        }).map(function (item) {
+            const cleanId = String(item.name).replace(/^models\//, "");
+            return { id: cleanId, name: item.displayName ? item.displayName + " — " + cleanId : cleanId };
+        });
+    }
+
+    async function loadGroqModels(key) {
+        const response = await fetch("https://api.groq.com/openai/v1/models", {
+            method: "GET",
+            headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" }
+        });
+        const result = await readJSON(response);
+        if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بـ Groq."));
+        if (!result.data || !Array.isArray(result.data)) throw new Error("لم تصل قائمة نماذج Groq.");
+
+        return result.data.filter(function (item) { return item && item.id && item.active !== false; })
+            .sort(function (a, b) { return a.id.localeCompare(b.id); })
+            .map(function (item) { return { id: item.id, name: item.id }; });
+    }
+
+    async function loadOpenAIModels(key) {
+        const response = await fetch("https://api.openai.com/v1/models", {
+            method: "GET",
+            headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" }
+        });
+        const result = await readJSON(response);
+        if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بـ OpenAI."));
+        if (!result.data || !Array.isArray(result.data)) throw new Error("لم تصل قائمة نماذج OpenAI.");
+
+        return result.data.filter(function (item) {
+            return item && item.id && (item.id.toLowerCase().startsWith("gpt-") ||
+                item.id.toLowerCase().startsWith("o1") ||
+                item.id.toLowerCase().startsWith("o3") ||
+                item.id.toLowerCase().startsWith("o4"));
+        }).sort(function (a, b) { return a.id.localeCompare(b.id); })
+            .map(function (item) { return { id: item.id, name: item.id }; });
+    }
+
+    function populateModels(models) {
+        if (!modelSelect) return;
+        const saved = getSavedSettings();
+        const savedModel = saved.model || "";
+
+        modelSelect.innerHTML = "";
+        if (!models || models.length === 0) {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "لا توجد نماذج متاحة";
+            modelSelect.appendChild(option);
+            return;
+        }
+
+        models.forEach(function (item) {
+            const option = document.createElement("option");
+            option.value = item.id;
+            option.textContent = item.name;
+            modelSelect.appendChild(option);
+        });
+
+        if (savedModel) {
+            const exists = Array.from(modelSelect.options).some(function (option) { return option.value === savedModel; });
+            if (exists) modelSelect.value = savedModel;
+        }
+    }
+
+    if (refreshModels) {
+        refreshModels.onclick = async function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            refreshModels.disabled = true;
+            try {
+                await loadModels();
+            } catch (error) {
+                if (settingsStatus) settingsStatus.innerHTML = "⚠ " + (error.message || "تعذر تحديث النماذج");
+            } finally {
+                refreshModels.disabled = false;
+            }
+        };
+    }
+
+    // ======================================
+    // Test Connection
+    // ======================================
+
+    async function testAIConnection() {
+        const data = {
+            provider: provider ? provider.value : "openrouter",
+            key: apiKey ? apiKey.value.trim() : "",
+            model: modelSelect ? modelSelect.value.trim() : ""
+        };
+
+        if (!data.key) throw new Error("يرجى إدخال مفتاح API أولاً.");
+        if (!data.model) throw new Error("يرجى تحديد نموذج الذكاء الاصطناعي أولاً.");
+
+        const testMessage = "أجب بكلمة واحدة فقط: متصل";
+
+        if (data.provider === "openrouter") {
+            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + data.key,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": window.location.href,
+                    "X-Title": "Research Tools"
+                },
+                body: JSON.stringify({
+                    model: data.model,
+                    messages: [{ role: "user", content: testMessage }],
+                    max_tokens: 10
+                })
+            });
+            const result = await readJSON(response);
+            if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بـ OpenRouter."));
+            return "✓ تم الاتصال بـ OpenRouter بنجاح";
+        }
+
+        if (data.provider === "groq") {
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": "Bearer " + data.key, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: data.model,
+                    messages: [{ role: "user", content: testMessage }],
+                    max_tokens: 10
+                })
+            });
+            const result = await readJSON(response);
+            if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بـ Groq."));
+            return "✓ تم الاتصال بـ Groq بنجاح";
+        }
+
+        if (data.provider === "openai") {
+            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": "Bearer " + data.key, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: data.model,
+                    messages: [{ role: "user", content: testMessage }],
+                    max_tokens: 10
+                })
+            });
+            const result = await readJSON(response);
+            if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بـ OpenAI."));
+            return "✓ تم الاتصال بـ OpenAI بنجاح";
+        }
+
+        if (data.provider === "gemini") {
+            const model = normalizeGeminiModel(data.model);
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+                encodeURIComponent(model) +
+                ":generateContent?key=" + encodeURIComponent(data.key);
+
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: testMessage }] }] })
+            });
+            const result = await readJSON(response);
+            if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بـ Gemini."));
+            return "✓ تم الاتصال بـ Gemini بنجاح";
+        }
+
+        throw new Error("مزود الذكاء الاصطناعي غير معروف.");
+    }
+
+    if (testConnection) {
+        testConnection.onclick = async function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            testConnection.disabled = true;
+            if (settingsStatus) settingsStatus.innerHTML = "⏳ جاري اختبار الاتصال...";
+            try {
+                const message = await testAIConnection();
+                if (settingsStatus) settingsStatus.innerHTML = message;
+            } catch (error) {
+                if (settingsStatus) settingsStatus.innerHTML = "⚠ " + (error.message || "تعذر الاتصال");
+            } finally {
+                testConnection.disabled = false;
+            }
+        };
+    }
+
+    // ======================================
+    // Search Popup (البحث في المحادثات فقط)
+    // ======================================
+
+    if (searchBtn) {
+        searchBtn.onclick = function (e) {
+            e.stopPropagation();
+            if (!searchPopup) return;
+            if (projectsPopup) projectsPopup.classList.remove("open");
+            if (chatPopup) chatPopup.classList.remove("open");
+            if (settingsWindow) settingsWindow.classList.remove("open");
+            searchPopup.classList.toggle("open");
+            if (searchPopup.classList.contains("open") && searchInput) searchInput.focus();
+        };
+    }
+
+    if (searchInput) {
+        searchInput.oninput = function () {
+            const keyword = searchInput.value.trim().toLowerCase();
+            if (!searchResults) return;
+            searchResults.innerHTML = "";
+            if (keyword === "") return;
+
+            chats.forEach(function (chat) {
+                if (chat.title.toLowerCase().includes(keyword)) {
+                    const item = document.createElement("div");
+                    item.className = "search-result-item";
+                    item.innerHTML = `<span class="chat-title">${chatIcon} ${chat.title}</span>`;
+                    item.onclick = function () {
+                        currentChat = chat;
+                        renderChat();
+                        if (searchPopup) searchPopup.classList.remove("open");
+                        searchInput.value = "";
+                        searchResults.innerHTML = "";
+                    };
+                    searchResults.appendChild(item);
+                }
+            });
+        };
+    }
+
+    // ======================================
+    // Citation Click Handler
+    // ======================================
+
+    if (chatArea) {
+        chatArea.addEventListener("click", function (event) {
+            const citation = event.target.closest(".document-citation");
+            if (!citation) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const rank = Number(citation.getAttribute("data-citation-rank"));
+            if (!Number.isNaN(rank)) openCitationInWord(rank);
+        });
+    }
+
+    // ======================================
+    // Sidebar Pin
+    // ======================================
+
+    const sidebar = document.querySelector(".sidebar");
+    const pinSidebar = document.getElementById("pin-sidebar");
+
+    if (pinSidebar && sidebar) {
+        let sidebarPinned = localStorage.getItem("sidebarPinned") === "true";
+        if (sidebarPinned) {
+            sidebar.classList.add("pinned");
+            pinSidebar.classList.add("pinned");
+            document.body.classList.add("sidebar-is-pinned");
+        }
+
+        pinSidebar.addEventListener("click", function (e) {
+            e.stopPropagation();
+            sidebarPinned = !sidebarPinned;
+            sidebar.classList.toggle("pinned", sidebarPinned);
+            pinSidebar.classList.toggle("pinned", sidebarPinned);
+            document.body.classList.toggle("sidebar-is-pinned", sidebarPinned);
+            localStorage.setItem("sidebarPinned", sidebarPinned ? "true" : "false");
+        });
+    }
+
+    // ======================================
+    // Initialization
+    // ======================================
+
     initializeSidebarSections();
     renderProjects();
     renderExpandedProjects();
@@ -1299,9 +2985,11 @@ Office.onReady(function () {
     renderChat();
     loadSettings();
 
-    console.log("Word AI Assistant - Orama Edition initialized.");
+    console.log("Word AI Assistant - Orama Version initialized successfully.");
+    console.log("Orama search engine ready.");
+    console.log("Supported providers: OpenRouter, Gemini, OpenAI, Groq");
 
-    // =====================================================
+    // ======================================
     // End of Office.onReady
-    // =====================================================
+    // ======================================
 });
