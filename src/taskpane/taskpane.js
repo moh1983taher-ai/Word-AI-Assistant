@@ -4995,9 +4995,8 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // في المقارنة:
-    // بعض الكلمات تصف نوع السؤال
-    // وليست مفاهيم المقارنة نفسها
+    // كلمات نوع السؤال وليست مفاهيمه
+    // في المقارنة خصوصًا
     // ==================================
 
     const comparisonMarkerFamilies =
@@ -5013,6 +5012,10 @@ async function searchIndexedDocument(
         ]);
 
 
+    // ==================================
+    // مفاهيم المقارنة الأساسية
+    // ==================================
+
     const comparisonConceptFamilies =
         retrievalProfile ===
         "comparison"
@@ -5022,8 +5025,10 @@ async function searchIndexedDocument(
                     family
                 ) {
 
-                    return !comparisonMarkerFamilies.has(
-                        family
+                    return (
+                        !comparisonMarkerFamilies.has(
+                            family
+                        )
                     );
 
                 }
@@ -5033,7 +5038,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // كل نتائج Orama
+    // نتائج Orama
     // ==================================
 
     const searchResults =
@@ -5041,7 +5046,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // Orama Search
+    // تنفيذ بحث Orama
     // ==================================
 
     function runOramaSearch(
@@ -5049,9 +5054,7 @@ async function searchIndexedDocument(
         exact
     ) {
 
-        if (
-            !term
-        ) {
+        if (!term) {
 
             return {
 
@@ -5181,7 +5184,6 @@ async function searchIndexedDocument(
 
     // ==================================
     // البحث في الكلمات المهمة
-    // يساعد الأسئلة المركبة والطويلة
     // ==================================
 
     queryTokens.forEach(
@@ -5275,7 +5277,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // العائلات الموجودة فعليًا
+    // عائلات موجودة فعليًا في النتائج
     // ==================================
 
     const matchedFamilies =
@@ -5694,7 +5696,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // كلمات السؤال الموجودة في الفقرة
+            // كلمات السؤال الموجودة
             // ==================================
 
             const matchedTokenCount =
@@ -5767,7 +5769,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // عدد عائلات السؤال الموجودة
+            // عدد العائلات المطابقة
             // ==================================
 
             const matchedFamilyCount =
@@ -5798,6 +5800,10 @@ async function searchIndexedDocument(
             // تغطية مفاهيم المقارنة
             // ==================================
 
+            let conceptCoverage =
+                0;
+
+
             let comparisonCoverage =
                 0;
 
@@ -5807,7 +5813,7 @@ async function searchIndexedDocument(
                 "comparison"
             ) {
 
-                const matchedComparisonFamilies =
+                const matchedConceptCount =
                     comparisonConceptFamilies.filter(
                         function (
                             family
@@ -5818,67 +5824,17 @@ async function searchIndexedDocument(
                             );
 
                         }
-                    );
+                    ).length;
 
 
-                comparisonCoverage =
+                conceptCoverage =
                     comparisonConceptFamilies.length >
                     0
 
-                        ? matchedComparisonFamilies.length /
+                        ? matchedConceptCount /
                           comparisonConceptFamilies.length
 
                         : 0;
-
-            }
-
-
-            // ==================================
-            // الفلترة الأولية
-            // ==================================
-
-            const minimumCoverage =
-                queryTokens.length >= 3
-                    ? 0.50
-                    : 0.34;
-
-
-            if (
-                retrievalProfile ===
-                    "comparison"
-            ) {
-
-                // لا نحذف المقاطع التي تحمل مفهومًا
-                // واحدًا فقط، لأن بعضها قد يكون مهمًا
-                // في شرح أحد طرفي المقارنة.
-                //
-                // لكن يجب أن تحمل على الأقل
-                // مفهومًا من المفاهيم الأساسية.
-
-                if (
-                    comparisonCoverage ===
-                        0 &&
-                    familyCoverage <
-                        minimumCoverage
-                ) {
-
-                    return;
-
-                }
-
-            }
-            else {
-
-                if (
-                    queryCoverage <
-                        minimumCoverage &&
-                    familyCoverage <
-                        minimumCoverage
-                ) {
-
-                    return;
-
-                }
 
             }
 
@@ -6033,16 +5989,16 @@ async function searchIndexedDocument(
                         0;
 
 
+                    const headingTokens =
+                        tokenizeDocumentText(
+                            normalizedHeading
+                        );
+
+
                     comparisonConceptFamilies.forEach(
                         function (
                             family
                         ) {
-
-                            const headingTokens =
-                                tokenizeDocumentText(
-                                    normalizedHeading
-                                );
-
 
                             const found =
                                 headingTokens.some(
@@ -6084,7 +6040,6 @@ async function searchIndexedDocument(
                             25;
 
                     }
-
                     else if (
                         headingConceptCount >
                         0
@@ -6101,17 +6056,19 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // قرب الكلمات
+            // قرب المفاهيم
             // ==================================
+
+            let comparisonProximity =
+                0;
+
 
             let proximityScore =
                 0;
 
 
             // ==================================
-            // في المقارنة:
-            // نحسب قرب مفاهيم المقارنة الأساسية
-            // بدل الاعتماد على كلمات مثل "الفرق"
+            // مقارنة
             // ==================================
 
             if (
@@ -6185,39 +6142,27 @@ async function searchIndexedDocument(
 
 
                     for (
-                        let left = 0;
+                        let i = 0;
 
-                        left <
+                        i <
                             familyPositions.length;
 
-                        left++
+                        i++
                     ) {
 
-                        const firstFamily =
-                            familyPositions[
-                                left
-                            ].family;
-
-
                         for (
-                            let right =
-                                left + 1;
+                            let j =
+                                i + 1;
 
-                            right <
+                            j <
                                 familyPositions.length;
 
-                            right++
+                            j++
                         ) {
 
-                            const secondFamily =
-                                familyPositions[
-                                    right
-                                ].family;
-
-
                             if (
-                                firstFamily ===
-                                    secondFamily
+                                familyPositions[i].family ===
+                                familyPositions[j].family
                             ) {
 
                                 continue;
@@ -6226,12 +6171,8 @@ async function searchIndexedDocument(
 
 
                             const span =
-                                familyPositions[
-                                    right
-                                ].position -
-                                familyPositions[
-                                    left
-                                ].position +
+                                familyPositions[j].position -
+                                familyPositions[i].position +
                                 1;
 
 
@@ -6257,12 +6198,15 @@ async function searchIndexedDocument(
                             null
                     ) {
 
-                        proximityScore =
+                        comparisonProximity =
                             20 /
                             Math.max(
                                 bestSpan,
                                 1
                             );
+
+                        proximityScore =
+                            comparisonProximity;
 
                     }
 
@@ -6270,11 +6214,11 @@ async function searchIndexedDocument(
 
             }
 
-            else {
+            // ==================================
+            // الأسئلة غير المقارنة
+            // ==================================
 
-                // ==================================
-                // الأسئلة غير المقارنة
-                // ==================================
+            else {
 
                 const tokenPositions =
                     [];
@@ -6299,7 +6243,7 @@ async function searchIndexedDocument(
 
                         if (
                             position >=
-                                0
+                            0
                         ) {
 
                             tokenPositions.push(
@@ -6353,19 +6297,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // التطابق الكامل
-            // ==================================
-
-            const exactPhrase =
-                normalizedText.includes(
-                    searchTerm
-                );
-
-
-            // ==================================
-            // Relation Score
-            // قياس وجود علاقة صريحة
-            // بين مفاهيم المقارنة
+            // هل توجد علاقة صريحة؟
             // ==================================
 
             let relationScore =
@@ -6374,12 +6306,10 @@ async function searchIndexedDocument(
 
             if (
                 retrievalProfile ===
-                "comparison"
+                "comparison" &&
+                conceptCoverage >
+                    0
             ) {
-
-                const normalizedOriginalText =
-                    normalizedText;
-
 
                 const relationPatterns = [
 
@@ -6395,6 +6325,8 @@ async function searchIndexedDocument(
 
                     /التمييز\s+بين/,
 
+                    /المفارق[ةه]\s+بين/,
+
                     /يفترق/,
 
                     /خلاف\s+بين/
@@ -6402,61 +6334,116 @@ async function searchIndexedDocument(
                 ];
 
 
-                const hasRelationPattern =
+                const hasExplicitRelation =
                     relationPatterns.some(
                         function (
                             pattern
                         ) {
 
                             return pattern.test(
-                                normalizedOriginalText
+                                normalizedText
                             );
 
                         }
                     );
 
 
+                // ==================================
+                // وجود المفهومين فقط
+                // لا يعني وجود مقارنة كاملة
+                // ==================================
+
                 if (
-                    hasRelationPattern
+                    conceptCoverage >=
+                    1
                 ) {
 
-                    relationScore +=
-                        30;
+                    comparisonCoverage =
+                        0.5;
+
+
+                    // ==================================
+                    // علاقة صريحة
+                    // ==================================
+
+                    if (
+                        hasExplicitRelation
+                    ) {
+
+                        comparisonCoverage =
+                            1;
+
+                    }
+
+                    // ==================================
+                    // قرب شديد
+                    // ==================================
+
+                    else if (
+                        comparisonProximity >=
+                        2
+                    ) {
+
+                        comparisonCoverage =
+                            0.75;
+
+                    }
 
                 }
 
 
-                // اجتماع جميع المفاهيم
+                // ==================================
+                // علاقة صريحة قوية
+                // ==================================
+
                 if (
                     comparisonCoverage >=
                     1
                 ) {
 
-                    relationScore +=
-                        20;
+                    relationScore =
+                        50;
 
                 }
 
+                // ==================================
+                // علاقة قوية بالاقتراب
+                // ==================================
 
-                // قرب المفاهيم
-                if (
-                    proximityScore >
+                else if (
+                    comparisonCoverage >=
+                    0.75
+                ) {
+
+                    relationScore =
+                        35;
+
+                }
+
+                // ==================================
+                // وجود المفهومين فقط
+                // ==================================
+
+                else if (
+                    comparisonCoverage >=
                     0.5
                 ) {
 
-                    relationScore +=
+                    relationScore =
                         15;
 
                 }
 
 
-                // تعزيز إضافي عندما يجتمع
-                // المفهومان في جملة قصيرة
+                // ==================================
+                // تعزيز العلاقة عند القرب الشديد
+                // ==================================
+
                 if (
                     comparisonCoverage >=
-                        1 &&
-                    proximityScore >=
-                        1
+                        0.75 &&
+                    comparisonProximity >=
+                        2
                 ) {
 
                     relationScore +=
@@ -6464,7 +6451,28 @@ async function searchIndexedDocument(
 
                 }
 
+
+                // ==================================
+                // الحد الأعلى
+                // ==================================
+
+                relationScore =
+                    Math.min(
+                        relationScore,
+                        70
+                    );
+
             }
+
+
+            // ==================================
+            // التطابق الكامل
+            // ==================================
+
+            const exactPhrase =
+                normalizedText.includes(
+                    searchTerm
+                );
 
 
             // ==================================
@@ -6523,7 +6531,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // التطابق الكامل
+            // تطابق العبارة كاملة
             // ==================================
 
             if (
@@ -6537,7 +6545,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // المطابقة متعددة المفاهيم
+            // تعزيز المطابقة متعددة المفاهيم
             // ==================================
 
             if (
@@ -6609,22 +6617,33 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // أولوية المقارنة بين المفاهيم
-            //
-            // لا نحذف النتيجة،
-            // وإنما نعطي أفضلية للمقاطع
-            // التي تجمع جميع المفاهيم الأساسية.
+            // أولوية المقاطع التي تجمع
+            // المفاهيم الأساسية
             // ==================================
 
             if (
                 retrievalProfile ===
-                    "comparison" &&
-                comparisonCoverage <
-                    1
+                "comparison"
             ) {
 
-                score *=
-                    0.65;
+                if (
+                    comparisonCoverage ===
+                    0
+                ) {
+
+                    score *=
+                        0.55;
+
+                }
+                else if (
+                    comparisonCoverage <
+                    0.75
+                ) {
+
+                    score *=
+                        0.75;
+
+                }
 
             }
 
@@ -6790,6 +6809,9 @@ async function searchIndexedDocument(
                 comparisonCoverage:
                     comparisonCoverage,
 
+                conceptCoverage:
+                    conceptCoverage,
+
                 matchType:
                     matchType,
 
@@ -6879,6 +6901,19 @@ async function searchIndexedDocument(
 
                 }
 
+
+                if (
+                    b.conceptCoverage !==
+                    a.conceptCoverage
+                ) {
+
+                    return (
+                        b.conceptCoverage -
+                        a.conceptCoverage
+                    );
+
+                }
+
             }
 
 
@@ -6918,8 +6953,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // تحديد عدد المرشحين
-    // قبل بناء السياق
+    // الحد الأقصى للمرشحين
     // ==================================
 
     const candidateLimit =
