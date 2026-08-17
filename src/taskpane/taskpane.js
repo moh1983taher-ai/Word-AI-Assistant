@@ -5119,7 +5119,86 @@ async function searchIndexedDocument(
     };
 
 }
+// ======================================
+// Console Test Bridge
+// إتاحة البحث للاختبار من Console
+// ======================================
 
+window.testIndexedSearch =
+    async function (
+        query
+    ) {
+
+        if (!currentDocument) {
+
+            console.warn(
+                "لا يوجد مستند نشط."
+            );
+
+            return null;
+
+        }
+
+        try {
+
+            const result =
+                await searchIndexedDocument(
+                    currentDocument.id,
+                    query,
+                    {
+                        maxResults:
+                            10
+                    }
+                );
+
+            console.log(
+                "======================================"
+            );
+
+            console.log(
+                "اختبار البحث:",
+                query
+            );
+
+            console.log(
+                "عدد النتائج:",
+                result.count
+            );
+
+            console.log(
+                "الكلمات:",
+                result.matchedTerms
+            );
+
+            console.log(
+                "العائلات:",
+                result.matchedFamilies
+            );
+
+            console.log(
+                "النتائج:",
+                result.results
+            );
+
+            console.log(
+                "======================================"
+            );
+
+            return result;
+
+        }
+        catch (error) {
+
+            console.error(
+                "فشل اختبار البحث:",
+                error
+            );
+
+            return null;
+
+        }
+
+    };
 
 // =====================================================
 // Orama Test
