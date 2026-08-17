@@ -5930,6 +5930,48 @@ async function searchIndexedDocument(
             searchTerm,
             structureData
         );
+    console.log(
+            "======================================"
+        );
+
+        console.log(
+            "تحليل الاستعلام:",
+            searchTerm
+        );
+
+        console.log(
+            "كل الكلمات:",
+            queryAnalysis.allTokens
+        );
+
+        console.log(
+            "كلمات المحتوى:",
+            queryAnalysis.contentTokens
+        );
+
+        console.log(
+            "الكلمات الوظيفية:",
+            queryAnalysis.functionTokens
+        );
+
+        console.log(
+            "العبارات المركبة:",
+            queryAnalysis.phraseCandidates
+        );
+
+        console.log(
+            "العائلات:",
+            queryAnalysis.families
+        );
+
+        console.log(
+            "المصطلحات الموزونة:",
+            queryAnalysis.weightedTerms
+        );
+
+        console.log(
+            "======================================"
+        );
 
 
     const queryTokens =
