@@ -4770,8 +4770,10 @@ function getHeadingParagraphRange(
 
 // =====================================================
 // Search Indexed Document
-// Orama + Arabic Families + Heading Ranking
-// + Query Profile + Comparison Relation
+// Orama + QPS + Arabic Families + General Re-Ranking
+// المحرك العام للاسترجاع
+// لا يحاول الإجابة عن السؤال
+// بل يستخرج أفضل المرشحين للذكاء الاصطناعي
 // =====================================================
 
 async function searchIndexedDocument(
@@ -4785,7 +4787,8 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // نوع السؤال
+    // نوع الاستعلام
+    // يستخدم كعامل ترجيح خفيف فقط
     // ==================================
 
     const retrievalProfile =
@@ -4796,7 +4799,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // تطبيع السؤال
+    // تطبيع الاستعلام
     // ==================================
 
     const searchTerm =
@@ -4812,6 +4815,9 @@ async function searchIndexedDocument(
             query:
                 "",
 
+            profile:
+                retrievalProfile,
+
             count:
                 0,
 
@@ -4822,9 +4828,6 @@ async function searchIndexedDocument(
                 [],
 
             matchedFamilies:
-                [],
-
-            comparisonConceptFamilies:
                 [],
 
             totalQueryTerms:
@@ -4892,7 +4895,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // فهرس Orama
+    // فهرس Orama + QPS
     // ==================================
 
     const db =
@@ -4912,7 +4915,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // كلمات البحث المهمة
+    // كلمات الاستعلام
     // ==================================
 
     const queryTokens =
@@ -4931,6 +4934,9 @@ async function searchIndexedDocument(
             query:
                 searchTerm,
 
+            profile:
+                retrievalProfile,
+
             count:
                 0,
 
@@ -4941,9 +4947,6 @@ async function searchIndexedDocument(
                 [],
 
             matchedFamilies:
-                [],
-
-            comparisonConceptFamilies:
                 [],
 
             totalQueryTerms:
@@ -4958,7 +4961,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // عائلات كلمات السؤال
+    // عائلات الاستعلام
     // ==================================
 
     const queryFamilies =
@@ -4995,58 +4998,65 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // كلمات نوع السؤال وليست مفاهيمه
-    // في المقارنة خصوصًا
+    // كلمات نوع السؤال
+    // نحتفظ بها ولا نحذفها
     // ==================================
 
-    const comparisonMarkerFamilies =
-        new Set([
+    const profileTerms = {
 
+        definition: [
+            "تعريف",
+            "مقصود",
+            "معني",
+            "معنى",
+            "مراد"
+        ],
+
+        effect: [
+            "اثر",
+            "تاثير",
+            "نتيجة",
+            "ينتج"
+        ],
+
+        comparison: [
             "فرق",
             "فروق",
+            "مقارنة",
             "مقارن",
-            "مقارنه",
             "تمييز",
             "خلاف"
+        ],
 
-        ]);
+        causes: [
+            "سبب",
+            "اسباب",
+            "علة",
+            "علل"
+        ],
 
+        location: [
+            "مبحث",
+            "مطلب",
+            "فصل",
+            "موضع",
+            "صفحة"
+        ],
 
-    // ==================================
-    // مفاهيم المقارنة الأساسية
-    // ==================================
+        general: []
 
-    const comparisonConceptFamilies =
-        retrievalProfile ===
-        "comparison"
-
-            ? queryFamilies.filter(
-                function (
-                    family
-                ) {
-
-                    return (
-                        !comparisonMarkerFamilies.has(
-                            family
-                        )
-                    );
-
-                }
-            )
-
-            : [];
+    };
 
 
-    // ==================================
-    // نتائج Orama
-    // ==================================
-
-    const searchResults =
+    const activeProfileTerms =
+        profileTerms[
+            retrievalProfile
+        ] ||
         [];
 
 
     // ==================================
-    // تنفيذ بحث Orama
+    // تشغيل Orama
     // ==================================
 
     function runOramaSearch(
@@ -5054,7 +5064,9 @@ async function searchIndexedDocument(
         exact
     ) {
 
-        if (!term) {
+        if (
+            !term
+        ) {
 
             return {
 
@@ -5158,8 +5170,16 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // البحث في السؤال كاملًا
+    // تجميع نتائج Orama
     // ==================================
+
+    const rawHits =
+        [];
+
+
+    // ----------------------------------
+    // العبارة كاملة
+    // ----------------------------------
 
     const fullQueryResult =
         runOramaSearch(
@@ -5175,16 +5195,24 @@ async function searchIndexedDocument(
         )
     ) {
 
-        searchResults.push(
-            ...fullQueryResult.hits
+        fullQueryResult.hits.forEach(
+            function (
+                hit
+            ) {
+
+                rawHits.push(
+                    hit
+                );
+
+            }
         );
 
     }
 
 
-    // ==================================
-    // البحث في الكلمات المهمة
-    // ==================================
+    // ----------------------------------
+    // الكلمات المهمة
+    // ----------------------------------
 
     queryTokens.forEach(
         function (
@@ -5205,8 +5233,59 @@ async function searchIndexedDocument(
                 )
             ) {
 
-                searchResults.push(
-                    ...result.hits
+                result.hits.forEach(
+                    function (
+                        hit
+                    ) {
+
+                        rawHits.push(
+                            hit
+                        );
+
+                    }
+                );
+
+            }
+
+        }
+    );
+
+
+    // ----------------------------------
+    // كلمات نوع الاستعلام
+    // تستخدم فقط لزيادة فرص العثور
+    // على مواد مرتبطة بنوع السؤال
+    // ----------------------------------
+
+    activeProfileTerms.forEach(
+        function (
+            term
+        ) {
+
+            const result =
+                runOramaSearch(
+                    term,
+                    false
+                );
+
+
+            if (
+                result &&
+                Array.isArray(
+                    result.hits
+                )
+            ) {
+
+                result.hits.forEach(
+                    function (
+                        hit
+                    ) {
+
+                        rawHits.push(
+                            hit
+                        );
+
+                    }
                 );
 
             }
@@ -5216,136 +5295,14 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // الكلمات المطابقة فعليًا
-    // ==================================
-
-    const matchedTerms =
-        queryTokens.filter(
-            function (
-                token
-            ) {
-
-                const normalizedToken =
-                    normalizeSearchText(
-                        token
-                    );
-
-
-                return searchResults.some(
-                    function (
-                        hit
-                    ) {
-
-                        if (
-                            !hit ||
-                            !hit.document
-                        ) {
-
-                            return false;
-
-                        }
-
-
-                        const text =
-                            normalizeSearchText(
-                                hit.document.text ||
-                                ""
-                            );
-
-
-                        const heading =
-                            normalizeSearchText(
-                                hit.document.heading ||
-                                ""
-                            );
-
-
-                        return (
-                            text.includes(
-                                normalizedToken
-                            ) ||
-                            heading.includes(
-                                normalizedToken
-                            )
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-
-    // ==================================
-    // عائلات موجودة فعليًا في النتائج
-    // ==================================
-
-    const matchedFamilies =
-        queryFamilies.filter(
-            function (
-                family
-            ) {
-
-                return searchResults.some(
-                    function (
-                        hit
-                    ) {
-
-                        if (
-                            !hit ||
-                            !hit.document
-                        ) {
-
-                            return false;
-
-                        }
-
-
-                        const text =
-                            String(
-                                hit.document.text ||
-                                ""
-                            );
-
-
-                        const tokens =
-                            tokenizeDocumentText(
-                                text
-                            );
-
-
-                        return tokens.some(
-                            function (
-                                token
-                            ) {
-
-                                return (
-                                    getConservativeFamilyKey(
-                                        token,
-                                        null
-                                    ) ===
-                                    family
-                                );
-
-                            }
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-
-    // ==================================
-    // إزالة التكرار حسب الفقرة
+    // دمج النتائج حسب الفقرة
     // ==================================
 
     const merged =
         new Map();
 
 
-    searchResults.forEach(
+    rawHits.forEach(
         function (
             hit
         ) {
@@ -5377,20 +5334,22 @@ async function searchIndexedDocument(
             }
 
 
-            const oramaScore =
-                Number(
-                    hit.score ||
-                    0
-                );
-
-
             const existing =
                 merged.get(
                     paragraphIndex
                 );
 
 
-            if (!existing) {
+            const score =
+                Number(
+                    hit.score ||
+                    0
+                );
+
+
+            if (
+                !existing
+            ) {
 
                 merged.set(
                     paragraphIndex,
@@ -5400,7 +5359,7 @@ async function searchIndexedDocument(
                             hit.document,
 
                         oramaScore:
-                            oramaScore
+                            score
 
                     }
                 );
@@ -5411,7 +5370,7 @@ async function searchIndexedDocument(
                 existing.oramaScore =
                     Math.max(
                         existing.oramaScore,
-                        oramaScore
+                        score
                     );
 
             }
@@ -5432,17 +5391,103 @@ async function searchIndexedDocument(
             : [];
 
 
-    // =================================================
+    const orderedHeadings =
+        headings
+            .filter(
+                function (
+                    heading
+                ) {
+
+                    return (
+                        heading &&
+                        typeof heading.index !==
+                            "undefined"
+                    );
+
+                }
+            )
+            .slice()
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    return (
+                        Number(
+                            a.index
+                        ) -
+                        Number(
+                            b.index
+                        )
+                    );
+
+                }
+            );
+
+
+    // ==================================
+    // الوصول إلى أقرب عنوان
+    // ==================================
+
+    function getNearestHeading(
+        paragraphIndex
+    ) {
+
+        let nearest =
+            null;
+
+
+        for (
+            let i =
+                orderedHeadings.length - 1;
+
+            i >= 0;
+
+            i--
+        ) {
+
+            const heading =
+                orderedHeadings[i];
+
+
+            if (
+                Number(
+                    heading.index
+                ) <=
+                Number(
+                    paragraphIndex
+                )
+            ) {
+
+                nearest =
+                    heading;
+
+                break;
+
+            }
+
+        }
+
+
+        return nearest;
+
+    }
+
+
+    // ==================================
     // Profile Score
-    // ترجيح النتيجة بحسب نوع السؤال
-    // =================================================
+    // ترجيح عام وخفيف
+    // ==================================
 
     function getProfileScore(
-        resultData
+        text,
+        heading
     ) {
 
         if (
-            !resultData
+            retrievalProfile ===
+            "general"
         ) {
 
             return 0;
@@ -5450,27 +5495,25 @@ async function searchIndexedDocument(
         }
 
 
-        const text =
+        const normalizedText =
             normalizeSearchText(
-                resultData.text ||
-                ""
+                text
             );
 
 
-        const heading =
+        const normalizedHeading =
             normalizeSearchText(
-                resultData.heading ||
-                ""
+                heading
             );
 
 
-        let profileScore =
+        let score =
             0;
 
 
-        // ==================================
-        // Definition
-        // ==================================
+        // ----------------------------------
+        // تعريف
+        // ----------------------------------
 
         if (
             retrievalProfile ===
@@ -5478,47 +5521,36 @@ async function searchIndexedDocument(
         ) {
 
             if (
-                heading.includes(
-                    searchTerm
-                )
-            ) {
-
-                profileScore +=
-                    25;
-
-            }
-
-
-            if (
-                text.includes(
-                    searchTerm
-                )
-            ) {
-
-                profileScore +=
-                    15;
-
-            }
-
-
-            if (
                 /تعريف|المقصود|المراد|يعني|يقصد|هو ان|هي ان/
                     .test(
-                        text
+                        normalizedText
                     )
             ) {
 
-                profileScore +=
-                    12;
+                score +=
+                    8;
+
+            }
+
+
+            if (
+                /تعريف|المقصود|المراد/
+                    .test(
+                        normalizedHeading
+                    )
+            ) {
+
+                score +=
+                    8;
 
             }
 
         }
 
 
-        // ==================================
-        // Effect
-        // ==================================
+        // ----------------------------------
+        // أثر
+        // ----------------------------------
 
         else if (
             retrievalProfile ===
@@ -5528,33 +5560,34 @@ async function searchIndexedDocument(
             if (
                 /اثر|تاثير|نتيجة|ينتج|يترتب|انعكاس/
                     .test(
-                        text
+                        normalizedText
                     )
             ) {
 
-                profileScore +=
-                    12;
+                score +=
+                    8;
 
             }
 
 
             if (
-                heading.includes(
-                    searchTerm
-                )
+                /اثر|تاثير|نتائج/
+                    .test(
+                        normalizedHeading
+                    )
             ) {
 
-                profileScore +=
-                    15;
+                score +=
+                    8;
 
             }
 
         }
 
 
-        // ==================================
-        // Comparison
-        // ==================================
+        // ----------------------------------
+        // مقارنة
+        // ----------------------------------
 
         else if (
             retrievalProfile ===
@@ -5562,35 +5595,36 @@ async function searchIndexedDocument(
         ) {
 
             if (
-                /الفرق|الفروق|مقارنة|يقارن|التمييز|يفترق|خلاف/
+                /علاق[ةه]|فرق|فروق|مقارنة|يقارن|تمييز|خلاف/
                     .test(
-                        text
+                        normalizedText
                     )
             ) {
 
-                profileScore +=
-                    12;
+                score +=
+                    8;
 
             }
 
 
             if (
-                heading.includes(
-                    searchTerm
-                )
+                /علاق[ةه]|فرق|فروق|مقارنة|يقارن|تمييز|خلاف/
+                    .test(
+                        normalizedHeading
+                    )
             ) {
 
-                profileScore +=
-                    15;
+                score +=
+                    10;
 
             }
 
         }
 
 
-        // ==================================
-        // Causes
-        // ==================================
+        // ----------------------------------
+        // أسباب
+        // ----------------------------------
 
         else if (
             retrievalProfile ===
@@ -5598,35 +5632,23 @@ async function searchIndexedDocument(
         ) {
 
             if (
-                /سبب|اسباب|علة|علل|لان|بسبب|من اسباب/
+                /سبب|اسباب|علة|علل|بسبب|لان/
                     .test(
-                        text
+                        normalizedText
                     )
             ) {
 
-                profileScore +=
-                    12;
-
-            }
-
-
-            if (
-                heading.includes(
-                    searchTerm
-                )
-            ) {
-
-                profileScore +=
-                    15;
+                score +=
+                    8;
 
             }
 
         }
 
 
-        // ==================================
-        // Location
-        // ==================================
+        // ----------------------------------
+        // موضع
+        // ----------------------------------
 
         else if (
             retrievalProfile ===
@@ -5634,39 +5656,40 @@ async function searchIndexedDocument(
         ) {
 
             if (
-                /الفصل|المبحث|المطلب|الباب|الصفحة|موضع|موضعه/
+                /المبحث|المطلب|الفصل|الباب|الموضع|الصفحة/
                     .test(
-                        text
+                        normalizedText
                     )
             ) {
 
-                profileScore +=
-                    10;
+                score +=
+                    6;
 
             }
 
 
             if (
-                heading.includes(
-                    searchTerm
-                )
+                /المبحث|المطلب|الفصل|الباب/
+                    .test(
+                        normalizedHeading
+                    )
             ) {
 
-                profileScore +=
-                    20;
+                score +=
+                    10;
 
             }
 
         }
 
 
-        return profileScore;
+        return score;
 
     }
 
 
     // ==================================
-    // النتائج النهائية
+    // بناء النتائج النهائية
     // ==================================
 
     const results =
@@ -5686,7 +5709,17 @@ async function searchIndexedDocument(
                 String(
                     paragraph.text ||
                     ""
-                );
+                )
+                    .trim();
+
+
+            if (
+                !originalText
+            ) {
+
+                return;
+
+            }
 
 
             const normalizedText =
@@ -5695,24 +5728,59 @@ async function searchIndexedDocument(
                 );
 
 
+            const nearestHeading =
+                getNearestHeading(
+                    paragraph.paragraphIndex
+                );
+
+
+            const headingText =
+                nearestHeading
+                    ? String(
+                        nearestHeading.text ||
+                        ""
+                    )
+                        .trim()
+                    : "";
+
+
+            const normalizedHeading =
+                normalizeSearchText(
+                    headingText
+                );
+
+
             // ==================================
-            // كلمات السؤال الموجودة
+            // الكلمات المطابقة
             // ==================================
 
-            const matchedTokenCount =
+            const matchedTokens =
                 queryTokens.filter(
                     function (
                         token
                     ) {
 
-                        return normalizedText.includes(
+                        const normalizedToken =
                             normalizeSearchText(
                                 token
+                            );
+
+
+                        return (
+                            normalizedText.includes(
+                                normalizedToken
+                            ) ||
+                            normalizedHeading.includes(
+                                normalizedToken
                             )
                         );
 
                     }
-                ).length;
+                );
+
+
+            const matchedTokenCount =
+                matchedTokens.length;
 
 
             const queryCoverage =
@@ -5729,14 +5797,14 @@ async function searchIndexedDocument(
             // عائلات الفقرة
             // ==================================
 
-            const paragraphFamilies =
-                [];
-
-
             const paragraphTokens =
                 tokenizeDocumentText(
                     originalText
                 );
+
+
+            const paragraphFamilies =
+                [];
 
 
             paragraphTokens.forEach(
@@ -5769,11 +5837,11 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // عدد العائلات المطابقة
+            // العائلات المطابقة
             // ==================================
 
-            const matchedFamilyCount =
-                matchedFamilies.filter(
+            const matchedFamiliesInParagraph =
+                queryFamilies.filter(
                     function (
                         family
                     ) {
@@ -5783,730 +5851,159 @@ async function searchIndexedDocument(
                         );
 
                     }
-                ).length;
+                );
+
+
+            const matchedFamilyCount =
+                matchedFamiliesInParagraph.length;
 
 
             const familyCoverage =
-                matchedFamilies.length >
+                queryFamilies.length >
                 0
 
                     ? matchedFamilyCount /
-                      matchedFamilies.length
+                      queryFamilies.length
 
                     : 0;
 
 
             // ==================================
-            // تغطية مفاهيم المقارنة
+            // تطابق العبارة
             // ==================================
 
-            let conceptCoverage =
-                0;
-
-
-            let comparisonCoverage =
-                0;
-
-
-            if (
-                retrievalProfile ===
-                "comparison"
-            ) {
-
-                const matchedConceptCount =
-                    comparisonConceptFamilies.filter(
-                        function (
-                            family
-                        ) {
-
-                            return paragraphFamilies.includes(
-                                family
-                            );
-
-                        }
-                    ).length;
-
-
-                conceptCoverage =
-                    comparisonConceptFamilies.length >
-                    0
-
-                        ? matchedConceptCount /
-                          comparisonConceptFamilies.length
-
-                        : 0;
-
-            }
-
-
-            // ==================================
-            // أقرب عنوان
-            // ==================================
-
-            let nearestHeading =
-                null;
-
-
-            for (
-                let i =
-                    headings.length - 1;
-
-                i >= 0;
-
-                i--
-            ) {
-
-                const heading =
-                    headings[i];
-
-
-                if (
-                    Number(
-                        heading.index
-                    ) <=
-                    Number(
-                        paragraph.paragraphIndex
-                    )
-                ) {
-
-                    nearestHeading =
-                        heading;
-
-                    break;
-
-                }
-
-            }
-
-
-            // ==================================
-            // درجة العنوان
-            // ==================================
-
-            let headingScore =
-                0;
-
-
-            let headingCoverage =
-                0;
-
-
-            if (
-                nearestHeading
-            ) {
-
-                const normalizedHeading =
-                    normalizeSearchText(
-                        nearestHeading.text
-                    );
-
-
-                queryTokens.forEach(
-                    function (
-                        token
-                    ) {
-
-                        const normalizedToken =
-                            normalizeSearchText(
-                                token
-                            );
-
-
-                        if (
-                            normalizedHeading.includes(
-                                normalizedToken
-                            )
-                        ) {
-
-                            headingScore +=
-                                6;
-
-                        }
-
-                    }
+            const exactPhrase =
+                normalizedText.includes(
+                    searchTerm
                 );
 
 
-                const matchedHeadingTokens =
-                    queryTokens.filter(
-                        function (
+            // ==================================
+            // قرب كلمات السؤال
+            // ==================================
+
+            const tokenPositions =
+                [];
+
+
+            queryTokens.forEach(
+                function (
+                    token
+                ) {
+
+                    const normalizedToken =
+                        normalizeSearchText(
                             token
-                        ) {
-
-                            return normalizedHeading.includes(
-                                normalizeSearchText(
-                                    token
-                                )
-                            );
-
-                        }
-                    ).length;
-
-
-                headingCoverage =
-                    queryTokens.length >
-                    0
-
-                        ? matchedHeadingTokens /
-                          queryTokens.length
-
-                        : 0;
-
-
-                if (
-                    normalizedHeading ===
-                    searchTerm
-                ) {
-
-                    headingScore +=
-                        40;
-
-                }
-                else if (
-                    normalizedHeading.includes(
-                        searchTerm
-                    )
-                ) {
-
-                    headingScore +=
-                        25;
-
-                }
-
-
-                // ==================================
-                // عنوان يجمع مفاهيم المقارنة
-                // ==================================
-
-                if (
-                    retrievalProfile ===
-                    "comparison" &&
-                    comparisonConceptFamilies.length >
-                        0
-                ) {
-
-                    let headingConceptCount =
-                        0;
-
-
-                    const headingTokens =
-                        tokenizeDocumentText(
-                            normalizedHeading
                         );
 
 
-                    comparisonConceptFamilies.forEach(
-                        function (
-                            family
-                        ) {
-
-                            const found =
-                                headingTokens.some(
-                                    function (
-                                        token
-                                    ) {
-
-                                        return (
-                                            getConservativeFamilyKey(
-                                                token,
-                                                null
-                                            ) ===
-                                            family
-                                        );
-
-                                    }
-                                );
-
-
-                            if (
-                                found
-                            ) {
-
-                                headingConceptCount +=
-                                    1;
-
-                            }
-
-                        }
-                    );
+                    const position =
+                        normalizedText.indexOf(
+                            normalizedToken
+                        );
 
 
                     if (
-                        headingConceptCount ===
-                        comparisonConceptFamilies.length
-                    ) {
-
-                        headingScore +=
-                            25;
-
-                    }
-
-                    // ==================================
-                    // عنوان مقارنة صريح
-                    // ==================================
-
-                    if (
-                        retrievalProfile ===
-                        "comparison" &&
-                        headingConceptCount ===
-                        comparisonConceptFamilies.length
-                    ) {
-
-                        const normalizedHeadingText =
-                            normalizeSearchText(
-                                nearestHeading.text
-                            );
-
-
-                        const explicitHeadingRelation =
-                            /علاق[ةه]\s+.*استصلاح.*عرف|علاق[ةه]\s+.*عرف.*استصلاح|الفرق\s+بين|الفروق\s+بين|مقارن[ةه]\s+بين|التمييز\s+بين/
-                                .test(
-                                    normalizedHeadingText
-                                );
-
-
-                        if (
-                            explicitHeadingRelation
-                        ) {
-
-                            headingScore +=
-                                25;
-
-                        }
-
-                    }
-                    else if (
-                        headingConceptCount >
+                        position >=
                         0
                     ) {
 
-                        headingScore +=
-                            8;
+                        tokenPositions.push(
+                            position
+                        );
 
                     }
 
                 }
-
-            }
-
-
-            // ==================================
-            // قرب المفاهيم
-            // ==================================
-
-            let comparisonProximity =
-                0;
+            );
 
 
             let proximityScore =
                 0;
 
 
-            // ==================================
-            // مقارنة
-            // ==================================
-
             if (
-                retrievalProfile ===
-                "comparison" &&
-                comparisonConceptFamilies.length >
-                    1
+                tokenPositions.length >
+                1
             ) {
 
-                const familyPositions =
-                    [];
-
-
-                paragraphTokens.forEach(
+                tokenPositions.sort(
                     function (
-                        token,
-                        tokenIndex
+                        a,
+                        b
                     ) {
 
-                        const family =
-                            getConservativeFamilyKey(
-                                token,
-                                null
-                            );
-
-
-                        if (
-                            comparisonConceptFamilies.includes(
-                                family
-                            )
-                        ) {
-
-                            familyPositions.push({
-
-                                family:
-                                    family,
-
-                                position:
-                                    tokenIndex
-
-                            });
-
-                        }
-
-                    }
-                );
-
-
-                if (
-                    familyPositions.length >
-                    1
-                ) {
-
-                    familyPositions.sort(
-                        function (
-                            a,
+                        return (
+                            a -
                             b
-                        ) {
-
-                            return (
-                                a.position -
-                                b.position
-                            );
-
-                        }
-                    );
-
-
-                    let bestSpan =
-                        null;
-
-
-                    for (
-                        let i = 0;
-
-                        i <
-                            familyPositions.length;
-
-                        i++
-                    ) {
-
-                        for (
-                            let j =
-                                i + 1;
-
-                            j <
-                                familyPositions.length;
-
-                            j++
-                        ) {
-
-                            if (
-                                familyPositions[i].family ===
-                                familyPositions[j].family
-                            ) {
-
-                                continue;
-
-                            }
-
-
-                            const span =
-                                familyPositions[j].position -
-                                familyPositions[i].position +
-                                1;
-
-
-                            if (
-                                bestSpan ===
-                                    null ||
-                                span <
-                                    bestSpan
-                            ) {
-
-                                bestSpan =
-                                    span;
-
-                            }
-
-                        }
-
-                    }
-
-
-                    if (
-                        bestSpan !==
-                            null
-                    ) {
-
-                        comparisonProximity =
-                            20 /
-                            Math.max(
-                                bestSpan,
-                                1
-                            );
-
-                        proximityScore =
-                            comparisonProximity;
-
-                    }
-
-                }
-
-            }
-
-            // ==================================
-            // الأسئلة غير المقارنة
-            // ==================================
-
-            else {
-
-                const tokenPositions =
-                    [];
-
-
-                queryTokens.forEach(
-                    function (
-                        token
-                    ) {
-
-                        const normalizedToken =
-                            normalizeSearchText(
-                                token
-                            );
-
-
-                        const position =
-                            normalizedText.indexOf(
-                                normalizedToken
-                            );
-
-
-                        if (
-                            position >=
-                            0
-                        ) {
-
-                            tokenPositions.push(
-                                position
-                            );
-
-                        }
-
-                    }
-                );
-
-
-                if (
-                    tokenPositions.length >
-                    1
-                ) {
-
-                    tokenPositions.sort(
-                        function (
-                            a,
-                            b
-                        ) {
-
-                            return (
-                                a -
-                                b
-                            );
-
-                        }
-                    );
-
-
-                    const span =
-                        tokenPositions[
-                            tokenPositions.length - 1
-                        ] -
-                        tokenPositions[0] +
-                        1;
-
-
-                    proximityScore =
-                        20 /
-                        Math.max(
-                            span,
-                            1
                         );
 
-                }
+                    }
+                );
+
+
+                const span =
+                    tokenPositions[
+                        tokenPositions.length - 1
+                    ] -
+                    tokenPositions[0] +
+                    1;
+
+
+                proximityScore =
+                    20 /
+                    Math.max(
+                        span,
+                        1
+                    );
 
             }
 
 
             // ==================================
-            // هل توجد علاقة صريحة؟
+            // أولوية العنوان
             // ==================================
 
-            let relationScore =
+            let headingScore =
                 0;
 
 
             if (
-                retrievalProfile ===
-                "comparison" &&
-                conceptCoverage >
-                    0
+                headingText
             ) {
 
-                const relationPatterns = [
+                matchedTokens.forEach(
+                    function () {
 
-                    /علاق[ةه]\s+بين/,
-
-                    /الفرق\s+بين/,
-
-                    /الفروق\s+بين/,
-
-                    /مقارن[ةه]\s+بين/,
-
-                    /يقارن\s+بين/,
-
-                    /التمييز\s+بين/,
-
-                    /المفارق[ةه]\s+بين/,
-
-                    /يفترق/,
-
-                    /خلاف\s+بين/
-
-                ];
-
-
-                const hasExplicitRelation =
-                    relationPatterns.some(
-                        function (
-                            pattern
-                        ) {
-
-                            return pattern.test(
-                                normalizedText
-                            );
-
-                        }
-                    );
-
-
-                // ==================================
-                // وجود المفهومين فقط
-                // لا يعني وجود مقارنة كاملة
-                // ==================================
-
-                if (
-                    conceptCoverage >=
-                    1
-                ) {
-
-                    comparisonCoverage =
-                        0.5;
-
-
-                    // ==================================
-                    // علاقة صريحة
-                    // ==================================
-
-                    if (
-                        hasExplicitRelation
-                    ) {
-
-                        comparisonCoverage =
-                            1;
+                        headingScore +=
+                            4;
 
                     }
+                );
 
-                    // ==================================
-                    // قرب شديد
-                    // ==================================
-
-                    else if (
-                        comparisonProximity >=
-                        2
-                    ) {
-
-                        comparisonCoverage =
-                            0.75;
-
-                    }
-
-                }
-
-
-                // ==================================
-                // علاقة صريحة قوية
-                // ==================================
 
                 if (
-                    comparisonCoverage >=
-                    1
+                    normalizedHeading.includes(
+                        searchTerm
+                    )
                 ) {
 
-                    relationScore =
-                        50;
+                    headingScore +=
+                        18;
 
                 }
-
-                // ==================================
-                // علاقة قوية بالاقتراب
-                // ==================================
-
-                else if (
-                    comparisonCoverage >=
-                    0.75
-                ) {
-
-                    relationScore =
-                        35;
-
-                }
-
-                // ==================================
-                // وجود المفهومين فقط
-                // ==================================
-
-                else if (
-                    comparisonCoverage >=
-                    0.5
-                ) {
-
-                    relationScore =
-                        15;
-
-                }
-
-
-                // ==================================
-                // تعزيز العلاقة عند القرب الشديد
-                // ==================================
-
-                if (
-                    comparisonCoverage >=
-                        0.75 &&
-                    comparisonProximity >=
-                        2
-                ) {
-
-                    relationScore +=
-                        15;
-
-                }
-
-
-                // ==================================
-                // الحد الأعلى
-                // ==================================
-
-                relationScore =
-                    Math.min(
-                        relationScore,
-                        70
-                    );
 
             }
 
 
             // ==================================
-            // التطابق الكامل
+            // درجة نوع السؤال
             // ==================================
 
-            const exactPhrase =
-                normalizedText.includes(
-                    searchTerm
+            const profileScore =
+                getProfileScore(
+                    originalText,
+                    headingText
                 );
 
 
@@ -6523,25 +6020,36 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // تغطية السؤال
+            // التغطية
             // ==================================
 
             score +=
                 queryCoverage *
-                20;
+                18;
 
 
             // ==================================
-            // تغطية العائلات
+            // العائلات
             // ==================================
 
             score +=
                 familyCoverage *
-                15;
+                16;
 
 
             // ==================================
-            // أولوية العنوان
+            // القرب
+            // ==================================
+
+            score +=
+                Math.min(
+                    proximityScore,
+                    8
+                );
+
+
+            // ==================================
+            // العنوان
             // ==================================
 
             score +=
@@ -6549,24 +6057,15 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // تغطية العنوان
+            // نوع السؤال
             // ==================================
 
             score +=
-                headingCoverage *
-                15;
+                profileScore;
 
 
             // ==================================
-            // قرب الكلمات
-            // ==================================
-
-            score +=
-                proximityScore;
-
-
-            // ==================================
-            // تطابق العبارة كاملة
+            // العبارة الكاملة
             // ==================================
 
             if (
@@ -6574,13 +6073,14 @@ async function searchIndexedDocument(
             ) {
 
                 score +=
-                    15;
+                    14;
 
             }
 
 
             // ==================================
-            // تعزيز المطابقة متعددة المفاهيم
+            // تغطية متعددة المفاهيم
+            // عامة لجميع أنواع الأسئلة
             // ==================================
 
             if (
@@ -6589,7 +6089,7 @@ async function searchIndexedDocument(
             ) {
 
                 score +=
-                    20;
+                    8;
 
             }
 
@@ -6600,91 +6100,40 @@ async function searchIndexedDocument(
             ) {
 
                 score +=
-                    15;
+                    6;
 
             }
 
 
             // ==================================
-            // درجة نوع السؤال
+            // لا توجد فلترة خاصة بنوع السؤال
             // ==================================
 
-            const profileScore =
-                getProfileScore({
+            const minimumCoverage =
+                queryTokens.length >=
+                4
 
-                    text:
-                        originalText,
+                    ? 0.25
 
-                    heading:
-                        nearestHeading
-                            ? nearestHeading.text
-                            : ""
+                    : 0.20;
 
-                });
-
-
-            score +=
-                profileScore;
-
-
-            // ==================================
-            // اجتماع مفاهيم المقارنة
-            // ==================================
 
             if (
-                retrievalProfile ===
-                "comparison"
-            ) {
-
-                score +=
-                    comparisonCoverage *
-                    25;
-
-            }
-
-
-            // ==================================
-            // علاقة المفاهيم
-            // ==================================
-
-            score +=
-                relationScore;
-
-
-            // ==================================
-            // أولوية المقاطع التي تجمع
-            // المفاهيم الأساسية
-            // ==================================
-
-            if (
-                retrievalProfile ===
-                "comparison"
-            ) {
-
-                if (
-                    comparisonCoverage ===
+                queryCoverage <
+                    minimumCoverage &&
+                familyCoverage <
+                    minimumCoverage &&
+                headingScore <=
                     0
-                ) {
+            ) {
 
-                    score *=
-                        0.55;
-
-                }
-                else if (
-                    comparisonCoverage <
-                    0.75
-                ) {
-
-                    score *=
-                        0.75;
-
-                }
+                return;
 
             }
 
 
             // ==================================
-            // نوع التطابق
+            // تحديد نوع المطابقة
             // ==================================
 
             let matchType =
@@ -6700,21 +6149,8 @@ async function searchIndexedDocument(
 
             }
             else if (
-                retrievalProfile ===
-                    "comparison" &&
-                comparisonCoverage >=
-                    1 &&
-                relationScore >
-                    0
-            ) {
-
-                matchType =
-                    "comparison";
-
-            }
-            else if (
                 headingScore >
-                0
+                    10
             ) {
 
                 matchType =
@@ -6723,7 +6159,7 @@ async function searchIndexedDocument(
             }
             else if (
                 matchedFamilyCount >
-                0
+                    0
             ) {
 
                 matchType =
@@ -6733,14 +6169,14 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // بناء السياق
+            // موضع أول مطابقة
             // ==================================
 
-            let context =
-                originalText;
+            let searchPosition =
+                -1;
 
 
-            const firstToken =
+            const firstMatchedToken =
                 queryTokens.find(
                     function (
                         token
@@ -6757,35 +6193,45 @@ async function searchIndexedDocument(
 
 
             if (
-                firstToken
+                firstMatchedToken
             ) {
 
-                const normalizedFirstToken =
-                    normalizeSearchText(
-                        firstToken
-                    );
-
-
-                const position =
+                searchPosition =
                     normalizedText.indexOf(
-                        normalizedFirstToken
+                        normalizeSearchText(
+                            firstMatchedToken
+                        )
                     );
 
+            }
+
+
+            // ==================================
+            // السياق الأولي
+            // ==================================
+
+            let context =
+                originalText;
+
+
+            if (
+                searchPosition >=
+                0
+            ) {
 
                 const start =
                     Math.max(
                         0,
-                        position -
-                        120
+                        searchPosition -
+                        140
                     );
 
 
                 const end =
                     Math.min(
                         normalizedText.length,
-                        position +
-                        normalizedFirstToken.length +
-                        320
+                        searchPosition +
+                        360
                     );
 
 
@@ -6799,7 +6245,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // حفظ النتيجة
+            // النتيجة
             // ==================================
 
             results.push({
@@ -6817,20 +6263,22 @@ async function searchIndexedDocument(
                     context,
 
                 heading:
-                    nearestHeading
-                        ? nearestHeading.text
-                        : "",
+                    headingText,
 
                 headingLevel:
                     nearestHeading
-                        ? nearestHeading.style
+                        ? nearestHeading.style ||
+                          ""
                         : "",
 
                 score:
                     score,
 
                 oramaScore:
-                    item.oramaScore,
+                    Number(
+                        item.oramaScore ||
+                        0
+                    ),
 
                 profile:
                     retrievalProfile,
@@ -6839,22 +6287,22 @@ async function searchIndexedDocument(
                     profileScore,
 
                 relationScore:
-                    relationScore,
-
-                comparisonCoverage:
-                    comparisonCoverage,
+                    0,
 
                 conceptCoverage:
-                    conceptCoverage,
+                    familyCoverage,
+
+                comparisonCoverage:
+                    familyCoverage,
 
                 matchType:
                     matchType,
 
                 matchedTerms:
-                    matchedTerms,
+                    matchedTokens,
 
                 matchedFamilies:
-                    matchedFamilies,
+                    matchedFamiliesInParagraph,
 
                 matchedFamilyCount:
                     matchedFamilyCount,
@@ -6869,7 +6317,14 @@ async function searchIndexedDocument(
                     headingScore,
 
                 headingCoverage:
-                    headingCoverage,
+                    headingScore >
+                    0
+                        ? Math.min(
+                            headingScore /
+                            30,
+                            1
+                        )
+                        : 0,
 
                 proximityScore:
                     proximityScore,
@@ -6907,47 +6362,14 @@ async function searchIndexedDocument(
 
 
             if (
-                retrievalProfile ===
-                "comparison"
+                b.familyCoverage !==
+                a.familyCoverage
             ) {
 
-                if (
-                    b.comparisonCoverage !==
-                    a.comparisonCoverage
-                ) {
-
-                    return (
-                        b.comparisonCoverage -
-                        a.comparisonCoverage
-                    );
-
-                }
-
-
-                if (
-                    b.relationScore !==
-                    a.relationScore
-                ) {
-
-                    return (
-                        b.relationScore -
-                        a.relationScore
-                    );
-
-                }
-
-
-                if (
-                    b.conceptCoverage !==
-                    a.conceptCoverage
-                ) {
-
-                    return (
-                        b.conceptCoverage -
-                        a.conceptCoverage
-                    );
-
-                }
+                return (
+                    b.familyCoverage -
+                    a.familyCoverage
+                );
 
             }
 
@@ -6966,13 +6388,13 @@ async function searchIndexedDocument(
 
 
             if (
-                b.familyCoverage !==
-                a.familyCoverage
+                b.headingScore !==
+                a.headingScore
             ) {
 
                 return (
-                    b.familyCoverage -
-                    a.familyCoverage
+                    b.headingScore -
+                    a.headingScore
                 );
 
             }
@@ -6988,21 +6410,17 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // الحد الأقصى للمرشحين
+    // حد المرشحين
+    // نرسل طبقة وسيطة غنية إلى الاسترجاع
     // ==================================
 
     const candidateLimit =
-        retrievalProfile ===
-            "comparison"
+        typeof settings.candidateLimit ===
+            "number"
 
-            ? 30
+                ? settings.candidateLimit
 
-            : retrievalProfile ===
-                "definition"
-
-                ? 20
-
-                : 25;
+                : 50;
 
 
     if (
@@ -7018,7 +6436,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // عدد الظهورات
+    // عدد الظهورات في المستند
     // ==================================
 
     let indexedOccurrences =
@@ -7033,7 +6451,7 @@ async function searchIndexedDocument(
             : [];
 
 
-    const allDocumentTokens =
+    const allTokens =
         tokenizeDocumentText(
             allParagraphs
                 .map(
@@ -7056,44 +6474,50 @@ async function searchIndexedDocument(
         );
 
 
-    matchedFamilies.forEach(
+    const countedFamilies =
+        new Set(
+            matchedFamilies
+        );
+
+
+    allTokens.forEach(
         function (
-            family
+            token
         ) {
 
-            allDocumentTokens.forEach(
-                function (
-                    token
-                ) {
+            const family =
+                getConservativeFamilyKey(
+                    token,
+                    null
+                );
 
-                    if (
-                        getConservativeFamilyKey(
-                            token,
-                            null
-                        ) ===
-                        family
-                    ) {
 
-                        indexedOccurrences +=
-                            1;
+            if (
+                countedFamilies.has(
+                    family
+                )
+            ) {
 
-                    }
+                indexedOccurrences +=
+                    1;
 
-                }
-            );
+            }
 
         }
     );
 
 
     // ==================================
-    // النتيجة النهائية
+    // النتيجة
     // ==================================
 
     return {
 
         query:
             searchTerm,
+
+        profile:
+            retrievalProfile,
 
         count:
             results.length,
@@ -7108,7 +6532,7 @@ async function searchIndexedDocument(
             matchedFamilies,
 
         comparisonConceptFamilies:
-            comparisonConceptFamilies,
+            [],
 
         totalQueryTerms:
             queryTokens.length,
