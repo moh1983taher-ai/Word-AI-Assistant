@@ -8596,6 +8596,141 @@ async function buildRetrievalContext(
             }
         );
 
+        // ==================================
+        // بوابة المحتوى في أسئلة المقارنة
+        // لا نأخذ العنوان كمصدر إلا إذا
+        // كان المحتوى التابع له صالحًا فعلًا
+        // ==================================
+
+        if (
+            retrievalProfile ===
+            "comparison"
+        ) {
+
+            if (
+                !bestParagraph ||
+                !bestParagraph.paragraph
+            ) {
+
+                return null;
+
+            }
+
+
+            const bestText =
+                String(
+                    bestParagraph.paragraph.text ||
+                    ""
+                ).trim();
+
+
+            const normalizedBestText =
+                normalizeSearchText(
+                    bestText
+                );
+
+
+            // ----------------------------------
+            // حساب وجود المفهومين في الفقرة
+            // ----------------------------------
+
+            let matchedConcepts =
+                0;
+
+
+            const bestTokens =
+                tokenizeDocumentText(
+                    bestText
+                );
+
+
+            comparisonConceptFamilies.forEach(
+                function (
+                    family
+                ) {
+
+                    const found =
+                        bestTokens.some(
+                            function (
+                                token
+                            ) {
+
+                                return (
+                                    getConservativeFamilyKey(
+                                        token,
+                                        null
+                                    ) ===
+                                    family
+                                );
+
+                            }
+                        );
+
+
+                    if (
+                        found
+                    ) {
+
+                        matchedConcepts +=
+                            1;
+
+                    }
+
+                }
+            );
+
+
+            const bestConceptCoverage =
+                comparisonConceptFamilies.length >
+                0
+
+                    ? matchedConcepts /
+                    comparisonConceptFamilies.length
+
+                    : 0;
+
+
+            // ----------------------------------
+            // هل توجد علاقة صريحة؟
+            // ----------------------------------
+
+            const hasExplicitRelation =
+                /علاق[ةه]|الفرق|الفروق|مقارن[ةه]|يقارن|التمييز|خلاف/
+                    .test(
+                        normalizedBestText
+                    );
+
+
+            // ----------------------------------
+            // إذا كان المحتوى لا يقدم
+            // المقارنة أو العلاقة، لا نستخدم
+            // العنوان كمصدر مباشر
+            // ----------------------------------
+
+            if (
+                bestConceptCoverage <
+                    1 ||
+                !hasExplicitRelation
+            ) {
+
+                return null;
+
+            }
+
+
+            if (
+                bestConceptCoverage ===
+                    1 &&
+                !hasExplicitRelation &&
+                bestParagraph.score <
+                    20
+            ) {
+
+                return null;
+
+            }
+
+        }
 
         return bestParagraph;
 
