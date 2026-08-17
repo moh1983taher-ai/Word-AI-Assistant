@@ -5,70 +5,62 @@
 // التخزين + المستندات + بنية المستند
 // ======================================
 
-Office.onReady(function () {
-
 // ======================================
 // Application State
-// الحالة العامة للتطبيق
+// يجب أن يكون خارج Office.onReady
 // ======================================
 
 const AppState = {
 
-    wordConnected:
-        true,
+    wordConnected: false,
 
-    currentDocument:
-        null,
+    currentDocument: null,
 
-    currentChat:
-        null,
+    currentChat: null,
 
-    currentProject:
-        null,
+    currentProject: null,
 
     aiSettings: {
 
-        provider:
-            "openrouter",
+        provider: "openrouter",
 
-        key:
-            "",
+        key: "",
 
-        model:
-            ""
+        model: ""
 
     },
 
-    currentCitationSources:
-        [],
+    currentCitationSources: [],
 
     searchState: {
 
-        query:
-            "",
+        query: "",
 
-        results:
-            [],
+        results: [],
 
-        isSearching:
-            false
+        isSearching: false
 
     },
 
     streaming: {
 
-        active:
-            false,
+        active: false,
 
-        provider:
-            "",
+        provider: "",
 
-        text:
-            ""
+        text: ""
 
     }
 
 };
+
+
+// ======================================
+// Office Initialization
+// ======================================
+
+Office.onReady(function () {
+
 
 // ======================================
 // Elements
