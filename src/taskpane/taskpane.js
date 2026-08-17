@@ -5679,7 +5679,43 @@ async function searchIndexedDocument(
                     ? matchedFamilyCount /
                       matchedFamilies.length
                     : 0;
+            
+            // ==================================
+            // تغطية مفاهيم المقارنة
+            // هل اجتمعت المفاهيم الأساسية في الفقرة؟
+            // ==================================
 
+            let comparisonCoverage =
+                0;
+
+
+            if (
+                retrievalProfile ===
+                "comparison"
+            ) {
+
+                const comparisonFamiliesInParagraph =
+                    matchedFamilies.filter(
+                        function (
+                            family
+                        ) {
+
+                            return paragraphFamilies.includes(
+                                family
+                            );
+
+                        }
+                    );
+
+
+                comparisonCoverage =
+                    matchedFamilies.length >
+                    0
+                        ? comparisonFamiliesInParagraph.length /
+                        matchedFamilies.length
+                        : 0;
+
+            }
             // ==================================
             // فلترة أولية حسب تغطية السؤال
             // ==================================
@@ -5724,7 +5760,20 @@ async function searchIndexedDocument(
 
             }
 
+            // ==================================
+            // تعزيز اجتماع مفاهيم المقارنة
+            // ==================================
 
+            if (
+                retrievalProfile ===
+                "comparison"
+            ) {
+
+                score +=
+                    comparisonCoverage *
+                    25;
+
+            }
             // ==================================
             // أقرب عنوان
             // ==================================
