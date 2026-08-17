@@ -4769,27 +4769,29 @@ function getHeadingParagraphRange(
 
 // =====================================================
 // Analyze Search Query
-// محلل الاستعلام العام
+// المحلل العام للاستعلام
 //
-// الهدف:
-// استخراج عناصر الاستعلام دون قاموس فقهي أو أصولي.
+// الوظائف:
+// 1) فصل كلمات السؤال عن الكلمات الوظيفية.
+// 2) تحديد الكلمات الموضوعية دون قاموس فقهي.
+// 3) معالجة اللواصق العربية تلقائيًا.
+// 4) استخراج العائلات الصرفية.
+// 5) اكتشاف العبارات المركبة الموجودة في المستند.
+// 6) حساب وزن أولي للمصطلحات.
+// 7) إبقاء البنية متوافقة مع searchIndexedDocument().
 //
-// المخرجات:
-// - allTokens
-// - contentTokens
-// - functionTokens
-// - phraseCandidates
-// - families
-// - weightedTerms
-//
-// لا يحاول هذا المحلل معرفة جواب السؤال.
-// وظيفته فقط معرفة: ما الذي ينبغي أن يبحث عنه المحرك.
+// ملاحظة:
+// لا توجد هنا قائمة بالمصطلحات الفقهية أو الأصولية.
 // =====================================================
 
 function analyzeSearchQuery(
     query,
     documentData
 ) {
+
+    // ==================================
+    // السؤال الأصلي
+    // ==================================
 
     const originalQuery =
         String(
@@ -4799,7 +4801,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // النتيجة الفارغة
+    // نتيجة فارغة
     // ==================================
 
     if (
@@ -4809,6 +4811,9 @@ function analyzeSearchQuery(
         return {
 
             query:
+                "",
+
+            normalizedQuery:
                 "",
 
             allTokens:
@@ -4830,6 +4835,9 @@ function analyzeSearchQuery(
                 [],
 
             contentCount:
+                0,
+
+            functionCount:
                 0
 
         };
@@ -4838,7 +4846,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // تطبيع السؤال
+    // تطبيع الاستعلام
     // ==================================
 
     const normalizedQuery =
@@ -4858,10 +4866,10 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // كلمات وظيفية شائعة جدًا
+    // الكلمات الوظيفية العامة
     //
-    // هذه الكلمات لا نحذفها من السؤال،
-    // وإنما نعطيها وزنًا منخفضًا.
+    // لا نحذفها من السؤال الأصلي،
+    // وإنما لا نجعلها مصطلحات موضوعية.
     // ==================================
 
     const commonFunctionWords =
@@ -4870,31 +4878,21 @@ function analyzeSearchQuery(
             "ما",
             "ماذا",
             "من",
-            "هو",
-            "هي",
-            "هم",
-            "هن",
+            "هل",
+            "كيف",
+            "لماذا",
+            "أين",
+            "متى",
+            "أي",
+            "اي",
             "في",
             "على",
             "عن",
             "الى",
             "إلى",
-            "منه",
-            "منها",
-            "به",
-            "بها",
-            "له",
-            "لها",
-            "هذا",
-            "هذه",
-            "ذلك",
-            "تلك",
-            "الذي",
-            "التي",
-            "الذين",
-            "اللاتي",
-            "بين",
+            "من",
             "مع",
+            "بين",
             "ثم",
             "أو",
             "او",
@@ -4906,17 +4904,6 @@ function analyzeSearchQuery(
             "أن",
             "ان",
             "إن",
-            "هل",
-            "أي",
-            "اي",
-            "كان",
-            "كانت",
-            "يكون",
-            "تكون",
-            "هو",
-            "هي",
-            "من",
-            "عن",
             "حتى",
             "قد",
             "لقد",
@@ -4924,55 +4911,83 @@ function analyzeSearchQuery(
             "لن",
             "لا",
             "ليس",
-            "ليست"
+            "ليست",
+            "هذا",
+            "هذه",
+            "ذلك",
+            "تلك",
+            "الذي",
+            "التي",
+            "الذين",
+            "اللاتي",
+            "به",
+            "بها",
+            "له",
+            "لها",
+            "منه",
+            "منها",
+            "عنه",
+            "عنها"
         ]);
 
 
     // ==================================
-    // كلمات صياغة السؤال
+    // كلمات توجيه السؤال
     //
-    // لا نحذفها لأنها قد تكون مهمة،
-    // لكن وزنها أقل من المصطلح الموضوعي.
+    // ليست مصطلحات موضوعية،
+    // لكنها مهمة لمعرفة طبيعة الاستعلام.
     // ==================================
 
     const queryInstructionWords =
         new Set([
 
-            "مقصود",
             "المقصود",
+            "مقصود",
             "معنى",
             "تعريف",
             "تعريفه",
             "تعريفها",
-            "مراد",
             "المراد",
-            "اثر",
+            "مراد",
+            "يقصد",
+            "تفسير",
+            "شرح",
+
             "أثر",
+            "اثر",
             "تأثير",
             "تاثير",
             "نتيجة",
             "نتائج",
+
             "حكم",
             "أحكام",
+            "حجية",
+
             "سبب",
             "أسباب",
             "اسباب",
-            "شروط",
+            "علة",
+            "علل",
+
             "شرط",
+            "شروط",
+
             "فرق",
-            "الفروق",
             "الفرق",
+            "فروق",
+            "الفروق",
+
             "مقارنة",
             "مقارن",
+
             "علاقة",
             "العلاقة",
-            "صلته",
             "صلة",
+            "صلته",
+            "صلتها",
+
             "كيفية",
-            "كيف",
-            "لماذا",
-            "لِمَ",
-            "أين",
             "موضع",
             "موضعه",
             "موضعها"
@@ -4980,126 +4995,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // فصل الكلمات
-    // ==================================
-
-    const contentTokens =
-        [];
-
-
-    const functionTokens =
-        [];
-
-
-    allTokens.forEach(
-        function (
-            token
-        ) {
-
-            const cleanToken =
-                String(
-                    token ||
-                    ""
-                ).trim();
-
-
-            if (
-                !cleanToken
-            ) {
-
-                return;
-
-            }
-
-
-            if (
-                commonFunctionWords.has(
-                    cleanToken
-                )
-            ) {
-
-                functionTokens.push({
-
-                    term:
-                        cleanToken,
-
-                    weight:
-                        0.10,
-
-                    category:
-                        "function"
-
-                });
-
-                return;
-
-            }
-
-
-            if (
-                queryInstructionWords.has(
-                    cleanToken
-                )
-            ) {
-
-                functionTokens.push({
-
-                    term:
-                        cleanToken,
-
-                    weight:
-                        0.35,
-
-                    category:
-                        "instruction"
-
-                });
-
-                return;
-
-            }
-
-
-            contentTokens.push(
-                cleanToken
-            );
-
-        }
-    );
-
-
-    // ==================================
-    // توحيد الكلمات الموضوعية
-    // ==================================
-
-    const uniqueContentTokens =
-        [];
-
-
-    contentTokens.forEach(
-        function (
-            token
-        ) {
-
-            if (
-                !uniqueContentTokens.includes(
-                    token
-                )
-            ) {
-
-                uniqueContentTokens.push(
-                    token
-                );
-
-            }
-
-        }
-    );
-
-
-    // ==================================
-    // النص الكامل للمستند
-    // لاستخدام أهمية المصطلح داخل المستند
+    // استخراج النص الكامل للمستند
     // ==================================
 
     let documentText =
@@ -5157,7 +5053,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // توكنات المستند
+    // استخراج توكنات المستند
     // ==================================
 
     const documentTokens =
@@ -5169,7 +5065,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // حساب تكرار المصطلحات
+    // تكرار الكلمات في المستند
     // ==================================
 
     const termFrequency =
@@ -5181,15 +5077,15 @@ function analyzeSearchQuery(
             token
         ) {
 
-            const key =
+            const cleanToken =
                 String(
                     token ||
                     ""
-                );
+                ).trim();
 
 
             if (
-                !key
+                !cleanToken
             ) {
 
                 return;
@@ -5198,10 +5094,10 @@ function analyzeSearchQuery(
 
 
             termFrequency.set(
-                key,
+                cleanToken,
                 (
                     termFrequency.get(
-                        key
+                        cleanToken
                     ) ||
                     0
                 ) +
@@ -5213,7 +5109,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // تكرار العائلات
+    // تكرار العائلات في المستند
     // ==================================
 
     const familyFrequency =
@@ -5257,24 +5153,600 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // بناء المصطلحات الموزونة
+    // استخراج صيغ البحث العربية
+    //
+    // مثال:
+    // والاستحسان
+    // ↓
+    // والاستحسان
+    // الاستحسان
+    //
+    // بالقياس
+    // ↓
+    // بالقياس
+    // القياس
+    // ==================================
+
+    function getSearchTermVariants(
+        token
+    ) {
+
+        const variants =
+            [];
+
+
+        let current =
+            String(
+                token ||
+                ""
+            ).trim();
+
+
+        if (
+            !current
+        ) {
+
+            return variants;
+
+        }
+
+
+        function addVariant(
+            value
+        ) {
+
+            const clean =
+                String(
+                    value ||
+                    ""
+                ).trim();
+
+
+            if (
+                !clean ||
+                clean.length <
+                    3
+            ) {
+
+                return;
+
+            }
+
+
+            if (
+                !variants.includes(
+                    clean
+                )
+            ) {
+
+                variants.push(
+                    clean
+                );
+
+            }
+
+        }
+
+
+        addVariant(
+            current
+        );
+
+
+        // ==================================
+        // نزع اللواصق تدريجيًا
+        // بحد أقصى 3 عمليات
+        // ==================================
+
+        let changed =
+            true;
+
+
+        let safety =
+            0;
+
+
+        while (
+            changed &&
+            safety <
+                3
+        ) {
+
+            changed =
+                false;
+
+
+            safety +=
+                1;
+
+
+            // ----------------------------------
+            // واو العطف
+            // ----------------------------------
+
+            if (
+                current.startsWith(
+                    "و"
+                ) &&
+                current.length >
+                    3
+            ) {
+
+                const next =
+                    current.substring(
+                        1
+                    );
+
+
+                if (
+                    next.length >=
+                    3
+                ) {
+
+                    current =
+                        next;
+
+                    addVariant(
+                        current
+                    );
+
+                    changed =
+                        true;
+
+                    continue;
+
+                }
+
+            }
+
+
+            // ----------------------------------
+            // فاء العطف
+            // ----------------------------------
+
+            if (
+                current.startsWith(
+                    "ف"
+                ) &&
+                current.length >
+                    3
+            ) {
+
+                const next =
+                    current.substring(
+                        1
+                    );
+
+
+                if (
+                    next.length >=
+                    3
+                ) {
+
+                    current =
+                        next;
+
+                    addVariant(
+                        current
+                    );
+
+                    changed =
+                        true;
+
+                    continue;
+
+                }
+
+            }
+
+
+            // ----------------------------------
+            // باء الجر
+            // ----------------------------------
+
+            if (
+                current.startsWith(
+                    "ب"
+                ) &&
+                current.length >
+                    3
+            ) {
+
+                const next =
+                    current.substring(
+                        1
+                    );
+
+
+                if (
+                    next.length >=
+                    3
+                ) {
+
+                    current =
+                        next;
+
+                    addVariant(
+                        current
+                    );
+
+                    changed =
+                        true;
+
+                    continue;
+
+                }
+
+            }
+
+
+            // ----------------------------------
+            // كاف الجر
+            // ----------------------------------
+
+            if (
+                current.startsWith(
+                    "ك"
+                ) &&
+                current.length >
+                    3
+            ) {
+
+                const next =
+                    current.substring(
+                        1
+                    );
+
+
+                if (
+                    next.length >=
+                    3
+                ) {
+
+                    current =
+                        next;
+
+                    addVariant(
+                        current
+                    );
+
+                    changed =
+                        true;
+
+                    continue;
+
+                }
+
+            }
+
+
+            // ----------------------------------
+            // لام الجر
+            // ----------------------------------
+
+            if (
+                current.startsWith(
+                    "ل"
+                ) &&
+                current.length >
+                    3
+            ) {
+
+                const next =
+                    current.substring(
+                        1
+                    );
+
+
+                if (
+                    next.length >=
+                    3
+                ) {
+
+                    current =
+                        next;
+
+                    addVariant(
+                        current
+                    );
+
+                    changed =
+                        true;
+
+                }
+
+            }
+
+        }
+
+
+        return variants;
+
+    }
+
+
+    // ==================================
+    // كلمات السؤال الوظيفية
+    // ==================================
+
+    const functionTokens =
+        [];
+
+
+    // ==================================
+    // الكلمات الموضوعية الخام
+    // ==================================
+
+    const rawContentTokens =
+        [];
+
+
+    allTokens.forEach(
+        function (
+            token
+        ) {
+
+            const cleanToken =
+                String(
+                    token ||
+                    ""
+                ).trim();
+
+
+            if (
+                !cleanToken
+            ) {
+
+                return;
+
+            }
+
+
+            if (
+                commonFunctionWords.has(
+                    cleanToken
+                )
+            ) {
+
+                functionTokens.push({
+
+                    term:
+                        cleanToken,
+
+                    weight:
+                        0.10,
+
+                    category:
+                        "function",
+
+                    variants:
+                        getSearchTermVariants(
+                            cleanToken
+                        )
+
+                });
+
+                return;
+
+            }
+
+
+            if (
+                queryInstructionWords.has(
+                    cleanToken
+                )
+            ) {
+
+                functionTokens.push({
+
+                    term:
+                        cleanToken,
+
+                    weight:
+                        0.35,
+
+                    category:
+                        "instruction",
+
+                    variants:
+                        getSearchTermVariants(
+                            cleanToken
+                        )
+
+                });
+
+                return;
+
+            }
+
+
+            rawContentTokens.push(
+                cleanToken
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // إزالة تكرار الكلمات الموضوعية
+    // ==================================
+
+    const contentTokens =
+        [];
+
+
+    rawContentTokens.forEach(
+        function (
+            token
+        ) {
+
+            if (
+                !contentTokens.includes(
+                    token
+                )
+            ) {
+
+                contentTokens.push(
+                    token
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // العائلات
+    // ==================================
+
+    const families =
+        [];
+
+
+    contentTokens.forEach(
+        function (
+            token
+        ) {
+
+            const variants =
+                getSearchTermVariants(
+                    token
+                );
+
+
+            let family =
+                getConservativeFamilyKey(
+                    token,
+                    null
+                );
+
+
+            // ----------------------------------
+            // إذا كانت الكلمة ملصقة،
+            // نجرب الصيغة المجردة
+            // ----------------------------------
+
+            if (
+                !family &&
+                variants.length >
+                    1
+            ) {
+
+                for (
+                    let i = 1;
+
+                    i <
+                        variants.length;
+
+                    i++
+                ) {
+
+                    family =
+                        getConservativeFamilyKey(
+                            variants[i],
+                            null
+                        );
+
+
+                    if (
+                        family
+                    ) {
+
+                        break;
+
+                    }
+
+                }
+
+            }
+
+
+            if (
+                family &&
+                !families.includes(
+                    family
+                )
+            ) {
+
+                families.push(
+                    family
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // المصطلحات الموزونة
     // ==================================
 
     const weightedTerms =
         [];
 
 
-    uniqueContentTokens.forEach(
+    contentTokens.forEach(
         function (
             token
         ) {
 
-            const family =
+            const variants =
+                getSearchTermVariants(
+                    token
+                );
+
+
+            let family =
                 getConservativeFamilyKey(
                     token,
                     null
                 );
 
+
+            if (
+                !family &&
+                variants.length >
+                    1
+            ) {
+
+                for (
+                    let i = 1;
+
+                    i <
+                        variants.length;
+
+                    i++
+                ) {
+
+                    const possibleFamily =
+                        getConservativeFamilyKey(
+                            variants[i],
+                            null
+                        );
+
+
+                    if (
+                        possibleFamily
+                    ) {
+
+                        family =
+                            possibleFamily;
+
+                        break;
+
+                    }
+
+                }
+
+            }
+
+
+            // ==================================
+            // تكرار الكلمة الأصلية
+            // ==================================
 
             const exactFrequency =
                 termFrequency.get(
@@ -5283,6 +5755,44 @@ function analyzeSearchQuery(
                 0;
 
 
+            // ==================================
+            // أعلى تكرار لصيغها
+            // ==================================
+
+            let variantFrequency =
+                0;
+
+
+            variants.forEach(
+                function (
+                    variant
+                ) {
+
+                    const frequency =
+                        termFrequency.get(
+                            variant
+                        ) ||
+                        0;
+
+
+                    if (
+                        frequency >
+                        variantFrequency
+                    ) {
+
+                        variantFrequency =
+                            frequency;
+
+                    }
+
+                }
+            );
+
+
+            // ==================================
+            // تكرار العائلة
+            // ==================================
+
             const familyFreq =
                 familyFrequency.get(
                     family
@@ -5290,36 +5800,67 @@ function analyzeSearchQuery(
                 0;
 
 
-            // ----------------------------------
-            // وجود المصطلح في المستند
-            // ----------------------------------
+            // ==================================
+            // هل للمصطلح حضور في المستند؟
+            // ==================================
 
-            const documentPresence =
-                exactFrequency >
-                0
-                    ? 1
-                    : (
-                        familyFreq >
-                        0
-                            ? 0.75
-                            : 0.35
-                    );
-
-
-            // ----------------------------------
-            // أهمية المصطلح بحسب ظهوره
-            //
-            // لا نريد أن تكون الكلمة ذات
-            // الظهور النادر مساوية دائمًا
-            // للكلمة المركزية في المستند.
-            // ----------------------------------
-
-            let frequencyWeight =
-                1;
+            let documentPresence =
+                0;
 
 
             if (
                 exactFrequency >
+                0
+            ) {
+
+                documentPresence =
+                    1;
+
+            }
+            else if (
+                variantFrequency >
+                0
+            ) {
+
+                documentPresence =
+                    0.90;
+
+            }
+            else if (
+                familyFreq >
+                0
+            ) {
+
+                documentPresence =
+                    0.75;
+
+            }
+            else {
+
+                documentPresence =
+                    0.35;
+
+            }
+
+
+            // ==================================
+            // وزن التكرار
+            // ==================================
+
+            let frequencyWeight =
+                0.60;
+
+
+            const strongestFrequency =
+                Math.max(
+                    exactFrequency,
+                    variantFrequency,
+                    familyFreq
+                );
+
+
+            if (
+                strongestFrequency >
                 0
             ) {
 
@@ -5328,35 +5869,20 @@ function analyzeSearchQuery(
                         1.25,
                         0.75 +
                         Math.log10(
-                            exactFrequency +
+                            strongestFrequency +
                             1
                         ) *
                         0.35
                     );
 
             }
-            else if (
-                familyFreq >
-                0
-            ) {
-
-                frequencyWeight =
-                    0.85;
-
-            }
-            else {
-
-                frequencyWeight =
-                    0.60;
-
-            }
 
 
-            // ----------------------------------
-            // أهمية عامة للمصطلح
-            // ----------------------------------
+            // ==================================
+            // الوزن العام
+            // ==================================
 
-            const weight =
+            const finalWeight =
                 documentPresence *
                 frequencyWeight;
 
@@ -5370,8 +5896,14 @@ function analyzeSearchQuery(
                     family ||
                     "",
 
+                variants:
+                    variants,
+
                 exactFrequency:
                     exactFrequency,
+
+                variantFrequency:
+                    variantFrequency,
 
                 familyFrequency:
                     familyFreq,
@@ -5381,7 +5913,7 @@ function analyzeSearchQuery(
 
                 weight:
                     Number(
-                        weight.toFixed(
+                        finalWeight.toFixed(
                             4
                         )
                     ),
@@ -5396,219 +5928,275 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // العبارات المركبة
+    // اكتشاف العبارات المركبة
     //
-    // نبحث عن كلمتين أو ثلاث كلمات
-    // متجاورة إذا كانت موجودة في المستند.
+    // نستخدم صيغ الكلمات الأساسية،
+    // لكن لا ننشئ قاموسًا مسبقًا.
     // ==================================
 
     const phraseCandidates =
         [];
 
 
-    const phraseTokenLimit =
-        Math.min(
-            3,
-            uniqueContentTokens.length
-        );
+    // ----------------------------------
+    // ترتيب الكلمات الأصلية حسب السؤال
+    // ----------------------------------
+
+    const phraseBaseTokens =
+        contentTokens.slice();
 
 
-    if (
-        phraseTokenLimit >=
-        2
+    // ==================================
+    // عبارات من كلمتين
+    // ثم ثلاث كلمات
+    // ==================================
+
+    for (
+        let phraseLength = 3;
+
+        phraseLength >= 2;
+
+        phraseLength--
     ) {
 
-        for (
-            let length = 3;
-
-            length >= 2;
-
-            length--
+        if (
+            phraseBaseTokens.length <
+            phraseLength
         ) {
 
-            for (
-                let i = 0;
+            continue;
 
-                i +
-                    length <=
-                    allTokens.length;
+        }
 
-                i++
+
+        for (
+            let i = 0;
+
+            i +
+                phraseLength <=
+                phraseBaseTokens.length;
+
+            i++
+        ) {
+
+            const sequence =
+                phraseBaseTokens.slice(
+                    i,
+                    i +
+                    phraseLength
+                );
+
+
+            if (
+                sequence.length <
+                2
             ) {
 
-                const sequence =
-                    allTokens.slice(
-                        i,
-                        i + length
-                    );
+                continue;
+
+            }
 
 
-                if (
-                    sequence.length <
-                    2
-                ) {
+            const variantsPerToken =
+                sequence.map(
+                    function (
+                        token
+                    ) {
 
-                    continue;
-
-                }
-
-
-                // ----------------------------------
-                // يجب أن تكون الكلمة جزءًا
-                // من المحتوى لا من أدوات السؤال
-                // ----------------------------------
-
-                const contentSequence =
-                    sequence.filter(
-                        function (
+                        return getSearchTermVariants(
                             token
-                        ) {
+                        );
 
-                            return (
-                                !commonFunctionWords.has(
-                                    token
-                                ) &&
-                                !queryInstructionWords.has(
-                                    token
-                                )
-                            );
-
-                        }
-                    );
+                    }
+                );
 
 
-                if (
-                    contentSequence.length <
-                    2
-                ) {
+            // ==================================
+            // العبارة الأصلية
+            // ==================================
 
-                    continue;
-
-                }
-
-
-                const phrase =
-                    sequence.join(
-                        " "
-                    );
+            const originalPhrase =
+                sequence.join(
+                    " "
+                );
 
 
-                const normalizedPhrase =
-                    normalizeSearchText(
-                        phrase
-                    );
+            const normalizedOriginalPhrase =
+                normalizeSearchText(
+                    originalPhrase
+                );
 
+
+            if (
+                normalizedOriginalPhrase &&
+                normalizedDocumentText.includes(
+                    normalizedOriginalPhrase
+                )
+            ) {
 
                 if (
-                    !normalizedPhrase
-                ) {
-
-                    continue;
-
-                }
-
-
-                // ----------------------------------
-                // وجود العبارة في المستند
-                // ----------------------------------
-
-                const phraseExists =
-                    normalizedDocumentText.includes(
-                        normalizedPhrase
-                    );
-
-
-                if (
-                    !phraseExists
-                ) {
-
-                    continue;
-
-                }
-
-
-                // ----------------------------------
-                // منع التكرار
-                // ----------------------------------
-
-                const alreadyExists =
-                    phraseCandidates.some(
+                    !phraseCandidates.some(
                         function (
                             item
                         ) {
 
                             return (
                                 item.phrase ===
-                                normalizedPhrase
+                                normalizedOriginalPhrase
                             );
 
                         }
+                    )
+                ) {
+
+                    phraseCandidates.push({
+
+                        phrase:
+                            normalizedOriginalPhrase,
+
+                        tokens:
+                            sequence,
+
+                        length:
+                            sequence.length,
+
+                        weight:
+                            phraseLength ===
+                            3
+                                ? 1.20
+                                : 1.00,
+
+                        source:
+                            "original"
+
+                    });
+
+                }
+
+            }
+
+
+            // ==================================
+            // تجربة الصيغ المجردة
+            // مثال:
+            // القياس والاستحسان
+            // ↓
+            // القياس الاستحسان
+            // ==================================
+
+            const normalizedVariants =
+                [];
+
+
+            for (
+                let j = 0;
+
+                j <
+                    variantsPerToken.length;
+
+                j++
+            ) {
+
+                const variants =
+                    variantsPerToken[j];
+
+
+                if (
+                    variants.length >
+                    1
+                ) {
+
+                    normalizedVariants.push(
+                        variants[variants.length - 1]
+                    );
+
+                }
+                else if (
+                    variants.length ===
+                    1
+                ) {
+
+                    normalizedVariants.push(
+                        variants[0]
+                    );
+
+                }
+
+            }
+
+
+            if (
+                normalizedVariants.length >=
+                2
+            ) {
+
+                const variantPhrase =
+                    normalizedVariants.join(
+                        " "
+                    );
+
+
+                const normalizedVariantPhrase =
+                    normalizeSearchText(
+                        variantPhrase
                     );
 
 
                 if (
-                    alreadyExists
+                    normalizedVariantPhrase &&
+                    normalizedVariantPhrase !==
+                        normalizedOriginalPhrase &&
+                    normalizedDocumentText.includes(
+                        normalizedVariantPhrase
+                    )
                 ) {
 
-                    continue;
+                    if (
+                        !phraseCandidates.some(
+                            function (
+                                item
+                            ) {
+
+                                return (
+                                    item.phrase ===
+                                    normalizedVariantPhrase
+                                );
+
+                            }
+                        )
+                    ) {
+
+                        phraseCandidates.push({
+
+                            phrase:
+                                normalizedVariantPhrase,
+
+                            tokens:
+                                sequence,
+
+                            length:
+                                sequence.length,
+
+                            weight:
+                                phraseLength ===
+                                3
+                                    ? 1.20
+                                    : 1.00,
+
+                            source:
+                                "normalized"
+
+                        });
+
+                    }
 
                 }
-
-
-                phraseCandidates.push({
-
-                    phrase:
-                        normalizedPhrase,
-
-                    tokens:
-                        contentSequence,
-
-                    length:
-                        contentSequence.length,
-
-                    weight:
-                        contentSequence.length ===
-                        3
-                            ? 1.20
-                            : 1.00
-
-                });
 
             }
 
         }
 
     }
-
-
-    // ==================================
-    // العائلات الموجودة في الاستعلام
-    // ==================================
-
-    const families =
-        [];
-
-
-    weightedTerms.forEach(
-        function (
-            item
-        ) {
-
-            if (
-                item.family &&
-                !families.includes(
-                    item.family
-                )
-            ) {
-
-                families.push(
-                    item.family
-                );
-
-            }
-
-        }
-    );
 
 
     // ==================================
@@ -5647,9 +6235,22 @@ function analyzeSearchQuery(
             }
 
 
+            if (
+                b.variantFrequency !==
+                a.variantFrequency
+            ) {
+
+                return (
+                    b.variantFrequency -
+                    a.variantFrequency
+                );
+
+            }
+
+
             return (
-                a.term.length -
-                b.term.length
+                b.term.length -
+                a.term.length
             );
 
         }
@@ -5657,7 +6258,39 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // النتيجة
+    // ترتيب العبارات
+    // ==================================
+
+    phraseCandidates.sort(
+        function (
+            a,
+            b
+        ) {
+
+            if (
+                b.weight !==
+                a.weight
+            ) {
+
+                return (
+                    b.weight -
+                    a.weight
+                );
+
+            }
+
+
+            return (
+                b.length -
+                a.length
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // النتيجة النهائية
     // ==================================
 
     return {
@@ -5672,7 +6305,7 @@ function analyzeSearchQuery(
             allTokens,
 
         contentTokens:
-            uniqueContentTokens,
+            contentTokens,
 
         functionTokens:
             functionTokens,
@@ -5687,7 +6320,7 @@ function analyzeSearchQuery(
             weightedTerms,
 
         contentCount:
-            uniqueContentTokens.length,
+            contentTokens.length,
 
         functionCount:
             functionTokens.length
