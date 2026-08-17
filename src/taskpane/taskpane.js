@@ -6040,6 +6040,41 @@ async function searchIndexedDocument(
                             25;
 
                     }
+
+                    // ==================================
+                    // عنوان مقارنة صريح
+                    // ==================================
+
+                    if (
+                        retrievalProfile ===
+                        "comparison" &&
+                        headingConceptCount ===
+                        comparisonConceptFamilies.length
+                    ) {
+
+                        const normalizedHeadingText =
+                            normalizeSearchText(
+                                nearestHeading.text
+                            );
+
+
+                        const explicitHeadingRelation =
+                            /علاق[ةه]\s+.*استصلاح.*عرف|علاق[ةه]\s+.*عرف.*استصلاح|الفرق\s+بين|الفروق\s+بين|مقارن[ةه]\s+بين|التمييز\s+بين/
+                                .test(
+                                    normalizedHeadingText
+                                );
+
+
+                        if (
+                            explicitHeadingRelation
+                        ) {
+
+                            headingScore +=
+                                25;
+
+                        }
+
+                    }
                     else if (
                         headingConceptCount >
                         0
