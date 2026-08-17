@@ -55,6 +55,10 @@ const AppState = {
 };
 
 
+let currentProject = null;
+let currentDocument = null;
+let currentChat = null;
+
 // ======================================
 // Office Initialization
 // ======================================
@@ -296,9 +300,7 @@ projects =
         });
 
 
-let currentProject = null;
 
-let currentDocument = null;
 
 
 // ======================================
@@ -2543,20 +2545,17 @@ function getHeadingLevelNumber(
 function getOramaEngine() {
 
     if (
-        typeof require !==
-        "function"
+        !window.Orama
     ) {
 
         throw new Error(
-            "مكتبة Orama غير متاحة في بيئة التطبيق. تأكد من تضمين @orama/orama في الحزمة."
+            "لم يتم تحميل مكتبة Orama."
         );
 
     }
 
 
-    return require(
-        "@orama/orama"
-    );
+    return window.Orama;
 
 }
 
@@ -17093,7 +17092,8 @@ if (searchInput) {
 // اختبار جاهزية مستند Orama الحالي
 // =====================================================
 
-async function testCurrentDocumentIndex() {
+window.testCurrentDocumentIndex =
+    async function () {
 
     if (!currentDocument) {
 

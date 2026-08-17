@@ -857,6 +857,23 @@
      JAVASCRIPT
      ========================================= -->
 
+     <script type="module">
+    import {
+        create,
+        insert,
+        insertMultiple,
+        search
+    } from "https://cdn.jsdelivr.net/npm/@orama/orama@3.1.18/+esm";
+
+    window.Orama = {
+        create,
+        insert,
+        insertMultiple,
+        search
+    };
+</script>
+
+
 <script src="taskpane.js"></script>
 
 
