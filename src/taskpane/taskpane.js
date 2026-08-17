@@ -2943,8 +2943,7 @@ async function ensureOramaRetrievalIndex(
 
         insertMultiple(
             db,
-            records,
-            500
+            records
         );
 
     }
@@ -5650,7 +5649,7 @@ function getCommonTextLength(
 // تحويل نتائج Orama إلى سياق ذكي
 // =====================================================
 
-function buildRetrievalContext(
+async function buildRetrievalContext(
     searchResult,
     options
 ) {
@@ -5685,6 +5684,63 @@ function buildRetrievalContext(
         )
     ) {
 
+            let structureData = null;
+
+    if (currentDocument) {
+
+        try {
+
+            structureData =
+                await ensureDocumentStructure(
+                    currentDocument
+                );
+
+        }
+        catch (error) {
+
+            console.warn(
+                "تعذر تحميل بنية المستند للسياق:",
+                error
+            );
+
+        }
+
+    }
+
+    const paragraphMap =
+        new Map();
+
+    if (
+        structureData &&
+        Array.isArray(
+            structureData.paragraphs
+        )
+    ) {
+
+        structureData.paragraphs.forEach(
+            function (
+                paragraph
+            ) {
+
+                if (
+                    paragraph &&
+                    typeof paragraph.index !==
+                        "undefined"
+                ) {
+
+                    paragraphMap.set(
+                        Number(
+                            paragraph.index
+                        ),
+                        paragraph
+                    );
+
+                }
+
+            }
+        );
+
+    }
         return {
 
             query:
@@ -5908,34 +5964,6 @@ function buildRetrievalContext(
     }
 
 
-    // =================================================
-    // خريطة فقرات المستند للحصول على الجيران
-    // =================================================
-
-    const paragraphMap =
-        new Map();
-
-
-    if (
-        currentDocument
-    ) {
-
-        // ---------------------------------------------
-        // سنحاول أولًا استخدام structureData المحفوظة
-        // ---------------------------------------------
-
-        getDocumentStructure(
-            currentDocument.id
-        )
-        .then(
-            function () {}
-        )
-        .catch(
-            function () {}
-        );
-
-    }
-
 
     // =================================================
     // بناء السياقات
@@ -5984,69 +6012,37 @@ function buildRetrievalContext(
 
 
             let previousContext =
-                includeNeighbors
-                    ? String(
-                        result.previousParagraphText ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
-                    : "";
-
+                "";
 
             let nextContext =
-                includeNeighbors
-                    ? String(
-                        result.nextParagraphText ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
-                    : "";
+                "";
 
 
             // ==================================
-            // إذا كانت النتيجة نفسها تحمل الجيران
+            // الفقرة السابقة من المستند الحقيقي
             // ==================================
 
             if (
-                !previousContext &&
-                Number(
-                    result.paragraphIndex
-                ) > 0
+                includeNeighbors &&
+                paragraphMap.size > 0
             ) {
 
-                const previous =
-                    results.find(
-                        function (
-                            item
-                        ) {
-
-                            return (
-                                Number(
-                                    item.paragraphIndex
-                                ) ===
-                                Number(
-                                    result.paragraphIndex
-                                ) - 1
-                            );
-
-                        }
+                const previousParagraph =
+                    paragraphMap.get(
+                        Number(
+                            result.paragraphIndex
+                        ) - 1
                     );
 
 
-                if (previous) {
+                if (
+                    previousParagraph &&
+                    previousParagraph.text
+                ) {
 
                     previousContext =
                         String(
-                            previous.text ||
-                            ""
+                            previousParagraph.text
                         )
                             .replace(
                                 /\s+/g,
@@ -6059,33 +6055,31 @@ function buildRetrievalContext(
             }
 
 
-            if (!nextContext) {
+            // ==================================
+            // الفقرة التالية من المستند الحقيقي
+            // ==================================
 
-                const next =
-                    results.find(
-                        function (
-                            item
-                        ) {
+            if (
+                includeNeighbors &&
+                paragraphMap.size > 0
+            ) {
 
-                            return (
-                                Number(
-                                    item.paragraphIndex
-                                ) ===
-                                Number(
-                                    result.paragraphIndex
-                                ) + 1
-                            );
-
-                        }
+                const nextParagraph =
+                    paragraphMap.get(
+                        Number(
+                            result.paragraphIndex
+                        ) + 1
                     );
 
 
-                if (next) {
+                if (
+                    nextParagraph &&
+                    nextParagraph.text
+                ) {
 
                     nextContext =
                         String(
-                            next.text ||
-                            ""
+                            nextParagraph.text
                         )
                             .replace(
                                 /\s+/g,
@@ -8705,75 +8699,6 @@ function getCurrentProject() {
 }
 
 
-// =====================================================
-// Set Current Project
-// =====================================================
-
-function setCurrentProject(
-    project
-) {
-
-    if (!project) {
-
-        currentProject =
-            null;
-
-        currentDocument =
-            null;
-
-
-        if (documentTitle) {
-
-            documentTitle.textContent =
-                "لا يوجد مستند مفتوح";
-
-        }
-
-
-        renderDocuments();
-
-        return;
-
-    }
-
-
-    currentProject =
-        project;
-
-
-    // ==================================
-    // التأكد من أن المشروع يحتوي
-    // على المصفوفات القديمة المطلوبة
-    // ==================================
-
-    if (
-        !Array.isArray(
-            currentProject.documents
-        )
-    ) {
-
-        currentProject.documents =
-            [];
-
-    }
-
-
-    if (
-        !Array.isArray(
-            currentProject.chatIds
-        )
-    ) {
-
-        currentProject.chatIds =
-            [];
-
-    }
-
-
-    renderDocuments();
-
-}
-
 
 // =====================================================
 // Create Project
@@ -8855,58 +8780,6 @@ function createProject(
 
 }
 
-
-// =====================================================
-// Attach Document To Project
-// =====================================================
-
-function attachDocumentToProject(
-    project,
-    documentItem
-) {
-
-    if (
-        !project ||
-        !documentItem
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        !Array.isArray(
-            project.documents
-        )
-    ) {
-
-        project.documents =
-            [];
-
-    }
-
-
-    if (
-        !project.documents.includes(
-            documentItem.id
-        )
-    ) {
-
-        project.documents.push(
-            documentItem.id
-        );
-
-
-        project.updatedAt =
-            new Date().toISOString();
-
-
-        saveProjects();
-
-    }
-
-}
 
 
 // =====================================================
