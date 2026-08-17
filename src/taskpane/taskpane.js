@@ -8685,7 +8685,81 @@ async function buildRetrievalContext(
 
     }
 
+    // ==================================
+    // حساب نسبة التشابه بين نصين
+    // ==================================
 
+    function calculateOverlap(
+        textA,
+        textB
+    ) {
+
+        const a =
+            String(
+                textA || ""
+            )
+                .replace(
+                    /\s+/g,
+                    " "
+                )
+                .trim();
+
+
+        const b =
+            String(
+                textB || ""
+            )
+                .replace(
+                    /\s+/g,
+                    " "
+                )
+                .trim();
+
+
+        if (
+            !a ||
+            !b
+        ) {
+
+            return 0;
+
+        }
+
+
+        const shorterLength =
+            Math.min(
+                a.length,
+                b.length
+            );
+
+
+        if (
+            shorterLength ===
+            0
+        ) {
+
+            return 0;
+
+        }
+
+
+        const commonLength =
+            getCommonTextLength(
+                a,
+                b
+            );
+
+
+        return (
+            commonLength /
+            shorterLength
+        );
+
+    }
+
+    // ==================================
+    // هل النتيجة مشابهة جدًا؟
+    // ==================================
     function isSimilarToSelected(
         candidate
     ) {
