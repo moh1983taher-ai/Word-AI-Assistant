@@ -4583,6 +4583,25 @@ async function searchOramaDocument(
         }
     );
 
+    // ==================================
+    // الاحتفاظ بأفضل المرشحين فقط
+    // قبل بناء السياق للذكاء الاصطناعي
+    // ==================================
+
+    const candidateLimit =
+        retrievalProfile === "comparison"
+            ? 30
+            : retrievalProfile === "definition"
+                ? 20
+                : 25;
+
+
+    const filteredResults =
+        results.slice(
+            0,
+            candidateLimit
+        );
+
 
     return results;
 
@@ -5666,6 +5685,50 @@ async function searchIndexedDocument(
                       matchedFamilies.length
                     : 0;
 
+            // ==================================
+            // فلترة أولية حسب تغطية السؤال
+            // ==================================
+
+            const minimumCoverage =
+                queryTokens.length >= 3
+                    ? 0.50
+                    : 0.34;
+
+
+            if (
+                queryCoverage < minimumCoverage &&
+                familyCoverage < minimumCoverage
+            ) {
+
+                return;
+
+            }
+
+            // ==================================
+            // تعزيز المطابقة متعددة المفاهيم
+            // ==================================
+
+            if (
+                matchedFamilyCount >=
+                2
+            ) {
+
+                score +=
+                    20;
+
+            }
+
+
+            if (
+                matchedTokenCount >=
+                2
+            ) {
+
+                score +=
+                    15;
+
+            }
+
 
             // ==================================
             // أقرب عنوان
@@ -6258,7 +6321,7 @@ async function searchIndexedDocument(
             results.length,
 
         results:
-            results,
+            filteredResults,
 
         matchedTerms:
             matchedTerms,
