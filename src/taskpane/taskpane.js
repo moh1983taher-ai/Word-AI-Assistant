@@ -5696,7 +5696,68 @@ function analyzeSearchQuery(
 
 }
 
+window.testAnalyzeSearchQuery =
+    async function (
+        query
+    ) {
 
+        if (
+            !currentDocument
+        ) {
+
+            console.warn(
+                "لا يوجد مستند نشط."
+            );
+
+            return null;
+
+        }
+
+
+        try {
+
+            const structureData =
+                await getDocumentStructure(
+                    currentDocument.id
+                );
+
+
+            const result =
+                analyzeSearchQuery(
+                    query,
+                    structureData
+                );
+
+
+            console.log(
+                "تحليل الاستعلام:",
+                query
+            );
+
+
+            console.log(
+                result
+            );
+
+
+            return result;
+
+        }
+        catch (
+            error
+        ) {
+
+            console.error(
+                "فشل تحليل الاستعلام:",
+                error
+            );
+
+
+            return null;
+
+        }
+
+    };
 // =====================================================
 // Search Indexed Document
 // المحرك العام للاسترجاع
