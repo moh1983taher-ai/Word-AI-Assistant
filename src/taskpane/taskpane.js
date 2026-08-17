@@ -1,266 +1,260 @@
-// ======================================
-// Word AI Assistant
-// Main Application Controller
-// PART 1 / 4
-// التخزين + المشاريع الأساسية + المستندات
-// + قراءة المستند + بنية المستند
-// ======================================
+/*
+ * Word AI Assistant - consolidated controller
+ * Search engine: Orama (primary and only retrieval engine)
+ * Keeps the existing UI IDs and the existing chat/provider behavior.
+ *
+ * Orama notes:
+ * - Arabic is a supported built-in language.
+ * - The main retrieval index stores paragraphs and headings in one DB.
+ * - Heading text receives a higher search boost.
+ * - searchIndexedDocument() is retained as the public/internal compatibility
+ *   name so the AI layer and older console tests continue to work.
+ */
 
 Office.onReady(function () {
 
+    // =====================================================
+    // DOM ELEMENTS
+    // =====================================================
 
-// ======================================
-// Elements
-// ======================================
+    const projectsBtn = document.getElementById("projects-btn");
+    const projectsPopup = document.getElementById("projects-popup");
+    const projectsList = document.getElementById("projects-list");
+    const documentsList = document.getElementById("documents-list");
+    const addDocumentBtn = document.getElementById("add-document-btn");
+    const wordDocumentPicker = document.getElementById("word-document-picker");
+    const newProjectBtn = document.getElementById("new-project-btn");
+    const chatBtn = document.getElementById("chat-btn");
+    const newChatBtn = document.getElementById("new-chat-btn");
+    const expandedSidebar = document.getElementById("expanded-sidebar");
+    const sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
+    const expandedSidebarToggleSlot = document.getElementById("expanded-sidebar-toggle-slot");
+    const input = document.getElementById("user-input");
+    const sendBtn = document.getElementById("send-btn");
+    const chatArea = document.getElementById("chat-area");
+    const documentTitle = document.getElementById("document-title");
 
-const projectsBtn =
-    document.getElementById("projects-btn");
+    const settingsBtn = document.getElementById("settings-btn");
+    const settingsWindow = document.getElementById("settings-window");
+    const closeSettings = document.getElementById("close-settings");
+    const showKey = document.getElementById("show-key");
+    const apiKey = document.getElementById("api-key");
+    const provider = document.getElementById("provider-select");
+    const modelSelect = document.getElementById("model-select");
+    const refreshModels = document.getElementById("refresh-models");
+    const saveSettingsBtn = document.getElementById("save-settings");
+    const testConnection = document.getElementById("test-connection");
+    const settingsStatus = document.getElementById("settings-status");
+    const providerInfo = document.getElementById("provider-info");
 
-const projectsPopup =
-    document.getElementById("projects-popup");
+    const chatPopup = document.getElementById("chat-popup");
+    const recentChatList = document.getElementById("recent-chat-list");
 
-const projectsList =
-    document.getElementById("projects-list");
+    const searchPopup = document.getElementById("search-popup");
+    const searchInput = document.getElementById("search-input");
+    const searchResults = document.getElementById("search-results");
+    const searchBtn = document.getElementById("search-btn");
 
-const documentsList =
-    document.getElementById("documents-list");
-
-const addDocumentBtn =
-    document.getElementById("add-document-btn");
-
-const wordDocumentPicker =
-    document.getElementById(
-        "word-document-picker"
-    );
-
-const newProjectBtn =
-    document.getElementById("new-project-btn");
-
-const chatBtn =
-    document.getElementById("chat-btn");
-
-const newChatBtn =
-    document.getElementById("new-chat-btn");
-
-const expandedSidebar =
-    document.getElementById("expanded-sidebar");
-
-const sidebarToggleBtn =
-    document.getElementById("sidebar-toggle-btn");
-
-const expandedSidebarToggleSlot =
-    document.getElementById(
-        "expanded-sidebar-toggle-slot"
-    );
-
-const sidebarTogglePlaceholder =
-    document.createComment(
+    let sidebarTogglePlaceholder = document.createComment(
         "sidebar-toggle-placeholder"
     );
 
-if (
-    sidebarToggleBtn &&
-    sidebarToggleBtn.parentNode
-) {
+    if (
+        sidebarToggleBtn &&
+        sidebarToggleBtn.parentNode
+    ) {
 
-    sidebarToggleBtn.parentNode.insertBefore(
-        sidebarTogglePlaceholder,
-        sidebarToggleBtn
-    );
+        sidebarToggleBtn.parentNode.insertBefore(
+            sidebarTogglePlaceholder,
+            sidebarToggleBtn
+        );
 
-}
-
-const input =
-    document.getElementById("user-input");
-
-const sendBtn =
-    document.getElementById("send-btn");
-
-const chatArea =
-    document.getElementById("chat-area");
-
-const documentTitle =
-    document.getElementById("document-title");
+    }
 
 
-// ======================================
-// AI Settings Elements
-// ======================================
+    // =====================================================
+    // STATE
+    // =====================================================
 
-const settingsBtn =
-    document.getElementById("settings-btn");
+    let projects = [];
+    let documents = [];
+    let chats = [];
 
-const settingsWindow =
-    document.getElementById("settings-window");
+    let currentProject = null;
+    let currentDocument = null;
+    let currentChat = null;
 
-const closeSettings =
-    document.getElementById("close-settings");
-
-const showKey =
-    document.getElementById("show-key");
-
-const apiKey =
-    document.getElementById("api-key");
-
-const provider =
-    document.getElementById("provider-select");
-
-const modelSelect =
-    document.getElementById("model-select");
-
-const refreshModels =
-    document.getElementById("refresh-models");
-
-const saveSettings =
-    document.getElementById("save-settings");
-
-const testConnection =
-    document.getElementById("test-connection");
-
-const settingsStatus =
-    document.getElementById("settings-status");
-
-const providerInfo =
-    document.getElementById("provider-info");
+    let currentCitationSources = [];
 
 
-// ======================================
-// Chat popup
-// ======================================
+    // =====================================================
+    // ORAMA CACHE
+    // محرك البحث الوحيد المستخدم في الاسترجاع
+    // =====================================================
 
-const chatPopup =
-    document.getElementById("chat-popup");
-
-const recentChatList =
-    document.getElementById("recent-chat-list");
-
-
-// ======================================
-// Search
-// ======================================
-
-const searchPopup =
-    document.getElementById("search-popup");
-
-const searchInput =
-    document.getElementById("search-input");
-
-const searchResults =
-    document.getElementById("search-results");
-
-const searchBtn =
-    document.getElementById("search-btn");
+    let oramaRetrievalDb = null;
+    let oramaRetrievalCacheKey = "";
+    let oramaRetrievalDocumentId = null;
 
 
-// ======================================
-// Citation Sources
-// مصادر الإحالات الحالية
-// ======================================
+    // =====================================================
+    // DOCUMENT DATABASE
+    // =====================================================
 
-let currentCitationSources = [];
+    const DOCUMENT_DB_NAME =
+        "WORD_AI_DOCUMENT_STORAGE";
+
+    const DOCUMENT_DB_VERSION =
+        4;
+
+    const DOCUMENT_STORE_NAME =
+        "files";
+
+    const DOCUMENT_TEXT_STORE_NAME =
+        "texts";
+
+    const DOCUMENT_STRUCTURE_STORE_NAME =
+        "structures";
 
 
-// ======================================
-// Projects System
-// ======================================
+    // =====================================================
+    // ORAMA SCHEMA VERSION
+    // تغيير الرقم يجبر المحرك على إعادة بناء ذاكرة Orama
+    // =====================================================
 
-let projects = [];
+    const ORAMA_SCHEMA_VERSION =
+        1;
 
-try {
+
+    // =====================================================
+    // SAFE STORAGE HELPERS
+    // =====================================================
+
+    function readStorageArray(
+        key
+    ) {
+
+        try {
+
+            const value =
+                JSON.parse(
+                    localStorage.getItem(
+                        key
+                    ) ||
+                    "[]"
+                );
+
+
+            return (
+                Array.isArray(
+                    value
+                )
+                    ? value
+                    : []
+            );
+
+        }
+        catch (
+            error
+        ) {
+
+            console.warn(
+                "تعذر قراءة التخزين:",
+                key,
+                error
+            );
+
+
+            return [];
+
+        }
+
+    }
+
+
+    // =====================================================
+    // LOAD PROJECTS
+    // =====================================================
 
     projects =
-        JSON.parse(
-            localStorage.getItem(
-                "WORD_AI_PROJECTS"
-            )
-        ) || [];
-
-}
-catch (error) {
-
-    console.warn(
-        "تعذر قراءة المشاريع المحفوظة:",
-        error
-    );
-
-    projects = [];
-
-}
-
-
-projects =
-    projects
+        readStorageArray(
+            "WORD_AI_PROJECTS"
+        )
         .filter(
             function (
-                project
+                item
             ) {
 
                 return (
-                    project &&
-                    typeof project === "object"
+                    item &&
+                    typeof item ===
+                        "object"
                 );
 
             }
         )
         .map(
             function (
-                project
+                item
             ) {
 
                 const now =
-                    new Date().toISOString();
+                    new Date()
+                        .toISOString();
+
 
                 return {
 
                     id:
-                        project.id ||
-                        Date.now(),
+                        item.id ||
+                        (
+                            Date.now() +
+                            Math.random()
+                        ),
 
                     name:
-                        project.name ||
+                        item.name ||
                         "مشروع جديد",
 
                     createdAt:
-                        project.createdAt ||
+                        item.createdAt ||
                         now,
 
                     updatedAt:
-                        project.updatedAt ||
+                        item.updatedAt ||
                         now,
 
                     documents:
                         Array.isArray(
-                            project.documents
+                            item.documents
                         )
-                            ? project.documents
+                            ? item.documents
                             : [],
 
                     references:
                         Array.isArray(
-                            project.references
+                            item.references
                         )
-                            ? project.references
+                            ? item.references
                             : [],
 
                     chatIds:
                         Array.isArray(
-                            project.chatIds
+                            item.chatIds
                         )
-                            ? project.chatIds
+                            ? item.chatIds
                             : [],
 
                     settings:
-                        project.settings &&
-                        typeof project.settings === "object"
-                            ? project.settings
+                        item.settings &&
+                        typeof item.settings ===
+                            "object"
+                            ? item.settings
                             : {
-
                                 citationStyle:
                                     "",
-
                                 notes:
                                     ""
-
                             }
 
                 };
@@ -269,1263 +263,2119 @@ projects =
         );
 
 
-// ======================================
-// Current Project / Document
-// ======================================
-
-let currentProject =
-    null;
-
-let currentDocument =
-    null;
-
-
-// ======================================
-// Orama Retrieval Cache
-// ذاكرة محرك Orama
-// ======================================
-
-let oramaRetrievalDb =
-    null;
-
-let oramaRetrievalCacheKey =
-    "";
-
-
-// ======================================
-// Documents System
-// ======================================
-
-let documents = [];
-
-try {
+    // =====================================================
+    // LOAD DOCUMENTS
+    // =====================================================
 
     documents =
-        JSON.parse(
-            localStorage.getItem(
-                "WORD_AI_DOCUMENTS"
-            )
-        ) || [];
-
-
-    documents =
-        documents
-            .filter(
-                function (
-                    documentItem
-                ) {
-
-                    return (
-                        documentItem &&
-                        typeof documentItem === "object"
-                    );
-
-                }
-            )
-            .map(
-                function (
-                    documentItem
-                ) {
-
-                    // ------------------------------
-                    // إحصاءات الفهرسة
-                    // ------------------------------
-
-                    if (
-                        typeof documentItem.indexTokenCount !==
-                        "number"
-                    ) {
-
-                        documentItem.indexTokenCount =
-                            0;
-
-                    }
-
-
-                    if (
-                        typeof documentItem.indexUniqueTerms !==
-                        "number"
-                    ) {
-
-                        documentItem.indexUniqueTerms =
-                            0;
-
-                    }
-
-
-                    if (
-                        typeof documentItem.indexUniqueFamilies !==
-                        "number"
-                    ) {
-
-                        documentItem.indexUniqueFamilies =
-                            0;
-
-                    }
-
-
-                    if (
-                        typeof documentItem.indexSchemaVersion !==
-                        "number"
-                    ) {
-
-                        documentItem.indexSchemaVersion =
-                            0;
-
-                    }
-
-
-                    // ------------------------------
-                    // حالات المستند
-                    // ------------------------------
-
-                    if (
-                        !documentItem.readStatus
-                    ) {
-
-                        documentItem.readStatus =
-                            "new";
-
-                    }
-
-
-                    if (
-                        !documentItem.indexStatus
-                    ) {
-
-                        documentItem.indexStatus =
-                            "new";
-
-                    }
-
-
-                    return documentItem;
-
-                }
-            );
-
-}
-catch (error) {
-
-    console.warn(
-        "تعذر قراءة المستندات المحفوظة:",
-        error
-    );
-
-    documents = [];
-
-}
-
-
-// ======================================
-// Save Documents
-// ======================================
-
-function saveDocuments() {
-
-    localStorage.setItem(
-        "WORD_AI_DOCUMENTS",
-        JSON.stringify(
-            documents
+        readStorageArray(
+            "WORD_AI_DOCUMENTS"
         )
-    );
+        .filter(
+            function (
+                item
+            ) {
 
-}
-
-
-// ======================================
-// Working Documents Storage
-// IndexedDB
-// ======================================
-
-const DOCUMENT_DB_NAME =
-    "WORD_AI_DOCUMENT_STORAGE";
-
-const DOCUMENT_DB_VERSION =
-    4;
-
-const DOCUMENT_STORE_NAME =
-    "files";
-
-const DOCUMENT_TEXT_STORE_NAME =
-    "texts";
-
-const DOCUMENT_INDEX_STORE_NAME =
-    "indexes";
-
-const DOCUMENT_STRUCTURE_STORE_NAME =
-    "structures";
-
-
-// ======================================
-// Orama Version
-// مهم: تغييرها يجبر Orama على إعادة
-// بناء فهرس الذاكرة
-// ======================================
-
-const ORAMA_RETRIEVAL_VERSION =
-    1;
-
-
-// ======================================
-// Open Documents Database
-// ======================================
-
-function openDocumentDatabase() {
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const request =
-                indexedDB.open(
-                    DOCUMENT_DB_NAME,
-                    DOCUMENT_DB_VERSION
+                return (
+                    item &&
+                    typeof item ===
+                        "object"
                 );
 
+            }
+        )
+        .map(
+            function (
+                item
+            ) {
 
-            request.onupgradeneeded =
-                function () {
+                return {
 
-                    const db =
-                        request.result;
+                    ...item,
 
+                    indexTokenCount:
+                        Number(
+                            item.indexTokenCount ||
+                            0
+                        ),
 
-                    // ------------------------------
-                    // ملفات Word
-                    // ------------------------------
+                    indexUniqueTerms:
+                        Number(
+                            item.indexUniqueTerms ||
+                            0
+                        ),
 
-                    if (
-                        !db.objectStoreNames
-                            .contains(
-                                DOCUMENT_STORE_NAME
-                            )
-                    ) {
+                    indexUniqueFamilies:
+                        Number(
+                            item.indexUniqueFamilies ||
+                            0
+                        ),
 
-                        db.createObjectStore(
-                            DOCUMENT_STORE_NAME
-                        );
+                    indexSchemaVersion:
+                        Number(
+                            item.indexSchemaVersion ||
+                            0
+                        ),
 
-                    }
+                    indexStatus:
+                        item.indexStatus ||
+                        "new",
 
-
-                    // ------------------------------
-                    // التخزين القديم للفهرس
-                    // يبقى للتوافق مع البيانات السابقة
-                    // ولا يمثل محرك البحث الجديد
-                    // ------------------------------
-
-                    if (
-                        !db.objectStoreNames
-                            .contains(
-                                DOCUMENT_INDEX_STORE_NAME
-                            )
-                    ) {
-
-                        db.createObjectStore(
-                            DOCUMENT_INDEX_STORE_NAME
-                        );
-
-                    }
-
-
-                    // ------------------------------
-                    // نصوص المستندات
-                    // ------------------------------
-
-                    if (
-                        !db.objectStoreNames
-                            .contains(
-                                DOCUMENT_TEXT_STORE_NAME
-                            )
-                    ) {
-
-                        db.createObjectStore(
-                            DOCUMENT_TEXT_STORE_NAME
-                        );
-
-                    }
-
-
-                    // ------------------------------
-                    // بنية المستند
-                    // ------------------------------
-
-                    if (
-                        !db.objectStoreNames
-                            .contains(
-                                DOCUMENT_STRUCTURE_STORE_NAME
-                            )
-                    ) {
-
-                        db.createObjectStore(
-                            DOCUMENT_STRUCTURE_STORE_NAME
-                        );
-
-                    }
+                    readStatus:
+                        item.readStatus ||
+                        "new"
 
                 };
 
-
-            request.onsuccess =
-                function () {
-
-                    const db =
-                        request.result;
+            }
+        );
 
 
-                    // عند ترقية قاعدة البيانات لاحقًا
-                    // لا نريد أن تتسبب نسخة اتصال قديمة
-                    // في مشاكل blocked
-                    db.onversionchange =
-                        function () {
+    // =====================================================
+    // LOAD CHATS
+    // =====================================================
 
-                            db.close();
+    chats =
+        readStorageArray(
+            "WORD_AI_CHATS"
+        )
+        .filter(
+            function (
+                item
+            ) {
 
-                        };
+                return (
+                    item &&
+                    typeof item ===
+                        "object"
+                );
 
+            }
+        )
+        .map(
+            function (
+                item
+            ) {
 
-                    resolve(
-                        db
-                    );
+                return {
 
-                };
+                    ...item,
 
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error ||
-                        new Error(
-                            "فشل فتح قاعدة بيانات المستندات."
+                    messages:
+                        Array.isArray(
+                            item.messages
                         )
-                    );
+                            ? item.messages
+                            : []
 
                 };
 
-        }
-    );
-
-}
+            }
+        );
 
 
-// ======================================
-// Save Working Word File
-// ======================================
+    // =====================================================
+    // SAVE PROJECTS
+    // =====================================================
 
-async function saveWorkingWordFile(
-    fileId,
-    file
-) {
+    function saveProjects() {
 
-    const db =
-        await openDocumentDatabase();
+        localStorage.setItem(
+            "WORD_AI_PROJECTS",
+            JSON.stringify(
+                projects
+            )
+        );
 
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_STORE_NAME,
-                    "readwrite"
-                );
+    }
 
 
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_STORE_NAME
-                );
+    // =====================================================
+    // SAVE DOCUMENTS
+    // =====================================================
+
+    function saveDocuments() {
+
+        localStorage.setItem(
+            "WORD_AI_DOCUMENTS",
+            JSON.stringify(
+                documents
+            )
+        );
+
+    }
 
 
-            const request =
-                store.put(
-                    file,
-                    String(
-                        fileId
-                    )
-                );
+    // =====================================================
+    // SAVE CHATS
+    // =====================================================
+
+    function saveChats() {
+
+        localStorage.setItem(
+            "WORD_AI_CHATS",
+            JSON.stringify(
+                chats
+            )
+        );
+
+    }
 
 
-            request.onsuccess =
-                function () {
+    saveProjects();
+    saveDocuments();
+    saveChats();
 
-                    resolve(
+
+    // =====================================================
+    // INDEXED DB
+    // =====================================================
+
+    function openDocumentDatabase() {
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const request =
+                    indexedDB.open(
+                        DOCUMENT_DB_NAME,
+                        DOCUMENT_DB_VERSION
+                    );
+
+
+                request.onupgradeneeded =
+                    function () {
+
+                        const db =
+                            request.result;
+
+
+                        if (
+                            !db.objectStoreNames
+                                .contains(
+                                    DOCUMENT_STORE_NAME
+                                )
+                        ) {
+
+                            db.createObjectStore(
+                                DOCUMENT_STORE_NAME
+                            );
+
+                        }
+
+
+                        if (
+                            !db.objectStoreNames
+                                .contains(
+                                    DOCUMENT_TEXT_STORE_NAME
+                                )
+                        ) {
+
+                            db.createObjectStore(
+                                DOCUMENT_TEXT_STORE_NAME
+                            );
+
+                        }
+
+
+                        if (
+                            !db.objectStoreNames
+                                .contains(
+                                    DOCUMENT_STRUCTURE_STORE_NAME
+                                )
+                        ) {
+
+                            db.createObjectStore(
+                                DOCUMENT_STRUCTURE_STORE_NAME
+                            );
+
+                        }
+
+                    };
+
+
+                request.onsuccess =
+                    function () {
+
+                        resolve(
+                            request.result
+                        );
+
+                    };
+
+
+                request.onerror =
+                    function () {
+
+                        reject(
+                            request.error ||
+                            new Error(
+                                "فشل فتح قاعدة المستندات."
+                            )
+                        );
+
+                    };
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // SAVE WORKING WORD FILE
+    // =====================================================
+
+    async function saveWorkingWordFile(
+        fileId,
+        file
+    ) {
+
+        const db =
+            await openDocumentDatabase();
+
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const tx =
+                    db.transaction(
+                        DOCUMENT_STORE_NAME,
+                        "readwrite"
+                    );
+
+
+                const store =
+                    tx.objectStore(
+                        DOCUMENT_STORE_NAME
+                    );
+
+
+                const request =
+                    store.put(
+                        file,
                         String(
                             fileId
                         )
                     );
 
-                };
 
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error ||
-                        new Error(
-                            "فشل حفظ نسخة العمل."
-                        )
-                    );
-
-                };
-
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-
-            transaction.onerror =
-                function () {
-
-                    reject(
-                        transaction.error ||
-                        new Error(
-                            "فشل حفظ نسخة العمل."
-                        )
-                    );
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Get Working Word File
-// ======================================
-
-async function getWorkingWordFile(
-    fileId
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_STORE_NAME,
-                    "readonly"
-                );
-
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_STORE_NAME
-                );
-
-
-            const request =
-                store.get(
-                    String(
-                        fileId
-                    )
-                );
-
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        request.result ||
-                        null
-                    );
-
-                };
-
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error ||
-                        new Error(
-                            "فشل قراءة نسخة العمل."
-                        )
-                    );
-
-                };
-
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Delete Working Word File
-// ======================================
-
-async function deleteWorkingWordFile(
-    fileId
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_STORE_NAME,
-                    "readwrite"
-                );
-
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_STORE_NAME
-                );
-
-
-            const request =
-                store.delete(
-                    String(
-                        fileId
-                    )
-                );
-
-
-            request.onsuccess =
-                function () {
-
-                    resolve();
-
-                };
-
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error ||
-                        new Error(
-                            "فشل حذف نسخة العمل."
-                        )
-                    );
-
-                };
-
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Convert Blob/File to Base64
-// ======================================
-
-function fileToBase64(
-    file
-) {
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const reader =
-                new FileReader();
-
-
-            reader.onload =
-                function () {
-
-                    const result =
-                        String(
-                            reader.result ||
-                            ""
-                        );
-
-
-                    const commaIndex =
-                        result.indexOf(
-                            ","
-                        );
-
-
-                    if (
-                        commaIndex ===
-                        -1
-                    ) {
+                request.onerror =
+                    function () {
 
                         reject(
-                            new Error(
-                                "تعذر تحويل ملف Word إلى Base64."
+                            request.error
+                        );
+
+                    };
+
+
+                tx.oncomplete =
+                    function () {
+
+                        db.close();
+
+                        resolve(
+                            String(
+                                fileId
                             )
                         );
 
-                        return;
-
-                    }
+                    };
 
 
-                    resolve(
-                        result.substring(
-                            commaIndex + 1
+                tx.onerror =
+                    function () {
+
+                        reject(
+                            tx.error
+                        );
+
+                    };
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // GET WORKING WORD FILE
+    // =====================================================
+
+    async function getWorkingWordFile(
+        fileId
+    ) {
+
+        const db =
+            await openDocumentDatabase();
+
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const tx =
+                    db.transaction(
+                        DOCUMENT_STORE_NAME,
+                        "readonly"
+                    );
+
+
+                const request =
+                    tx.objectStore(
+                        DOCUMENT_STORE_NAME
+                    )
+                    .get(
+                        String(
+                            fileId
                         )
                     );
+
+
+                request.onsuccess =
+                    function () {
+
+                        resolve(
+                            request.result ||
+                            null
+                        );
+
+                    };
+
+
+                request.onerror =
+                    function () {
+
+                        reject(
+                            request.error
+                        );
+
+                    };
+
+
+                tx.oncomplete =
+                    function () {
+
+                        db.close();
+
+                    };
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // DELETE WORKING WORD FILE
+    // =====================================================
+
+    async function deleteWorkingWordFile(
+        fileId
+    ) {
+
+        const db =
+            await openDocumentDatabase();
+
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const tx =
+                    db.transaction(
+                        DOCUMENT_STORE_NAME,
+                        "readwrite"
+                    );
+
+
+                const request =
+                    tx.objectStore(
+                        DOCUMENT_STORE_NAME
+                    )
+                    .delete(
+                        String(
+                            fileId
+                        )
+                    );
+
+
+                request.onerror =
+                    function () {
+
+                        reject(
+                            request.error
+                        );
+
+                    };
+
+
+                tx.oncomplete =
+                    function () {
+
+                        db.close();
+
+                        resolve();
+
+                    };
+
+
+                tx.onerror =
+                    function () {
+
+                        reject(
+                            tx.error
+                        );
+
+                    };
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // SAVE DOCUMENT TEXT
+    // =====================================================
+
+    async function saveDocumentText(
+        documentId,
+        text
+    ) {
+
+        const db =
+            await openDocumentDatabase();
+
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const tx =
+                    db.transaction(
+                        DOCUMENT_TEXT_STORE_NAME,
+                        "readwrite"
+                    );
+
+
+                const record = {
+
+                    documentId:
+                        String(
+                            documentId
+                        ),
+
+                    text:
+                        String(
+                            text ||
+                            ""
+                        ),
+
+                    updatedAt:
+                        new Date()
+                            .toISOString()
 
                 };
 
 
-            reader.onerror =
-                function () {
-
-                    reject(
-                        reader.error ||
-                        new Error(
-                            "فشل قراءة ملف Word."
+                const request =
+                    tx.objectStore(
+                        DOCUMENT_TEXT_STORE_NAME
+                    )
+                    .put(
+                        record,
+                        String(
+                            documentId
                         )
                     );
 
-                };
+
+                request.onerror =
+                    function () {
+
+                        reject(
+                            request.error
+                        );
+
+                    };
 
 
-            reader.readAsDataURL(
-                file
+                tx.oncomplete =
+                    function () {
+
+                        db.close();
+
+                        resolve(
+                            record
+                        );
+
+                    };
+
+
+                tx.onerror =
+                    function () {
+
+                        reject(
+                            tx.error
+                        );
+
+                    };
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // GET DOCUMENT TEXT
+    // =====================================================
+
+    async function getDocumentText(
+        documentId
+    ) {
+
+        const db =
+            await openDocumentDatabase();
+
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const tx =
+                    db.transaction(
+                        DOCUMENT_TEXT_STORE_NAME,
+                        "readonly"
+                    );
+
+
+                const request =
+                    tx.objectStore(
+                        DOCUMENT_TEXT_STORE_NAME
+                    )
+                    .get(
+                        String(
+                            documentId
+                        )
+                    );
+
+
+                request.onsuccess =
+                    function () {
+
+                        resolve(
+                            request.result ||
+                            null
+                        );
+
+                    };
+
+
+                request.onerror =
+                    function () {
+
+                        reject(
+                            request.error
+                        );
+
+                    };
+
+
+                tx.oncomplete =
+                    function () {
+
+                        db.close();
+
+                    };
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // SAVE DOCUMENT STRUCTURE
+    // =====================================================
+
+    async function saveDocumentStructure(
+        documentId,
+        structureData
+    ) {
+
+        const db =
+            await openDocumentDatabase();
+
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const tx =
+                    db.transaction(
+                        DOCUMENT_STRUCTURE_STORE_NAME,
+                        "readwrite"
+                    );
+
+
+                const request =
+                    tx.objectStore(
+                        DOCUMENT_STRUCTURE_STORE_NAME
+                    )
+                    .put(
+                        structureData,
+                        String(
+                            documentId
+                        )
+                    );
+
+
+                request.onerror =
+                    function () {
+
+                        reject(
+                            request.error
+                        );
+
+                    };
+
+
+                tx.oncomplete =
+                    function () {
+
+                        db.close();
+
+                        resolve(
+                            structureData
+                        );
+
+                    };
+
+
+                tx.onerror =
+                    function () {
+
+                        reject(
+                            tx.error
+                        );
+
+                    };
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // GET DOCUMENT STRUCTURE
+    // =====================================================
+
+    async function getDocumentStructure(
+        documentId
+    ) {
+
+        const db =
+            await openDocumentDatabase();
+
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const tx =
+                    db.transaction(
+                        DOCUMENT_STRUCTURE_STORE_NAME,
+                        "readonly"
+                    );
+
+
+                const request =
+                    tx.objectStore(
+                        DOCUMENT_STRUCTURE_STORE_NAME
+                    )
+                    .get(
+                        String(
+                            documentId
+                        )
+                    );
+
+
+                request.onsuccess =
+                    function () {
+
+                        resolve(
+                            request.result ||
+                            null
+                        );
+
+                    };
+
+
+                request.onerror =
+                    function () {
+
+                        reject(
+                            request.error
+                        );
+
+                    };
+
+
+                tx.oncomplete =
+                    function () {
+
+                        db.close();
+
+                    };
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // FILE -> BASE64
+    // =====================================================
+
+    function fileToBase64(
+        file
+    ) {
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                const reader =
+                    new FileReader();
+
+
+                reader.onload =
+                    function () {
+
+                        const result =
+                            String(
+                                reader.result ||
+                                ""
+                            );
+
+
+                        const commaIndex =
+                            result.indexOf(
+                                ","
+                            );
+
+
+                        if (
+                            commaIndex ===
+                            -1
+                        ) {
+
+                            reject(
+                                new Error(
+                                    "تعذر تحويل ملف Word إلى Base64."
+                                )
+                            );
+
+                            return;
+
+                        }
+
+
+                        resolve(
+                            result.substring(
+                                commaIndex +
+                                1
+                            )
+                        );
+
+                    };
+
+
+                reader.onerror =
+                    function () {
+
+                        reject(
+                            reader.error ||
+                            new Error(
+                                "فشل قراءة ملف Word."
+                            )
+                        );
+
+                    };
+
+
+                reader.readAsDataURL(
+                    file
+                );
+
+            }
+        );
+
+    }
+
+
+    // =====================================================
+    // CREATE DOCUMENT
+    // =====================================================
+
+    function createDocument(
+        file,
+        projectId,
+        order
+    ) {
+
+        const now =
+            new Date()
+                .toISOString();
+
+
+        const documentId =
+            Date.now();
+
+
+        const item = {
+
+            id:
+                documentId,
+
+            projectId:
+                projectId,
+
+            name:
+                file.name.replace(
+                    /\.docx$/i,
+                    ""
+                ),
+
+            fileName:
+                file.name,
+
+            fileType:
+                file.type ||
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+            storageId:
+                String(
+                    documentId
+                ),
+
+            order:
+                typeof order ===
+                    "number"
+                        ? order
+                        : 0,
+
+            type:
+                "word",
+
+            readStatus:
+                "new",
+
+            indexStatus:
+                "new",
+
+            indexTokenCount:
+                0,
+
+            indexUniqueTerms:
+                0,
+
+            indexUniqueFamilies:
+                0,
+
+            indexSchemaVersion:
+                0,
+
+            createdAt:
+                now,
+
+            updatedAt:
+                now
+
+        };
+
+
+        documents.push(
+            item
+        );
+
+
+        saveDocuments();
+
+
+        return item;
+
+    }
+
+
+    // =====================================================
+    // DOCUMENT STATUS
+    // =====================================================
+
+    function updateDocumentReadStatus(
+        item,
+        status
+    ) {
+
+        if (!item) {
+
+            return;
+
+        }
+
+
+        item.readStatus =
+            status;
+
+
+        item.updatedAt =
+            new Date()
+                .toISOString();
+
+
+        if (
+            status ===
+            "read"
+        ) {
+
+            item.readAt =
+                new Date()
+                    .toISOString();
+
+        }
+
+
+        saveDocuments();
+
+    }
+
+
+    function updateDocumentIndexStatus(
+        item,
+        status
+    ) {
+
+        if (!item) {
+
+            return;
+
+        }
+
+
+        item.indexStatus =
+            status;
+
+
+        item.updatedAt =
+            new Date()
+                .toISOString();
+
+
+        saveDocuments();
+
+    }
+
+
+    // =====================================================
+    // PROJECT DOCUMENTS
+    // =====================================================
+
+    function getProjectDocuments(
+        projectId
+    ) {
+
+        if (!projectId) {
+
+            return [];
+
+        }
+
+
+        return documents
+            .filter(
+                function (
+                    item
+                ) {
+
+                    return (
+                        item &&
+                        item.projectId ===
+                            projectId
+                    );
+
+                }
+            )
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    return (
+                        Number(
+                            a.order ||
+                            0
+                        ) -
+                        Number(
+                            b.order ||
+                            0
+                        )
+                    );
+
+                }
+            );
+
+    }
+
+
+    function attachDocumentToProject(
+        project,
+        item
+    ) {
+
+        if (
+            !project ||
+            !item
+        ) {
+
+            return;
+
+        }
+
+
+        if (
+            !Array.isArray(
+                project.documents
+            )
+        ) {
+
+            project.documents =
+                [];
+
+        }
+
+
+        if (
+            !project.documents.includes(
+                item.id
+            )
+        ) {
+
+            project.documents.push(
+                item.id
+            );
+
+
+            project.updatedAt =
+                new Date()
+                    .toISOString();
+
+
+            saveProjects();
+
+        }
+
+    }
+
+
+    function setCurrentProject(
+        project
+    ) {
+
+        currentProject =
+            project ||
+            null;
+
+
+        renderDocuments();
+
+    }
+
+
+    // =====================================================
+    // TEXT NORMALIZATION
+    // =====================================================
+
+    function normalizeSearchText(
+        text
+    ) {
+
+        return String(
+            text ||
+            ""
+        )
+
+        // إزالة التشكيل
+        .replace(
+            /[\u064B-\u065F\u0670]/g,
+            ""
+        )
+
+        // إزالة التطويل
+        .replace(
+            /\u0640/g,
+            ""
+        )
+
+        // توحيد الألف
+        .replace(
+            /[أإآٱ]/g,
+            "ا"
+        )
+
+        // توحيد الياء
+        .replace(
+            /ى/g,
+            "ي"
+        )
+
+        // توحيد بعض أشكال الهمزة
+        .replace(
+            /ؤ/g,
+            "و"
+        )
+        .replace(
+            /ئ/g,
+            "ي"
+        )
+
+        // تنظيف المسافات
+        .replace(
+            /\s+/g,
+            " "
+        )
+
+        .trim()
+        .toLowerCase();
+
+    }
+
+
+    function tokenizeDocumentText(
+        text
+    ) {
+
+        return (
+            normalizeSearchText(
+                text
+            )
+            .match(
+                /[\p{L}\p{N}]+/gu
+            ) ||
+            []
+        );
+
+    }
+
+
+    function getSearchQueryTokens(
+        query
+    ) {
+
+        const stopWords =
+            new Set([
+
+                "ما",
+                "ماذا",
+                "من",
+                "هو",
+                "هي",
+                "هم",
+                "في",
+                "على",
+                "عن",
+                "الى",
+                "إلى",
+                "منه",
+                "بها",
+                "به",
+                "لها",
+                "له",
+                "هذا",
+                "هذه",
+                "ذلك",
+                "تلك",
+                "الذي",
+                "التي",
+                "الذين",
+                "بين",
+                "مع",
+                "ثم",
+                "او",
+                "أو",
+                "و",
+                "ف",
+                "ب",
+                "ك",
+                "ل",
+                "أن",
+                "إن",
+                "هل",
+                "كيف",
+                "لماذا",
+                "أي",
+                "اي",
+                "كان",
+                "كانت",
+                "يكون",
+                "تكون",
+                "فيها",
+                "فيه"
+
+            ]);
+
+
+        const tokens =
+            tokenizeDocumentText(
+                query
+            );
+
+
+        const filtered =
+            tokens.filter(
+                function (
+                    token
+                ) {
+
+                    return (
+                        token.length >
+                            2 &&
+                        !stopWords.has(
+                            token
+                        )
+                    );
+
+                }
+            );
+
+
+        return (
+            filtered.length
+                ? filtered
+                : tokens
+        );
+
+    }
+
+
+    // =====================================================
+    // BUILD DOCUMENT STRUCTURE
+    // =====================================================
+
+    async function buildDocumentStructure(
+        documentItem
+    ) {
+
+        if (!documentItem) {
+
+            throw new Error(
+                "لم يتم تحديد المستند."
             );
 
         }
-    );
-
-}
 
 
-// ======================================
-// Create Document
-// ======================================
-
-function createDocument(
-    file,
-    projectId,
-    order
-) {
-
-    const now =
-        new Date().toISOString();
+        const file =
+            await getWorkingWordFile(
+                documentItem.storageId
+            );
 
 
-    const documentId =
-        Date.now();
+        if (!file) {
+
+            throw new Error(
+                "لم يتم العثور على نسخة العمل."
+            );
+
+        }
 
 
-    const documentItem = {
-
-        id:
-            documentId,
-
-        projectId:
-            projectId,
-
-        name:
-            file.name.replace(
-                /\.docx$/i,
-                ""
-            ),
-
-        fileName:
-            file.name,
-
-        fileType:
-            file.type ||
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-
-        storageId:
-            String(
-                documentId
-            ),
-
-        order:
-            typeof order === "number"
-                ? order
-                : 0,
-
-        type:
-            "word",
-
-        readStatus:
-            "new",
-
-        indexStatus:
-            "new",
-
-        indexTokenCount:
-            0,
-
-        indexUniqueTerms:
-            0,
-
-        indexUniqueFamilies:
-            0,
-
-        indexSchemaVersion:
-            ORAMA_RETRIEVAL_VERSION,
-
-        indexUpdatedAt:
-            "",
-
-        createdAt:
-            now,
-
-        updatedAt:
-            now
-
-    };
+        const base64 =
+            await fileToBase64(
+                file
+            );
 
 
-    documents.push(
+        return await Word.run(
+            async function (
+                context
+            ) {
+
+                if (
+                    !Office.context.requirements
+                        .isSetSupported(
+                            "WordApiHiddenDocument",
+                            "1.3"
+                        )
+                ) {
+
+                    throw new Error(
+                        "إصدار Word الحالي لا يدعم تحليل بنية المستند."
+                    );
+
+                }
+
+
+                const workingDocument =
+                    context.application
+                        .createDocument(
+                            base64
+                        );
+
+
+                const paragraphs =
+                    workingDocument.body
+                        .paragraphs;
+
+
+                const tables =
+                    workingDocument.body
+                        .tables;
+
+
+                paragraphs.load(
+                    [
+                        "items/text",
+                        "items/styleBuiltIn",
+                        "items/tableNestingLevel"
+                    ]
+                );
+
+
+                tables.load(
+                    [
+                        "items/rowCount",
+                        "items/columnCount",
+                        "items/styleBuiltIn"
+                    ]
+                );
+
+
+                await context.sync();
+
+
+                const paragraphItems =
+                    paragraphs.items.map(
+                        function (
+                            paragraph,
+                            index
+                        ) {
+
+                            return {
+
+                                index:
+                                    index,
+
+                                id:
+                                    String(
+                                        index
+                                    ),
+
+                                text:
+                                    String(
+                                        paragraph.text ||
+                                        ""
+                                    ).trim(),
+
+                                style:
+                                    String(
+                                        paragraph.styleBuiltIn ||
+                                        ""
+                                    ),
+
+                                tableNestingLevel:
+                                    Number(
+                                        paragraph.tableNestingLevel ||
+                                        0
+                                    )
+
+                            };
+
+                        }
+                    );
+
+
+                const headings =
+                    paragraphItems.filter(
+                        function (
+                            paragraph
+                        ) {
+
+                            return (
+                                paragraph.style &&
+                                /^Heading[1-9]$/i.test(
+                                    paragraph.style
+                                )
+                            );
+
+                        }
+                    );
+
+
+                const tableItems =
+                    tables.items.map(
+                        function (
+                            table,
+                            index
+                        ) {
+
+                            return {
+
+                                index:
+                                    index,
+
+                                rows:
+                                    Number(
+                                        table.rowCount ||
+                                        0
+                                    ),
+
+                                columns:
+                                    Number(
+                                        table.columnCount ||
+                                        0
+                                    ),
+
+                                style:
+                                    String(
+                                        table.styleBuiltIn ||
+                                        ""
+                                    )
+
+                            };
+
+                        }
+                    );
+
+
+                return {
+
+                    documentId:
+                        String(
+                            documentItem.id
+                        ),
+
+                    paragraphCount:
+                        paragraphItems.length,
+
+                    headingCount:
+                        headings.length,
+
+                    tableCount:
+                        tableItems.length,
+
+                    paragraphs:
+                        paragraphItems,
+
+                    headings:
+                        headings,
+
+                    tables:
+                        tableItems,
+
+                    updatedAt:
+                        new Date()
+                            .toISOString()
+
+                };
+
+            }
+        );
+
+    }
+
+
+    async function ensureDocumentStructure(
         documentItem
-    );
-
-
-    saveDocuments();
-
-
-    return documentItem;
-
-}
-
-
-// ======================================
-// Update Document Read Status
-// ======================================
-
-function updateDocumentReadStatus(
-    documentItem,
-    status
-) {
-
-    if (
-        !documentItem
     ) {
 
-        return;
-
-    }
-
-
-    documentItem.readStatus =
-        status;
+        const existing =
+            await getDocumentStructure(
+                documentItem.id
+            );
 
 
-    documentItem.updatedAt =
-        new Date().toISOString();
+        if (
+            existing &&
+            Array.isArray(
+                existing.paragraphs
+            ) &&
+            Array.isArray(
+                existing.headings
+            )
+        ) {
+
+            return existing;
+
+        }
 
 
-    if (
-        status === "read"
-    ) {
-
-        documentItem.readAt =
-            new Date().toISOString();
-
-    }
-
-
-    saveDocuments();
-
-}
-
-
-// ======================================
-// Update Document Index Status
-// ======================================
-
-function updateDocumentIndexStatus(
-    documentItem,
-    status
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        return;
-
-    }
-
-
-    documentItem.indexStatus =
-        status;
-
-
-    documentItem.updatedAt =
-        new Date().toISOString();
-
-
-    saveDocuments();
-
-}
-
-
-// ======================================
-// Get Project Documents
-// ======================================
-
-function getProjectDocuments(
-    projectId
-) {
-
-    if (
-        !projectId
-    ) {
-
-        return [];
-
-    }
-
-
-    return documents
-        .filter(
-            function (
+        const structure =
+            await buildDocumentStructure(
                 documentItem
-            ) {
+            );
 
-                return (
-                    documentItem &&
-                    documentItem.projectId ===
-                        projectId
-                );
 
-            }
-        )
-        .sort(
+        await saveDocumentStructure(
+            documentItem.id,
+            structure
+        );
+
+
+        return structure;
+
+    }
+
+
+    // =====================================================
+    // ORAMA LOADER
+    // =====================================================
+
+    function loadOrama() {
+
+        try {
+
+            return require(
+                "@orama/orama"
+            );
+
+        }
+        catch (
+            error
+        ) {
+
+            throw new Error(
+                "تعذر تحميل Orama من الحزمة @orama/orama: " +
+                error.message
+            );
+
+        }
+
+    }
+
+
+    // =====================================================
+    // HEADING LEVEL
+    // =====================================================
+
+    function getHeadingLevelNumber(
+        style
+    ) {
+
+        const match =
+            String(
+                style ||
+                ""
+            )
+            .match(
+                /Heading\s*([1-9])/i
+            );
+
+
+        return (
+            match
+                ? Number(
+                    match[1]
+                )
+                : 9
+        );
+
+    }
+
+
+    // =====================================================
+    // BUILD ORAMA PRIMARY RETRIEVAL INDEX
+    // الفهرس الرئيسي الوحيد
+    // =====================================================
+
+    async function buildOramaRetrievalIndex(
+        documentItem,
+        structureData
+    ) {
+
+        const {
+            create,
+            insertMultiple
+        } =
+            loadOrama();
+
+
+        const paragraphs =
+            Array.isArray(
+                structureData.paragraphs
+            )
+                ? structureData.paragraphs
+                : [];
+
+
+        const headings =
+            Array.isArray(
+                structureData.headings
+            )
+                ? structureData.headings
+                    .filter(
+                        function (
+                            heading
+                        ) {
+
+                            return (
+                                heading &&
+                                typeof heading.index !==
+                                    "undefined" &&
+                                String(
+                                    heading.text ||
+                                    ""
+                                ).trim()
+                            );
+
+                        }
+                    )
+                    .sort(
+                        function (
+                            a,
+                            b
+                        ) {
+
+                            return (
+                                Number(
+                                    a.index
+                                ) -
+                                Number(
+                                    b.index
+                                )
+                            );
+
+                        }
+                    )
+                : [];
+
+
+        const headingMap =
+            new Map();
+
+
+        headings.forEach(
             function (
-                a,
-                b
+                heading
             ) {
 
-                return (
+                headingMap.set(
                     Number(
-                        a.order || 0
-                    ) -
-                    Number(
-                        b.order || 0
-                    )
+                        heading.index
+                    ),
+                    heading
                 );
 
             }
         );
 
-}
 
-
-// ======================================
-// Save Indexed Document Text
-// ======================================
-
-async function saveDocumentText(
-    documentId,
-    text
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-
-    return new Promise(
-        function (
-            resolve,
-            reject
+        function nearestHeading(
+            paragraphIndex
         ) {
 
-            const transaction =
-                db.transaction(
-                    DOCUMENT_TEXT_STORE_NAME,
-                    "readwrite"
+            if (
+                headingMap.has(
+                    paragraphIndex
+                )
+            ) {
+
+                return headingMap.get(
+                    paragraphIndex
                 );
 
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_TEXT_STORE_NAME
-                );
+            }
 
 
-            const record = {
+            for (
+                let i =
+                    headings.length - 1;
+                i >= 0;
+                i--
+            ) {
 
-                documentId:
+                if (
+                    Number(
+                        headings[i].index
+                    ) <
+                    paragraphIndex
+                ) {
+
+                    return headings[i];
+
+                }
+
+            }
+
+
+            return null;
+
+        }
+
+
+        const records =
+            [];
+
+
+        paragraphs.forEach(
+            function (
+                paragraph
+            ) {
+
+                if (
+                    !paragraph ||
+                    !paragraph.text
+                ) {
+
+                    return;
+
+                }
+
+
+                const text =
                     String(
-                        documentId
-                    ),
-
-                text:
-                    String(
-                        text ||
-                        ""
-                    ),
-
-                updatedAt:
-                    new Date().toISOString()
-
-            };
+                        paragraph.text
+                    ).trim();
 
 
-            const request =
-                store.put(
-                    record,
-                    String(
-                        documentId
-                    )
-                );
+                if (!text) {
+
+                    return;
+
+                }
 
 
-            request.onsuccess =
-                function () {
+                const paragraphIndex =
+                    Number(
+                        paragraph.index
+                    );
 
-                    resolve(
+
+                const heading =
+                    nearestHeading(
+                        paragraphIndex
+                    );
+
+
+                const isHeading =
+                    Boolean(
+                        heading &&
+                        Number(
+                            heading.index
+                        ) ===
+                        paragraphIndex
+                    );
+
+
+                records.push({
+
+                    id:
+                        "p-" +
+                        String(
+                            paragraphIndex
+                        ),
+
+                    paragraphIndex:
+                        paragraphIndex,
+
+                    text:
+                        text,
+
+                    heading:
+                        heading
+                            ? String(
+                                heading.text ||
+                                ""
+                            ).trim()
+                            : "",
+
+                    headingIndex:
+                        heading
+                            ? Number(
+                                heading.index
+                            )
+                            : -1,
+
+                    headingLevel:
+                        heading
+                            ? String(
+                                heading.style ||
+                                ""
+                            )
+                            : "",
+
+                    headingLevelNumber:
+                        heading
+                            ? getHeadingLevelNumber(
+                                heading.style
+                            )
+                            : 9,
+
+                    isHeading:
+                        isHeading,
+
+                    documentId:
+                        String(
+                            documentItem.id
+                        )
+
+                });
+
+            }
+        );
+
+
+        const cacheKey =
+            [
+
+                String(
+                    documentItem.id
+                ),
+
+                String(
+                    documentItem.indexUpdatedAt ||
+                    ""
+                ),
+
+                String(
+                    ORAMA_SCHEMA_VERSION
+                ),
+
+                String(
+                    records.length
+                ),
+
+                String(
+                    headings.length
+                )
+
+            ].join(
+                "|"
+            );
+
+
+        if (
+            oramaRetrievalDb &&
+            oramaRetrievalCacheKey ===
+                cacheKey &&
+            oramaRetrievalDocumentId ===
+                String(
+                    documentItem.id
+                )
+        ) {
+
+            return oramaRetrievalDb;
+
+        }
+
+
+        // =================================================
+        // Orama يدعم العربية
+        // =================================================
+
+        const db =
+            create({
+
+                schema: {
+
+                    id:
+                        "string",
+
+                    paragraphIndex:
+                        "number",
+
+                    text:
+                        "string",
+
+                    heading:
+                        "string",
+
+                    headingIndex:
+                        "number",
+
+                    headingLevel:
+                        "string",
+
+                    headingLevelNumber:
+                        "number",
+
+                    isHeading:
+                        "boolean",
+
+                    documentId:
+                        "string"
+
+                },
+
+                language:
+                    "arabic"
+
+            });
+
+
+        if (
+            records.length
+        ) {
+
+            await insertMultiple(
+                db,
+                records,
+                500
+            );
+
+        }
+
+
+        oramaRetrievalDb =
+            db;
+
+
+        oramaRetrievalCacheKey =
+            cacheKey;
+
+
+        oramaRetrievalDocumentId =
+            String(
+                documentItem.id
+            );
+
+
+        // =================================================
+        // تحديث إحصاءات المستند
+        // =================================================
+
+        documentItem.indexStatus =
+            "indexed";
+
+
+        documentItem.indexTokenCount =
+            records.reduce(
+                function (
+                    total,
+                    record
+                ) {
+
+                    return (
+                        total +
+                        tokenizeDocumentText(
+                            record.text
+                        ).length
+                    );
+
+                },
+                0
+            );
+
+
+        documentItem.indexUniqueTerms =
+            new Set(
+                records.flatMap(
+                    function (
                         record
-                    );
+                    ) {
 
-                };
+                        return tokenizeDocumentText(
+                            record.text
+                        );
 
+                    }
+                )
+            )
+            .size;
 
-            request.onerror =
-                function () {
 
-                    reject(
-                        request.error ||
-                        new Error(
-                            "فشل حفظ نص المستند."
-                        )
-                    );
+        // لم نعد نحتاج للفهرس العائلي القديم.
+        documentItem.indexUniqueFamilies =
+            0;
 
-                };
 
+        documentItem.indexSchemaVersion =
+            ORAMA_SCHEMA_VERSION;
 
-            transaction.oncomplete =
-                function () {
 
-                    db.close();
+        documentItem.indexUpdatedAt =
+            new Date()
+                .toISOString();
 
-                };
 
-        }
-    );
+        saveDocuments();
 
-}
 
+        console.log(
+            "تم بناء فهرس Orama الرئيسي:",
+            {
+                documentId:
+                    documentItem.id,
 
-// ======================================
-// Get Indexed Document Text
-// ======================================
+                records:
+                    records.length,
 
-async function getDocumentText(
-    documentId
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_TEXT_STORE_NAME,
-                    "readonly"
-                );
-
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_TEXT_STORE_NAME
-                );
-
-
-            const request =
-                store.get(
-                    String(
-                        documentId
-                    )
-                );
-
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        request.result ||
-                        null
-                    );
-
-                };
-
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error ||
-                        new Error(
-                            "فشل قراءة نص المستند."
-                        )
-                    );
-
-                };
-
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Save Document Structure
-// ======================================
-
-async function saveDocumentStructure(
-    documentId,
-    structureData
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_STRUCTURE_STORE_NAME,
-                    "readwrite"
-                );
-
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_STRUCTURE_STORE_NAME
-                );
-
-
-            const request =
-                store.put(
-                    structureData,
-                    String(
-                        documentId
-                    )
-                );
-
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        structureData
-                    );
-
-                };
-
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error ||
-                        new Error(
-                            "فشل حفظ بنية المستند."
-                        )
-                    );
-
-                };
-
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Get Document Structure
-// ======================================
-
-async function getDocumentStructure(
-    documentId
-) {
-
-    const db =
-        await openDocumentDatabase();
-
-
-    return new Promise(
-        function (
-            resolve,
-            reject
-        ) {
-
-            const transaction =
-                db.transaction(
-                    DOCUMENT_STRUCTURE_STORE_NAME,
-                    "readonly"
-                );
-
-
-            const store =
-                transaction.objectStore(
-                    DOCUMENT_STRUCTURE_STORE_NAME
-                );
-
-
-            const request =
-                store.get(
-                    String(
-                        documentId
-                    )
-                );
-
-
-            request.onsuccess =
-                function () {
-
-                    resolve(
-                        request.result ||
-                        null
-                    );
-
-                };
-
-
-            request.onerror =
-                function () {
-
-                    reject(
-                        request.error ||
-                        new Error(
-                            "فشل قراءة بنية المستند."
-                        )
-                    );
-
-                };
-
-
-            transaction.oncomplete =
-                function () {
-
-                    db.close();
-
-                };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Build Document Structure
-// استخراج الفقرات والعناوين والجداول
-// ======================================
-
-async function buildDocumentStructure(
-    documentItem
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        throw new Error(
-            "لم يتم تحديد المستند."
+                headings:
+                    headings.length
+            }
         );
+
+
+        return db;
 
     }
 
 
-    const file =
-        await getWorkingWordFile(
-            documentItem.storageId
-        );
+    // =====================================================
+    // READ CURRENT WORKING DOCUMENT
+    // =====================================================
 
-
-    if (
-        !file
+    async function readCurrentWordDocument(
+        documentItem
     ) {
 
-        throw new Error(
-            "لم يتم العثور على نسخة العمل."
+        if (!documentItem) {
+
+            throw new Error(
+                "لم يتم تحديد المستند."
+            );
+
+        }
+
+
+        updateDocumentReadStatus(
+            documentItem,
+            "reading"
         );
 
-    }
 
-
-    const base64 =
-        await fileToBase64(
-            file
+        updateDocumentIndexStatus(
+            documentItem,
+            "indexing"
         );
 
 
-    return await Word.run(
-        async function (
-            context
-        ) {
+        try {
 
             if (
                 !Office.context.requirements
@@ -1536,567 +2386,230 @@ async function buildDocumentStructure(
             ) {
 
                 throw new Error(
-                    "إصدار Word الحالي لا يدعم تحليل بنية المستند."
+                    "إصدار Word الحالي لا يدعم قراءة نسخة العمل."
                 );
 
             }
 
 
-            const workingDocument =
-                context.application
-                    .createDocument(
-                        base64
-                    );
-
-
-            const paragraphs =
-                workingDocument.body.paragraphs;
-
-
-            paragraphs.load(
-                [
-                    "items/text",
-                    "items/styleBuiltIn",
-                    "items/tableNestingLevel"
-                ]
-            );
-
-
-            const tables =
-                workingDocument.body.tables;
-
-
-            tables.load(
-                [
-                    "items/rowCount",
-                    "items/columnCount",
-                    "items/styleBuiltIn"
-                ]
-            );
-
-
-            await context.sync();
-
-
-            const paragraphItems =
-                paragraphs.items.map(
-                    function (
-                        paragraph,
-                        index
-                    ) {
-
-                        return {
-
-                            index:
-                                index,
-
-                            id:
-                                String(
-                                    index
-                                ),
-
-                            text:
-                                String(
-                                    paragraph.text ||
-                                    ""
-                                ).trim(),
-
-                            style:
-                                String(
-                                    paragraph.styleBuiltIn ||
-                                    ""
-                                ),
-
-                            tableNestingLevel:
-                                Number(
-                                    paragraph.tableNestingLevel ||
-                                    0
-                                )
-
-                        };
-
-                    }
+            const file =
+                await getWorkingWordFile(
+                    documentItem.storageId
                 );
 
 
-            const headings =
-                paragraphItems.filter(
-                    function (
-                        paragraph
+            if (!file) {
+
+                throw new Error(
+                    "لم يتم العثور على نسخة العمل."
+                );
+
+            }
+
+
+            const base64 =
+                await fileToBase64(
+                    file
+                );
+
+
+            const text =
+                await Word.run(
+                    async function (
+                        context
                     ) {
 
+                        const workingDocument =
+                            context.application
+                                .createDocument(
+                                    base64
+                                );
+
+
+                        const body =
+                            workingDocument.body;
+
+
+                        body.load(
+                            "text"
+                        );
+
+
+                        await context.sync();
+
+
                         return (
-                            paragraph.style &&
-                            /^Heading[1-9]$/i.test(
-                                paragraph.style
-                            )
+                            body.text ||
+                            ""
                         );
 
                     }
                 );
 
 
-            const tableItems =
-                tables.items.map(
-                    function (
-                        table,
-                        index
-                    ) {
+            await saveDocumentText(
+                documentItem.id,
+                text
+            );
 
-                        return {
 
-                            index:
-                                index,
+            updateDocumentReadStatus(
+                documentItem,
+                "read"
+            );
 
-                            rows:
-                                Number(
-                                    table.rowCount ||
-                                    0
-                                ),
 
-                            columns:
-                                Number(
-                                    table.columnCount ||
-                                    0
-                                ),
+            // =================================================
+            // بناء البنية
+            // =================================================
 
-                            style:
-                                String(
-                                    table.styleBuiltIn ||
-                                    ""
-                                )
-
-                        };
-
-                    }
+            const structureData =
+                await buildDocumentStructure(
+                    documentItem
                 );
 
 
-            return {
-
-                documentId:
-                    String(
-                        documentItem.id
-                    ),
-
-                paragraphCount:
-                    paragraphItems.length,
-
-                headingCount:
-                    headings.length,
-
-                tableCount:
-                    tableItems.length,
-
-                paragraphs:
-                    paragraphItems,
-
-                headings:
-                    headings,
-
-                tables:
-                    tableItems,
-
-                updatedAt:
-                    new Date().toISOString()
-
-            };
-
-        }
-    );
-
-}
-
-
-// ======================================
-// Ensure Document Structure
-// ======================================
-
-async function ensureDocumentStructure(
-    documentItem
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        throw new Error(
-            "لم يتم تحديد المستند."
-        );
-
-    }
-
-
-    let structure =
-        await getDocumentStructure(
-            documentItem.id
-        );
-
-
-    if (
-        structure &&
-        Array.isArray(
-            structure.paragraphs
-        )
-    ) {
-
-        return structure;
-
-    }
-
-
-    structure =
-        await buildDocumentStructure(
-            documentItem
-        );
-
-
-    await saveDocumentStructure(
-        documentItem.id,
-        structure
-    );
-
-
-    return structure;
-
-}
-
-
-// ======================================
-// Read Current Working Word Document
-// القراءة + حفظ النص + بناء البنية
-// ======================================
-
-async function readCurrentWordDocument(
-    documentItem
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        throw new Error(
-            "لم يتم تحديد المستند."
-        );
-
-    }
-
-
-    updateDocumentReadStatus(
-        documentItem,
-        "reading"
-    );
-
-
-    try {
-
-        // ------------------------------
-        // التحقق من دعم Word API
-        // ------------------------------
-
-        if (
-            !Office.context.requirements
-                .isSetSupported(
-                    "WordApiHiddenDocument",
-                    "1.3"
-                )
-        ) {
-
-            throw new Error(
-                "إصدار Word الحالي لا يدعم قراءة نسخة العمل."
-            );
-
-        }
-
-
-        // ------------------------------
-        // استرجاع نسخة العمل
-        // ------------------------------
-
-        const file =
-            await getWorkingWordFile(
-                documentItem.storageId
+            await saveDocumentStructure(
+                documentItem.id,
+                structureData
             );
 
 
-        if (
-            !file
-        ) {
+            // =================================================
+            // بناء Orama الرئيسي
+            // =================================================
 
-            throw new Error(
-                "لم يتم العثور على نسخة العمل."
-            );
-
-        }
-
-
-        // ------------------------------
-        // تحويل الملف إلى Base64
-        // ------------------------------
-
-        const base64 =
-            await fileToBase64(
-                file
+            await buildOramaRetrievalIndex(
+                documentItem,
+                structureData
             );
 
 
-        // ------------------------------
-        // قراءة النص
-        // ------------------------------
-
-        const text =
-            await Word.run(
-                async function (
-                    context
-                ) {
-
-                    const workingDocument =
-                        context.application
-                            .createDocument(
-                                base64
-                            );
+            updateDocumentIndexStatus(
+                documentItem,
+                "indexed"
+            );
 
 
-                    const body =
-                        workingDocument.body;
+            saveDocuments();
 
 
-                    body.load(
-                        "text"
-                    );
+            console.log(
+                "تمت قراءة المستند وفهرسته بواسطة Orama:",
+                {
+                    documentId:
+                        documentItem.id,
 
+                    paragraphCount:
+                        structureData.paragraphCount,
 
-                    await context.sync();
+                    headingCount:
+                        structureData.headingCount,
 
-
-                    return String(
-                        body.text ||
-                        ""
-                    );
-
+                    indexTokenCount:
+                        documentItem.indexTokenCount
                 }
             );
 
 
-        // ------------------------------
-        // حفظ النص
-        // ------------------------------
+            return text;
 
-        await saveDocumentText(
-            documentItem.id,
-            text
-        );
+        }
+        catch (
+            error
+        ) {
 
-
-        // ------------------------------
-        // تثبيت حالة القراءة
-        // ------------------------------
-
-        updateDocumentReadStatus(
-            documentItem,
-            "read"
-        );
-
-
-        // ------------------------------
-        // بناء بنية المستند
-        // ------------------------------
-
-        const structureData =
-            await buildDocumentStructure(
-                documentItem
+            updateDocumentReadStatus(
+                documentItem,
+                "error"
             );
 
 
-        await saveDocumentStructure(
-            documentItem.id,
-            structureData
-        );
+            updateDocumentIndexStatus(
+                documentItem,
+                "error"
+            );
 
 
-        // ------------------------------
-        // إحصاءات أولية
-        // ------------------------------
-        // هذه الإحصاءات مؤقتة حتى يبني Orama
-        // فهرس الاسترجاع في الجزء التالي.
-
-        documentItem.indexTokenCount =
-            tokenizeDocumentText(
-                text
-            ).length;
+            console.error(
+                "فشل قراءة/فهرسة المستند:",
+                error
+            );
 
 
-        documentItem.indexUniqueTerms =
-            new Set(
-                tokenizeDocumentText(
-                    text
-                )
-            ).size;
-
-
-        documentItem.indexUniqueFamilies =
-            0;
-
-
-        documentItem.indexSchemaVersion =
-            ORAMA_RETRIEVAL_VERSION;
-
-
-        documentItem.indexUpdatedAt =
-            new Date().toISOString();
-
-
-        updateDocumentIndexStatus(
-            documentItem,
-            "indexed"
-        );
-
-
-        saveDocuments();
-
-
-        console.log(
-            "تمت قراءة المستند بنجاح:",
-            {
-                documentId:
-                    documentItem.id,
-
-                tokenCount:
-                    documentItem.indexTokenCount,
-
-                uniqueTerms:
-                    documentItem.indexUniqueTerms,
-
-                headings:
-                    structureData.headingCount,
-
-                paragraphs:
-                    structureData.paragraphCount,
-
-                tables:
-                    structureData.tableCount
-
-            }
-        );
-
-
-        return text;
-
-    }
-    catch (error) {
-
-        updateDocumentReadStatus(
-            documentItem,
-            "error"
-        );
-
-
-        updateDocumentIndexStatus(
-            documentItem,
-            "error"
-        );
-
-
-        console.error(
-            "فشل قراءة المستند:",
-            error
-        );
-
-
-        throw error;
-
-    }
-
-}
-
-
-// ======================================
-// Set Active Document
-// ======================================
-
-function setCurrentDocument(
-    documentItem
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        currentDocument =
-            null;
-
-
-        currentCitationSources =
-            [];
-
-
-        if (
-            documentTitle
-        ) {
-
-            documentTitle.textContent =
-                "لا يوجد مستند مفتوح";
+            throw error;
 
         }
 
+    }
 
-        if (
-            typeof renderDocuments ===
-            "function"
-        ) {
+
+    // =====================================================
+    // SET CURRENT DOCUMENT
+    // =====================================================
+
+    function setCurrentDocument(
+        documentItem
+    ) {
+
+        if (!documentItem) {
+
+            currentDocument =
+                null;
+
+
+            if (documentTitle) {
+
+                documentTitle.textContent =
+                    "لا يوجد مستند مفتوح";
+
+            }
+
 
             renderDocuments();
 
+
+            return;
+
         }
 
 
-        return;
-
-    }
-
-
-    currentDocument =
-        documentItem;
+        currentDocument =
+            documentItem;
 
 
-    currentCitationSources =
-        [];
+        if (documentTitle) {
+
+            documentTitle.textContent =
+                documentItem.name;
+
+        }
 
 
-    if (
-        documentTitle
-    ) {
+        if (
+            documentItem.readStatus ===
+            "read"
+        ) {
 
-        documentTitle.textContent =
-            documentItem.name;
+            ensureDocumentStructure(
+                documentItem
+            )
+            .then(
+                function (
+                    structureData
+                ) {
 
-    }
+                    return buildOramaRetrievalIndex(
+                        documentItem,
+                        structureData
+                    );
 
-
-    // ------------------------------
-    // إذا كانت النسخة قد قرئت
-    // نتحقق من البنية فقط
-    // ------------------------------
-
-    if (
-        documentItem.readStatus ===
-        "read"
-    ) {
-
-        ensureDocumentStructure(
-            documentItem
-        )
+                }
+            )
             .then(
                 function () {
 
-                    if (
-                        typeof renderDocuments ===
-                        "function"
-                    ) {
-
-                        renderDocuments();
-
-                    }
+                    renderDocuments();
 
                 }
             )
@@ -2106,57 +2619,40 @@ function setCurrentDocument(
                 ) {
 
                     console.error(
-                        "تعذر تحديث بنية المستند:",
+                        "تعذر تجهيز فهرس Orama:",
                         error
                     );
 
 
-                    if (
-                        typeof renderDocuments ===
-                        "function"
-                    ) {
-
-                        renderDocuments();
-
-                    }
+                    renderDocuments();
 
                 }
             );
 
 
-        if (
-            typeof renderDocuments ===
-            "function"
-        ) {
-
             renderDocuments();
+
+
+            return;
 
         }
 
 
-        return;
-
-    }
-
-
-    // ------------------------------
-    // المستند جديد
-    // ------------------------------
-
-    readCurrentWordDocument(
-        documentItem
-    )
+        readCurrentWordDocument(
+            documentItem
+        )
         .then(
-            function () {
+            function (
+                text
+            ) {
 
-                if (
-                    typeof renderDocuments ===
-                    "function"
-                ) {
+                console.log(
+                    "محتوى نسخة العمل:",
+                    text
+                );
 
-                    renderDocuments();
 
-                }
+                renderDocuments();
 
             }
         )
@@ -2171,190 +2667,2680 @@ function setCurrentDocument(
                 );
 
 
-                if (
-                    typeof renderDocuments ===
-                    "function"
-                ) {
-
-                    renderDocuments();
-
-                }
+                renderDocuments();
 
             }
         );
 
 
-    if (
-        typeof renderDocuments ===
-        "function"
-    ) {
-
         renderDocuments();
 
     }
 
-}
 
+    // =====================================================
+    // UPDATE DOCUMENT TIMESTAMP
+    // =====================================================
 
-// ======================================
-// Update Document Timestamp
-// ======================================
-
-function touchDocument(
-    documentItem
-) {
-
-    if (
-        !documentItem
+    function touchDocument(
+        documentItem
     ) {
 
-        return;
+        if (!documentItem) {
 
-    }
-
-
-    documentItem.updatedAt =
-        new Date().toISOString();
-
-
-    saveDocuments();
-
-}
-
-
-// ======================================
-// Attach Document To Project
-// ======================================
-
-function attachDocumentToProject(
-    project,
-    documentItem
-) {
-
-    if (
-        !project ||
-        !documentItem
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        !Array.isArray(
-            project.documents
-        )
-    ) {
-
-        project.documents =
-            [];
-
-    }
-
-
-    if (
-        !project.documents.includes(
-            documentItem.id
-        )
-    ) {
-
-        project.documents.push(
-            documentItem.id
-        );
-
-
-        project.updatedAt =
-            new Date().toISOString();
-
-
-        saveProjects();
-
-    }
-
-}
-
-
-// ======================================
-// Set Active Project
-// ======================================
-
-function setCurrentProject(
-    project
-) {
-
-    if (
-        !project
-    ) {
-
-        currentProject =
-            null;
-
-
-        currentDocument =
-            null;
-
-
-        currentCitationSources =
-            [];
-
-
-        if (
-            typeof renderDocuments ===
-            "function"
-        ) {
-
-            renderDocuments();
+            return;
 
         }
 
 
+        documentItem.updatedAt =
+            new Date()
+                .toISOString();
+
+    }
+
+
+    // =====================================================
+    // ADD DOCUMENT
+    // =====================================================
+
+    if (
+        addDocumentBtn &&
+        wordDocumentPicker
+    ) {
+
+        addDocumentBtn.onclick =
+            function (
+                e
+            ) {
+
+                e.preventDefault();
+                e.stopPropagation();
+
+
+                if (!currentProject) {
+
+                    if (documentsList) {
+
+                        documentsList.innerHTML = `
+                            <div class="empty-document">
+                                اختر مشروعًا أولًا لإضافة مستند
+                            </div>
+                        `;
+
+                    }
+
+
+                    return;
+
+                }
+
+
+                wordDocumentPicker.value =
+                    "";
+
+
+                wordDocumentPicker.click();
+
+            };
+
+
+        wordDocumentPicker.onchange =
+            async function () {
+
+                try {
+
+                    const file =
+                        wordDocumentPicker.files &&
+                        wordDocumentPicker.files[0];
+
+
+                    if (!file) {
+
+                        return;
+
+                    }
+
+
+                    if (
+                        !/\.docx$/i.test(
+                            file.name
+                        )
+                    ) {
+
+                        console.warn(
+                            "الملف المختار ليس DOCX."
+                        );
+
+
+                        return;
+
+                    }
+
+
+                    if (!currentProject) {
+
+                        return;
+
+                    }
+
+
+                    const projectDocuments =
+                        getProjectDocuments(
+                            currentProject.id
+                        );
+
+
+                    const nextOrder =
+                        projectDocuments.length +
+                        1;
+
+
+                    const documentItem =
+                        createDocument(
+                            file,
+                            currentProject.id,
+                            nextOrder
+                        );
+
+
+                    await saveWorkingWordFile(
+                        documentItem.storageId,
+                        file
+                    );
+
+
+                    attachDocumentToProject(
+                        currentProject,
+                        documentItem
+                    );
+
+
+                    setCurrentDocument(
+                        documentItem
+                    );
+
+
+                    renderDocuments();
+
+
+                    console.log(
+                        "تم استيراد مستند Word:",
+                        {
+                            name:
+                                documentItem.name,
+
+                            fileName:
+                                documentItem.fileName,
+
+                            storageId:
+                                documentItem.storageId
+                        }
+                    );
+
+                }
+                catch (
+                    error
+                ) {
+
+                    console.error(
+                        "فشل استيراد مستند Word:",
+                        error
+                    );
+
+
+                    if (documentsList) {
+
+                        documentsList.innerHTML = `
+                            <div class="empty-document">
+                                تعذر استيراد المستند
+                            </div>
+                        `;
+
+                    }
+
+                }
+
+            };
+
+    }
+
+    // =====================================================
+    // نهاية الجزء الأول
+    // الجزء الثاني يتابع:
+    // المشاريع + المستندات + المحادثات + الواجهة الجانبية
+    // =====================================================
+    // ======================================
+// Word AI Assistant
+// PART 2 / 4
+// المشاريع + المستندات + المحادثات + الواجهة الجانبية
+// ======================================
+
+
+// =====================================================
+// PROJECT / CHAT ICONS
+// =====================================================
+
+const projectIcon = `
+    <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#000000"
+        stroke-width="1"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true">
+
+        <path
+            d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+        </path>
+
+    </svg>
+`;
+
+
+const chatIcon = `
+    <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#000000"
+        stroke-width="1"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true">
+
+        <path
+            d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z">
+        </path>
+
+    </svg>
+`;
+            if (
+                documentItem.indexStatus ===
+                "indexed"
+            ) {
+
+                status.textContent =
+                    "✓ مفهرس · " +
+                    documentItem.indexTokenCount +
+                    " كلمة · " +
+                    documentItem.indexUniqueTerms +
+                    " فريدة";
+
+
+                if (
+                    documentItem.indexUniqueFamilies
+                ) {
+
+                    status.textContent +=
+                        " · " +
+                        documentItem.indexUniqueFamilies +
+                        " عائلة";
+
+                }
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "indexing"
+            ) {
+
+                status.textContent =
+                    "جارٍ الفهرسة...";
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "error"
+            ) {
+
+                status.textContent =
+                    "⚠ فشل الفهرسة";
+
+            }
+            else if (
+                documentItem.readStatus ===
+                "reading"
+            ) {
+
+                status.textContent =
+                    "جارٍ القراءة...";
+
+            }
+            else if (
+                documentItem.readStatus ===
+                "read"
+            ) {
+
+                status.textContent =
+                    "✓ تمت القراءة";
+
+            }
+            else {
+
+                status.textContent =
+                    "جديد";
+
+            }
+
+
+            title.onclick =
+                function (e) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    setCurrentDocument(
+                        documentItem
+                    );
+
+                };
+
+
+            const menuButton =
+                document.createElement(
+                    "button"
+                );
+
+
+            menuButton.className =
+                "document-menu";
+
+
+            menuButton.type =
+                "button";
+
+
+            menuButton.title =
+                "خيارات المستند";
+
+
+            menuButton.textContent =
+                "⋮";
+
+
+            const options =
+                document.createElement(
+                    "div"
+                );
+
+
+            options.className =
+                "document-options-menu";
+
+
+            options.innerHTML = `
+
+                <div class="rename-document">
+                    ✏ إعادة تسمية
+                </div>
+
+                <div class="move-document-up">
+                    ↑ نقل إلى أعلى
+                </div>
+
+                <div class="move-document-down">
+                    ↓ نقل إلى أسفل
+                </div>
+
+                <div class="delete-document">
+                    🗑 حذف
+                </div>
+
+            `;
+
+
+            if (index === 0) {
+
+                const moveUp =
+                    options.querySelector(
+                        ".move-document-up"
+                    );
+
+                if (moveUp) {
+
+                    moveUp.style.display =
+                        "none";
+
+                }
+
+            }
+
+
+            if (
+                index ===
+                projectDocuments.length - 1
+            ) {
+
+                const moveDown =
+                    options.querySelector(
+                        ".move-document-down"
+                    );
+
+                if (moveDown) {
+
+                    moveDown.style.display =
+                        "none";
+
+                }
+
+            }
+
+
+            menuButton.onclick =
+                function (e) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    document
+                        .querySelectorAll(
+                            ".document-options-menu.open"
+                        )
+                        .forEach(
+                            function (menu) {
+
+                                if (
+                                    menu !==
+                                    options
+                                ) {
+
+                                    menu.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+
+                            }
+                        );
+
+
+                    options.classList.toggle(
+                        "open"
+                    );
+
+                };
+
+
+            // ==================================
+            // Rename
+            // ==================================
+
+            const renameButton =
+                options.querySelector(
+                    ".rename-document"
+                );
+
+
+            if (renameButton) {
+
+                renameButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        const oldName =
+                            documentItem.name;
+
+
+                        const inputRename =
+                            document.createElement(
+                                "input"
+                            );
+
+
+                        inputRename.className =
+                            "edit-document-title";
+
+
+                        inputRename.value =
+                            oldName;
+
+
+                        title.replaceWith(
+                            inputRename
+                        );
+
+
+                        inputRename.focus();
+
+
+                        inputRename.setSelectionRange(
+                            inputRename.value.length,
+                            inputRename.value.length
+                        );
+
+
+                        function finishRename(
+                            saveChange
+                        ) {
+
+                            const newName =
+                                inputRename.value.trim();
+
+
+                            if (
+                                saveChange &&
+                                newName !== ""
+                            ) {
+
+                                documentItem.name =
+                                    newName;
+
+
+                                documentItem.updatedAt =
+                                    new Date()
+                                        .toISOString();
+
+
+                                saveDocuments();
+
+                            }
+                            else {
+
+                                documentItem.name =
+                                    oldName;
+
+                            }
+
+
+                            renderDocuments();
+
+                        }
+
+
+                        inputRename.onkeydown =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    event.preventDefault();
+
+                                    finishRename(
+                                        true
+                                    );
+
+                                }
+
+
+                                if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    event.preventDefault();
+
+                                    finishRename(
+                                        false
+                                    );
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Move Up
+            // ==================================
+
+            const moveUpButton =
+                options.querySelector(
+                    ".move-document-up"
+                );
+
+
+            if (moveUpButton) {
+
+                moveUpButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        if (index <= 0)
+                            return;
+
+
+                        const previousDocument =
+                            projectDocuments[
+                                index - 1
+                            ];
+
+
+                        const currentOrder =
+                            documentItem.order;
+
+
+                        documentItem.order =
+                            previousDocument.order;
+
+
+                        previousDocument.order =
+                            currentOrder;
+
+
+                        documentItem.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        previousDocument.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        saveDocuments();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Move Down
+            // ==================================
+
+            const moveDownButton =
+                options.querySelector(
+                    ".move-document-down"
+                );
+
+
+            if (moveDownButton) {
+
+                moveDownButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        if (
+                            index >=
+                            projectDocuments.length - 1
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const nextDocument =
+                            projectDocuments[
+                                index + 1
+                            ];
+
+
+                        const currentOrder =
+                            documentItem.order;
+
+
+                        documentItem.order =
+                            nextDocument.order;
+
+
+                        nextDocument.order =
+                            currentOrder;
+
+
+                        documentItem.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        nextDocument.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        saveDocuments();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // ==================================
+            // Delete
+            // ==================================
+
+            const deleteButton =
+                options.querySelector(
+                    ".delete-document"
+                );
+
+
+            if (deleteButton) {
+
+                deleteButton.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        const oldConfirm =
+                            document.querySelector(
+                                ".document-delete-confirm"
+                            );
+
+
+                        if (oldConfirm) {
+
+                            oldConfirm.remove();
+
+                        }
+
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "document-delete-confirm";
+
+
+                        confirmBox.innerHTML = `
+                            <div class="document-delete-dialog">
+
+                                <div class="document-delete-message">
+                                    هل تريد حذف المستند؟
+                                </div>
+
+                                <div class="document-delete-name">
+                                    ${documentItem.name}
+                                </div>
+
+                                <div class="document-delete-buttons">
+
+                                    <button
+                                        type="button"
+                                        class="confirm-document-delete">
+                                        حذف
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="cancel-document-delete">
+                                        إلغاء
+                                    </button>
+
+                                </div>
+
+                            </div>
+                        `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-document-delete"
+                            );
+
+
+                        if (confirmDelete) {
+
+                            confirmDelete.onclick =
+                                async function () {
+
+                                    documents =
+                                        documents.filter(
+                                            function (
+                                                doc
+                                            ) {
+
+                                                return (
+                                                    doc.id !==
+                                                    documentItem.id
+                                                );
+
+                                            }
+                                        );
+
+
+                                    if (
+                                        currentProject &&
+                                        Array.isArray(
+                                            currentProject.documents
+                                        )
+                                    ) {
+
+                                        currentProject.documents =
+                                            currentProject.documents.filter(
+                                                function (
+                                                    id
+                                                ) {
+
+                                                    return (
+                                                        id !==
+                                                        documentItem.id
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        currentProject.updatedAt =
+                                            new Date()
+                                                .toISOString();
+
+
+                                        saveProjects();
+
+                                    }
+
+
+                                    try {
+
+                                        await deleteWorkingWordFile(
+                                            documentItem.storageId
+                                        );
+
+                                    }
+                                    catch (
+                                        storageError
+                                    ) {
+
+                                        console.warn(
+                                            "تعذر حذف نسخة العمل:",
+                                            storageError
+                                        );
+
+                                    }
+
+
+                                    if (
+                                        currentDocument &&
+                                        currentDocument.id ===
+                                            documentItem.id
+                                    ) {
+
+                                        currentDocument =
+                                            null;
+
+
+                                        if (
+                                            documentTitle
+                                        ) {
+
+                                            documentTitle.textContent =
+                                                "لا يوجد مستند مفتوح";
+
+                                        }
+
+                                    }
+
+
+                                    const remaining =
+                                        getProjectDocuments(
+                                            currentProject.id
+                                        );
+
+
+                                    remaining.forEach(
+                                        function (
+                                            doc,
+                                            newIndex
+                                        ) {
+
+                                            doc.order =
+                                                newIndex + 1;
+
+
+                                            doc.updatedAt =
+                                                new Date()
+                                                    .toISOString();
+
+                                        }
+                                    );
+
+
+                                    saveDocuments();
+
+
+                                    confirmBox.remove();
+
+
+                                    renderDocuments();
+
+                                };
+
+                        }
+
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-document-delete"
+                            );
+
+
+                        if (cancelDelete) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        confirmBox.onclick =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.target ===
+                                    confirmBox
+                                ) {
+
+                                    confirmBox.remove();
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            item.appendChild(
+                title
+            );
+
+
+            item.appendChild(
+                status
+            );
+
+
+            item.appendChild(
+                menuButton
+            );
+
+
+            item.appendChild(
+                options
+            );
+
+
+            documentsList.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
+
+// =====================================================
+// RENDER DOCUMENTS
+// =====================================================
+
+function renderDocuments() {
+
+    if (!documentsList) {
+
         return;
 
     }
 
 
-    currentProject =
-        project;
+    documentsList.innerHTML = "";
 
 
-    if (
-        currentDocument &&
-        currentDocument.projectId !==
-            project.id
-    ) {
+    if (!currentProject) {
 
-        currentDocument =
-            null;
+        documentsList.innerHTML = `
+            <div class="empty-document">
+                اختر مشروعًا لعرض مستنداته
+            </div>
+        `;
 
-        currentCitationSources =
-            [];
+        return;
 
     }
 
 
+    const projectDocuments =
+        getProjectDocuments(
+            currentProject.id
+        );
+
+
     if (
-        typeof renderDocuments ===
-        "function"
+        projectDocuments.length ===
+        0
     ) {
 
-        renderDocuments();
+        documentsList.innerHTML = `
+            <div class="empty-document">
+                لا توجد مستندات
+            </div>
+        `;
+
+        return;
 
     }
+
+
+    projectDocuments.forEach(
+        function (
+            documentItem,
+            index
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "document-item";
+
+
+            if (
+                currentDocument &&
+                String(
+                    currentDocument.id
+                ) ===
+                String(
+                    documentItem.id
+                )
+            ) {
+
+                item.classList.add(
+                    "active-document"
+                );
+
+            }
+
+
+            const title =
+                document.createElement(
+                    "span"
+                );
+
+
+            title.className =
+                "document-title";
+
+
+            title.textContent =
+                documentItem.name;
+
+
+            const status =
+                document.createElement(
+                    "span"
+                );
+
+
+            status.className =
+                "document-read-status";
+
+
+            if (
+                documentItem.indexStatus ===
+                "indexed"
+            ) {
+
+                status.textContent =
+                    "✓ مفهرس";
+
+
+                if (
+                    documentItem.indexTokenCount
+                ) {
+
+                    status.textContent +=
+                        " · " +
+                        documentItem.indexTokenCount +
+                        " كلمة";
+
+                }
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "indexing"
+            ) {
+
+                status.textContent =
+                    "جارٍ الفهرسة...";
+
+            }
+            else if (
+                documentItem.indexStatus ===
+                "error"
+            ) {
+
+                status.textContent =
+                    "⚠ فشل الفهرسة";
+
+            }
+            else if (
+                documentItem.readStatus ===
+                "reading"
+            ) {
+
+                status.textContent =
+                    "جارٍ القراءة...";
+
+            }
+            else if (
+                documentItem.readStatus ===
+                "read"
+            ) {
+
+                status.textContent =
+                    "✓ تمت القراءة";
+
+            }
+            else {
+
+                status.textContent =
+                    "جديد";
+
+            }
+
+
+            title.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    setCurrentDocument(
+                        documentItem
+                    );
+
+                };
+
+
+            // =================================================
+            // DOCUMENT MENU
+            // =================================================
+
+            const menuButton =
+                document.createElement(
+                    "button"
+                );
+
+
+            menuButton.className =
+                "document-menu";
+
+
+            menuButton.type =
+                "button";
+
+
+            menuButton.title =
+                "خيارات المستند";
+
+
+            menuButton.textContent =
+                "⋮";
+
+
+            const options =
+                document.createElement(
+                    "div"
+                );
+
+
+            options.className =
+                "document-options-menu";
+
+
+            options.innerHTML = `
+                <div class="rename-document">
+                    ✏ إعادة تسمية
+                </div>
+
+                <div class="move-document-up">
+                    ↑ نقل إلى أعلى
+                </div>
+
+                <div class="move-document-down">
+                    ↓ نقل إلى أسفل
+                </div>
+
+                <div class="delete-document">
+                    🗑 حذف
+                </div>
+            `;
+
+
+            if (
+                index ===
+                0
+            ) {
+
+                const moveUp =
+                    options.querySelector(
+                        ".move-document-up"
+                    );
+
+
+                if (moveUp) {
+
+                    moveUp.style.display =
+                        "none";
+
+                }
+
+            }
+
+
+            if (
+                index ===
+                projectDocuments.length -
+                1
+            ) {
+
+                const moveDown =
+                    options.querySelector(
+                        ".move-document-down"
+                    );
+
+
+                if (moveDown) {
+
+                    moveDown.style.display =
+                        "none";
+
+                }
+
+            }
+
+
+            menuButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    document
+                        .querySelectorAll(
+                            ".document-options-menu.open"
+                        )
+                        .forEach(
+                            function (
+                                menu
+                            ) {
+
+                                if (
+                                    menu !==
+                                    options
+                                ) {
+
+                                    menu.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+
+                            }
+                        );
+
+
+                    options.classList.toggle(
+                        "open"
+                    );
+
+                };
+
+
+            // =================================================
+            // RENAME DOCUMENT
+            // =================================================
+
+            const renameButton =
+                options.querySelector(
+                    ".rename-document"
+                );
+
+
+            if (renameButton) {
+
+                renameButton.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        const oldName =
+                            documentItem.name;
+
+
+                        const inputRename =
+                            document.createElement(
+                                "input"
+                            );
+
+
+                        inputRename.className =
+                            "edit-document-title";
+
+
+                        inputRename.value =
+                            oldName;
+
+
+                        title.replaceWith(
+                            inputRename
+                        );
+
+
+                        inputRename.focus();
+
+
+                        inputRename.setSelectionRange(
+                            inputRename.value.length,
+                            inputRename.value.length
+                        );
+
+
+                        function finishRename(
+                            saveChange
+                        ) {
+
+                            const newName =
+                                inputRename.value
+                                    .trim();
+
+
+                            if (
+                                saveChange &&
+                                newName
+                            ) {
+
+                                documentItem.name =
+                                    newName;
+
+
+                                documentItem.updatedAt =
+                                    new Date()
+                                        .toISOString();
+
+
+                                saveDocuments();
+
+                            }
+                            else {
+
+                                documentItem.name =
+                                    oldName;
+
+                            }
+
+
+                            renderDocuments();
+
+                        }
+
+
+                        inputRename.onkeydown =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    event.preventDefault();
+
+
+                                    finishRename(
+                                        true
+                                    );
+
+                                }
+
+
+                                if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    event.preventDefault();
+
+
+                                    finishRename(
+                                        false
+                                    );
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // =================================================
+            // MOVE DOCUMENT UP
+            // =================================================
+
+            const moveUpButton =
+                options.querySelector(
+                    ".move-document-up"
+                );
+
+
+            if (moveUpButton) {
+
+                moveUpButton.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        if (
+                            index <=
+                            0
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const previousDocument =
+                            projectDocuments[
+                                index - 1
+                            ];
+
+
+                        const currentOrder =
+                            documentItem.order;
+
+
+                        documentItem.order =
+                            previousDocument.order;
+
+
+                        previousDocument.order =
+                            currentOrder;
+
+
+                        documentItem.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        previousDocument.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        saveDocuments();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // =================================================
+            // MOVE DOCUMENT DOWN
+            // =================================================
+
+            const moveDownButton =
+                options.querySelector(
+                    ".move-document-down"
+                );
+
+
+            if (moveDownButton) {
+
+                moveDownButton.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        if (
+                            index >=
+                            projectDocuments.length -
+                            1
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const nextDocument =
+                            projectDocuments[
+                                index + 1
+                            ];
+
+
+                        const currentOrder =
+                            documentItem.order;
+
+
+                        documentItem.order =
+                            nextDocument.order;
+
+
+                        nextDocument.order =
+                            currentOrder;
+
+
+                        documentItem.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        nextDocument.updatedAt =
+                            new Date()
+                                .toISOString();
+
+
+                        saveDocuments();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        renderDocuments();
+
+                    };
+
+            }
+
+
+            // =================================================
+            // DELETE DOCUMENT
+            // =================================================
+
+            const deleteButton =
+                options.querySelector(
+                    ".delete-document"
+                );
+
+
+            if (deleteButton) {
+
+                deleteButton.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        const oldConfirm =
+                            document.querySelector(
+                                ".document-delete-confirm"
+                            );
+
+
+                        if (oldConfirm) {
+
+                            oldConfirm.remove();
+
+                        }
+
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "document-delete-confirm";
+
+
+                        confirmBox.innerHTML = `
+                            <div class="document-delete-dialog">
+
+                                <div class="document-delete-message">
+                                    هل تريد حذف المستند؟
+                                </div>
+
+                                <div class="document-delete-name">
+                                    ${documentItem.name}
+                                </div>
+
+                                <div class="document-delete-buttons">
+
+                                    <button
+                                        type="button"
+                                        class="confirm-document-delete">
+                                        حذف
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="cancel-document-delete">
+                                        إلغاء
+                                    </button>
+
+                                </div>
+
+                            </div>
+                        `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-document-delete"
+                            );
+
+
+                        if (confirmDelete) {
+
+                            confirmDelete.onclick =
+                                async function () {
+
+                                    documents =
+                                        documents.filter(
+                                            function (
+                                                doc
+                                            ) {
+
+                                                return (
+                                                    String(
+                                                        doc.id
+                                                    ) !==
+                                                    String(
+                                                        documentItem.id
+                                                    )
+                                                );
+
+                                            }
+                                        );
+
+
+                                    if (
+                                        currentProject &&
+                                        Array.isArray(
+                                            currentProject.documents
+                                        )
+                                    ) {
+
+                                        currentProject.documents =
+                                            currentProject.documents.filter(
+                                                function (
+                                                    id
+                                                ) {
+
+                                                    return (
+                                                        String(
+                                                            id
+                                                        ) !==
+                                                        String(
+                                                            documentItem.id
+                                                        )
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        currentProject.updatedAt =
+                                            new Date()
+                                                .toISOString();
+
+
+                                        saveProjects();
+
+                                    }
+
+
+                                    try {
+
+                                        await deleteWorkingWordFile(
+                                            documentItem.storageId
+                                        );
+
+                                    }
+                                    catch (
+                                        storageError
+                                    ) {
+
+                                        console.warn(
+                                            "تعذر حذف نسخة العمل:",
+                                            storageError
+                                        );
+
+                                    }
+
+
+                                    if (
+                                        currentDocument &&
+                                        String(
+                                            currentDocument.id
+                                        ) ===
+                                        String(
+                                            documentItem.id
+                                        )
+                                    ) {
+
+                                        currentDocument =
+                                            null;
+
+
+                                        currentCitationSources =
+                                            [];
+
+
+                                        if (
+                                            documentTitle
+                                        ) {
+
+                                            documentTitle.textContent =
+                                                "لا يوجد مستند مفتوح";
+
+                                        }
+
+                                    }
+
+
+                                    const remaining =
+                                        getProjectDocuments(
+                                            currentProject
+                                                ? currentProject.id
+                                                : null
+                                        );
+
+
+                                    remaining.forEach(
+                                        function (
+                                            doc,
+                                            newIndex
+                                        ) {
+
+                                            doc.order =
+                                                newIndex + 1;
+
+                                        }
+                                    );
+
+
+                                    oramaRetrievalDb =
+                                        null;
+
+
+                                    oramaRetrievalCacheKey =
+                                        "";
+
+
+                                    oramaRetrievalDocumentId =
+                                        null;
+
+
+                                    saveDocuments();
+
+
+                                    confirmBox.remove();
+
+
+                                    renderDocuments();
+
+                                };
+
+                        }
+
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-document-delete"
+                            );
+
+
+                        if (cancelDelete) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        confirmBox.onclick =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.target ===
+                                    confirmBox
+                                ) {
+
+                                    confirmBox.remove();
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            item.appendChild(
+                title
+            );
+
+
+            item.appendChild(
+                status
+            );
+
+
+            item.appendChild(
+                menuButton
+            );
+
+
+            item.appendChild(
+                options
+            );
+
+
+            documentsList.appendChild(
+                item
+            );
+
+        }
+    );
 
 }
 
 
-// ======================================
-// Add Document
-// ======================================
+// =====================================================
+// RENDER PROJECTS
+// =====================================================
 
-if (
-    addDocumentBtn &&
-    wordDocumentPicker
-) {
+function renderProjects() {
 
-    addDocumentBtn.onclick =
+    if (!projectsList) {
+
+        return;
+
+    }
+
+
+    projectsList.innerHTML =
+        "";
+
+
+    if (
+        projects.length ===
+        0
+    ) {
+
+        projectsList.innerHTML = `
+            <div class="empty-project">
+                لا توجد مشاريع
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    projects.forEach(
+        function (
+            project
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "project-item";
+
+
+            item.innerHTML = `
+                <span class="project-title">
+                    ${projectIcon}
+                    ${project.name}
+                </span>
+
+                <button
+                    class="project-menu"
+                    type="button">
+                    ⋮
+                </button>
+
+                <div class="project-options-menu">
+
+                    <div class="rename-project">
+                        ✏ إعادة تسمية
+                    </div>
+
+                    <div class="delete-project">
+                        🗑 حذف
+                    </div>
+
+                </div>
+            `;
+
+
+            item.onclick =
+                function (
+                    e
+                ) {
+
+                    if (
+                        e.target.closest(
+                            ".project-menu"
+                        ) ||
+                        e.target.closest(
+                            ".project-options-menu"
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    e.stopPropagation();
+
+
+                    setCurrentProject(
+                        project
+                    );
+
+
+                    if (projectsPopup) {
+
+                        projectsPopup.classList.remove(
+                            "open"
+                        );
+
+                    }
+
+                };
+
+
+            const menu =
+                item.querySelector(
+                    ".project-menu"
+                );
+
+
+            if (menu) {
+
+                menu.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        document
+                            .querySelectorAll(
+                                ".project-options-menu.open"
+                            )
+                            .forEach(
+                                function (
+                                    menuItem
+                                ) {
+
+                                    menuItem.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+                            );
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (!options) {
+
+                            return;
+
+                        }
+
+
+                        options.classList.add(
+                            "open"
+                        );
+
+
+                        const rect =
+                            menu.getBoundingClientRect();
+
+
+                        const menuWidth =
+                            140;
+
+
+                        const menuHeight =
+                            options.offsetHeight ||
+                            80;
+
+
+                        const margin =
+                            8;
+
+
+                        let left =
+                            rect.left -
+                            menuWidth -
+                            margin;
+
+
+                        let top =
+                            rect.bottom +
+                            margin;
+
+
+                        if (
+                            left <
+                            margin
+                        ) {
+
+                            left =
+                                rect.right +
+                                margin;
+
+                        }
+
+
+                        if (
+                            left +
+                            menuWidth >
+                            window.innerWidth -
+                            margin
+                        ) {
+
+                            left =
+                                window.innerWidth -
+                                menuWidth -
+                                margin;
+
+                        }
+
+
+                        if (
+                            top +
+                            menuHeight >
+                            window.innerHeight -
+                            margin
+                        ) {
+
+                            top =
+                                rect.top -
+                                menuHeight -
+                                margin;
+
+                        }
+
+
+                        if (
+                            top <
+                            margin
+                        ) {
+
+                            top =
+                                margin;
+
+                        }
+
+
+                        options.style.position =
+                            "fixed";
+
+
+                        options.style.left =
+                            left +
+                            "px";
+
+
+                        options.style.top =
+                            top +
+                            "px";
+
+
+                        options.style.right =
+                            "auto";
+
+
+                        options.style.bottom =
+                            "auto";
+
+
+                        options.style.zIndex =
+                            "999999";
+
+                    };
+
+            }
+
+
+            // =================================================
+            // RENAME PROJECT
+            // =================================================
+
+            const renameProject =
+                item.querySelector(
+                    ".rename-project"
+                );
+
+
+            if (renameProject) {
+
+                renameProject.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (options) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const titleElement =
+                            item.querySelector(
+                                ".project-title"
+                            );
+
+
+                        if (!titleElement) {
+
+                            return;
+
+                        }
+
+
+                        const oldName =
+                            project.name;
+
+
+                        titleElement.innerHTML = `
+                            <input
+                                class="edit-project-title"
+                                value="${oldName}">
+                        `;
+
+
+                        const edit =
+                            titleElement.querySelector(
+                                ".edit-project-title"
+                            );
+
+
+                        if (!edit) {
+
+                            return;
+
+                        }
+
+
+                        edit.focus();
+
+
+                        edit.setSelectionRange(
+                            edit.value.length,
+                            edit.value.length
+                        );
+
+
+                        edit.onkeydown =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    event.preventDefault();
+
+
+                                    const value =
+                                        edit.value.trim();
+
+
+                                    project.name =
+                                        value ||
+                                        oldName;
+
+
+                                    project.updatedAt =
+                                        new Date()
+                                            .toISOString();
+
+
+                                    saveProjects();
+
+
+                                    renderProjects();
+
+
+                                    renderExpandedProjects();
+
+                                }
+
+
+                                if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    event.preventDefault();
+
+
+                                    project.name =
+                                        oldName;
+
+
+                                    renderProjects();
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // =================================================
+            // DELETE PROJECT
+            // =================================================
+
+            const deleteProject =
+                item.querySelector(
+                    ".delete-project"
+                );
+
+
+            if (deleteProject) {
+
+                deleteProject.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (options) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "project-delete-confirm";
+
+
+                        confirmBox.innerHTML = `
+                            <div class="confirm-dialog">
+
+                                <p>
+                                    هل تريد حذف المشروع:
+                                    <br>
+
+                                    <strong>
+                                        ${project.name}
+                                    </strong>
+
+                                    ؟
+                                </p>
+
+                                <button
+                                    class="confirm-project-delete"
+                                    type="button">
+                                    حذف
+                                </button>
+
+                                <button
+                                    class="cancel-project-delete"
+                                    type="button">
+                                    إلغاء
+                                </button>
+
+                            </div>
+                        `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-project-delete"
+                            );
+
+
+                        if (confirmDelete) {
+
+                            confirmDelete.onclick =
+                                async function () {
+
+                                    const projectDocumentIds =
+                                        Array.isArray(
+                                            project.documents
+                                        )
+                                            ? project.documents
+                                            : [];
+
+
+                                    for (
+                                        let i = 0;
+                                        i <
+                                        projectDocumentIds.length;
+                                        i++
+                                    ) {
+
+                                        const documentItem =
+                                            documents.find(
+                                                function (
+                                                    d
+                                                ) {
+
+                                                    return (
+                                                        String(
+                                                            d.id
+                                                        ) ===
+                                                        String(
+                                                            projectDocumentIds[i]
+                                                        )
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        if (
+                                            documentItem
+                                        ) {
+
+                                            try {
+
+                                                await deleteWorkingWordFile(
+                                                    documentItem.storageId
+                                                );
+
+                                            }
+                                            catch (
+                                                error
+                                            ) {
+
+                                                console.warn(
+                                                    "تعذر حذف نسخة العمل:",
+                                                    error
+                                                );
+
+                                            }
+
+                                        }
+
+                                    }
+
+
+                                    documents =
+                                        documents.filter(
+                                            function (
+                                                doc
+                                            ) {
+
+                                                return (
+                                                    !projectDocumentIds.some(
+                                                        function (
+                                                            id
+                                                        ) {
+
+                                                            return (
+                                                                String(
+                                                                    id
+                                                                ) ===
+                                                                String(
+                                                                    doc.id
+                                                                )
+                                                            );
+
+                                                        }
+                                                    )
+                                                );
+
+                                            }
+                                        );
+
+
+                                    projects =
+                                        projects.filter(
+                                            function (
+                                                p
+                                            ) {
+
+                                                return (
+                                                    String(
+                                                        p.id
+                                                    ) !==
+                                                    String(
+                                                        project.id
+                                                    )
+                                                );
+
+                                            }
+                                        );
+
+
+                                    if (
+                                        currentProject &&
+                                        String(
+                                            currentProject.id
+                                        ) ===
+                                        String(
+                                            project.id
+                                        )
+                                    ) {
+
+                                        currentProject =
+                                            null;
+
+
+                                        currentDocument =
+                                            null;
+
+
+                                        currentCitationSources =
+                                            [];
+
+
+                                        if (
+                                            documentTitle
+                                        ) {
+
+                                            documentTitle.textContent =
+                                                "لا يوجد مستند مفتوح";
+
+                                        }
+
+                                    }
+
+
+                                    oramaRetrievalDb =
+                                        null;
+
+
+                                    oramaRetrievalCacheKey =
+                                        "";
+
+
+                                    oramaRetrievalDocumentId =
+                                        null;
+
+
+                                    saveDocuments();
+
+
+                                    saveProjects();
+
+
+                                    renderProjects();
+
+
+                                    renderExpandedProjects();
+
+
+                                    renderDocuments();
+
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-project-delete"
+                            );
+
+
+                        if (cancelDelete) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+                    };
+
+            }
+
+
+            projectsList.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
+
+
+// =====================================================
+// NEW PROJECT
+// =====================================================
+
+if (newProjectBtn) {
+
+    newProjectBtn.onclick =
         function (
             e
         ) {
@@ -2363,4351 +5349,682 @@ if (
             e.stopPropagation();
 
 
-            if (
-                !currentProject
-            ) {
-
-                if (
-                    documentsList
-                ) {
-
-                    documentsList.innerHTML =
-                        `
-                            <div class="empty-document">
-                                اختر مشروعًا أولًا لإضافة مستند
-                            </div>
-                        `;
-
-                }
+            const oldBox =
+                document.querySelector(
+                    ".project-create-box"
+                );
 
 
-                return;
+            if (oldBox) {
+
+                oldBox.remove();
 
             }
 
 
-            wordDocumentPicker.value =
-                "";
-
-
-            wordDocumentPicker.click();
-
-        };
-
-
-    wordDocumentPicker.onchange =
-        async function () {
-
-            try {
-
-                const file =
-                    wordDocumentPicker.files &&
-                    wordDocumentPicker.files[0];
-
-
-                if (
-                    !file
-                ) {
-
-                    return;
-
-                }
-
-
-                if (
-                    !/\.docx$/i.test(
-                        file.name
-                    )
-                ) {
-
-                    console.warn(
-                        "الملف المختار ليس DOCX."
-                    );
-
-
-                    return;
-
-                }
-
-
-                if (
-                    !currentProject
-                ) {
-
-                    return;
-
-                }
-
-
-                const projectDocuments =
-                    getProjectDocuments(
-                        currentProject.id
-                    );
-
-
-                const nextOrder =
-                    projectDocuments.length +
-                    1;
-
-
-                const documentItem =
-                    createDocument(
-                        file,
-                        currentProject.id,
-                        nextOrder
-                    );
-
-
-                await saveWorkingWordFile(
-                    documentItem.storageId,
-                    file
+            const box =
+                document.createElement(
+                    "div"
                 );
 
 
-                attachDocumentToProject(
-                    currentProject,
-                    documentItem
-                );
+            box.className =
+                "project-create-box";
 
 
-                setCurrentDocument(
-                    documentItem
-                );
+            box.innerHTML = `
+                <div class="rename-dialog">
 
+                    <input
+                        class="new-project-name"
+                        placeholder="اسم المشروع">
 
-                if (
-                    typeof renderDocuments ===
-                    "function"
-                ) {
+                    <button
+                        class="save-project"
+                        type="button">
+                        حفظ
+                    </button>
 
-                    renderDocuments();
+                    <button
+                        class="cancel-project"
+                        type="button">
+                        إلغاء
+                    </button>
 
-                }
+                </div>
+            `;
 
 
-                console.log(
-                    "تم استيراد مستند Word:",
-                    {
-
-                        name:
-                            documentItem.name,
-
-                        fileName:
-                            documentItem.fileName,
-
-                        storageId:
-                            documentItem.storageId,
-
-                        documentId:
-                            documentItem.id
-
-                    }
-                );
-
-            }
-            catch (
-                error
-            ) {
-
-                console.error(
-                    "فشل استيراد مستند Word:",
-                    error
-                );
-
-
-                if (
-                    documentsList
-                ) {
-
-                    documentsList.innerHTML =
-                        `
-                            <div class="empty-document">
-                                تعذر استيراد المستند
-                            </div>
-                        `;
-
-                }
-
-            }
-
-        };
-
-}
-
-
-// ======================================
-// PART 1 END
-// ======================================
-
-});
-// ======================================
-// Word AI Assistant
-// PART 2 / 4
-// محرك البحث الجديد Orama
-// بناء الفهرس + البحث + العناوين
-// + نطاقات المطالب + سياق الاسترجاع
-// ======================================
-
-
-// =====================================================
-// Orama Loader
-// تحميل Orama مرة واحدة
-// =====================================================
-
-function getOramaEngine() {
-
-    if (
-        typeof require !==
-        "function"
-    ) {
-
-        throw new Error(
-            "Webpack require غير متاح في هذه البيئة."
-        );
-
-    }
-
-
-    return require(
-        "@orama/orama"
-    );
-
-}
-
-
-// =====================================================
-// Get Orama Components
-// =====================================================
-
-function getOramaComponents() {
-
-    try {
-
-        return require(
-            "@orama/orama/components"
-        );
-
-    }
-    catch (error) {
-
-        console.warn(
-            "تعذر تحميل مكونات Orama:",
-            error
-        );
-
-        return {};
-
-    }
-
-}
-
-
-// =====================================================
-// Normalize Orama Query
-// تطبيع سؤال البحث قبل إرساله إلى Orama
-// =====================================================
-
-function normalizeOramaQuery(
-    query
-) {
-
-    return normalizeSearchText(
-        String(
-            query ||
-            ""
-        )
-    )
-        .replace(
-            /[،,؛;؟?!:()[\]{}"«»]/g,
-            " "
-        )
-        .replace(
-            /\s+/g,
-            " "
-        )
-        .trim();
-
-}
-
-
-// =====================================================
-// Get Heading Level Number
-// Heading1 => 1
-// Heading2 => 2
-// ...
-// =====================================================
-
-function getHeadingLevelNumber(
-    style
-) {
-
-    const match =
-        String(
-            style ||
-            ""
-        ).match(
-            /Heading\s*([1-9])/i
-        );
-
-
-    if (
-        match
-    ) {
-
-        return Number(
-            match[1]
-        );
-
-    }
-
-
-    return 9;
-
-}
-
-
-// =====================================================
-// Sort Headings
-// =====================================================
-
-function sortHeadings(
-    headings
-) {
-
-    return (
-        Array.isArray(
-            headings
-        )
-            ? headings
-                .filter(
-                    function (
-                        heading
-                    ) {
-
-                        return (
-                            heading &&
-                            typeof heading.index !==
-                                "undefined" &&
-                            String(
-                                heading.text ||
-                                ""
-                            ).trim()
-                        );
-
-                    }
-                )
-                .slice()
-                .sort(
-                    function (
-                        a,
-                        b
-                    ) {
-
-                        return (
-                            Number(
-                                a.index
-                            ) -
-                            Number(
-                                b.index
-                            )
-                        );
-
-                    }
-                )
-            : []
-    );
-
-}
-
-
-// =====================================================
-// Find Heading For Paragraph
-// العثور على العنوان الأقرب للفقرة
-// =====================================================
-
-function findNearestHeading(
-    paragraphIndex,
-    headings
-) {
-
-    let nearest =
-        null;
-
-
-    const sorted =
-        sortHeadings(
-            headings
-        );
-
-
-    for (
-        let i =
-            sorted.length - 1;
-
-        i >= 0;
-
-        i--
-    ) {
-
-        const heading =
-            sorted[i];
-
-
-        if (
-            Number(
-                heading.index
-            ) <=
-            Number(
-                paragraphIndex
-            )
-        ) {
-
-            nearest =
-                heading;
-
-            break;
-
-        }
-
-    }
-
-
-    return nearest;
-
-}
-
-
-// =====================================================
-// Build Orama Retrieval Index
-// الفهرس الرئيسي الجديد
-// =====================================================
-
-async function ensureOramaRetrievalIndex(
-    documentItem,
-    structureData
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        throw new Error(
-            "لم يتم تحديد المستند لبناء فهرس Orama."
-        );
-
-    }
-
-
-    if (
-        !structureData
-    ) {
-
-        throw new Error(
-            "لا توجد بنية للمستند لبناء فهرس Orama."
-        );
-
-    }
-
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-
-    const headings =
-        sortHeadings(
-            structureData.headings
-        );
-
-
-    // ==========================================
-    // مفتاح ذاكرة الفهرس
-    // ==========================================
-
-    const cacheKey =
-        [
-
-            String(
-                documentItem.id
-            ),
-
-            String(
-                documentItem.indexUpdatedAt ||
-                structureData.updatedAt ||
-                ""
-            ),
-
-            String(
-                ORAMA_RETRIEVAL_VERSION
-            ),
-
-            String(
-                paragraphs.length
-            ),
-
-            String(
-                headings.length
-            )
-
-        ].join(
-            "|"
-        );
-
-
-    // ==========================================
-    // استخدام الفهرس الموجود في الذاكرة
-    // ==========================================
-
-    if (
-        oramaRetrievalDb &&
-        oramaRetrievalCacheKey ===
-            cacheKey
-    ) {
-
-        return oramaRetrievalDb;
-
-    }
-
-
-    const {
-        create,
-        insertMultiple
-    } =
-        getOramaEngine();
-
-
-    // ==========================================
-    // إنشاء قاعدة Orama
-    // ==========================================
-
-    const db =
-        create({
-
-            schema: {
-
-                id:
-                    "string",
-
-                paragraphIndex:
-                    "number",
-
-                text:
-                    "string",
-
-                heading:
-                    "string",
-
-                headingIndex:
-                    "number",
-
-                headingLevel:
-                    "string",
-
-                isHeading:
-                    "boolean"
-
-            },
-
-            language:
-                "arabic"
-
-        });
-
-
-    // ==========================================
-    // بناء السجلات
-    // ==========================================
-
-    const records =
-        [];
-
-
-    paragraphs.forEach(
-        function (
-            paragraph
-        ) {
-
-            if (
-                !paragraph
-            ) {
-
-                return;
-
-            }
-
-
-            const text =
-                String(
-                    paragraph.text ||
-                    ""
-                )
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
-
-            if (
-                !text
-            ) {
-
-                return;
-
-            }
-
-
-            const paragraphIndex =
-                Number(
-                    paragraph.index
-                );
-
-
-            const heading =
-                findNearestHeading(
-                    paragraphIndex,
-                    headings
-                );
-
-
-            const isHeading =
-                Boolean(
-                    heading &&
-                    Number(
-                        heading.index
-                    ) ===
-                    paragraphIndex
-                );
-
-
-            records.push({
-
-                id:
-                    "p-" +
-                    String(
-                        paragraphIndex
-                    ),
-
-                paragraphIndex:
-                    paragraphIndex,
-
-                text:
-                    text,
-
-                heading:
-                    heading
-                        ? String(
-                            heading.text ||
-                            ""
-                        )
-                            .replace(
-                                /\s+/g,
-                                " "
-                            )
-                            .trim()
-                        : "",
-
-                headingIndex:
-                    heading
-                        ? Number(
-                            heading.index
-                        )
-                        : -1,
-
-                headingLevel:
-                    heading
-                        ? String(
-                            heading.style ||
-                            ""
-                        )
-                        : "",
-
-                isHeading:
-                    isHeading
-
-            });
-
-        }
-    );
-
-
-    // ==========================================
-    // إدخال البيانات في Orama
-    // ==========================================
-
-    if (
-        records.length >
-        0
-    ) {
-
-        await insertMultiple(
-            db,
-            records
-        );
-
-    }
-
-
-    // ==========================================
-    // حفظ الذاكرة
-    // ==========================================
-
-    oramaRetrievalDb =
-        db;
-
-
-    oramaRetrievalCacheKey =
-        cacheKey;
-
-
-    oramaDocumentDb =
-        db;
-
-
-    oramaDocumentId =
-        String(
-            documentItem.id
-        );
-
-
-    console.log(
-        "تم بناء فهرس Orama للاسترجاع:",
-        records.length,
-        "فقرة"
-    );
-
-
-    console.log(
-        "عدد العناوين:",
-        headings.length
-    );
-
-
-    return db;
-
-}
-
-
-// =====================================================
-// Get Orama Index For Document
-// التأكد من وجود الفهرس الصحيح للمستند
-// =====================================================
-
-async function getOramaDocumentIndex(
-    documentItem
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        return null;
-
-    }
-
-
-    const structureData =
-        await ensureDocumentStructure(
-            documentItem
-        );
-
-
-    if (
-        !structureData
-    ) {
-
-        return null;
-
-    }
-
-
-    return await ensureOramaRetrievalIndex(
-        documentItem,
-        structureData
-    );
-
-}
-
-
-// =====================================================
-// Calculate Heading Relevance
-// حساب قوة العنوان بالنسبة للاستعلام
-// =====================================================
-
-function calculateHeadingRelevance(
-    heading,
-    queryTokens,
-    normalizedQuery
-) {
-
-    if (
-        !heading
-    ) {
-
-        return 0;
-
-    }
-
-
-    const headingText =
-        normalizeSearchText(
-            heading
-        );
-
-
-    if (
-        !headingText
-    ) {
-
-        return 0;
-
-    }
-
-
-    const tokens =
-        Array.isArray(
-            queryTokens
-        )
-            ? queryTokens
-            : [];
-
-
-    let matched =
-        0;
-
-
-    tokens.forEach(
-        function (
-            token
-        ) {
-
-            if (
-                token &&
-                headingText.includes(
-                    token
-                )
-            ) {
-
-                matched +=
-                    1;
-
-            }
-
-        }
-    );
-
-
-    const coverage =
-        tokens.length >
-        0
-            ? matched /
-              tokens.length
-            : 0;
-
-
-    let score =
-        0;
-
-
-    // ==========================================
-    // تطابق العنوان كاملًا
-    // ==========================================
-
-    if (
-        headingText ===
-        normalizedQuery
-    ) {
-
-        score +=
-            100;
-
-    }
-
-
-    // ==========================================
-    // العنوان يحتوي على السؤال
-    // ==========================================
-
-    if (
-        normalizedQuery &&
-        headingText.includes(
-            normalizedQuery
-        )
-    ) {
-
-        score +=
-            60;
-
-    }
-
-
-    // ==========================================
-    // عدد الكلمات المطابقة
-    // ==========================================
-
-    score +=
-        matched *
-        15;
-
-
-    // ==========================================
-    // تغطية السؤال
-    // ==========================================
-
-    score +=
-        coverage *
-        35;
-
-
-    return score;
-
-}
-
-
-// =====================================================
-// Build Orama Search Query
-// =====================================================
-
-function buildOramaSearchQuery(
-    query,
-    queryTokens
-) {
-
-    const normalizedQuery =
-        normalizeOramaQuery(
-            query
-        );
-
-
-    const tokens =
-        Array.isArray(
-            queryTokens
-        )
-            ? queryTokens.filter(
-                function (
-                    token
-                ) {
-
-                    return (
-                        token &&
-                        token.length >=
-                        3
-                    );
-
-                }
-            )
-            : [];
-
-
-    // ==========================================
-    // في حال وجود سؤال مركب
-    // نبحث بالعبارة وكلماتها
-    // ==========================================
-
-    const terms =
-        [];
-
-
-    if (
-        normalizedQuery
-    ) {
-
-        terms.push(
-            normalizedQuery
-        );
-
-    }
-
-
-    tokens.forEach(
-        function (
-            token
-        ) {
-
-            if (
-                !terms.includes(
-                    token
-                )
-            ) {
-
-                terms.push(
-                    token
-                );
-
-            }
-
-        }
-    );
-
-
-    return terms;
-
-}
-
-
-// =====================================================
-// Search Orama Document
-// المحرك الفعلي الجديد
-// =====================================================
-
-async function searchOramaDocument(
-    documentItem,
-    query,
-    options
-) {
-
-    if (
-        !documentItem
-    ) {
-
-        return {
-
-            query:
-                String(
-                    query ||
-                    ""
-                ),
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                [],
-
-            matchedFamilies:
-                [],
-
-            profile:
-                "general"
-
-        };
-
-    }
-
-
-    const normalizedQuery =
-        normalizeOramaQuery(
-            query
-        );
-
-
-    if (
-        !normalizedQuery
-    ) {
-
-        return {
-
-            query:
-                "",
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                [],
-
-            matchedFamilies:
-                [],
-
-            profile:
-                "general"
-
-        };
-
-    }
-
-
-    const settings =
-        options ||
-        {};
-
-
-    const profile =
-        settings.profile ||
-        "general";
-
-
-    const maxResults =
-        typeof settings.maxResults ===
-            "number"
-                ? Math.max(
-                    1,
-                    settings.maxResults
-                )
-                : 10;
-
-
-    const structureData =
-        await ensureDocumentStructure(
-            documentItem
-        );
-
-
-    if (
-        !structureData
-    ) {
-
-        return {
-
-            query:
-                normalizedQuery,
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                [],
-
-            matchedFamilies:
-                [],
-
-            profile:
-                profile
-
-        };
-
-    }
-
-
-    const db =
-        await ensureOramaRetrievalIndex(
-            documentItem,
-            structureData
-        );
-
-
-    if (
-        !db
-    ) {
-
-        return {
-
-            query:
-                normalizedQuery,
-
-            count:
-                0,
-
-            results:
-                [],
-
-            matchedTerms:
-                [],
-
-            matchedFamilies:
-                [],
-
-            profile:
-                profile
-
-        };
-
-    }
-
-
-    const {
-        search
-    } =
-        getOramaEngine();
-
-
-    // ==========================================
-    // كلمات الاستعلام
-    // ==========================================
-
-    const queryTokens =
-        getSearchQueryTokens(
-            normalizedQuery
-        );
-
-
-    const searchTerms =
-        buildOramaSearchQuery(
-            normalizedQuery,
-            queryTokens
-        );
-
-
-    // ==========================================
-    // تنفيذ البحث الأساسي
-    // ==========================================
-
-    let hits =
-        [];
-
-
-    // أولًا: البحث بالعبارة كاملة
-    // ==========================================
-
-    try {
-
-        const fullResult =
-            await search(
-                db,
-                {
-
-                    term:
-                        normalizedQuery,
-
-                    properties:
-                        [
-                            "text",
-                            "heading"
-                        ],
-
-                    boost:
-                        {
-                            heading:
-                                6
-                        },
-
-                    tolerance:
-                        2,
-
-                    limit:
-                        Math.max(
-                            20,
-                            maxResults *
-                            4
-                        )
-
-                }
+            document.body.appendChild(
+                box
             );
 
 
-        if (
-            fullResult &&
-            Array.isArray(
-                fullResult.hits
-            )
-        ) {
-
-            hits =
-                fullResult.hits;
-
-        }
-
-    }
-    catch (error) {
-
-        console.warn(
-            "فشل البحث بالعبارة الكاملة في Orama:",
-            error
-        );
-
-    }
+            const buttonRect =
+                newProjectBtn.getBoundingClientRect();
 
 
-    // ==========================================
-    // البحث الاحتياطي بكلمات الاستعلام
-    // ==========================================
+            const screenMargin =
+                12;
 
-    if (
-        searchTerms.length >
-        1
-    ) {
 
-        for (
-            let i = 0;
-            i < searchTerms.length;
-            i++
-        ) {
+            let left =
+                buttonRect.left;
 
-            const term =
-                searchTerms[i];
+
+            let top =
+                buttonRect.bottom +
+                8;
+
+
+            const actualBoxWidth =
+                box.offsetWidth ||
+                240;
+
+
+            const boxHeight =
+                box.offsetHeight ||
+                120;
 
 
             if (
-                !term ||
-                term ===
-                    normalizedQuery
+                left +
+                actualBoxWidth >
+                window.innerWidth -
+                screenMargin
             ) {
 
-                continue;
+                left =
+                    window.innerWidth -
+                    actualBoxWidth -
+                    screenMargin;
 
             }
-
-
-            try {
-
-                const termResult =
-                    await search(
-                        db,
-                        {
-
-                            term:
-                                term,
-
-                            properties:
-                                [
-                                    "text",
-                                    "heading"
-                                ],
-
-                            boost:
-                                {
-                                    heading:
-                                        6
-                                },
-
-                            tolerance:
-                                2,
-
-                            limit:
-                                Math.max(
-                                    20,
-                                    maxResults *
-                                    3
-                                )
-
-                        }
-                    );
-
-
-                if (
-                    termResult &&
-                    Array.isArray(
-                        termResult.hits
-                    )
-                ) {
-
-                    hits =
-                        hits.concat(
-                            termResult.hits
-                        );
-
-                }
-
-            }
-            catch (
-                error
-            ) {
-
-                console.warn(
-                    "فشل البحث الجزئي في Orama:",
-                    term,
-                    error
-                );
-
-            }
-
-        }
-
-    }
-
-
-    // ==========================================
-    // إزالة التكرار
-    // ==========================================
-
-    const uniqueHits =
-        new Map();
-
-
-    hits.forEach(
-        function (
-            hit
-        ) {
-
-            if (
-                !hit ||
-                !hit.document
-            ) {
-
-                return;
-
-            }
-
-
-            const document =
-                hit.document;
-
-
-            const id =
-                String(
-                    document.id ||
-                    (
-                        "p-" +
-                        document.paragraphIndex
-                    )
-                );
-
-
-            const existing =
-                uniqueHits.get(
-                    id
-                );
 
 
             if (
-                !existing ||
-                Number(
-                    hit.score ||
-                    0
-                ) >
-                Number(
-                    existing.score ||
-                    0
-                )
+                left <
+                screenMargin
             ) {
 
-                uniqueHits.set(
-                    id,
-                    hit
-                );
+                left =
+                    screenMargin;
 
             }
 
-        }
-    );
-
-
-    // ==========================================
-    // إعداد بيانات العناوين
-    // ==========================================
-
-    const headings =
-        sortHeadings(
-            structureData.headings
-        );
-
-
-    // ==========================================
-    // حساب قوة النتائج
-    // ==========================================
-
-    const scoredResults =
-        [];
-
-
-    uniqueHits.forEach(
-        function (
-            hit
-        ) {
-
-            const doc =
-                hit.document;
-
-
-            const paragraphIndex =
-                Number(
-                    doc.paragraphIndex
-                );
-
-
-            const heading =
-                String(
-                    doc.heading ||
-                    ""
-                )
-                    .trim();
-
-
-            const headingRelevance =
-                calculateHeadingRelevance(
-                    heading,
-                    queryTokens,
-                    normalizedQuery
-                );
-
-
-            const headingLevel =
-                getHeadingLevelNumber(
-                    doc.headingLevel
-                );
-
-
-            let score =
-                Number(
-                    hit.score ||
-                    0
-                );
-
-
-            // ==========================================
-            // أولوية العناوين
-            // ==========================================
 
             if (
-                doc.isHeading
+                top +
+                boxHeight >
+                window.innerHeight -
+                screenMargin
             ) {
 
-                score +=
-                    30;
-
-            }
-
-
-            score +=
-                headingRelevance;
-
-
-            // ==========================================
-            // أولوية المبحث/المطلب
-            // ==========================================
-
-            if (
-                headingLevel ===
-                2
-            ) {
-
-                score +=
-                    12;
-
-            }
-            else if (
-                headingLevel ===
-                3
-            ) {
-
-                score +=
-                    15;
-
-            }
-            else if (
-                headingLevel ===
-                4
-            ) {
-
-                score +=
+                top =
+                    buttonRect.top -
+                    boxHeight -
                     8;
 
             }
 
 
-            // ==========================================
-            // تطابق السؤال كاملًا داخل الفقرة
-            // ==========================================
+            box.style.position =
+                "fixed";
 
-            const normalizedText =
-                normalizeSearchText(
-                    doc.text ||
-                    ""
+
+            box.style.left =
+                left +
+                "px";
+
+
+            box.style.top =
+                top +
+                "px";
+
+
+            box.style.zIndex =
+                "999999";
+
+
+            const inputProject =
+                box.querySelector(
+                    ".new-project-name"
                 );
 
 
-            if (
-                normalizedText.includes(
-                    normalizedQuery
-                )
-            ) {
+            if (inputProject) {
 
-                score +=
-                    20;
+                inputProject.focus();
 
             }
 
 
-            // ==========================================
-            // عدد كلمات السؤال الموجودة
-            // ==========================================
-
-            let matchedTokens =
-                0;
+            const saveProjectButton =
+                box.querySelector(
+                    ".save-project"
+                );
 
 
-            queryTokens.forEach(
+            if (saveProjectButton) {
+
+                saveProjectButton.onclick =
+                    function () {
+
+                        const name =
+                            inputProject
+                                ? inputProject.value.trim()
+                                : "";
+
+
+                        if (
+                            name
+                        ) {
+
+                            const now =
+                                new Date()
+                                    .toISOString();
+
+
+                            const newProject = {
+
+                                id:
+                                    Date.now(),
+
+                                name:
+                                    name,
+
+                                createdAt:
+                                    now,
+
+                                updatedAt:
+                                    now,
+
+                                documents:
+                                    [],
+
+                                references:
+                                    [],
+
+                                chatIds:
+                                    [],
+
+                                settings: {
+
+                                    citationStyle:
+                                        "",
+
+                                    notes:
+                                        ""
+
+                                }
+
+                            };
+
+
+                            projects.unshift(
+                                newProject
+                            );
+
+
+                            saveProjects();
+
+
+                            renderProjects();
+
+
+                            renderExpandedProjects();
+
+                        }
+
+
+                        box.remove();
+
+                    };
+
+            }
+
+
+            const cancelProject =
+                box.querySelector(
+                    ".cancel-project"
+                );
+
+
+            if (cancelProject) {
+
+                cancelProject.onclick =
+                    function () {
+
+                        box.remove();
+
+                    };
+
+            }
+
+
+            box.onclick =
                 function (
-                    token
+                    event
                 ) {
 
-                    if (
-                        normalizedText.includes(
-                            token
-                        )
-                    ) {
-
-                        matchedTokens +=
-                            1;
-
-                    }
-
-                }
-            );
-
-
-            const queryCoverage =
-                queryTokens.length >
-                0
-                    ? matchedTokens /
-                      queryTokens.length
-                    : 0;
-
-
-            score +=
-                queryCoverage *
-                12;
-
-
-            // ==========================================
-            // محاولة تحديد نوع المطابقة
-            // ==========================================
-
-            let matchType =
-                "word";
-
-
-            if (
-                normalizedText.includes(
-                    normalizedQuery
-                )
-            ) {
-
-                matchType =
-                    "exact";
-
-            }
-            else if (
-                doc.isHeading ||
-                headingRelevance >=
-                    25
-            ) {
-
-                matchType =
-                    "heading";
-
-            }
-
-
-            scoredResults.push({
-
-                id:
-                    String(
-                        doc.id ||
-                        ""
-                    ),
-
-                paragraphIndex:
-                    paragraphIndex,
-
-                paragraphId:
-                    String(
-                        doc.id ||
-                        (
-                            "p-" +
-                            paragraphIndex
-                        )
-                    ),
-
-                text:
-                    String(
-                        doc.text ||
-                        ""
-                    ),
-
-                heading:
-                    heading,
-
-                headingIndex:
-                    Number(
-                        doc.headingIndex ||
-                        -1
-                    ),
-
-                headingLevel:
-                    String(
-                        doc.headingLevel ||
-                        ""
-                    ),
-
-                isHeading:
-                    Boolean(
-                        doc.isHeading
-                    ),
-
-                score:
-                    score,
-
-                oramaScore:
-                    Number(
-                        hit.score ||
-                        0
-                    ),
-
-                matchedTokens:
-                    matchedTokens,
-
-                queryCoverage:
-                    queryCoverage,
-
-                headingRelevance:
-                    headingRelevance,
-
-                matchType:
-                    matchType
-
-            });
-
-        }
-    );
-
-
-    // ==========================================
-    // ترتيب النتائج
-    // ==========================================
-
-    scoredResults.sort(
-        function (
-            a,
-            b
-        ) {
-
-            if (
-                b.score !==
-                a.score
-            ) {
-
-                return (
-                    b.score -
-                    a.score
-                );
-
-            }
-
-
-            if (
-                Boolean(
-                    b.isHeading
-                ) !==
-                Boolean(
-                    a.isHeading
-                )
-            ) {
-
-                return (
-                    b.isHeading
-                        ? 1
-                        : -1
-                );
-
-            }
-
-
-            if (
-                b.queryCoverage !==
-                a.queryCoverage
-            ) {
-
-                return (
-                    b.queryCoverage -
-                    a.queryCoverage
-                );
-
-            }
-
-
-            return (
-                a.paragraphIndex -
-                b.paragraphIndex
-            );
-
-        }
-    );
-
-
-    // ==========================================
-    // النتيجة النهائية
-    // ==========================================
-
-    const finalResults =
-        scoredResults.slice(
-            0,
-            maxResults
-        );
-
-
-    return {
-
-        query:
-            normalizedQuery,
-
-        count:
-            scoredResults.length,
-
-        results:
-            finalResults,
-
-        matchedTerms:
-            queryTokens,
-
-        matchedFamilies:
-            [],
-
-        totalQueryTerms:
-            queryTokens.length,
-
-        profile:
-            profile,
-
-        indexedOccurrences:
-            scoredResults.length,
-
-        headings:
-            headings
-
-    };
-
-}
-
-
-// =====================================================
-// Search Orama Headings
-// البحث المباشر في العناوين
-// =====================================================
-
-async function searchOramaHeadings(
-    documentItem,
-    query
-) {
-
-    if (
-        !documentItem ||
-        !query
-    ) {
-
-        return [];
-
-    }
-
-
-    const structureData =
-        await ensureDocumentStructure(
-            documentItem
-        );
-
-
-    if (
-        !structureData ||
-        !Array.isArray(
-            structureData.headings
-        )
-    ) {
-
-        return [];
-
-    }
-
-
-    const headings =
-        sortHeadings(
-            structureData.headings
-        );
-
-
-    if (
-        headings.length ===
-        0
-    ) {
-
-        return [];
-
-    }
-
-
-    const {
-        create,
-        insertMultiple,
-        search
-    } =
-        getOramaEngine();
-
-
-    const db =
-        create({
-
-            schema: {
-
-                headingIndex:
-                    "number",
-
-                heading:
-                    "string",
-
-                style:
-                    "string",
-
-                level:
-                    "number"
-
-            },
-
-            language:
-                "arabic"
-
-        });
-
-
-    const records =
-        headings.map(
-            function (
-                heading
-            ) {
-
-                return {
-
-                    headingIndex:
-                        Number(
-                            heading.index
-                        ),
-
-                    heading:
-                        String(
-                            heading.text ||
-                            ""
-                        )
-                            .trim(),
-
-                    style:
-                        String(
-                            heading.style ||
-                            ""
-                        ),
-
-                    level:
-                        getHeadingLevelNumber(
-                            heading.style
-                        )
+                    event.stopPropagation();
 
                 };
 
-            }
-        );
-
-
-    await insertMultiple(
-        db,
-        records
-    );
-
-
-    const normalizedQuery =
-        normalizeOramaQuery(
-            query
-        );
-
-
-    if (
-        !normalizedQuery
-    ) {
-
-        return [];
-
-    }
-
-
-    let result;
-
-
-    try {
-
-        result =
-            await search(
-                db,
-                {
-
-                    term:
-                        normalizedQuery,
-
-                    properties:
-                        [
-                            "heading"
-                        ],
-
-                    tolerance:
-                        2,
-
-                    limit:
-                        20
-
-                }
-            );
-
-    }
-    catch (error) {
-
-        console.error(
-            "فشل البحث في عناوين Orama:",
-            error
-        );
-
-        return [];
-
-    }
-
-
-    if (
-        !result ||
-        !Array.isArray(
-            result.hits
-        )
-    ) {
-
-        return [];
-
-    }
-
-
-    return result.hits.map(
-        function (
-            hit
-        ) {
-
-            return {
-
-                score:
-                    Number(
-                        hit.score ||
-                        0
-                    ),
-
-                headingIndex:
-                    Number(
-                        hit.document.headingIndex
-                    ),
-
-                heading:
-                    String(
-                        hit.document.heading ||
-                        ""
-                    ),
-
-                style:
-                    String(
-                        hit.document.style ||
-                        ""
-                    ),
-
-                level:
-                    Number(
-                        hit.document.level ||
-                        9
-                    )
-
-            };
-
-        }
-    );
+        };
 
 }
 
 
 // =====================================================
-// Get Heading Paragraph Range
-// الحصول على نطاق فقرات المطلب
+// PROJECTS BUTTON
 // =====================================================
 
-function getHeadingParagraphRange(
-    structureData,
-    headingIndex
-) {
+if (projectsBtn) {
 
-    if (
-        !structureData ||
-        !Array.isArray(
-            structureData.paragraphs
-        ) ||
-        !Array.isArray(
-            structureData.headings
-        )
-    ) {
-
-        return [];
-
-    }
-
-
-    const paragraphs =
-        structureData.paragraphs;
-
-
-    const headings =
-        sortHeadings(
-            structureData.headings
-        );
-
-
-    const currentHeadingPosition =
-        headings.findIndex(
-            function (
-                heading
-            ) {
-
-                return (
-                    Number(
-                        heading.index
-                    ) ===
-                    Number(
-                        headingIndex
-                    )
-                );
-
-            }
-        );
-
-
-    if (
-        currentHeadingPosition ===
-        -1
-    ) {
-
-        return [];
-
-    }
-
-
-    const startIndex =
-        Number(
-            headings[
-                currentHeadingPosition
-            ].index
-        );
-
-
-    const nextHeading =
-        headings[
-            currentHeadingPosition + 1
-        ];
-
-
-    const endIndex =
-        nextHeading
-            ? Number(
-                nextHeading.index
-            ) - 1
-            : paragraphs.length - 1;
-
-
-    return paragraphs.filter(
+    projectsBtn.onclick =
         function (
-            paragraph
+            e
         ) {
 
-            if (
-                !paragraph
-            ) {
+            e.preventDefault();
+            e.stopPropagation();
 
-                return false;
+
+            if (!projectsPopup) {
+
+                return;
 
             }
 
 
-            const index =
-                Number(
-                    paragraph.index
+            if (chatPopup) {
+
+                chatPopup.classList.remove(
+                    "open"
                 );
 
-
-            return (
-                index >
-                startIndex &&
-                index <=
-                endIndex
-            );
-
-        }
-    );
-
-}
+            }
 
 
-// =====================================================
-// Build Orama Heading Expansion
-// توسيع نتيجة العنوان إلى محتوى المطلب
-// =====================================================
+            if (searchPopup) {
 
-function expandHeadingResult(
-    structureData,
-    result,
-    maxParagraphs
-) {
+                searchPopup.classList.remove(
+                    "open"
+                );
 
-    if (
-        !result ||
-        !result.isHeading
-    ) {
-
-        return result;
-
-    }
+            }
 
 
-    const headingIndex =
-        Number(
-            result.paragraphIndex
-        );
+            if (settingsWindow) {
+
+                settingsWindow.classList.remove(
+                    "open"
+                );
+
+            }
 
 
-    const range =
-        getHeadingParagraphRange(
-            structureData,
-            headingIndex
-        );
-
-
-    const limit =
-        typeof maxParagraphs ===
-            "number"
-                ? Math.max(
-                    1,
-                    maxParagraphs
-                )
-                : 3;
-
-
-    const selected =
-        range.slice(
-            0,
-            limit
-        );
-
-
-    const content =
-        selected
-            .map(
-                function (
-                    paragraph
-                ) {
-
-                    return String(
-                        paragraph.text ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim();
-
-                }
-            )
-            .filter(
-                function (
-                    text
-                ) {
-
-                    return text !== "";
-
-                }
-            )
-            .join(
-                " "
+            projectsPopup.classList.toggle(
+                "open"
             );
 
 
-    return Object.assign(
-        {},
-        result,
-        {
-
-            headingMatch:
-                true,
-
-            sectionParagraphs:
-                selected,
-
-            sectionText:
-                content
-
-        }
-    );
-
-}
-
-
-// =====================================================
-// Add Neighbor Paragraphs
-// إضافة الفقرة السابقة واللاحقة
-// =====================================================
-
-function addNeighborParagraphs(
-    structureData,
-    result
-) {
-
-    if (
-        !structureData ||
-        !result
-    ) {
-
-        return result;
-
-    }
-
-
-    const paragraphs =
-        Array.isArray(
-            structureData.paragraphs
-        )
-            ? structureData.paragraphs
-            : [];
-
-
-    const index =
-        Number(
-            result.paragraphIndex
-        );
-
-
-    const previous =
-        paragraphs.find(
-            function (
-                paragraph
-            ) {
-
-                return (
-                    Number(
-                        paragraph.index
-                    ) ===
-                    index - 1
-                );
-
-            }
-        );
-
-
-    const next =
-        paragraphs.find(
-            function (
-                paragraph
-            ) {
-
-                return (
-                    Number(
-                        paragraph.index
-                    ) ===
-                    index + 1
-                );
-
-            }
-        );
-
-
-    return Object.assign(
-        {},
-        result,
-        {
-
-            previousParagraphText:
-                previous
-                    ? String(
-                        previous.text ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
-                    : "",
-
-            nextParagraphText:
-                next
-                    ? String(
-                        next.text ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
-                    : ""
-
-        }
-    );
-
-}
-
-
-// =====================================================
-// Search + Expand + Neighbors
-// الواجهة الموحدة للاسترجاع
-// =====================================================
-
-async function searchOramaForRetrieval(
-    documentItem,
-    query,
-    options
-) {
-
-    const settings =
-        options ||
-        {};
-
-
-    const maxResults =
-        typeof settings.maxResults ===
-            "number"
-                ? settings.maxResults
-                : 8;
-
-
-    const structureData =
-        await ensureDocumentStructure(
-            documentItem
-        );
-
-
-    const searchResult =
-        await searchOramaDocument(
-            documentItem,
-            query,
-            settings
-        );
-
-
-    const expandedResults =
-        searchResult.results.map(
-            function (
-                result
-            ) {
-
-                let item =
-                    expandHeadingResult(
-                        structureData,
-                        result,
-                        settings.headingParagraphs || 3
-                    );
-
-
-                item =
-                    addNeighborParagraphs(
-                        structureData,
-                        item
-                    );
-
-
-                return item;
-
-            }
-        );
-
-
-    // ==========================================
-    // منع تكرار الفقرات
-    // ==========================================
-
-    const unique =
-        new Map();
-
-
-    expandedResults.forEach(
-        function (
-            result
-        ) {
-
-            const key =
-                String(
-                    result.paragraphIndex
-                );
-
-
-            if (
-                !unique.has(
-                    key
-                ) ||
-                Number(
-                    result.score ||
-                    0
-                ) >
-                Number(
-                    unique.get(
-                        key
-                    ).score ||
-                    0
-                )
-            ) {
-
-                unique.set(
-                    key,
-                    result
-                );
-
-            }
-
-        }
-    );
-
-
-    let results =
-        Array.from(
-            unique.values()
-        );
-
-
-    // ==========================================
-    // إعادة الترتيب بعد التوسعة
-    // ==========================================
-
-    results.sort(
-        function (
-            a,
-            b
-        ) {
-
-            return (
-                Number(
-                    b.score ||
-                    0
-                ) -
-                Number(
-                    a.score ||
-                    0
-                )
-            );
-
-        }
-    );
-
-
-    results =
-        results.slice(
-            0,
-            maxResults
-        );
-
-
-    return {
-
-        query:
-            searchResult.query,
-
-        count:
-            searchResult.count,
-
-        results:
-            results,
-
-        matchedTerms:
-            searchResult.matchedTerms,
-
-        matchedFamilies:
-            searchResult.matchedFamilies,
-
-        totalQueryTerms:
-            searchResult.totalQueryTerms,
-
-        profile:
-            searchResult.profile,
-
-        indexedOccurrences:
-            searchResult.indexedOccurrences
-
-    };
-
-}
-
-
-// =====================================================
-// Compatibility Bridge
-// الاسم الجديد بدل searchIndexedDocument
-// =====================================================
-//
-// لا نعيد بناء المحرك القديم.
-// هذا الاسم سيستخدمه الجزء الثالث للـ AI.
-// =====================================================
-
-async function searchIndexedDocument(
-    documentId,
-    query,
-    options
-) {
-
-    const documentItem =
-        documents.find(
-            function (
-                documentItem
-            ) {
-
-                return (
-                    documentItem &&
-                    String(
-                        documentItem.id
-                    ) ===
-                    String(
-                        documentId
-                    )
-                );
-
-            }
-        ) ||
-        currentDocument;
-
-
-    if (
-        !documentItem
-    ) {
-
-        throw new Error(
-            "لم يتم العثور على المستند."
-        );
-
-    }
-
-
-    return await searchOramaForRetrieval(
-        documentItem,
-        query,
-        options || {}
-    );
-
-}
-
-
-// =====================================================
-// Build Retrieval Context
-// تحويل نتائج Orama إلى سياق AI
-// =====================================================
-
-function buildRetrievalContext(
-    searchResult,
-    options
-) {
-
-    const settings =
-        options ||
-        {};
-
-
-    const maxResults =
-        typeof settings.maxResults ===
-            "number"
-                ? settings.maxResults
-                : 4;
-
-
-    const maxChars =
-        typeof settings.maxChars ===
-            "number"
-                ? settings.maxChars
-                : 3500;
-
-
-    const includeNeighbors =
-        settings.includeNeighbors !==
-        false;
-
-
-    if (
-        !searchResult ||
-        !Array.isArray(
-            searchResult.results
-        )
-    ) {
-
-        return {
-
-            query:
-                "",
-
-            count:
-                0,
-
-            selectedCount:
-                0,
-
-            totalOccurrences:
-                0,
-
-            contexts:
-                [],
-
-            text:
-                ""
+            renderProjects();
 
         };
 
-    }
+}
 
 
-    const results =
-        searchResult.results
-            .filter(
-                function (
-                    result
-                ) {
+// =====================================================
+// EXPANDED SIDEBAR
+// =====================================================
 
-                    return (
-                        result &&
-                        typeof result.text ===
-                            "string"
-                    );
+if (
+    sidebarToggleBtn &&
+    expandedSidebar &&
+    expandedSidebarToggleSlot
+) {
 
-                }
-            )
-            .slice()
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return (
-                        Number(
-                            b.score ||
-                            0
-                        ) -
-                        Number(
-                            a.score ||
-                            0
-                        )
-                    );
-
-                }
-            );
-
-
-    const selected =
-        [];
-
-
-    const selectedParagraphIndexes =
-        new Set();
-
-
-    for (
-        let i = 0;
-        i < results.length;
-        i++
-    ) {
-
-        const candidate =
-            results[i];
-
-
-        const paragraphIndex =
-            Number(
-                candidate.paragraphIndex
-            );
-
-
-        if (
-            selectedParagraphIndexes.has(
-                paragraphIndex
-            )
-        ) {
-
-            continue;
-
-        }
-
-
-        const candidateText =
-            String(
-                candidate.sectionText ||
-                candidate.text ||
-                ""
-            )
-                .replace(
-                    /\s+/g,
-                    " "
-                )
-                .trim();
-
-
-        if (
-            !candidateText
-        ) {
-
-            continue;
-
-        }
-
-
-        selected.push(
-            candidate
-        );
-
-
-        selectedParagraphIndexes.add(
-            paragraphIndex
-        );
-
-
-        if (
-            selected.length >=
-            maxResults
-        ) {
-
-            break;
-
-        }
-
-    }
-
-
-    const contexts =
-        [];
-
-
-    let totalChars =
-        0;
-
-
-    selected.forEach(
+    sidebarToggleBtn.onclick =
         function (
-            result,
-            index
+            e
         ) {
 
-            const remainingChars =
-                maxChars -
-                totalChars;
+            e.preventDefault();
+            e.stopPropagation();
 
 
-            if (
-                remainingChars <=
-                0
-            ) {
-
-                return;
-
-            }
-
-
-            let mainContext =
-                String(
-                    result.sectionText ||
-                    result.text ||
-                    ""
-                )
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
-
-            if (
-                !mainContext
-            ) {
-
-                return;
-
-            }
-
-
-            const heading =
-                String(
-                    result.heading ||
-                    ""
-                )
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim();
-
-
-            let previousContext =
-                includeNeighbors
-                    ? String(
-                        result.previousParagraphText ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
-                    : "";
-
-
-            let nextContext =
-                includeNeighbors
-                    ? String(
-                        result.nextParagraphText ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
-                    : "";
-
-
-            if (
-                selectedParagraphIndexes.has(
-                    Number(
-                        result.paragraphIndex
-                    ) - 1
-                )
-            ) {
-
-                previousContext =
-                    "";
-
-            }
-
-
-            if (
-                selectedParagraphIndexes.has(
-                    Number(
-                        result.paragraphIndex
-                    ) + 1
-                )
-            ) {
-
-                nextContext =
-                    "";
-
-            }
-
-
-            const reserved =
-                220;
-
-
-            const available =
-                Math.max(
-                    300,
-                    remainingChars -
-                    reserved
+            const isOpening =
+                !expandedSidebar.classList.contains(
+                    "open"
                 );
 
 
-            if (
-                mainContext.length >
-                available
-            ) {
+            if (isOpening) {
 
-                mainContext =
-                    mainContext.substring(
-                        0,
-                        available
-                    ) +
-                    "…";
+                expandedSidebar.classList.add(
+                    "open"
+                );
+
+
+                document.body.classList.add(
+                    "expanded-sidebar-open"
+                );
+
+
+                sidebarToggleBtn.title =
+                    "إخفاء القائمة";
+
+
+                sidebarToggleBtn.classList.add(
+                    "sidebar-open"
+                );
+
+
+                expandedSidebarToggleSlot.appendChild(
+                    sidebarToggleBtn
+                );
+
+            }
+            else {
+
+                expandedSidebar.classList.remove(
+                    "open"
+                );
+
+
+                document.body.classList.remove(
+                    "expanded-sidebar-open"
+                );
+
+
+                sidebarToggleBtn.title =
+                    "إظهار القائمة";
+
+
+                sidebarToggleBtn.classList.remove(
+                    "sidebar-open"
+                );
+
+
+                if (
+                    sidebarTogglePlaceholder.parentNode
+                ) {
+
+                    sidebarTogglePlaceholder.parentNode.insertBefore(
+                        sidebarToggleBtn,
+                        sidebarTogglePlaceholder.nextSibling
+                    );
+
+                }
 
             }
 
+        };
 
-            let context =
-                mainContext;
-
-
-            let remaining =
-                available -
-                context.length;
+}
 
 
-            if (
-                includeNeighbors &&
-                previousContext &&
-                remaining >
-                150
-            ) {
+// =====================================================
+// EXPANDED PROJECTS
+// =====================================================
 
-                const allowed =
-                    remaining -
-                    1;
+function renderExpandedProjects() {
 
-
-                const previousPart =
-                    previousContext.length >
-                    allowed
-                        ? previousContext.substring(
-                            Math.max(
-                                0,
-                                previousContext.length -
-                                allowed
-                            )
-                        ) +
-                        "…"
-                        : previousContext;
+    const list =
+        document.getElementById(
+            "expanded-projects-list"
+        );
 
 
-                context =
-                    previousPart +
-                    " " +
-                    context;
+    if (!list) {
 
-            }
+        return;
 
-
-            remaining =
-                available -
-                context.length;
+    }
 
 
-            if (
-                includeNeighbors &&
-                nextContext &&
-                remaining >
-                150
-            ) {
-
-                const allowed =
-                    remaining -
-                    1;
+    list.innerHTML =
+        "";
 
 
-                const nextPart =
-                    nextContext.length >
-                    allowed
-                        ? nextContext.substring(
-                            0,
-                            allowed
-                        ) +
-                        "…"
-                        : nextContext;
+    projects.forEach(
+        function (
+            project
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
 
 
-                context =
-                    context +
-                    " " +
-                    nextPart;
-
-            }
+            item.className =
+                "expanded-project-item";
 
 
-            const item = {
-
-                rank:
-                    index + 1,
-
-                paragraphIndex:
-                    result.paragraphIndex,
-
-                heading:
-                    heading,
-
-                score:
-                    Number(
-                        result.score ||
-                        0
-                    ),
-
-                matchType:
-                    result.matchType ||
-                    "word",
-
-                headingMatch:
-                    Boolean(
-                        result.headingMatch
-                    ),
-
-                sectionText:
-                    String(
-                        result.sectionText ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim(),
-
-                previousParagraph:
-                    previousContext,
-
-                mainParagraph:
-                    String(
-                        result.text ||
-                        ""
-                    )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim(),
-
-                nextParagraph:
-                    nextContext,
-
-                context:
-                    context
-
-            };
+            item.innerHTML = `
+                <span>
+                    ${projectIcon}
+                    ${project.name}
+                </span>
+            `;
 
 
-            contexts.push(
+            item.onclick =
+                function (
+                    e
+                ) {
+
+                    e.stopPropagation();
+
+
+                    setCurrentProject(
+                        project
+                    );
+
+                };
+
+
+            list.appendChild(
                 item
             );
 
-
-            totalChars +=
-                context.length;
-
         }
     );
-
-
-    const textParts =
-        [];
-
-
-    contexts.forEach(
-        function (
-            item
-        ) {
-
-            let block =
-                "[مقطع " +
-                String(
-                    item.rank
-                ) +
-                "]\n";
-
-
-            if (
-                item.heading
-            ) {
-
-                block +=
-                    "العنوان: " +
-                    item.heading +
-                    "\n";
-
-            }
-
-
-            if (
-                item.previousParagraph
-            ) {
-
-                block +=
-                    "السياق السابق: " +
-                    item.previousParagraph +
-                    "\n";
-
-            }
-
-
-            block +=
-                "المقطع المطابق: " +
-                item.mainParagraph;
-
-
-            if (
-                item.nextParagraph
-            ) {
-
-                block +=
-                    "\nالسياق التالي: " +
-                    item.nextParagraph;
-
-            }
-
-
-            textParts.push(
-                block
-            );
-
-        }
-    );
-
-
-    return {
-
-        query:
-            searchResult.query ||
-            "",
-
-        count:
-            Number(
-                searchResult.count ||
-                results.length
-            ),
-
-        selectedCount:
-            contexts.length,
-
-        totalOccurrences:
-            Number(
-                searchResult.indexedOccurrences ||
-                0
-            ),
-
-        contexts:
-            contexts,
-
-        text:
-            textParts.join(
-                "\n\n---\n\n"
-            )
-
-    };
 
 }
 
 
 // =====================================================
-// Debug Bridge
-// اختبار محرك Orama الجديد
+// SIDEBAR RECENT CHATS
 // =====================================================
 
-window.testOramaSearch =
-    async function (
-        query
-    ) {
+function renderSidebarChats() {
 
-        console.log(
-            "بدء اختبار Orama الجديد:",
-            query
+    const list =
+        document.getElementById(
+            "new-chat-list"
         );
 
 
-        if (
-            !currentDocument
-        ) {
+    if (!list) {
 
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
+        return;
+
+    }
 
 
-            return [];
-
-        }
-
-
-        try {
-
-            const result =
-                await searchOramaDocument(
-                    currentDocument,
-                    query,
-                    {
-
-                        profile:
-                            "general",
-
-                        maxResults:
-                            10
-
-                    }
-                );
+    list.innerHTML =
+        "";
 
 
-            console.log(
-                "===================================="
-            );
-
-
-            console.log(
-                "Orama Search"
-            );
-
-
-            console.log(
-                "السؤال:",
-                query
-            );
-
-
-            console.log(
-                "عدد النتائج:",
-                result.count
-            );
-
-
-            console.log(
-                "===================================="
-            );
-
-
-            result.results.forEach(
-                function (
-                    item,
-                    index
-                ) {
-
-                    console.log(
-                        "#" +
-                        (
-                            index + 1
-                        ),
-                        {
-
-                            score:
-                                item.score,
-
-                            oramaScore:
-                                item.oramaScore,
-
-                            heading:
-                                item.heading,
-
-                            paragraphIndex:
-                                item.paragraphIndex,
-
-                            matchType:
-                                item.matchType,
-
-                            headingRelevance:
-                                item.headingRelevance,
-
-                            queryCoverage:
-                                item.queryCoverage,
-
-                            text:
-                                String(
-                                    item.text ||
-                                    ""
-                                ).substring(
-                                    0,
-                                    300
-                                )
-
-                        }
-                    );
-
-                }
-            );
-
-
-            return result.results;
-
-        }
-        catch (
-            error
-        ) {
-
-            console.error(
-                "فشل اختبار Orama:",
-                error
-            );
-
-
-            return [];
-
-        }
-
-    };
-
-
-// =====================================================
-// Debug Heading Search
-// اختبار البحث في العناوين
-// =====================================================
-
-window.testOramaHeadingSearch =
-    async function (
-        query
+    if (
+        chats.length ===
+        0
     ) {
 
-        if (
-            !currentDocument
-        ) {
-
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
+        list.innerHTML = `
+            <div class="empty-chat">
+                لا توجد محادثات
+            </div>
+        `;
 
 
-            return [];
+        return;
 
-        }
-
-
-        try {
-
-            const results =
-                await searchOramaHeadings(
-                    currentDocument,
-                    query
-                );
+    }
 
 
-            console.log(
-                "======================================"
-            );
-
-
-            console.log(
-                "بحث Orama في العناوين"
-            );
-
-
-            console.log(
-                "السؤال:",
-                query
-            );
-
-
-            console.log(
-                "عدد النتائج:",
-                results.length
-            );
-
-
-            console.log(
-                "======================================"
-            );
-
-
-            results.forEach(
-                function (
-                    item,
-                    index
-                ) {
-
-                    console.log(
-                        "#" +
-                        (
-                            index + 1
-                        ),
-                        item
-                    );
-
-                }
-            );
-
-
-            return results;
-
-        }
-        catch (
-            error
-        ) {
-
-            console.error(
-                "فشل اختبار عناوين Orama:",
-                error
-            );
-
-
-            return [];
-
-        }
-
-    };
-
-
-// =====================================================
-// Standalone Orama Test
-// اختبار مستقل للتأكد من أن Orama نفسه يعمل
-// =====================================================
-
-window.testOramaStandalone =
-    async function (
-        query
-    ) {
-
-        if (
-            !currentDocument
-        ) {
-
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
-
-
-            return [];
-
-        }
-
-
-        try {
-
-            const structureData =
-                await ensureDocumentStructure(
-                    currentDocument
-                );
-
-
-            if (
-                !structureData
+    chats
+        .slice(
+            0,
+            8
+        )
+        .forEach(
+            function (
+                chat
             ) {
 
-                return [];
-
-            }
-
-
-            const paragraphs =
-                Array.isArray(
-                    structureData.paragraphs
-                )
-                    ? structureData.paragraphs
-                    : [];
+                const item =
+                    document.createElement(
+                        "div"
+                    );
 
 
-            const headings =
-                sortHeadings(
-                    structureData.headings
-                );
+                item.className =
+                    "recent-chat-item";
 
 
-            const {
-                create,
-                insertMultiple,
-                search
-            } =
-                getOramaEngine();
+                item.innerHTML = `
+                    <span class="chat-title">
+                        ${chatIcon}
+                        ${chat.title}
+                    </span>
+                `;
 
 
-            const db =
-                create({
+                item.onclick =
+                    function (
+                        e
+                    ) {
 
-                    schema: {
-
-                        id:
-                            "string",
-
-                        paragraphIndex:
-                            "number",
-
-                        text:
-                            "string",
-
-                        heading:
-                            "string"
-
-                    },
-
-                    language:
-                        "arabic"
-
-                });
+                        e.stopPropagation();
 
 
-            const records =
-                paragraphs
-                    .filter(
-                        function (
-                            paragraph
-                        ) {
+                        currentChat =
+                            chat;
 
-                            return (
-                                paragraph &&
-                                String(
-                                    paragraph.text ||
-                                    ""
-                                ).trim()
+
+                        renderChat();
+
+
+                        if (projectsPopup) {
+
+                            projectsPopup.classList.remove(
+                                "open"
                             );
 
                         }
-                    )
-                    .map(
-                        function (
-                            paragraph
-                        ) {
-
-                            const heading =
-                                findNearestHeading(
-                                    Number(
-                                        paragraph.index
-                                    ),
-                                    headings
-                                );
 
 
-                            return {
+                        if (chatPopup) {
 
-                                id:
-                                    "p-" +
-                                    String(
-                                        paragraph.index
-                                    ),
-
-                                paragraphIndex:
-                                    Number(
-                                        paragraph.index
-                                    ),
-
-                                text:
-                                    String(
-                                        paragraph.text ||
-                                        ""
-                                    )
-                                        .trim(),
-
-                                heading:
-                                    heading
-                                        ? String(
-                                            heading.text ||
-                                            ""
-                                        ).trim()
-                                        : ""
-
-                            };
+                            chatPopup.classList.remove(
+                                "open"
+                            );
 
                         }
-                    );
 
 
-            console.log(
-                "عدد السجلات التي ستدخل Orama:",
-                records.length
-            );
+                        if (searchPopup) {
+
+                            searchPopup.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+                    };
 
 
-            if (
-                records.length ===
-                0
-            ) {
-
-                return [];
+                list.appendChild(
+                    item
+                );
 
             }
+        );
+
+}
 
 
-            await insertMultiple(
-                db,
-                records
-            );
+// =====================================================
+// CREATE NEW CHAT
+// =====================================================
 
+function createNewChat() {
 
-            console.log(
-                "تم إدخال السجلات إلى Orama."
-            );
+    currentChat = {
 
+        id:
+            Date.now(),
 
-            const normalizedQuery =
-                normalizeOramaQuery(
-                    query
-                );
+        title:
+            "محادثة جديدة",
 
+        messages:
+            [],
 
-            const result =
-                await search(
-                    db,
-                    {
+        isTemporary:
+            true,
 
-                        term:
-                            normalizedQuery,
-
-                        properties:
-                            [
-                                "text",
-                                "heading"
-                            ],
-
-                        boost:
-                            {
-                                heading:
-                                    5
-                            },
-
-                        tolerance:
-                            2,
-
-                        limit:
-                            10
-
-                    }
-                );
-
-
-            console.log(
-                "===================================="
-            );
-
-
-            console.log(
-                "Orama Standalone Test"
-            );
-
-
-            console.log(
-                "السؤال:",
-                query
-            );
-
-
-            console.log(
-                "عدد النتائج:",
-                result.count
-            );
-
-
-            console.log(
-                "===================================="
-            );
-
-
-            const finalResults =
-                Array.isArray(
-                    result.hits
-                )
-                    ? result.hits.map(
-                        function (
-                            hit
-                        ) {
-
-                            return {
-
-                                score:
-                                    Number(
-                                        hit.score ||
-                                        0
-                                    ),
-
-                                heading:
-                                    hit.document.heading,
-
-                                paragraphIndex:
-                                    hit.document.paragraphIndex,
-
-                                paragraphId:
-                                    hit.document.id,
-
-                                text:
-                                    String(
-                                        hit.document.text ||
-                                        ""
-                                    )
-
-                            };
-
-                        }
-                    )
-                    : [];
-
-
-            finalResults.forEach(
-                function (
-                    item,
-                    index
-                ) {
-
-                    console.log(
-                        "#" +
-                        (
-                            index + 1
-                        ),
-                        item
-                    );
-
-                }
-            );
-
-
-            return finalResults;
-
-        }
-        catch (
-            error
-        ) {
-
-            console.error(
-                "فشل اختبار Orama المستقل:",
-                error
-            );
-
-
-            return [];
-
-        }
+        projectId:
+            currentProject
+                ? currentProject.id
+                : null
 
     };
 
 
-// =====================================================
-// Test Current Orama Index
-// اختبار حالة فهرس المستند الحالي
-// =====================================================
+    currentCitationSources =
+        [];
 
-window.testCurrentDocumentOrama =
-    async function () {
 
-        if (
-            !currentDocument
-        ) {
+    if (input) {
 
-            console.warn(
-                "لا يوجد مستند نشط."
-            );
-
-
-            return null;
-
-        }
-
-
-        try {
-
-            const structureData =
-                await ensureDocumentStructure(
-                    currentDocument
-                );
-
-
-            const db =
-                await ensureOramaRetrievalIndex(
-                    currentDocument,
-                    structureData
-                );
-
-
-            console.log(
-                "======================================"
-            );
-
-
-            console.log(
-                "حالة فهرس Orama"
-            );
-
-
-            console.log(
-                "المستند:",
-                currentDocument.name
-            );
-
-
-            console.log(
-                "Document ID:",
-                currentDocument.id
-            );
-
-
-            console.log(
-                "الفقرات:",
-                structureData.paragraphCount
-            );
-
-
-            console.log(
-                "العناوين:",
-                structureData.headingCount
-            );
-
-
-            console.log(
-                "Orama DB:",
-                db
-            );
-
-
-            console.log(
-                "Cache Key:",
-                oramaRetrievalCacheKey
-            );
-
-
-            console.log(
-                "======================================"
-            );
-
-
-            return db;
-
-        }
-        catch (
-            error
-        ) {
-
-            console.error(
-                "فشل فحص فهرس Orama:",
-                error
-            );
-
-
-            return null;
-
-        }
-
-    };
-
-
-// =====================================================
-// PART 2 END
-// =====================================================
-// ======================================
-// Word AI Assistant
-// PART 3 / 4
-// الذكاء الاصطناعي + الإعدادات + النماذج
-// متوافق مع Orama الجديد في PART 2
-// ======================================
-
-
-// =====================================================
-// Gemini Model Normalization
-// =====================================================
-
-function normalizeGeminiModel(
-    model
-) {
-
-    return String(
-        model || ""
-    ).replace(
-        /^models\//,
-        ""
-    );
-
-}
-
-
-// =====================================================
-// JSON Reader
-// =====================================================
-
-async function readJSON(
-    response
-) {
-
-    try {
-
-        return await response.json();
-
-    }
-    catch (e) {
-
-        return {};
-
-    }
-
-}
-
-
-// =====================================================
-// API Error
-// =====================================================
-
-function getAPIError(
-    result,
-    fallback
-) {
-
-    if (!result) {
-
-        return fallback;
-
-    }
-
-
-    if (result.error) {
-
-        if (
-            typeof result.error ===
-            "string"
-        ) {
-
-            return result.error;
-
-        }
-
-
-        if (
-            result.error.message
-        ) {
-
-            let message =
-                String(
-                    result.error.message
-                );
-
-
-            if (
-                result.error.code
-            ) {
-
-                message +=
-                    " | Code: " +
-                    result.error.code;
-
-            }
-
-
-            return message;
-
-        }
-
-    }
-
-
-    if (
-        result.message
-    ) {
-
-        return String(
-            result.message
-        );
-
-    }
-
-
-    return fallback;
-
-}
-
-
-// =====================================================
-// Extract OpenAI / OpenRouter / Groq Answer
-// =====================================================
-
-function extractOpenAIStyleAnswer(
-    result,
-    providerName
-) {
-
-    if (
-        result &&
-        Array.isArray(
-            result.choices
-        ) &&
-        result.choices.length > 0
-    ) {
-
-        const choice =
-            result.choices[0];
-
-
-        if (
-            choice &&
-            choice.message &&
-            typeof choice.message.content ===
-                "string"
-        ) {
-
-            return choice.message.content;
-
-        }
-
-    }
-
-
-    throw new Error(
-        "لم يصل رد صالح من " +
-        providerName +
-        "."
-    );
-
-}
-
-
-// =====================================================
-// Extract Gemini Answer
-// =====================================================
-
-function extractGeminiAnswer(
-    result
-) {
-
-    if (
-        result &&
-        Array.isArray(
-            result.candidates
-        ) &&
-        result.candidates.length > 0
-    ) {
-
-        const candidate =
-            result.candidates[0];
-
-
-        if (
-            candidate &&
-            candidate.content &&
-            Array.isArray(
-                candidate.content.parts
-            )
-        ) {
-
-            const answerParts =
-                candidate.content.parts
-                    .filter(
-                        function (
-                            part
-                        ) {
-
-                            if (
-                                !part ||
-                                typeof part.text !==
-                                    "string"
-                            ) {
-
-                                return false;
-
-                            }
-
-
-                            if (
-                                part.thought ===
-                                true
-                            ) {
-
-                                return false;
-
-                            }
-
-
-                            return true;
-
-                        }
-                    )
-                    .map(
-                        function (
-                            part
-                        ) {
-
-                            return part.text;
-
-                        }
-                    );
-
-
-            if (
-                answerParts.length >
-                0
-            ) {
-
-                return answerParts
-                    .join(
-                        "\n"
-                    )
-                    .trim();
-
-            }
-
-        }
-
-    }
-
-
-    throw new Error(
-        "لم يصل رد صالح من Gemini."
-    );
-
-}
-
-
-// =====================================================
-// AI Settings Storage
-// =====================================================
-
-function getSavedSettings() {
-
-    try {
-
-        return (
-            JSON.parse(
-                localStorage.getItem(
-                    "AI_SETTINGS"
-                )
-            ) || {}
-        );
-
-    }
-    catch (e) {
-
-        return {};
-
-    }
-
-}
-
-
-// =====================================================
-// Save AI Settings
-// =====================================================
-
-function saveAISettings(
-    data
-) {
-
-    localStorage.setItem(
-        "AI_SETTINGS",
-        JSON.stringify(
-            data ||
-            {}
-        )
-    );
-
-}
-
-
-// =====================================================
-// Provider Information
-// =====================================================
-
-function updateProviderInfo() {
-
-    if (
-        !providerInfo ||
-        !provider
-    ) {
-
-        return;
-
-    }
-
-
-    const value =
-        String(
-            provider.value ||
-            "openrouter"
-        ).toLowerCase();
-
-
-    if (
-        value ===
-        "openrouter"
-    ) {
-
-        providerInfo.innerHTML =
-            "OpenRouter: سيتم جلب النماذج المجانية المتاحة.";
-
-        return;
-
-    }
-
-
-    if (
-        value ===
-        "gemini"
-    ) {
-
-        providerInfo.innerHTML =
-            "Gemini: سيتم جلب النماذج التي تدعم generateContent.";
-
-        return;
-
-    }
-
-
-    if (
-        value ===
-        "groq"
-    ) {
-
-        providerInfo.innerHTML =
-            "Groq: سيتم جلب النماذج المتاحة من حسابك.";
-
-        return;
-
-    }
-
-
-    if (
-        value ===
-        "openai"
-    ) {
-
-        providerInfo.innerHTML =
-            "OpenAI: سيتم جلب النماذج المتاحة من حسابك.";
-
-        return;
-
-    }
-
-
-    providerInfo.innerHTML =
-        "سيتم تحديد طريقة الاتصال بحسب المزود.";
-
-}
-
-
-// =====================================================
-// Load Saved Settings
-// =====================================================
-
-function loadSettings() {
-
-    const data =
-        getSavedSettings();
-
-
-    if (provider) {
-
-        provider.value =
-            data.provider ||
-            "openrouter";
-
-    }
-
-
-    if (apiKey) {
-
-        apiKey.value =
-            data.key ||
-            "";
-
-    }
-
-
-    if (modelSelect) {
-
-        const savedModel =
-            data.model ||
+        input.value =
             "";
 
 
-        modelSelect.innerHTML =
-            "";
-
-
-        if (
-            savedModel
-        ) {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                savedModel;
-
-
-            option.textContent =
-                savedModel;
-
-
-            modelSelect.appendChild(
-                option
-            );
-
-
-            modelSelect.value =
-                savedModel;
-
-        }
-        else {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-
-            option.value =
-                "";
-
-
-            option.textContent =
-                "أدخل المفتاح ثم حدّث النماذج";
-
-
-            modelSelect.appendChild(
-                option
-            );
-
-        }
+        input.style.height =
+            "auto";
 
     }
 
 
-    updateProviderInfo();
+    renderSidebarChats();
+
+
+    renderRecentChats();
+
+
+    renderChat();
 
 }
 
 
 // =====================================================
-// Settings Button
+// NEW CHAT BUTTON
 // =====================================================
 
-if (settingsBtn) {
+if (newChatBtn) {
 
-    settingsBtn.onclick =
-        function (e) {
+    newChatBtn.onclick =
+        function (
+            e
+        ) {
 
             e.preventDefault();
             e.stopPropagation();
@@ -6740,78 +6057,446 @@ if (settingsBtn) {
             }
 
 
-            if (!settingsWindow) {
+            if (settingsWindow) {
 
-                console.warn(
-                    "عنصر settings-window غير موجود في الصفحة."
+                settingsWindow.classList.remove(
+                    "open"
                 );
+
+            }
+
+
+            createNewChat();
+
+        };
+
+}
+
+
+// =====================================================
+// INITIALIZE SIDEBAR SECTIONS
+// =====================================================
+
+function initializeSidebarSections() {
+
+    const headers =
+        document.querySelectorAll(
+            ".section-title[data-target], .section-toggle[data-target]"
+        );
+
+
+    headers.forEach(
+        function (
+            header
+        ) {
+
+            const targetId =
+                header.getAttribute(
+                    "data-target"
+                );
+
+
+            if (!targetId) {
 
                 return;
 
             }
 
 
-            loadSettings();
+            const target =
+                document.getElementById(
+                    targetId
+                );
 
 
-            settingsWindow.classList.add(
+            if (!target) {
+
+                return;
+
+            }
+
+
+            target.classList.remove(
                 "open"
             );
 
-        };
+
+            header.classList.remove(
+                "open"
+            );
+
+
+            header.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    const isOpen =
+                        target.classList.contains(
+                            "open"
+                        );
+
+
+                    target.classList.toggle(
+                        "open",
+                        !isOpen
+                    );
+
+
+                    header.classList.toggle(
+                        "open",
+                        !isOpen
+                    );
+
+                };
+
+        }
+    );
 
 }
 
 
 // =====================================================
-// Provider Change
+// CHAT STORAGE
 // =====================================================
 
-if (provider) {
+function ensureCurrentChatObject() {
 
-    provider.onchange =
-        function () {
+    if (
+        currentChat
+    ) {
 
-            updateProviderInfo();
+        return;
 
-
-            if (modelSelect) {
-
-                modelSelect.innerHTML = `
-                    <option value="">
-                        أدخل المفتاح ثم حدّث النماذج
-                    </option>
-                `;
-
-            }
+    }
 
 
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "";
-
-            }
-
-        };
+    createNewChat();
 
 }
 
 
 // =====================================================
-// Close Settings
+// END PART 2
+// الجزء الثالث يتابع:
+// الإعدادات + مزودو الذكاء الاصطناعي + البحث + الاسترجاع
+// =====================================================
+// =====================================================
+// PART 3 / 4
+// الإعدادات + مزودو الذكاء الاصطناعي
+// + محرك البحث الجديد + الاسترجاع
 // =====================================================
 
-if (closeSettings) {
 
-    closeSettings.onclick =
-        function (e) {
+// =====================================================
+// SETTINGS
+// =====================================================
+
+function loadSettings() {
+
+    const data =
+        getSavedSettings();
+
+
+    if (
+        providerSelect &&
+        data.provider
+    ) {
+
+        providerSelect.value =
+            data.provider;
+
+    }
+
+
+    if (
+        modelSelect &&
+        data.model
+    ) {
+
+        modelSelect.value =
+            data.model;
+
+    }
+
+
+    if (
+        apiKeyInput &&
+        data.key
+    ) {
+
+        apiKeyInput.value =
+            data.key;
+
+    }
+
+
+    if (
+        showKeyCheckbox &&
+        data.showKey
+    ) {
+
+        showKeyCheckbox.checked =
+            true;
+
+    }
+
+
+    updateAPIKeyVisibility();
+
+
+    updateProviderUI();
+
+}
+
+
+// =====================================================
+// SAVE SETTINGS
+// =====================================================
+
+function saveSettings() {
+
+    const provider =
+        providerSelect
+            ? providerSelect.value
+            : "openrouter";
+
+
+    const model =
+        modelSelect
+            ? modelSelect.value.trim()
+            : "";
+
+
+    const key =
+        apiKeyInput
+            ? apiKeyInput.value.trim()
+            : "";
+
+
+    const showKey =
+        showKeyCheckbox
+            ? showKeyCheckbox.checked
+            : false;
+
+
+    const settings = {
+
+        provider:
+            provider,
+
+        model:
+            model,
+
+        key:
+            key,
+
+        showKey:
+            showKey
+
+    };
+
+
+    localStorage.setItem(
+        "AI_SETTINGS",
+        JSON.stringify(
+            settings
+        )
+    );
+
+
+    updateAPIKeyVisibility();
+
+
+    updateProviderUI();
+
+}
+
+
+// =====================================================
+// API KEY VISIBILITY
+// =====================================================
+
+function updateAPIKeyVisibility() {
+
+    if (
+        !apiKeyInput ||
+        !showKeyCheckbox
+    ) {
+
+        return;
+
+    }
+
+
+    apiKeyInput.type =
+        showKeyCheckbox.checked
+            ? "text"
+            : "password";
+
+}
+
+
+// =====================================================
+// PROVIDER UI
+// =====================================================
+
+function updateProviderUI() {
+
+    const provider =
+        providerSelect
+            ? String(
+                providerSelect.value ||
+                ""
+            ).toLowerCase()
+            : "";
+
+
+    if (
+        providerLabel
+    ) {
+
+        if (
+            provider ===
+            "gemini"
+        ) {
+
+            providerLabel.textContent =
+                "Gemini";
+
+        }
+        else if (
+            provider ===
+            "openai"
+        ) {
+
+            providerLabel.textContent =
+                "OpenAI";
+
+        }
+        else if (
+            provider ===
+            "groq"
+        ) {
+
+            providerLabel.textContent =
+                "Groq";
+
+        }
+        else {
+
+            providerLabel.textContent =
+                "OpenRouter";
+
+        }
+
+    }
+
+
+    if (
+        modelSelect
+    ) {
+
+        modelSelect.disabled =
+            false;
+
+    }
+
+}
+
+
+// =====================================================
+// SETTINGS BUTTON
+// =====================================================
+
+if (
+    settingsBtn
+) {
+
+    settingsBtn.onclick =
+        function (
+            e
+        ) {
 
             e.preventDefault();
             e.stopPropagation();
 
 
-            if (settingsWindow) {
+            if (
+                settingsWindow
+            ) {
+
+                settingsWindow.classList.toggle(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                projectsPopup
+            ) {
+
+                projectsPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                chatPopup
+            ) {
+
+                chatPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                searchPopup
+            ) {
+
+                searchPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            loadSettings();
+
+        };
+
+}
+
+
+// =====================================================
+// CLOSE SETTINGS
+// =====================================================
+
+if (
+    closeSettingsBtn
+) {
+
+    closeSettingsBtn.onclick =
+        function (
+            e
+        ) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            if (
+                settingsWindow
+            ) {
 
                 settingsWindow.classList.remove(
                     "open"
@@ -6825,42 +6510,32 @@ if (closeSettings) {
 
 
 // =====================================================
-// Show / Hide API Key
+// SAVE SETTINGS BUTTON
 // =====================================================
 
 if (
-    showKey &&
-    apiKey
+    saveSettingsBtn
 ) {
 
-    showKey.onclick =
-        function (e) {
+    saveSettingsBtn.onclick =
+        function (
+            e
+        ) {
 
             e.preventDefault();
             e.stopPropagation();
 
 
+            saveSettings();
+
+
             if (
-                apiKey.type ===
-                "password"
+                settingsWindow
             ) {
 
-                apiKey.type =
-                    "text";
-
-
-                showKey.innerHTML =
-                    "🙈";
-
-            }
-            else {
-
-                apiKey.type =
-                    "password";
-
-
-                showKey.innerHTML =
-                    "👁";
+                settingsWindow.classList.remove(
+                    "open"
+                );
 
             }
 
@@ -6870,211 +6545,152 @@ if (
 
 
 // =====================================================
-// Save Settings Button
+// PROVIDER CHANGE
 // =====================================================
 
-if (saveSettings) {
+if (
+    providerSelect
+) {
 
-    saveSettings.onclick =
-        function (e) {
+    providerSelect.onchange =
+        async function () {
 
-            e.preventDefault();
-            e.stopPropagation();
+            updateProviderUI();
 
 
-            const settings = {
-
-                provider:
-                    provider
-                        ? String(
-                            provider.value ||
-                            "openrouter"
-                        )
-                        : "openrouter",
-
-                key:
-                    apiKey
-                        ? String(
-                            apiKey.value ||
-                            ""
-                        ).trim()
-                        : "",
-
-                model:
-                    modelSelect
-                        ? String(
-                            modelSelect.value ||
-                            ""
-                        ).trim()
-                        : ""
-
-            };
+            const provider =
+                String(
+                    providerSelect.value ||
+                    ""
+                ).toLowerCase();
 
 
             if (
-                !settings.key
+                modelSelect
             ) {
 
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        "⚠ يرجى إدخال مفتاح API.";
-
-                }
-
-                return;
-
-            }
-
-
-            if (
-                !settings.model
-            ) {
-
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        "⚠ يرجى تحديد نموذج الذكاء الاصطناعي.";
-
-                }
-
-                return;
-
-            }
-
-
-            saveAISettings(
-                settings
-            );
-
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "✓ تم حفظ إعدادات الذكاء الاصطناعي";
-
-            }
-
-        };
-
-}
-
-
-// =====================================================
-// Load Models
-// =====================================================
-
-async function loadModels() {
-
-    const selectedProvider =
-        provider
-            ? String(
-                provider.value ||
-                "openrouter"
-            ).toLowerCase()
-            : "openrouter";
-
-
-    if (
-        selectedProvider ===
-        "openrouter"
-    ) {
-
-        await loadOpenRouterModels();
-        return;
-
-    }
-
-
-    if (
-        selectedProvider ===
-        "gemini"
-    ) {
-
-        await loadGeminiModels();
-        return;
-
-    }
-
-
-    if (
-        selectedProvider ===
-        "groq"
-    ) {
-
-        await loadGroqModels();
-        return;
-
-    }
-
-
-    if (
-        selectedProvider ===
-        "openai"
-    ) {
-
-        await loadOpenAIModels();
-        return;
-
-    }
-
-
-    throw new Error(
-        "مزود الذكاء الاصطناعي غير معروف."
-    );
-
-}
-
-
-// =====================================================
-// Refresh Models Button
-// =====================================================
-
-if (refreshModels) {
-
-    refreshModels.onclick =
-        async function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            refreshModels.disabled =
-                true;
-
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "⏳ جاري تحديث النماذج...";
+                modelSelect.innerHTML = `
+                    <option value="">
+                        جاري تحميل النماذج...
+                    </option>
+                `;
 
             }
 
 
             try {
 
-                await loadModels();
+                await LoadModels(
+                    provider
+                );
 
             }
-            catch (error) {
+            catch (
+                error
+            ) {
 
-                if (settingsStatus) {
+                console.warn(
+                    "تعذر تحميل النماذج:",
+                    error
+                );
 
-                    settingsStatus.innerHTML =
-                        "⚠ " +
-                        (
-                            error &&
-                            error.message
-                                ? error.message
-                                : "تعذر تحديث النماذج"
-                        );
+
+                if (
+                    modelSelect
+                ) {
+
+                    modelSelect.innerHTML = `
+                        <option value="">
+                            تعذر تحميل النماذج
+                        </option>
+                    `;
+
+                }
+
+            }
+
+        };
+
+}
+
+
+// =====================================================
+// REFRESH MODELS
+// =====================================================
+
+if (
+    refreshModelsBtn
+) {
+
+    refreshModelsBtn.onclick =
+        async function (
+            e
+        ) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            const provider =
+                providerSelect
+                    ? String(
+                        providerSelect.value ||
+                        ""
+                    ).toLowerCase()
+                    : "openrouter";
+
+
+            try {
+
+                refreshModelsBtn.disabled =
+                    true;
+
+
+                if (
+                    modelStatus
+                ) {
+
+                    modelStatus.textContent =
+                        "جاري تحميل النماذج...";
+
+                }
+
+
+                await LoadModels(
+                    provider
+                );
+
+
+                if (
+                    modelStatus
+                ) {
+
+                    modelStatus.textContent =
+                        "تم تحديث النماذج";
+
+                }
+
+            }
+            catch (
+                error
+            ) {
+
+                if (
+                    modelStatus
+                ) {
+
+                    modelStatus.textContent =
+                        error &&
+                        error.message
+                            ? error.message
+                            : "فشل تحديث النماذج";
 
                 }
 
             }
             finally {
 
-                refreshModels.disabled =
+                refreshModelsBtn.disabled =
                     false;
 
             }
@@ -7085,33 +6701,313 @@ if (refreshModels) {
 
 
 // =====================================================
-// Groq Models
+// LOAD MODELS
 // =====================================================
 
-async function loadGroqModels() {
+async function LoadModels(
+    provider
+) {
+
+    const cleanProvider =
+        String(
+            provider ||
+            ""
+        ).toLowerCase();
+
+
+    if (
+        cleanProvider ===
+        "gemini"
+    ) {
+
+        await loadGeminiModels();
+
+        return;
+
+    }
+
+
+    if (
+        cleanProvider ===
+        "openrouter"
+    ) {
+
+        await loadOpenRouterModels();
+
+        return;
+
+    }
+
+
+    if (
+        cleanProvider ===
+        "groq"
+    ) {
+
+        await loadGroqModels();
+
+        return;
+
+    }
+
+
+    if (
+        cleanProvider ===
+        "openai"
+    ) {
+
+        await loadOpenAIModels();
+
+        return;
+
+    }
+
+
+    throw new Error(
+        "مزود غير مدعوم."
+    );
+
+}
+
+
+// =====================================================
+// GEMINI MODELS
+// =====================================================
+
+async function loadGeminiModels() {
+
+    const data =
+        getSavedSettings();
+
 
     const key =
-        apiKey
-            ? String(
-                apiKey.value ||
-                ""
-            ).trim()
-            : "";
+        data.key ||
+        "";
 
 
-    if (!key) {
+    if (
+        !key.trim()
+    ) {
 
         throw new Error(
-            "يرجى إدخال مفتاح Groq أولاً."
+            "أدخل مفتاح Gemini أولًا."
         );
 
     }
 
 
-    if (settingsStatus) {
+    const response =
+        await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            {
 
-        settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج Groq...";
+                method:
+                    "GET",
+
+                headers: {
+
+                    "x-goog-api-key":
+                        key
+
+                }
+
+            }
+        );
+
+
+    const result =
+        await readJSON(
+            response
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل تحميل نماذج Gemini."
+            )
+        );
+
+    }
+
+
+    const models =
+        Array.isArray(
+            result.models
+        )
+            ? result.models
+            : [];
+
+
+    const usableModels =
+        models.filter(
+            function (
+                item
+            ) {
+
+                return (
+                    item &&
+                    item.name &&
+                    (
+                        !item.supportedGenerationMethods ||
+                        item.supportedGenerationMethods.includes(
+                            "generateContent"
+                        )
+                    )
+                );
+
+            }
+        );
+
+
+    fillModelSelect(
+        usableModels.map(
+            function (
+                item
+            ) {
+
+                return {
+
+                    id:
+                        normalizeGeminiModel(
+                            item.name
+                        ),
+
+                    name:
+                        item.displayName ||
+                        normalizeGeminiModel(
+                            item.name
+                        )
+
+                };
+
+            }
+        )
+    );
+
+}
+
+
+// =====================================================
+// OPENROUTER MODELS
+// =====================================================
+
+async function loadOpenRouterModels() {
+
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    const response =
+        await fetch(
+            "https://openrouter.ai/api/v1/models",
+            {
+
+                method:
+                    "GET",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    ...(key.trim()
+                        ? {
+                            "Authorization":
+                                "Bearer " +
+                                key
+                        }
+                        : {})
+
+                }
+
+            }
+        );
+
+
+    const result =
+        await readJSON(
+            response
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل تحميل نماذج OpenRouter."
+            )
+        );
+
+    }
+
+
+    const models =
+        Array.isArray(
+            result.data
+        )
+            ? result.data
+            : [];
+
+
+    fillModelSelect(
+        models.map(
+            function (
+                item
+            ) {
+
+                return {
+
+                    id:
+                        item.id,
+
+                    name:
+                        item.name ||
+                        item.id
+
+                };
+
+            }
+        )
+    );
+
+}
+
+
+// =====================================================
+// GROQ MODELS
+// =====================================================
+
+async function loadGroqModels() {
+
+    const data =
+        getSavedSettings();
+
+
+    const key =
+        data.key ||
+        "";
+
+
+    if (
+        !key.trim()
+    ) {
+
+        throw new Error(
+            "أدخل مفتاح Groq أولًا."
+        );
 
     }
 
@@ -7126,12 +7022,9 @@ async function loadGroqModels() {
 
                 headers: {
 
-                    Authorization:
+                    "Authorization":
                         "Bearer " +
-                        key,
-
-                    "Content-Type":
-                        "application/json"
+                        key
 
                 }
 
@@ -7145,66 +7038,29 @@ async function loadGroqModels() {
         );
 
 
-    if (!response.ok) {
+    if (
+        !response.ok
+    ) {
 
         throw new Error(
             getAPIError(
                 result,
-                "فشل الاتصال بـ Groq."
+                "فشل تحميل نماذج Groq."
             )
-        );
-
-    }
-
-
-    if (
-        !result ||
-        !Array.isArray(
-            result.data
-        )
-    ) {
-
-        throw new Error(
-            "لم تصل قائمة نماذج Groq."
         );
 
     }
 
 
     const models =
-        result.data
-            .filter(
-                function (
-                    item
-                ) {
-
-                    return (
-                        item &&
-                        item.id &&
-                        item.active !== false
-                    );
-
-                }
-            )
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return String(
-                        a.id
-                    ).localeCompare(
-                        String(
-                            b.id
-                        )
-                    );
-
-                }
-            );
+        Array.isArray(
+            result.data
+        )
+            ? result.data
+            : [];
 
 
-    populateModels(
+    fillModelSelect(
         models.map(
             function (
                 item
@@ -7224,223 +7080,31 @@ async function loadGroqModels() {
         )
     );
 
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "✓ تم تحديث نماذج Groq: " +
-            models.length;
-
-    }
-
 }
 
 
 // =====================================================
-// OpenRouter Models
-// =====================================================
-
-async function loadOpenRouterModels() {
-
-    const key =
-        apiKey
-            ? String(
-                apiKey.value ||
-                ""
-            ).trim()
-            : "";
-
-
-    if (!key) {
-
-        throw new Error(
-            "يرجى إدخال مفتاح OpenRouter أولاً."
-        );
-
-    }
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج OpenRouter المجانية...";
-
-    }
-
-
-    const response =
-        await fetch(
-            "https://openrouter.ai/api/v1/models",
-            {
-
-                method:
-                    "GET",
-
-                headers: {
-
-                    Authorization:
-                        "Bearer " +
-                        key,
-
-                    "Content-Type":
-                        "application/json",
-
-                    "HTTP-Referer":
-                        window.location.href,
-
-                    "X-Title":
-                        "Research Tools"
-
-                }
-
-            }
-        );
-
-
-    const result =
-        await readJSON(
-            response
-        );
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenRouter."
-            )
-        );
-
-    }
-
-
-    if (
-        !result ||
-        !Array.isArray(
-            result.data
-        )
-    ) {
-
-        throw new Error(
-            "لم تصل قائمة النماذج من OpenRouter."
-        );
-
-    }
-
-
-    const freeModels =
-        result.data.filter(
-            function (
-                item
-            ) {
-
-                if (
-                    !item ||
-                    !item.id
-                ) {
-
-                    return false;
-
-                }
-
-
-                return String(
-                    item.id
-                ).endsWith(
-                    ":free"
-                );
-
-            }
-        );
-
-
-    const models =
-        freeModels
-            .map(
-                function (
-                    item
-                ) {
-
-                    return {
-
-                        id:
-                            item.id,
-
-                        name:
-                            (
-                                item.name ||
-                                item.id
-                            ) +
-                            " (مجاني)"
-
-                    };
-
-                }
-            )
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return String(
-                        a.name
-                    ).localeCompare(
-                        String(
-                            b.name
-                        ),
-                        "ar"
-                    );
-
-                }
-            );
-
-
-    populateModels(
-        models
-    );
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "✓ تم تحديث النماذج المجانية: " +
-            models.length;
-
-    }
-
-}
-
-
-// =====================================================
-// OpenAI Models
+// OPENAI MODELS
 // =====================================================
 
 async function loadOpenAIModels() {
 
+    const data =
+        getSavedSettings();
+
+
     const key =
-        apiKey
-            ? String(
-                apiKey.value ||
-                ""
-            ).trim()
-            : "";
+        data.key ||
+        "";
 
 
-    if (!key) {
+    if (
+        !key.trim()
+    ) {
 
         throw new Error(
-            "يرجى إدخال مفتاح OpenAI أولاً."
+            "أدخل مفتاح OpenAI أولًا."
         );
-
-    }
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج OpenAI...";
 
     }
 
@@ -7455,12 +7119,9 @@ async function loadOpenAIModels() {
 
                 headers: {
 
-                    Authorization:
+                    "Authorization":
                         "Bearer " +
-                        key,
-
-                    "Content-Type":
-                        "application/json"
+                        key
 
                 }
 
@@ -7474,220 +7135,43 @@ async function loadOpenAIModels() {
         );
 
 
-    if (!response.ok) {
+    if (
+        !response.ok
+    ) {
 
         throw new Error(
             getAPIError(
                 result,
-                "فشل الاتصال بـ OpenAI."
+                "فشل تحميل نماذج OpenAI."
             )
         );
 
     }
 
 
-    if (
-        !result ||
-        !Array.isArray(
+    const models =
+        Array.isArray(
             result.data
         )
-    ) {
-
-        throw new Error(
-            "لم تصل قائمة نماذج OpenAI."
-        );
-
-    }
+            ? result.data
+            : [];
 
 
-    const models =
-        result.data
+    fillModelSelect(
+        models
             .filter(
                 function (
                     item
                 ) {
 
-                    if (
-                        !item ||
-                        !item.id
-                    ) {
-
-                        return false;
-
-                    }
-
-
-                    const id =
-                        String(
-                            item.id
-                        ).toLowerCase();
-
-
                     return (
-                        id.startsWith("gpt-") ||
-                        id.startsWith("o1") ||
-                        id.startsWith("o3") ||
-                        id.startsWith("o4")
-                    );
-
-                }
-            )
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return String(
-                        a.id
-                    ).localeCompare(
-                        String(
-                            b.id
-                        )
-                    );
-
-                }
-            );
-
-
-    populateModels(
-        models.map(
-            function (
-                item
-            ) {
-
-                return {
-
-                    id:
-                        item.id,
-
-                    name:
-                        item.id
-
-                };
-
-            }
-        )
-    );
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "✓ تم تحديث نماذج OpenAI: " +
-            models.length;
-
-    }
-
-}
-
-
-// =====================================================
-// Gemini Models
-// =====================================================
-
-async function loadGeminiModels() {
-
-    const key =
-        apiKey
-            ? String(
-                apiKey.value ||
-                ""
-            ).trim()
-            : "";
-
-
-    if (!key) {
-
-        throw new Error(
-            "يرجى إدخال مفتاح Gemini أولاً."
-        );
-
-    }
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج Gemini...";
-
-    }
-
-
-    const url =
-        "https://generativelanguage.googleapis.com/v1beta/models?key=" +
-        encodeURIComponent(
-            key
-        );
-
-
-    const response =
-        await fetch(
-            url,
-            {
-                method:
-                    "GET"
-            }
-        );
-
-
-    const result =
-        await readJSON(
-            response
-        );
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Gemini."
-            )
-        );
-
-    }
-
-
-    if (
-        !result ||
-        !Array.isArray(
-            result.models
-        )
-    ) {
-
-        throw new Error(
-            "لم تصل قائمة نماذج Gemini."
-        );
-
-    }
-
-
-    const models =
-        result.models
-            .filter(
-                function (
-                    item
-                ) {
-
-                    if (
-                        !item ||
-                        !item.name ||
-                        !Array.isArray(
-                            item.supportedGenerationMethods
-                        )
-                    ) {
-
-                        return false;
-
-                    }
-
-
-                    return (
-                        item.supportedGenerationMethods
-                            .includes(
-                                "generateContent"
+                        item &&
+                        item.id &&
+                        (
+                            item.id.includes(
+                                "gpt"
                             )
+                        )
                     );
 
                 }
@@ -7697,71 +7181,38 @@ async function loadGeminiModels() {
                     item
                 ) {
 
-                    const cleanId =
-                        String(
-                            item.name
-                        ).replace(
-                            /^models\//,
-                            ""
-                        );
-
-
                     return {
 
                         id:
-                            cleanId,
+                            item.id,
 
                         name:
-                            item.displayName
-                                ? item.displayName +
-                                  " — " +
-                                  cleanId
-                                : cleanId
+                            item.id
 
                     };
 
                 }
-            );
-
-
-    populateModels(
-        models
+            )
     );
-
-
-    if (settingsStatus) {
-
-        settingsStatus.innerHTML =
-            "✓ تم تحديث نماذج Gemini: " +
-            models.length;
-
-    }
 
 }
 
 
 // =====================================================
-// Populate Models
+// FILL MODEL SELECT
 // =====================================================
 
-function populateModels(
+function fillModelSelect(
     models
 ) {
 
-    if (!modelSelect) {
+    if (
+        !modelSelect
+    ) {
 
         return;
 
     }
-
-
-    const saved =
-        getSavedSettings();
-
-
-    const savedModel =
-        saved.model ||
-        "";
 
 
     modelSelect.innerHTML =
@@ -7769,45 +7220,35 @@ function populateModels(
 
 
     if (
-        !Array.isArray(
-            models
-        ) ||
+        !Array.isArray(models) ||
         models.length ===
-            0
+        0
     ) {
 
-        const option =
-            document.createElement(
-                "option"
-            );
-
-
-        option.value =
-            "";
-
-
-        option.textContent =
-            "لا توجد نماذج متاحة";
-
-
-        modelSelect.appendChild(
-            option
-        );
-
+        modelSelect.innerHTML = `
+            <option value="">
+                لا توجد نماذج متاحة
+            </option>
+        `;
 
         return;
 
     }
 
 
+    const savedModel =
+        getSavedSettings().model ||
+        "";
+
+
     models.forEach(
         function (
-            item
+            model
         ) {
 
             if (
-                !item ||
-                !item.id
+                !model ||
+                !model.id
             ) {
 
                 return;
@@ -7822,12 +7263,12 @@ function populateModels(
 
 
             option.value =
-                item.id;
+                model.id;
 
 
             option.textContent =
-                item.name ||
-                item.id;
+                model.name ||
+                model.id;
 
 
             modelSelect.appendChild(
@@ -7839,34 +7280,31 @@ function populateModels(
 
 
     if (
-        savedModel
+        savedModel &&
+        Array.from(
+            modelSelect.options
+        ).some(
+            function (
+                option
+            ) {
+
+                return (
+                    option.value ===
+                    savedModel
+                );
+
+            }
+        )
     ) {
 
-        const exists =
-            Array.from(
-                modelSelect.options
-            ).some(
-                function (
-                    option
-                ) {
+        modelSelect.value =
+            savedModel;
 
-                    return (
-                        option.value ===
-                        savedModel
-                    );
+    }
+    else {
 
-                }
-            );
-
-
-        if (
-            exists
-        ) {
-
-            modelSelect.value =
-                savedModel;
-
-        }
+        modelSelect.selectedIndex =
+            0;
 
     }
 
@@ -7874,238 +7312,102 @@ function populateModels(
 
 
 // =====================================================
-// AI Connection Test
+// TEST CONNECTION
 // =====================================================
 
-async function testAIConnection() {
+if (
+    testConnectionBtn
+) {
 
-    const data = {
-
-        provider:
-            provider
-                ? String(
-                    provider.value ||
-                    "openrouter"
-                ).toLowerCase()
-                : "openrouter",
-
-        key:
-            apiKey
-                ? String(
-                    apiKey.value ||
-                    ""
-                ).trim()
-                : "",
-
-        model:
-            modelSelect
-                ? String(
-                    modelSelect.value ||
-                    ""
-                ).trim()
-                : ""
-
-    };
-
-
-    if (
-        !data.key
-    ) {
-
-        throw new Error(
-            "يرجى إدخال مفتاح API أولاً."
-        );
-
-    }
-
-
-    if (
-        !data.model
-    ) {
-
-        throw new Error(
-            "يرجى تحديد نموذج الذكاء الاصطناعي أولاً."
-        );
-
-    }
-
-
-    // ==================================
-    // OpenRouter
-    // ==================================
-
-    if (
-        data.provider ===
-        "openrouter"
-    ) {
-
-        const response =
-            await fetch(
-                "https://openrouter.ai/api/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        Authorization:
-                            "Bearer " +
-                            data.key,
-
-                        "Content-Type":
-                            "application/json",
-
-                        "HTTP-Referer":
-                            window.location.href,
-
-                        "X-Title":
-                            "Research Tools"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                data.model,
-
-                            messages: [
-
-                                {
-
-                                    role:
-                                        "user",
-
-                                    content:
-                                        "أجب بكلمة واحدة فقط: متصل"
-
-                                }
-
-                            ],
-
-                            max_tokens:
-                                10
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (
-            !response.ok
+    testConnectionBtn.onclick =
+        async function (
+            e
         ) {
 
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ OpenRouter."
-                )
-            );
-
-        }
+            e.preventDefault();
+            e.stopPropagation();
 
 
-        return "✓ تم الاتصال بـ OpenRouter بنجاح";
+            try {
 
-    }
+                testConnectionBtn.disabled =
+                    true;
 
 
-    // ==================================
-    // OpenAI
-    // ==================================
+                if (
+                    modelStatus
+                ) {
 
-    if (
-        data.provider ===
-        "openai"
-    ) {
-
-        const response =
-            await fetch(
-                "https://api.openai.com/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        Authorization:
-                            "Bearer " +
-                            data.key,
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                data.model,
-
-                            messages: [
-
-                                {
-
-                                    role:
-                                        "user",
-
-                                    content:
-                                        "أجب بكلمة واحدة فقط: متصل"
-
-                                }
-
-                            ],
-
-                            max_tokens:
-                                10
-
-                        })
+                    modelStatus.textContent =
+                        "جاري اختبار الاتصال...";
 
                 }
-            );
 
 
-        const result =
-            await readJSON(
-                response
-            );
+                saveSettings();
 
 
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ OpenAI."
-                )
-            );
-
-        }
+                await TestAIConnection();
 
 
-        return "✓ تم الاتصال بـ OpenAI بنجاح";
+                if (
+                    modelStatus
+                ) {
 
-    }
+                    modelStatus.textContent =
+                        "تم الاتصال بنجاح";
+
+                }
+
+            }
+            catch (
+                error
+            ) {
+
+                if (
+                    modelStatus
+                ) {
+
+                    modelStatus.textContent =
+                        error &&
+                        error.message
+                            ? error.message
+                            : "فشل الاتصال";
+
+                }
+
+            }
+            finally {
+
+                testConnectionBtn.disabled =
+                    false;
+
+            }
+
+        };
+
+}
 
 
-    // ==================================
-    // Gemini
-    // ==================================
+// =====================================================
+// TEST AI CONNECTION
+// =====================================================
+
+async function TestAIConnection() {
+
+    const data =
+        getSavedSettings();
+
+
+    const provider =
+        String(
+            data.provider ||
+            ""
+        ).toLowerCase();
+
 
     if (
-        data.provider ===
+        provider ===
         "gemini"
     ) {
 
@@ -8115,58 +7417,20 @@ async function testAIConnection() {
             );
 
 
-        const url =
-            "https://generativelanguage.googleapis.com/v1beta/models/" +
-            encodeURIComponent(
-                model
-            ) +
-            ":generateContent?key=" +
-            encodeURIComponent(
-                data.key
-            );
-
-
         const response =
             await fetch(
-                url,
+                "https://generativelanguage.googleapis.com/v1beta/models/" +
+                encodeURIComponent(
+                    model
+                ),
                 {
-
-                    method:
-                        "POST",
 
                     headers: {
 
-                        "Content-Type":
-                            "application/json"
+                        "x-goog-api-key":
+                            data.key
 
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            contents: [
-
-                                {
-
-                                    role:
-                                        "user",
-
-                                    parts: [
-
-                                        {
-
-                                            text:
-                                                "أجب بكلمة واحدة فقط: متصل"
-
-                                        }
-
-                                    ]
-
-                                }
-
-                            ]
-
-                        })
+                    }
 
                 }
             );
@@ -8192,77 +7456,89 @@ async function testAIConnection() {
         }
 
 
-        return "✓ تم الاتصال بـ Gemini بنجاح";
+        return true;
 
     }
 
 
-    // ==================================
-    // Groq
-    // ==================================
-
     if (
-        data.provider ===
-        "groq"
+        provider ===
+        "openrouter"
     ) {
 
         const response =
             await fetch(
-                "https://api.groq.com/openai/v1/chat/completions",
+                "https://openrouter.ai/api/v1/models",
                 {
-
-                    method:
-                        "POST",
 
                     headers: {
 
-                        Authorization:
+                        "Authorization":
                             "Bearer " +
-                            data.key,
+                            data.key
 
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                data.model,
-
-                            messages: [
-
-                                {
-
-                                    role:
-                                        "user",
-
-                                    content:
-                                        "أجب بكلمة واحدة فقط: متصل"
-
-                                }
-
-                            ],
-
-                            max_tokens:
-                                10
-
-                        })
+                    }
 
                 }
-            );
-
-
-        const result =
-            await readJSON(
-                response
             );
 
 
         if (
             !response.ok
         ) {
+
+            const result =
+                await readJSON(
+                    response
+                );
+
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ OpenRouter."
+                )
+            );
+
+        }
+
+
+        return true;
+
+    }
+
+
+    if (
+        provider ===
+        "groq"
+    ) {
+
+        const response =
+            await fetch(
+                "https://api.groq.com/openai/v1/models",
+                {
+
+                    headers: {
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key
+
+                    }
+
+                }
+            );
+
+
+        if (
+            !response.ok
+        ) {
+
+            const result =
+                await readJSON(
+                    response
+                );
+
 
             throw new Error(
                 getAPIError(
@@ -8274,7 +7550,54 @@ async function testAIConnection() {
         }
 
 
-        return "✓ تم الاتصال بـ Groq بنجاح";
+        return true;
+
+    }
+
+
+    if (
+        provider ===
+        "openai"
+    ) {
+
+        const response =
+            await fetch(
+                "https://api.openai.com/v1/models",
+                {
+
+                    headers: {
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key
+
+                    }
+
+                }
+            );
+
+
+        if (
+            !response.ok
+        ) {
+
+            const result =
+                await readJSON(
+                    response
+                );
+
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ OpenAI."
+                )
+            );
+
+        }
+
+
+        return true;
 
     }
 
@@ -8287,646 +7610,870 @@ async function testAIConnection() {
 
 
 // =====================================================
-// Test Connection Button
+// NEW SEARCH ENGINE
+// محرك البحث الجديد باستخدام Orama
 // =====================================================
 
-if (testConnection) {
-
-    testConnection.onclick =
-        async function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
+let oramaRetrievalDb =
+    null;
 
 
-            testConnection.disabled =
-                true;
+let oramaRetrievalCacheKey =
+    "";
 
 
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "⏳ جاري اختبار الاتصال...";
-
-            }
-
-
-            try {
-
-                const message =
-                    await testAIConnection();
-
-
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        message;
-
-                }
-
-            }
-            catch (error) {
-
-                if (settingsStatus) {
-
-                    settingsStatus.innerHTML =
-                        "⚠ " +
-                        (
-                            error &&
-                            error.message
-                                ? error.message
-                                : "تعذر الاتصال"
-                        );
-
-                }
-
-            }
-            finally {
-
-                testConnection.disabled =
-                    false;
-
-            }
-
-        };
-
-}
+let oramaRetrievalDocumentId =
+    null;
 
 
 // =====================================================
-// Retrieval Profile
-// تحديد طبيعة السؤال
+// LOAD ORAMA MODULE
+// تحميل محرك Orama بطريقة متوافقة مع Webpack
 // =====================================================
 
-function getRetrievalProfile(
-    query
-) {
-
-    const text =
-        normalizeSearchText(
-            query
-        );
-
-
-    const profile = {
-
-        type:
-            "general",
-
-        maxResults:
-            8,
-
-        maxChars:
-            8000
-
-    };
-
-
-    // ==================================
-    // تعريف
-    // ==================================
+async function getOramaModule() {
 
     if (
-        /ماهو|ماهى|ماهي|ما هي|المقصود|معنى|تعريف|يقصد ب|المراد ب/
-            .test(
-                text
-            )
+        window.__researchOramaModule
     ) {
 
-        profile.type =
-            "definition";
-
-        profile.maxResults =
-            5;
-
-        profile.maxChars =
-            6000;
-
-        return profile;
-
-    }
-
-
-    // ==================================
-    // أثر
-    // ==================================
-
-    if (
-        /اثر|أثر|تاثير|تأثير|نتائج|ينتج عن|يترتب على|انعكاس/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "effect";
-
-        profile.maxResults =
-            8;
-
-        profile.maxChars =
-            9000;
-
-        return profile;
-
-    }
-
-
-    // ==================================
-    // مقارنة
-    // ==================================
-
-    if (
-        /الفرق|الفروق|مقارنة|يقارن|ما الفرق|التمييز بين|يفترق/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "comparison";
-
-        profile.maxResults =
-            10;
-
-        profile.maxChars =
-            10000;
-
-        return profile;
-
-    }
-
-
-    // ==================================
-    // أسباب
-    // ==================================
-
-    if (
-        /لماذا|سبب|اسباب|أسباب|علة|علل|لأن|لان|بسبب/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "causes";
-
-        profile.maxResults =
-            8;
-
-        profile.maxChars =
-            9000;
-
-        return profile;
-
-    }
-
-
-    // ==================================
-    // موقع / موضع
-    // ==================================
-
-    if (
-        /اين|أين|موضع|موضعه|الفصل|المبحث|المطلب|الصفحة/
-            .test(
-                text
-            )
-    ) {
-
-        profile.type =
-            "location";
-
-        profile.maxResults =
-            6;
-
-        profile.maxChars =
-            6000;
-
-        return profile;
-
-    }
-
-
-    return profile;
-
-}
-
-
-// =====================================================
-// Retrieval Limits
-// تحديد حجم السياق
-// =====================================================
-
-function getRetrievalLimits(
-    providerName,
-    modelName
-) {
-
-    const providerValue =
-        String(
-            providerName ||
-            ""
-        ).toLowerCase();
-
-
-    if (
-        providerValue ===
-        "groq"
-    ) {
-
-        return {
-
-            maxResults:
-                4,
-
-            maxChars:
-                3500
-
-        };
-
-    }
-
-
-    if (
-        providerValue ===
-        "openrouter"
-    ) {
-
-        return {
-
-            maxResults:
-                5,
-
-            maxChars:
-                5000
-
-        };
-
-    }
-
-
-    if (
-        providerValue ===
-        "gemini"
-    ) {
-
-        return {
-
-            maxResults:
-                6,
-
-            maxChars:
-                6000
-
-        };
-
-    }
-
-
-    if (
-        providerValue ===
-        "openai"
-    ) {
-
-        return {
-
-            maxResults:
-                6,
-
-            maxChars:
-                6000
-
-        };
-
-    }
-
-
-    return {
-
-        maxResults:
-            4,
-
-        maxChars:
-            3500
-
-    };
-
-}
-
-
-// =====================================================
-// Estimate Tokens
-// =====================================================
-
-function estimateTokenCount(
-    text
-) {
-
-    return Math.ceil(
-        String(
-            text ||
-            ""
-        ).length /
-        4
-    );
-
-}
-
-
-// =====================================================
-// Build AI Document Context
-// يستخدم Orama عبر searchIndexedDocument
-// =====================================================
-
-async function buildAIDocumentContext(
-    query
-) {
-
-    if (!currentDocument) {
-
-        currentCitationSources =
-            [];
-
-
-        return {
-
-            found:
-                false,
-
-            query:
-                query,
-
-            profile:
-                "general",
-
-            text:
-                ""
-
-        };
+        return window.__researchOramaModule;
 
     }
 
 
     try {
 
-        const retrievalProfile =
-            getRetrievalProfile(
-                query
-            );
-
-
-        const settings =
-            getSavedSettings();
-
-
-        const retrievalLimits =
-            getRetrievalLimits(
-                settings.provider,
-                settings.model
-            );
-
-
-        let maxResults =
-            retrievalLimits.maxResults;
-
-
-        let maxChars =
-            retrievalLimits.maxChars;
-
-
         if (
-            retrievalProfile.type ===
-            "comparison"
+            typeof require !==
+            "function"
         ) {
 
-            maxResults =
-                Math.min(
-                    maxResults + 1,
-                    6
-                );
-
-
-            maxChars =
-                Math.min(
-                    maxChars + 1000,
-                    6500
-                );
+            throw new Error(
+                "Webpack require غير متاح."
+            );
 
         }
 
 
-        // ==================================
-        // Orama هو محرك البحث الأساسي
-        // ==================================
-
-        const searchResult =
-            await searchIndexedDocument(
-                currentDocument.id,
-                query,
-                {
-
-                    profile:
-                        retrievalProfile.type,
-
-                    maxResults:
-                        Math.max(
-                            maxResults * 2,
-                            10
-                        ),
-
-                    headingParagraphs:
-                        3
-
-                }
+        const module =
+            require(
+                "@orama/orama"
             );
 
 
         if (
-            !searchResult ||
-            !Array.isArray(
-                searchResult.results
-            ) ||
-            searchResult.results.length ===
-                0
+            !module
         ) {
 
-            currentCitationSources =
-                [];
+            throw new Error(
+                "تعذر تحميل @orama/orama."
+            );
+
+        }
 
 
-            return {
+        window.__researchOramaModule =
+            module;
 
-                found:
-                    false,
 
-                query:
-                    query,
+        return module;
 
-                profile:
-                    retrievalProfile.type,
+    }
+    catch (
+        error
+    ) {
+
+        console.error(
+            "تعذر تحميل محرك Orama:",
+            error
+        );
+
+
+        return null;
+
+    }
+
+}
+
+
+// =====================================================
+// BUILD NEW SEARCH INDEX
+// بناء فهرس البحث الجديد
+// =====================================================
+
+async function buildNewSearchIndex(
+    documentItem
+) {
+
+    if (
+        !documentItem
+    ) {
+
+        return null;
+
+    }
+
+
+    // ==================================
+    // تحميل بنية المستند الفعلية
+    // ==================================
+
+    const structureData =
+        await ensureDocumentStructure(
+            documentItem
+        );
+
+
+    if (
+        !structureData ||
+        !Array.isArray(
+            structureData.paragraphs
+        )
+    ) {
+
+        console.warn(
+            "لا توجد فقرات صالحة لبناء فهرس Orama."
+        );
+
+
+        return null;
+
+    }
+
+
+    const paragraphs =
+        structureData.paragraphs;
+
+
+    // ==================================
+    // تحميل Orama
+    // ==================================
+
+    const module =
+        await getOramaModule();
+
+
+    if (
+        !module
+    ) {
+
+        return null;
+
+    }
+
+
+    const create =
+        module.create ||
+        (
+            module.default &&
+            module.default.create
+        );
+
+
+    const insertMultiple =
+        module.insertMultiple ||
+        (
+            module.default &&
+            module.default.insertMultiple
+        );
+
+
+    if (
+        typeof create !==
+        "function" ||
+        typeof insertMultiple !==
+        "function"
+    ) {
+
+        throw new Error(
+            "دوال Orama المطلوبة غير متاحة."
+        );
+
+    }
+
+
+    // ==================================
+    // إنشاء قاعدة البيانات
+    // ==================================
+
+    const db =
+        create({
+
+            schema: {
+
+                id:
+                    "string",
 
                 text:
-                    ""
+                    "string",
 
-            };
+                heading:
+                    "string",
 
-        }
+                paragraphIndex:
+                    "number",
 
+                headingIndex:
+                    "number",
 
-        const retrieval =
-            buildRetrievalContext(
-                searchResult,
-                {
+                headingLevel:
+                    "string",
 
-                    maxResults:
-                        maxResults,
+                isHeading:
+                    "boolean"
 
-                    maxChars:
-                        maxChars,
+            },
 
-                    includeNeighbors:
-                        true
+            language:
+                "arabic"
 
-                }
-            );
-
-
-        if (
-            !retrieval ||
-            !retrieval.text
-        ) {
-
-            currentCitationSources =
-                [];
+        });
 
 
-            return {
+    // ==================================
+    // ترتيب العناوين
+    // ==================================
 
-                found:
-                    false,
-
-                query:
-                    query,
-
-                profile:
-                    retrievalProfile.type,
-
-                text:
-                    ""
-
-            };
-
-        }
-
-
-        // ==================================
-        // مصادر الإحالات
-        // ==================================
-
-        currentCitationSources =
-            Array.isArray(
-                retrieval.contexts
-            )
-                ? retrieval.contexts.map(
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+                .filter(
                     function (
-                        item
+                        heading
                     ) {
 
-                        return {
-
-                            rank:
-                                item.rank,
-
-                            paragraphIndex:
-                                item.paragraphIndex,
-
-                            heading:
-                                item.heading ||
-                                "",
-
-                            mainParagraph:
-                                item.mainParagraph ||
-                                "",
-
-                            text:
-                                item.context ||
-                                item.mainParagraph ||
+                        return (
+                            heading &&
+                            typeof heading.index !==
+                                "undefined" &&
+                            String(
+                                heading.text ||
                                 ""
-
-                        };
+                            ).trim()
+                        );
 
                     }
                 )
-                : [];
+                .sort(
+                    function (
+                        a,
+                        b
+                    ) {
 
+                        return (
+                            Number(
+                                a.index
+                            ) -
+                            Number(
+                                b.index
+                            )
+                        );
 
-        return {
-
-            found:
-                true,
-
-            query:
-                query,
-
-            profile:
-                retrievalProfile.type,
-
-            resultCount:
-                Number(
-                    searchResult.count ||
-                    0
-                ),
-
-            selectedCount:
-                Number(
-                    retrieval.selectedCount ||
-                    0
-                ),
-
-            totalOccurrences:
-                Number(
-                    retrieval.totalOccurrences ||
-                    0
-                ),
-
-            matchedFamilies:
-                Array.isArray(
-                    searchResult.matchedFamilies
+                    }
                 )
-                    ? searchResult.matchedFamilies
-                    : [],
+            : [];
 
-            matchedTerms:
-                Array.isArray(
-                    searchResult.matchedTerms
-                )
-                    ? searchResult.matchedTerms
-                    : [],
 
-            contexts:
-                Array.isArray(
-                    retrieval.contexts
-                )
-                    ? retrieval.contexts
-                    : [],
+    // ==================================
+    // خريطة العناوين
+    // ==================================
 
-            text:
-                retrieval.text ||
-                ""
+    const headingMap =
+        new Map();
 
-        };
+
+    headings.forEach(
+        function (
+            heading
+        ) {
+
+            headingMap.set(
+                Number(
+                    heading.index
+                ),
+                heading
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // العثور على أقرب عنوان
+    // ==================================
+
+    function getParagraphHeading(
+        paragraphIndex
+    ) {
+
+        // الفقرة نفسها عنوان
+        if (
+            headingMap.has(
+                paragraphIndex
+            )
+        ) {
+
+            return headingMap.get(
+                paragraphIndex
+            );
+
+        }
+
+
+        // أقرب عنوان سابق
+        for (
+            let i =
+                headings.length - 1;
+
+            i >= 0;
+
+            i--
+        ) {
+
+            const heading =
+                headings[i];
+
+
+            if (
+                Number(
+                    heading.index
+                ) <
+                paragraphIndex
+            ) {
+
+                return heading;
+
+            }
+
+        }
+
+
+        return null;
 
     }
-    catch (error) {
+
+
+    // ==================================
+    // بناء سجلات Orama
+    // ==================================
+
+    const records =
+        [];
+
+
+    paragraphs.forEach(
+        function (
+            paragraph
+        ) {
+
+            if (
+                !paragraph
+            ) {
+
+                return;
+
+            }
+
+
+            const text =
+                String(
+                    paragraph.text ||
+                    ""
+                ).trim();
+
+
+            if (
+                !text
+            ) {
+
+                return;
+
+            }
+
+
+            const paragraphIndex =
+                Number(
+                    paragraph.index
+                );
+
+
+            const heading =
+                getParagraphHeading(
+                    paragraphIndex
+                );
+
+
+            const isHeading =
+                Boolean(
+                    heading &&
+                    Number(
+                        heading.index
+                    ) ===
+                    paragraphIndex
+                );
+
+
+            records.push({
+
+                id:
+                    "p-" +
+                    String(
+                        paragraphIndex
+                    ),
+
+                text:
+                    text,
+
+                heading:
+                    heading
+                        ? String(
+                            heading.text ||
+                            ""
+                        ).trim()
+                        : "",
+
+                paragraphIndex:
+                    paragraphIndex,
+
+                headingIndex:
+                    heading
+                        ? Number(
+                            heading.index
+                        )
+                        : -1,
+
+                headingLevel:
+                    heading
+                        ? String(
+                            heading.style ||
+                            ""
+                        )
+                        : "",
+
+                isHeading:
+                    isHeading
+
+            });
+
+        }
+    );
+
+
+    // ==================================
+    // إدخال جميع السجلات دفعة واحدة
+    // ==================================
+
+    if (
+        records.length >
+        0
+    ) {
+
+        await insertMultiple(
+            db,
+            records
+        );
+
+    }
+
+
+    // ==================================
+    // بناء مفتاح الذاكرة
+    // ==================================
+
+    const cacheKey =
+        [
+
+            String(
+                documentItem.id
+            ),
+
+            String(
+                documentItem.indexUpdatedAt ||
+                ""
+            ),
+
+            String(
+                paragraphs.length
+            ),
+
+            String(
+                headings.length
+            )
+
+        ].join(
+            "|"
+        );
+
+
+    // ==================================
+    // حفظ الفهرس في الذاكرة
+    // ==================================
+
+    oramaRetrievalDb =
+        db;
+
+
+    oramaRetrievalCacheKey =
+        cacheKey;
+
+
+    oramaRetrievalDocumentId =
+        String(
+            documentItem.id
+        );
+
+
+    console.log(
+        "تم بناء فهرس Orama الجديد:",
+        {
+
+            documentId:
+                documentItem.id,
+
+            paragraphs:
+                records.length,
+
+            headings:
+                headings.length
+
+        }
+    );
+
+
+    return db;
+
+}
+
+
+// =====================================================
+// ENSURE NEW SEARCH INDEX
+// التأكد من وجود فهرس Orama حديث
+// =====================================================
+
+async function ensureNewSearchIndex(
+    documentItem
+) {
+
+    if (
+        !documentItem
+    ) {
+
+        return null;
+
+    }
+
+
+    const structureData =
+        await ensureDocumentStructure(
+            documentItem
+        );
+
+
+    if (
+        !structureData
+    ) {
+
+        return null;
+
+    }
+
+
+    const paragraphs =
+        Array.isArray(
+            structureData.paragraphs
+        )
+            ? structureData.paragraphs
+            : [];
+
+
+    const headings =
+        Array.isArray(
+            structureData.headings
+        )
+            ? structureData.headings
+            : [];
+
+
+    const expectedCacheKey =
+        [
+
+            String(
+                documentItem.id
+            ),
+
+            String(
+                documentItem.indexUpdatedAt ||
+                ""
+            ),
+
+            String(
+                paragraphs.length
+            ),
+
+            String(
+                headings.length
+            )
+
+        ].join(
+            "|"
+        );
+
+
+    // ==================================
+    // استخدام الفهرس الموجود
+    // ==================================
+
+    if (
+        oramaRetrievalDb &&
+        oramaRetrievalCacheKey ===
+            expectedCacheKey &&
+        String(
+            oramaRetrievalDocumentId
+        ) ===
+        String(
+            documentItem.id
+        )
+    ) {
+
+        return oramaRetrievalDb;
+
+    }
+
+
+    // ==================================
+    // إعادة البناء
+    // ==================================
+
+    return await buildNewSearchIndex(
+        documentItem
+    );
+
+}
+
+
+// =====================================================
+// SEARCH DOCUMENT WITH NEW ENGINE
+// البحث في المستند باستخدام Orama
+// =====================================================
+
+async function searchDocumentWithNewEngine(
+    query,
+    documentItem,
+    limit
+) {
+
+    const cleanQuery =
+        String(
+            query ||
+            ""
+        ).trim();
+
+
+    if (
+        !cleanQuery ||
+        !documentItem
+    ) {
+
+        return [];
+
+    }
+
+
+    // ==================================
+    // التأكد من وجود الفهرس
+    // ==================================
+
+    const db =
+        await ensureNewSearchIndex(
+            documentItem
+        );
+
+
+    if (
+        !db
+    ) {
+
+        return [];
+
+    }
+
+
+    // ==================================
+    // تحميل دالة البحث
+    // ==================================
+
+    const module =
+        await getOramaModule();
+
+
+    if (
+        !module
+    ) {
+
+        return [];
+
+    }
+
+
+    const search =
+        module.search ||
+        (
+            module.default &&
+            module.default.search
+        );
+
+
+    if (
+        typeof search !==
+        "function"
+    ) {
+
+        throw new Error(
+            "دالة search في Orama غير متاحة."
+        );
+
+    }
+
+
+    // ==================================
+    // تنفيذ البحث
+    // ==================================
+
+    const result =
+        await search(
+            db,
+            {
+
+                term:
+                    cleanQuery,
+
+                properties: [
+
+                    "text",
+
+                    "heading"
+
+                ],
+
+                limit:
+                    Math.max(
+                        1,
+                        Number(
+                            limit ||
+                            8
+                        )
+                    ),
+
+                tolerance:
+                    1
+
+            }
+        );
+
+
+    if (
+        !result ||
+        !Array.isArray(
+            result.hits
+        )
+    ) {
+
+        return [];
+
+    }
+
+
+    // ==================================
+    // تحويل النتائج
+    // ==================================
+
+    return result.hits.map(
+        function (
+            hit,
+            index
+        ) {
+
+            const document =
+                hit.document ||
+                {};
+
+
+            return {
+
+                rank:
+                    index + 1,
+
+                paragraphIndex:
+                    Number(
+                        document.paragraphIndex ||
+                        0
+                    ),
+
+                paragraphId:
+                    document.id ||
+                    "",
+
+                heading:
+                    String(
+                        document.heading ||
+                        ""
+                    ),
+
+                headingIndex:
+                    Number(
+                        document.headingIndex ||
+                        -1
+                    ),
+
+                headingLevel:
+                    String(
+                        document.headingLevel ||
+                        ""
+                    ),
+
+                isHeading:
+                    Boolean(
+                        document.isHeading
+                    ),
+
+                text:
+                    String(
+                        document.text ||
+                        ""
+                    ),
+
+                score:
+                    Number(
+                        hit.score ||
+                        0
+                    )
+
+            };
+
+        }
+    );
+
+}
+
+
+// =====================================================
+// BUILD AI DOCUMENT CONTEXT
+// بناء سياق المستند من نتائج Orama
+// =====================================================
+
+async function buildAIDocumentContext(
+    question
+) {
+
+    if (
+        !currentDocument
+    ) {
 
         currentCitationSources =
             [];
-
-
-        console.warn(
-            "تعذر استرجاع سياق المستند عبر Orama:",
-            error
-        );
 
 
         return {
@@ -8935,623 +8482,675 @@ async function buildAIDocumentContext(
                 false,
 
             query:
-                query,
-
-            profile:
-                "general",
+                String(
+                    question ||
+                    ""
+                ),
 
             text:
-                ""
+                "",
+
+            sources:
+                [],
+
+            resultCount:
+                0,
+
+            selectedCount:
+                0
 
         };
 
     }
 
-}
 
-
-// =====================================================
-// AI Request
-// الطلب غير المتدفق
-// =====================================================
-
-async function askAI(
-    text
-) {
-
-    const data =
-        getSavedSettings();
-
-
-    const selectedProvider =
+    const cleanQuestion =
         String(
-            data.provider ||
-            "openrouter"
-        ).toLowerCase();
-
-
-    const key =
-        String(
-            data.key ||
+            question ||
             ""
         ).trim();
-
-
-    const model =
-        String(
-            data.model ||
-            ""
-        ).trim();
-
-
-    if (!key) {
-
-        throw new Error(
-            "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
-        );
-
-    }
-
-
-    if (!model) {
-
-        throw new Error(
-            "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
-        );
-
-    }
-
-
-    // ==================================
-    // أولًا نسترجع سياق المستند
-    // قبل حساب تاريخ المحادثة
-    // ==================================
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
-
-
-    const conversationMessages =
-        [];
-
-
-    const historyLimit =
-        documentContext &&
-        documentContext.found
-            ? 2
-            : 4;
 
 
     if (
-        currentChat &&
-        Array.isArray(
-            currentChat.messages
-        )
+        !cleanQuestion
     ) {
 
-        const previousMessages =
-            currentChat.messages.slice(
-                -historyLimit
+        currentCitationSources =
+            [];
+
+
+        return {
+
+            found:
+                false,
+
+            query:
+                "",
+
+            text:
+                "",
+
+            sources:
+                [],
+
+            resultCount:
+                0,
+
+            selectedCount:
+                0
+
+        };
+
+    }
+
+
+    // ==================================
+    // تحديد نوع السؤال
+    // ==================================
+
+    const retrievalProfile =
+        typeof getRetrievalProfile ===
+            "function"
+                ? getRetrievalProfile(
+                    cleanQuestion
+                )
+                : {
+
+                    type:
+                        "general",
+
+                    maxResults:
+                        8,
+
+                    maxChars:
+                        8000
+
+                };
+
+
+    // ==================================
+    // عدد النتائج
+    // ==================================
+
+    const requestedLimit =
+        retrievalProfile &&
+        typeof retrievalProfile.maxResults ===
+            "number"
+                ? retrievalProfile.maxResults
+                : 8;
+
+
+    const results =
+        await searchDocumentWithNewEngine(
+            cleanQuestion,
+            currentDocument,
+            Math.max(
+                10,
+                requestedLimit
+            )
+        );
+
+
+    if (
+        !results ||
+        results.length ===
+            0
+    ) {
+
+        currentCitationSources =
+            [];
+
+
+        return {
+
+            found:
+                false,
+
+            query:
+                cleanQuestion,
+
+            profile:
+                retrievalProfile.type,
+
+            text:
+                "",
+
+            sources:
+                [],
+
+            resultCount:
+                0,
+
+            selectedCount:
+                0
+
+        };
+
+    }
+
+
+    // ==================================
+    // منع التكرار
+    // ==================================
+
+    const selected =
+        [];
+
+
+    const selectedParagraphs =
+        new Set();
+
+
+    const maxResults =
+        Math.max(
+            1,
+            requestedLimit
+        );
+
+
+    for (
+        let i = 0;
+
+        i <
+        results.length &&
+        selected.length <
+            maxResults;
+
+        i++
+    ) {
+
+        const item =
+            results[i];
+
+
+        if (
+            !item
+        ) {
+
+            continue;
+
+        }
+
+
+        const paragraphKey =
+            String(
+                item.paragraphIndex
             );
 
 
-        previousMessages.forEach(
+        if (
+            selectedParagraphs.has(
+                paragraphKey
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        selectedParagraphs.add(
+            paragraphKey
+        );
+
+
+        selected.push(
+            item
+        );
+
+    }
+
+
+    // ==================================
+    // بناء مصادر الإحالات
+    // ==================================
+
+    currentCitationSources =
+        selected.map(
             function (
-                msg
+                item,
+                index
             ) {
 
-                if (
-                    !msg ||
-                    !msg.text
-                ) {
+                return {
 
-                    return;
+                    rank:
+                        index + 1,
 
-                }
+                    paragraphIndex:
+                        item.paragraphIndex,
 
+                    paragraphId:
+                        item.paragraphId ||
+                        "",
 
-                let messageText =
-                    String(
-                        msg.text
-                    ).trim();
+                    heading:
+                        item.heading ||
+                        "",
 
+                    mainParagraph:
+                        item.text ||
+                        "",
 
-                const maxHistoryChars =
-                    documentContext &&
-                    documentContext.found
-                        ? 1000
-                        : 1500;
+                    text:
+                        item.text ||
+                        "",
 
+                    score:
+                        item.score ||
+                        0
 
-                if (
-                    messageText.length >
-                    maxHistoryChars
-                ) {
-
-                    messageText =
-                        messageText.substring(
-                            0,
-                            maxHistoryChars
-                        ) +
-                        "…";
-
-                }
-
-
-                conversationMessages.push({
-
-                    role:
-                        msg.role ===
-                        "ai"
-                            ? "assistant"
-                            : "user",
-
-                    content:
-                        messageText
-
-                });
+                };
 
             }
         );
 
-    }
-
 
     // ==================================
-    // محتوى السؤال
+    // بناء سياق النموذج
     // ==================================
 
-    let userContent =
-        text;
+    const textParts =
+        [];
 
 
-    if (
-        documentContext &&
-        documentContext.found
-    ) {
+    selected.forEach(
+        function (
+            item,
+            index
+        ) {
 
-        userContent =
-            [
+            const block =
+                [
 
-                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
-                "",
-
-                "=== سؤال المستخدم ===",
-                text,
-
-                "",
-
-                "=== بيانات المستند ===",
-                "اسم المستند: " +
+                    "[مقطع " +
                     (
-                        currentDocument
-                            ? currentDocument.name
-                            : ""
-                    ),
+                        index + 1
+                    ) +
+                    "]",
 
-                "نوع الاسترجاع: " +
-                    documentContext.profile,
+                    item.heading
+                        ? "العنوان: " +
+                          item.heading
+                        : "",
 
-                "العائلات المطابقة: " +
-                    (
-                        documentContext.matchedFamilies &&
-                        documentContext.matchedFamilies.length
-                            ? documentContext.matchedFamilies.join("، ")
-                            : "لا توجد"
-                    ),
+                    "المقطع: " +
+                    String(
+                        item.text ||
+                        ""
+                    ).trim()
 
-                "",
+                ]
+                .filter(
+                    function (
+                        value
+                    ) {
 
-                "=== المادة المستخرجة ===",
-                documentContext.text,
+                        return Boolean(
+                            String(
+                                value ||
+                                ""
+                            ).trim()
+                        );
 
-                "",
-
-                "=== قواعد الإجابة ===",
-                "اعتمد على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
-                "استخرج الأفكار المرتبطة بالسؤال فقط.",
-                "ادمج الأفكار المتشابهة.",
-                "أجب عن جميع جوانب السؤال التي تدعمها المادة.",
-                "لا تضف معلومة غير موجودة في المادة المستخرجة.",
-                "إذا لم تكف المادة للإجابة عن جزء من السؤال، صرّح بذلك.",
-                "لا تستخدم المعرفة العامة لسد النقص إلا إذا طلب المستخدم ذلك صراحة.",
-                "حافظ على العربية والأسلوب الأكاديمي.",
-                "ضع الإحالات بصيغة [مقطع X].",
-                "لا تخترع أرقام المقاطع.",
-                "قدّم إجابة تركيبية لا تلخيصًا منفصلًا لكل مقطع.",
-                "استبعد المقاطع التي تحتوي كلمات السؤال دون أن تجيب عنه مباشرة."
-
-            ].join(
-                "\n"
-            );
-
-    }
-
-
-    conversationMessages.push({
-
-        role:
-            "user",
-
-        content:
-            userContent
-
-    });
-
-
-    // ==================================
-    // OpenRouter
-    // ==================================
-
-    if (
-        selectedProvider ===
-        "openrouter"
-    ) {
-
-        const response =
-            await fetch(
-                "https://openrouter.ai/api/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json",
-
-                        Authorization:
-                            "Bearer " +
-                            key,
-
-                        "HTTP-Referer":
-                            window.location.href,
-
-                        "X-Title":
-                            "Research Tools"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                model,
-
-                            messages:
-                                conversationMessages,
-
-                            max_tokens:
-                                8000,
-
-                            temperature:
-                                0.2
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ OpenRouter."
+                    }
                 )
-            );
+                .join(
+                    "\n"
+                );
+
+
+            if (
+                block
+            ) {
+
+                textParts.push(
+                    block
+                );
+
+            }
 
         }
-
-
-        return extractOpenAIStyleAnswer(
-            result,
-            "OpenRouter"
-        );
-
-    }
-
-
-    // ==================================
-    // OpenAI
-    // ==================================
-
-    if (
-        selectedProvider ===
-        "openai"
-    ) {
-
-        const response =
-            await fetch(
-                "https://api.openai.com/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json",
-
-                        Authorization:
-                            "Bearer " +
-                            key
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                model,
-
-                            messages:
-                                conversationMessages,
-
-                            max_tokens:
-                                8000,
-
-                            temperature:
-                                0.2
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ OpenAI."
-                )
-            );
-
-        }
-
-
-        return extractOpenAIStyleAnswer(
-            result,
-            "OpenAI"
-        );
-
-    }
-
-
-    // ==================================
-    // Gemini
-    // ==================================
-
-    if (
-        selectedProvider ===
-        "gemini"
-    ) {
-
-        const cleanModel =
-            normalizeGeminiModel(
-                model
-            );
-
-
-        const url =
-            "https://generativelanguage.googleapis.com/v1beta/models/" +
-            encodeURIComponent(
-                cleanModel
-            ) +
-            ":generateContent?key=" +
-            encodeURIComponent(
-                key
-            );
-
-
-        const contents =
-            conversationMessages.map(
-                function (
-                    msg
-                ) {
-
-                    return {
-
-                        role:
-                            msg.role ===
-                            "assistant"
-                                ? "model"
-                                : "user",
-
-                        parts: [
-
-                            {
-
-                                text:
-                                    msg.content
-
-                            }
-
-                        ]
-
-                    };
-
-                }
-            );
-
-
-        const response =
-            await fetch(
-                url,
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            contents:
-                                contents
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Gemini."
-                )
-            );
-
-        }
-
-
-        return extractGeminiAnswer(
-            result
-        );
-
-    }
-
-
-    // ==================================
-    // Groq
-    // ==================================
-
-    if (
-        selectedProvider ===
-        "groq"
-    ) {
-
-        const response =
-            await fetch(
-                "https://api.groq.com/openai/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json",
-
-                        Authorization:
-                            "Bearer " +
-                            key
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                model,
-
-                            messages:
-                                conversationMessages,
-
-                            max_tokens:
-                                3000,
-
-                            temperature:
-                                0.2
-
-                        })
-
-                }
-            );
-
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Groq."
-                )
-            );
-
-        }
-
-
-        return extractOpenAIStyleAnswer(
-            result,
-            "Groq"
-        );
-
-    }
-
-
-    throw new Error(
-        "مزود الذكاء الاصطناعي غير معروف: " +
-        selectedProvider
     );
+
+
+    const contextText =
+        textParts.join(
+            "\n\n---\n\n"
+        );
+
+
+    return {
+
+        found:
+            selected.length >
+            0,
+
+        query:
+            cleanQuestion,
+
+        profile:
+            retrievalProfile.type,
+
+        text:
+            contextText,
+
+        sources:
+            currentCitationSources,
+
+        resultCount:
+            results.length,
+
+        selectedCount:
+            selected.length,
+
+        totalOccurrences:
+            results.length,
+
+        matchedFamilies:
+            [],
+
+        matchedTerms:
+            []
+
+    };
 
 }
 
 
 // =====================================================
-// PART 3 END
+// SEARCH POPUP
 // =====================================================
- // ======================================
-// Word AI Assistant
+
+if (
+    searchBtn
+) {
+
+    searchBtn.onclick =
+        function (
+            e
+        ) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            if (
+                searchPopup
+            ) {
+
+                searchPopup.classList.toggle(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                projectsPopup
+            ) {
+
+                projectsPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                chatPopup
+            ) {
+
+                chatPopup.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                settingsWindow
+            ) {
+
+                settingsWindow.classList.remove(
+                    "open"
+                );
+
+            }
+
+
+            if (
+                searchInput
+            ) {
+
+                searchInput.focus();
+
+            }
+
+        };
+
+}
+
+
+// =====================================================
+// SEARCH INPUT
+// =====================================================
+
+async function executeDocumentSearch() {
+
+    if (
+        !searchInput ||
+        !currentDocument
+    ) {
+
+        return;
+
+    }
+
+
+    const query =
+        searchInput.value.trim();
+
+
+    if (
+        !query
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        searchStatus
+    ) {
+
+        searchStatus.textContent =
+            "جاري البحث...";
+
+    }
+
+
+    try {
+
+        const results =
+            await searchDocumentWithNewEngine(
+                query,
+                currentDocument,
+                20
+            );
+
+
+        if (
+            searchResultsList
+        ) {
+
+            searchResultsList.innerHTML =
+                "";
+
+        }
+
+
+        if (
+            results.length ===
+            0
+        ) {
+
+            if (
+                searchStatus
+            ) {
+
+                searchStatus.textContent =
+                    "لا توجد نتائج.";
+
+            }
+
+
+            return;
+
+        }
+
+
+        results.forEach(
+            function (
+                result
+            ) {
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                item.className =
+                    "search-result-item";
+
+
+                item.innerHTML = `
+
+                    <div class="search-result-heading">
+                        ${result.heading || ""}
+                    </div>
+
+                    <div class="search-result-text">
+                        ${result.text || ""}
+                    </div>
+
+                    <div class="search-result-meta">
+                        مقطع ${result.rank}
+                    </div>
+
+                `;
+
+
+                item.onclick =
+                    function () {
+
+                        currentCitationSources =
+                            results;
+
+
+                        if (
+                            chatArea
+                        ) {
+
+                            chatArea.scrollTop =
+                                chatArea.scrollHeight;
+
+                        }
+
+                    };
+
+
+                if (
+                    searchResultsList
+                ) {
+
+                    searchResultsList.appendChild(
+                        item
+                    );
+
+                }
+
+            }
+        );
+
+
+        if (
+            searchStatus
+        ) {
+
+            searchStatus.textContent =
+                "تم العثور على " +
+                results.length +
+                " نتيجة.";
+
+        }
+
+    }
+    catch (
+        error
+    ) {
+
+        if (
+            searchStatus
+        ) {
+
+            searchStatus.textContent =
+                error &&
+                error.message
+                    ? error.message
+                    : "فشل البحث.";
+
+        }
+
+    }
+
+}
+
+
+if (
+    searchInput
+) {
+
+    searchInput.onkeydown =
+        function (
+            e
+        ) {
+
+            if (
+                e.key ===
+                "Enter"
+            ) {
+
+                e.preventDefault();
+
+
+                executeDocumentSearch();
+
+            }
+
+        };
+
+}
+
+
+// =====================================================
+// END PART 3
+// الجزء الرابع:
+// محركات البث + sendMessage + التهيئة النهائية
+// =====================================================
+// =====================================================
 // PART 4 / 4
-// Streaming + Send + Initialization
-// ======================================
+// محركات البث + إرسال الرسالة + التهيئة النهائية
+// =====================================================
 
 
 // =====================================================
-// Stream Groq AI
+// STREAM GEMINI AI
 // =====================================================
 
-async function streamGroqAI(
+async function streamGeminiAI(
     text,
     onChunk
 ) {
@@ -9561,40 +9160,36 @@ async function streamGroqAI(
 
 
     const key =
-        String(
-            data.key ||
-            ""
-        ).trim();
+        data.key ||
+        "";
 
 
     const model =
-        String(
-            data.model ||
-            ""
-        ).trim();
+        data.model ||
+        "";
 
 
-    if (!key) {
+    if (
+        !key.trim()
+    ) {
 
         throw new Error(
-            "لم يتم إدخال مفتاح Groq من الإعدادات."
+            "لم يتم إدخال مفتاح Gemini من الإعدادات."
         );
 
     }
 
 
-    if (!model) {
+    if (
+        !model.trim()
+    ) {
 
         throw new Error(
-            "لم يتم تحديد نموذج Groq."
+            "لم يتم تحديد نموذج Gemini من الإعدادات."
         );
 
     }
 
-
-    // ==================================
-    // سياق المستند
-    // ==================================
 
     const documentContext =
         await buildAIDocumentContext(
@@ -9602,9 +9197,56 @@ async function streamGroqAI(
         );
 
 
-    // ==================================
-    // تاريخ المحادثة
-    // ==================================
+    const systemInstruction = [
+
+        "أنت مساعد بحث أكاديمي يعمل على مستندات Word.",
+
+        "اعتمد على المادة المستخرجة من المستند بوصفها المصدر الأساسي للإجابة.",
+
+        "أجب عن السؤال مباشرة وبأسلوب أكاديمي واضح.",
+
+        "رتب الإجابة وفق محاور السؤال، ولا تخلط بين أجزائه.",
+
+        "إذا كان السؤال يتضمن أكثر من جانب، فافصل بينها بعناوين أو فقرات واضحة.",
+
+        "ادمج الأفكار المتشابهة في صياغة واحدة.",
+
+        "لا تحول كل مقطع مستخرج إلى فقرة مستقلة؛ ابنِ إجابة تركيبية من المقاطع.",
+
+        "استبعد المعلومة الجانبية التي لا تجيب مباشرة عن السؤال.",
+
+        "إذا دعمت عدة مقاطع الفكرة نفسها، اجمع إحالاتها بعد الفكرة.",
+
+        "لا تكرر الفكرة نفسها لمجرد ورودها في أكثر من مقطع.",
+
+        "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المادة المستخرجة.",
+
+        "إذا لم تكف المادة المستخرجة للإجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
+
+        "لا تستخدم المعرفة العامة لسد النقص في المستند إلا إذا طلب المستخدم ذلك صراحة.",
+
+        "لا تذكر مشكلة الدراسة أو أهدافها أو منهجها أو أسئلتها إلا إذا طلب المستخدم ذلك صراحة.",
+
+        "ضع الإحالات بعد الأفكار التي يدعمها المستند بصيغة [مقطع X].",
+
+        "إذا كانت الإحالة تشمل أكثر من مقطع فاستخدم [مقطع X، مقطع Y].",
+
+        "لا تخترع أرقام المقاطع.",
+
+        "حافظ على لغة السؤال ولغة المستند.",
+
+        "استخدم العناوين والقوائم باعتدال عندما تساعد على وضوح الإجابة.",
+
+        "لا تبدأ باعتذار أو تمهيد غير ضروري.",
+
+        "لا تعيد صياغة سؤال المستخدم في بداية الإجابة.",
+
+        "قدّم خلاصة مترابطة ومباشرة، لا تلخيصًا منفصلًا لكل مقطع."
+
+    ].join(
+        "\n"
+    );
+
 
     const conversationMessages =
         [];
@@ -9685,11 +9327,17 @@ async function streamGroqAI(
                     role:
                         msg.role ===
                         "ai"
-                            ? "assistant"
+                            ? "model"
                             : "user",
 
-                    content:
-                        messageText
+                    parts: [
+
+                        {
+                            text:
+                                messageText
+                        }
+
+                    ]
 
                 });
 
@@ -9699,10 +9347,6 @@ async function streamGroqAI(
     }
 
 
-    // ==================================
-    // محتوى السؤال
-    // ==================================
-
     let userContent =
         text;
 
@@ -9715,15 +9359,14 @@ async function streamGroqAI(
         userContent =
             [
 
-                "أنت مساعد بحث أكاديمي يعمل على مستند Word.",
-                "",
-
                 "=== سؤال المستخدم ===",
+
                 text,
 
                 "",
 
                 "=== اسم المستند ===",
+
                 (
                     currentDocument
                         ? currentDocument.name
@@ -9733,628 +9376,7 @@ async function streamGroqAI(
                 "",
 
                 "=== المادة المستخرجة من المستند ===",
-                documentContext.text,
 
-                "",
-
-                "=== قواعد الإجابة ===",
-                "اعتمد على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
-                "استخرج الأفكار المرتبطة بالسؤال فقط.",
-                "ادمج الأفكار المتشابهة.",
-                "أجب عن جميع جوانب السؤال التي تدعمها المادة.",
-                "لا تضف معلومات غير موجودة في المادة المستخرجة.",
-                "إذا لم تكف المادة للإجابة عن جزء من السؤال، صرّح بذلك.",
-                "لا تستخدم المعرفة العامة لسد النقص إلا إذا طلب المستخدم ذلك صراحة.",
-                "حافظ على العربية والأسلوب الأكاديمي.",
-                "ضع الإحالات بصيغة [مقطع X].",
-                "لا تخترع أرقام المقاطع.",
-                "قدّم إجابة تركيبية مترابطة."
-
-            ].join(
-                "\n"
-            );
-
-    }
-
-
-    conversationMessages.push({
-
-        role:
-            "user",
-
-        content:
-            userContent
-
-    });
-
-
-    // ==================================
-    // إرسال الطلب
-    // ==================================
-
-    const response =
-        await fetch(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    Authorization:
-                        "Bearer " +
-                        key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            model,
-
-                        messages:
-                            conversationMessages,
-
-                        max_tokens:
-                            2500,
-
-                        temperature:
-                            0.2,
-
-                        stream:
-                            true
-
-                    })
-
-            }
-        );
-
-
-    if (
-        !response.ok
-    ) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Groq."
-            )
-        );
-
-    }
-
-
-    if (
-        !response.body
-    ) {
-
-        throw new Error(
-            "المتصفح لا يدعم استقبال الرد المتدفق من Groq."
-        );
-
-    }
-
-
-    const reader =
-        response.body.getReader();
-
-
-    const decoder =
-        new TextDecoder(
-            "utf-8"
-        );
-
-
-    let buffer =
-        "";
-
-    let fullAnswer =
-        "";
-
-
-    while (true) {
-
-        const streamResult =
-            await reader.read();
-
-
-        if (
-            streamResult.done
-        ) {
-
-            break;
-
-        }
-
-
-        buffer +=
-            decoder.decode(
-                streamResult.value,
-                {
-                    stream:
-                        true
-                }
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r\n/g,
-                "\n"
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r/g,
-                "\n"
-            );
-
-
-        const events =
-            buffer.split(
-                "\n\n"
-            );
-
-
-        buffer =
-            events.pop() ||
-            "";
-
-
-        events.forEach(
-            function (
-                event
-            ) {
-
-                event
-                    .split("\n")
-                    .forEach(
-                        function (
-                            line
-                        ) {
-
-                            const cleanLine =
-                                line.trim();
-
-
-                            if (
-                                !cleanLine.startsWith(
-                                    "data:"
-                                )
-                            ) {
-
-                                return;
-
-                            }
-
-
-                            const dataText =
-                                cleanLine
-                                    .substring(
-                                        5
-                                    )
-                                    .trim();
-
-
-                            if (
-                                !dataText ||
-                                dataText ===
-                                    "[DONE]"
-                            ) {
-
-                                return;
-
-                            }
-
-
-                            let parsed;
-
-                            try {
-
-                                parsed =
-                                    JSON.parse(
-                                        dataText
-                                    );
-
-                            }
-                            catch (
-                                error
-                            ) {
-
-                                return;
-
-                            }
-
-
-                            const delta =
-                                parsed &&
-                                parsed.choices &&
-                                parsed.choices[0] &&
-                                parsed.choices[0].delta
-                                    ? parsed.choices[0].delta.content
-                                    : "";
-
-
-                            if (
-                                typeof delta !==
-                                    "string" ||
-                                !delta
-                            ) {
-
-                                return;
-
-                            }
-
-
-                            fullAnswer +=
-                                delta;
-
-
-                            if (
-                                typeof onChunk ===
-                                "function"
-                            ) {
-
-                                onChunk(
-                                    delta,
-                                    fullAnswer
-                                );
-
-                            }
-
-                        }
-                    );
-
-            }
-        );
-
-    }
-
-
-    if (
-        buffer.trim()
-    ) {
-
-        // قد توجد بيانات نهائية غير مكتملة
-        const remainingLines =
-            buffer
-                .split("\n")
-                .map(
-                    function (
-                        line
-                    ) {
-
-                        return line.trim();
-
-                    }
-                )
-                .filter(
-                    function (
-                        line
-                    ) {
-
-                        return line.startsWith(
-                            "data:"
-                        );
-
-                    }
-                );
-
-
-        remainingLines.forEach(
-            function (
-                line
-            ) {
-
-                const dataText =
-                    line
-                        .substring(
-                            5
-                        )
-                        .trim();
-
-
-                if (
-                    !dataText ||
-                    dataText ===
-                        "[DONE]"
-                ) {
-
-                    return;
-
-                }
-
-
-                try {
-
-                    const parsed =
-                        JSON.parse(
-                            dataText
-                        );
-
-
-                    const delta =
-                        parsed &&
-                        parsed.choices &&
-                        parsed.choices[0] &&
-                        parsed.choices[0].delta
-                            ? parsed.choices[0].delta.content
-                            : "";
-
-
-                    if (
-                        typeof delta ===
-                            "string" &&
-                        delta
-                    ) {
-
-                        fullAnswer +=
-                            delta;
-
-
-                        if (
-                            typeof onChunk ===
-                            "function"
-                        ) {
-
-                            onChunk(
-                                delta,
-                                fullAnswer
-                            );
-
-                        }
-
-                    }
-
-                }
-                catch (
-                    error
-                ) {
-
-                    // تجاهل الجزء غير القابل للتحليل
-
-                }
-
-            }
-        );
-
-    }
-
-
-    if (
-        !fullAnswer.trim()
-    ) {
-
-        throw new Error(
-            "لم يصل نص من Groq عبر البث المتدفق."
-        );
-
-    }
-
-
-    return fullAnswer.trim();
-
-}
-
-
-// =====================================================
-// Stream Gemini AI
-// =====================================================
-
-async function streamGeminiAI(
-    text,
-    onChunk
-) {
-
-    const data =
-        getSavedSettings();
-
-
-    const key =
-        String(
-            data.key ||
-            ""
-        ).trim();
-
-
-    const model =
-        String(
-            data.model ||
-            ""
-        ).trim();
-
-
-    if (!key) {
-
-        throw new Error(
-            "لم يتم إدخال مفتاح Gemini من الإعدادات."
-        );
-
-    }
-
-
-    if (!model) {
-
-        throw new Error(
-            "لم يتم تحديد نموذج Gemini من الإعدادات."
-        );
-
-    }
-
-
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
-
-
-    const systemInstruction = [
-
-        "أنت مساعد بحث أكاديمي يعمل على مستندات Word.",
-
-        "اعتمد على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
-
-        "أجب عن السؤال مباشرة وبأسلوب أكاديمي واضح.",
-
-        "رتب الإجابة وفق محاور السؤال.",
-
-        "ادمج الأفكار المتشابهة.",
-
-        "استبعد المعلومة الجانبية التي لا تجيب عن السؤال.",
-
-        "لا تضف معلومة غير موجودة في المادة المستخرجة.",
-
-        "إذا لم تكف المادة للإجابة عن جزء من السؤال، صرّح بذلك.",
-
-        "لا تستخدم المعرفة العامة لسد النقص إلا إذا طلب المستخدم ذلك صراحة.",
-
-        "ضع الإحالات بصيغة [مقطع X].",
-
-        "لا تخترع أرقام المقاطع.",
-
-        "قدّم خلاصة تركيبية مترابطة."
-
-    ].join(
-        "\n"
-    );
-
-
-    const conversationMessages =
-        [];
-
-
-    const historyLimit =
-        documentContext &&
-        documentContext.found
-            ? 2
-            : 4;
-
-
-    if (
-        currentChat &&
-        Array.isArray(
-            currentChat.messages
-        )
-    ) {
-
-        const messagesWithoutCurrent =
-            currentChat.messages.slice(
-                0,
-                -1
-            );
-
-
-        messagesWithoutCurrent
-            .slice(
-                -historyLimit
-            )
-            .forEach(
-                function (
-                    msg
-                ) {
-
-                    if (
-                        !msg ||
-                        !msg.text
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    let messageText =
-                        String(
-                            msg.text
-                        ).trim();
-
-
-                    const maxHistoryChars =
-                        documentContext &&
-                        documentContext.found
-                            ? 1000
-                            : 1500;
-
-
-                    if (
-                        messageText.length >
-                        maxHistoryChars
-                    ) {
-
-                        messageText =
-                            messageText.substring(
-                                0,
-                                maxHistoryChars
-                            ) +
-                            "…";
-
-                    }
-
-
-                    conversationMessages.push({
-
-                        role:
-                            msg.role ===
-                            "ai"
-                                ? "model"
-                                : "user",
-
-                        parts: [
-
-                            {
-                                text:
-                                    messageText
-                            }
-
-                        ]
-
-                    });
-
-                }
-            );
-
-    }
-
-
-    let userContent =
-        text;
-
-
-    if (
-        documentContext &&
-        documentContext.found
-    ) {
-
-        userContent =
-            [
-
-                "=== سؤال المستخدم ===",
-                text,
-
-                "",
-
-                "=== اسم المستند ===",
-                (
-                    currentDocument
-                        ? currentDocument.name
-                        : ""
-                ),
-
-                "",
-
-                "=== المادة المستخرجة ===",
                 documentContext.text
 
             ].join(
@@ -10489,11 +9511,12 @@ async function streamGeminiAI(
     let buffer =
         "";
 
+
     let fullAnswer =
         "";
 
 
-    function processGeminiLine(
+    function processSSELine(
         line
     ) {
 
@@ -10536,6 +9559,7 @@ async function streamGeminiAI(
 
 
         let parsed;
+
 
         try {
 
@@ -10644,7 +9668,9 @@ async function streamGeminiAI(
     }
 
 
-    while (true) {
+    while (
+        true
+    ) {
 
         const streamResult =
             await reader.read();
@@ -10673,8 +9699,11 @@ async function streamGeminiAI(
             buffer.replace(
                 /\r\n/g,
                 "\n"
-            )
-            .replace(
+            );
+
+
+        buffer =
+            buffer.replace(
                 /\r/g,
                 "\n"
             );
@@ -10704,7 +9733,7 @@ async function streamGeminiAI(
                 );
 
 
-            processGeminiLine(
+            processSSELine(
                 line
             );
 
@@ -10723,7 +9752,7 @@ async function streamGeminiAI(
         buffer.trim()
     ) {
 
-        processGeminiLine(
+        processSSELine(
             buffer
         );
 
@@ -10747,7 +9776,7 @@ async function streamGeminiAI(
 
 
 // =====================================================
-// Stream OpenRouter AI
+// STREAM OPENROUTER AI
 // =====================================================
 
 async function streamOpenRouterAI(
@@ -10760,20 +9789,18 @@ async function streamOpenRouterAI(
 
 
     const key =
-        String(
-            data.key ||
-            ""
-        ).trim();
+        data.key ||
+        "";
 
 
     const model =
-        String(
-            data.model ||
-            ""
-        ).trim();
+        data.model ||
+        "";
 
 
-    if (!key) {
+    if (
+        !key.trim()
+    ) {
 
         throw new Error(
             "لم يتم إدخال مفتاح OpenRouter من الإعدادات."
@@ -10782,7 +9809,9 @@ async function streamOpenRouterAI(
     }
 
 
-    if (!model) {
+    if (
+        !model.trim()
+    ) {
 
         throw new Error(
             "لم يتم تحديد نموذج OpenRouter."
@@ -10815,72 +9844,77 @@ async function streamOpenRouterAI(
         )
     ) {
 
-        currentChat.messages
-            .slice(
+        const messagesWithoutCurrent =
+            currentChat.messages.slice(
                 0,
                 -1
-            )
-            .slice(
+            );
+
+
+        const previousMessages =
+            messagesWithoutCurrent.slice(
                 -historyLimit
-            )
-            .forEach(
-                function (
-                    msg
+            );
+
+
+        previousMessages.forEach(
+            function (
+                msg
+            ) {
+
+                if (
+                    !msg ||
+                    !msg.text
                 ) {
 
-                    if (
-                        !msg ||
-                        !msg.text
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    let messageText =
-                        String(
-                            msg.text
-                        ).trim();
-
-
-                    const maxHistoryChars =
-                        documentContext &&
-                        documentContext.found
-                            ? 1000
-                            : 1500;
-
-
-                    if (
-                        messageText.length >
-                        maxHistoryChars
-                    ) {
-
-                        messageText =
-                            messageText.substring(
-                                0,
-                                maxHistoryChars
-                            ) +
-                            "…";
-
-                    }
-
-
-                    conversationMessages.push({
-
-                        role:
-                            msg.role ===
-                            "ai"
-                                ? "assistant"
-                                : "user",
-
-                        content:
-                            messageText
-
-                    });
+                    return;
 
                 }
-            );
+
+
+                let messageText =
+                    String(
+                        msg.text
+                    ).trim();
+
+
+                const maxHistoryChars =
+                    documentContext &&
+                    documentContext.found
+                        ? 1000
+                        : 1500;
+
+
+                if (
+                    messageText.length >
+                    maxHistoryChars
+                ) {
+
+                    messageText =
+                        messageText.substring(
+                            0,
+                            maxHistoryChars
+                        ) +
+                        "…";
+
+                }
+
+
+                conversationMessages.push({
+
+                    role:
+                        msg.role ===
+                        "ai"
+                            ? "assistant"
+                            : "user",
+
+                    content:
+                        messageText
+
+                });
+
+            }
+        );
 
     }
 
@@ -10897,16 +9931,18 @@ async function streamOpenRouterAI(
         userContent =
             [
 
-                "أنت مساعد بحث أكاديمي.",
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
 
                 "",
 
                 "=== سؤال المستخدم ===",
+
                 text,
 
                 "",
 
                 "=== اسم المستند ===",
+
                 (
                     currentDocument
                         ? currentDocument.name
@@ -10916,18 +9952,8 @@ async function streamOpenRouterAI(
                 "",
 
                 "=== المادة المستخرجة من المستند ===",
-                documentContext.text,
 
-                "",
-
-                "=== قواعد الإجابة ===",
-                "اعتمد على المادة المستخرجة بوصفها المصدر الأساسي.",
-                "أجب عن السؤال مباشرة.",
-                "ادمج الأفكار المتشابهة.",
-                "لا تضف معلومات غير موجودة في المادة.",
-                "ضع الإحالات بصيغة [مقطع X].",
-                "لا تخترع أرقام المقاطع.",
-                "قدّم إجابة مترابطة."
+                documentContext.text
 
             ].join(
                 "\n"
@@ -10960,7 +9986,7 @@ async function streamOpenRouterAI(
                     "Content-Type":
                         "application/json",
 
-                    Authorization:
+                    "Authorization":
                         "Bearer " +
                         key,
 
@@ -11040,11 +10066,12 @@ async function streamOpenRouterAI(
     let buffer =
         "";
 
+
     let fullAnswer =
         "";
 
 
-    function processOpenRouterLine(
+    function processSSELine(
         line
     ) {
 
@@ -11087,6 +10114,7 @@ async function streamOpenRouterAI(
 
 
         let parsed;
+
 
         try {
 
@@ -11144,7 +10172,9 @@ async function streamOpenRouterAI(
     }
 
 
-    while (true) {
+    while (
+        true
+    ) {
 
         const streamResult =
             await reader.read();
@@ -11173,8 +10203,11 @@ async function streamOpenRouterAI(
             buffer.replace(
                 /\r\n/g,
                 "\n"
-            )
-            .replace(
+            );
+
+
+        buffer =
+            buffer.replace(
                 /\r/g,
                 "\n"
             );
@@ -11204,7 +10237,7 @@ async function streamOpenRouterAI(
                 );
 
 
-            processOpenRouterLine(
+            processSSELine(
                 line
             );
 
@@ -11223,7 +10256,7 @@ async function streamOpenRouterAI(
         buffer.trim()
     ) {
 
-        processOpenRouterLine(
+        processSSELine(
             buffer
         );
 
@@ -11247,7 +10280,7 @@ async function streamOpenRouterAI(
 
 
 // =====================================================
-// Stream OpenAI AI
+// STREAM OPENAI
 // =====================================================
 
 async function streamOpenAI(
@@ -11260,20 +10293,18 @@ async function streamOpenAI(
 
 
     const key =
-        String(
-            data.key ||
-            ""
-        ).trim();
+        data.key ||
+        "";
 
 
     const model =
-        String(
-            data.model ||
-            ""
-        ).trim();
+        data.model ||
+        "";
 
 
-    if (!key) {
+    if (
+        !key.trim()
+    ) {
 
         throw new Error(
             "لم يتم إدخال مفتاح OpenAI من الإعدادات."
@@ -11282,7 +10313,9 @@ async function streamOpenAI(
     }
 
 
-    if (!model) {
+    if (
+        !model.trim()
+    ) {
 
         throw new Error(
             "لم يتم تحديد نموذج OpenAI."
@@ -11315,72 +10348,77 @@ async function streamOpenAI(
         )
     ) {
 
-        currentChat.messages
-            .slice(
+        const messagesWithoutCurrent =
+            currentChat.messages.slice(
                 0,
                 -1
-            )
-            .slice(
+            );
+
+
+        const previousMessages =
+            messagesWithoutCurrent.slice(
                 -historyLimit
-            )
-            .forEach(
-                function (
-                    msg
+            );
+
+
+        previousMessages.forEach(
+            function (
+                msg
+            ) {
+
+                if (
+                    !msg ||
+                    !msg.text
                 ) {
 
-                    if (
-                        !msg ||
-                        !msg.text
-                    ) {
-
-                        return;
-
-                    }
-
-
-                    let messageText =
-                        String(
-                            msg.text
-                        ).trim();
-
-
-                    const maxHistoryChars =
-                        documentContext &&
-                        documentContext.found
-                            ? 1000
-                            : 1500;
-
-
-                    if (
-                        messageText.length >
-                        maxHistoryChars
-                    ) {
-
-                        messageText =
-                            messageText.substring(
-                                0,
-                                maxHistoryChars
-                            ) +
-                            "…";
-
-                    }
-
-
-                    conversationMessages.push({
-
-                        role:
-                            msg.role ===
-                            "ai"
-                                ? "assistant"
-                                : "user",
-
-                        content:
-                            messageText
-
-                    });
+                    return;
 
                 }
-            );
+
+
+                let messageText =
+                    String(
+                        msg.text
+                    ).trim();
+
+
+                const maxHistoryChars =
+                    documentContext &&
+                    documentContext.found
+                        ? 1000
+                        : 1500;
+
+
+                if (
+                    messageText.length >
+                    maxHistoryChars
+                ) {
+
+                    messageText =
+                        messageText.substring(
+                            0,
+                            maxHistoryChars
+                        ) +
+                        "…";
+
+                }
+
+
+                conversationMessages.push({
+
+                    role:
+                        msg.role ===
+                        "ai"
+                            ? "assistant"
+                            : "user",
+
+                    content:
+                        messageText
+
+                });
+
+            }
+        );
 
     }
 
@@ -11397,16 +10435,18 @@ async function streamOpenAI(
         userContent =
             [
 
-                "أنت مساعد بحث أكاديمي.",
+                "أنت تجيب عن سؤال مستخدم في أداة بحث أكاديمية.",
 
                 "",
 
                 "=== سؤال المستخدم ===",
+
                 text,
 
                 "",
 
                 "=== اسم المستند ===",
+
                 (
                     currentDocument
                         ? currentDocument.name
@@ -11416,18 +10456,8 @@ async function streamOpenAI(
                 "",
 
                 "=== المادة المستخرجة من المستند ===",
-                documentContext.text,
 
-                "",
-
-                "=== قواعد الإجابة ===",
-                "اعتمد على المادة المستخرجة بوصفها المصدر الأساسي.",
-                "أجب عن السؤال مباشرة.",
-                "ادمج الأفكار المتشابهة.",
-                "لا تضف معلومات غير موجودة في المادة.",
-                "ضع الإحالات بصيغة [مقطع X].",
-                "لا تخترع أرقام المقاطع.",
-                "قدّم إجابة مترابطة."
+                documentContext.text
 
             ].join(
                 "\n"
@@ -11460,7 +10490,7 @@ async function streamOpenAI(
                     "Content-Type":
                         "application/json",
 
-                    Authorization:
+                    "Authorization":
                         "Bearer " +
                         key
 
@@ -11534,11 +10564,12 @@ async function streamOpenAI(
     let buffer =
         "";
 
+
     let fullAnswer =
         "";
 
 
-    function processOpenAILine(
+    function processSSELine(
         line
     ) {
 
@@ -11581,6 +10612,7 @@ async function streamOpenAI(
 
 
         let parsed;
+
 
         try {
 
@@ -11638,7 +10670,9 @@ async function streamOpenAI(
     }
 
 
-    while (true) {
+    while (
+        true
+    ) {
 
         const streamResult =
             await reader.read();
@@ -11667,8 +10701,11 @@ async function streamOpenAI(
             buffer.replace(
                 /\r\n/g,
                 "\n"
-            )
-            .replace(
+            );
+
+
+        buffer =
+            buffer.replace(
                 /\r/g,
                 "\n"
             );
@@ -11698,7 +10735,7 @@ async function streamOpenAI(
                 );
 
 
-            processOpenAILine(
+            processSSELine(
                 line
             );
 
@@ -11717,7 +10754,7 @@ async function streamOpenAI(
         buffer.trim()
     ) {
 
-        processOpenAILine(
+        processSSELine(
             buffer
         );
 
@@ -11741,18 +10778,14 @@ async function streamOpenAI(
 
 
 // =====================================================
-// Send Message
-// إرسال الرسالة
-// Streaming موحد مع تحديث واجهة مخفف
+// SEND MESSAGE
 // =====================================================
 
 async function sendMessage() {
 
-    // ======================================
-    // التحقق من صندوق الإدخال
-    // ======================================
-
-    if (!input) {
+    if (
+        !input
+    ) {
 
         return;
 
@@ -11760,23 +10793,21 @@ async function sendMessage() {
 
 
     const text =
-        String(
-            input.value || ""
-        ).trim();
+        input.value.trim();
 
 
-    if (!text) {
+    if (
+        !text
+    ) {
 
         return;
 
     }
 
 
-    // ======================================
-    // إنشاء محادثة عند عدم وجود محادثة
-    // ======================================
-
-    if (!currentChat) {
+    if (
+        !currentChat
+    ) {
 
         currentChat = {
 
@@ -11804,10 +10835,6 @@ async function sendMessage() {
 
     }
 
-
-    // ======================================
-    // تثبيت المحادثة المؤقتة
-    // ======================================
 
     if (
         currentChat.isTemporary
@@ -11837,7 +10864,6 @@ async function sendMessage() {
                 ) {
 
                     return (
-                        chat &&
                         chat.id ===
                         currentChat.id
                     );
@@ -11856,10 +10882,6 @@ async function sendMessage() {
 
         }
 
-
-        // ==================================
-        // ربط المحادثة بالمشروع
-        // ==================================
 
         if (
             currentProject &&
@@ -11906,10 +10928,6 @@ async function sendMessage() {
     }
 
 
-    // ======================================
-    // إضافة رسالة المستخدم
-    // ======================================
-
     currentChat.messages.push({
 
         role:
@@ -11924,22 +10942,17 @@ async function sendMessage() {
     saveChats();
 
 
-    // ======================================
-    // تحديث الواجهة بعد سؤال المستخدم
-    // ======================================
-
     renderChat();
+
 
     renderChatList();
 
+
     renderSidebarChats();
+
 
     renderRecentChats();
 
-
-    // ======================================
-    // تنظيف صندوق الإدخال
-    // ======================================
 
     input.value =
         "";
@@ -11948,10 +10961,6 @@ async function sendMessage() {
     input.style.height =
         "auto";
 
-
-    // ======================================
-    // إنشاء فقاعة التحميل
-    // ======================================
 
     const loading =
         document.createElement(
@@ -11982,10 +10991,6 @@ async function sendMessage() {
     }
 
 
-    // ======================================
-    // قراءة إعدادات مزود الذكاء الاصطناعي
-    // ======================================
-
     const savedSettings =
         getSavedSettings();
 
@@ -11994,12 +10999,8 @@ async function sendMessage() {
         String(
             savedSettings.provider ||
             "openrouter"
-        ).trim().toLowerCase();
+        ).toLowerCase();
 
-
-    // ======================================
-    // حالة العرض المتدفق
-    // ======================================
 
     let pendingRenderText =
         "";
@@ -12008,10 +11009,6 @@ async function sendMessage() {
     let renderTimer =
         null;
 
-
-    // ======================================
-    // تحديث فقاعة الرد
-    // ======================================
 
     function renderStreamingText() {
 
@@ -12025,8 +11022,7 @@ async function sendMessage() {
 
 
         if (
-            pendingRenderText ===
-            ""
+            !pendingRenderText
         ) {
 
             loading.innerHTML =
@@ -12059,10 +11055,6 @@ async function sendMessage() {
 
     }
 
-
-    // ======================================
-    // جدولة تحديث الواجهة
-    // ======================================
 
     function scheduleRender(
         fullText
@@ -12098,19 +11090,11 @@ async function sendMessage() {
     }
 
 
-    // ======================================
-    // تنفيذ طلب الذكاء الاصطناعي
-    // ======================================
-
     try {
 
         let answer =
             "";
 
-
-        // ==================================
-        // Groq
-        // ==================================
 
         if (
             selectedProvider ===
@@ -12133,12 +11117,6 @@ async function sendMessage() {
                 );
 
         }
-
-
-        // ==================================
-        // Gemini
-        // ==================================
-
         else if (
             selectedProvider ===
             "gemini"
@@ -12160,12 +11138,6 @@ async function sendMessage() {
                 );
 
         }
-
-
-        // ==================================
-        // OpenRouter
-        // ==================================
-
         else if (
             selectedProvider ===
             "openrouter"
@@ -12187,12 +11159,6 @@ async function sendMessage() {
                 );
 
         }
-
-
-        // ==================================
-        // OpenAI
-        // ==================================
-
         else if (
             selectedProvider ===
             "openai"
@@ -12214,12 +11180,6 @@ async function sendMessage() {
                 );
 
         }
-
-
-        // ==================================
-        // مزود غير معروف
-        // ==================================
-
         else {
 
             throw new Error(
@@ -12229,10 +11189,6 @@ async function sendMessage() {
 
         }
 
-
-        // ======================================
-        // إلغاء أي تحديث مؤجل
-        // ======================================
 
         if (
             renderTimer !==
@@ -12250,10 +11206,6 @@ async function sendMessage() {
         }
 
 
-        // ======================================
-        // عرض الرد النهائي
-        // ======================================
-
         pendingRenderText =
             String(
                 answer ||
@@ -12264,10 +11216,6 @@ async function sendMessage() {
         renderStreamingText();
 
 
-        // ======================================
-        // إزالة فقاعة التحميل
-        // ======================================
-
         if (
             loading &&
             loading.parentNode
@@ -12277,10 +11225,6 @@ async function sendMessage() {
 
         }
 
-
-        // ======================================
-        // حفظ إجابة الذكاء الاصطناعي
-        // ======================================
 
         currentChat.messages.push({
 
@@ -12330,15 +11274,14 @@ async function sendMessage() {
         saveChats();
 
 
-        // ======================================
-        // تحديث كل قوائم المحادثات
-        // ======================================
-
         renderChat();
+
 
         renderChatList();
 
+
         renderSidebarChats();
+
 
         renderRecentChats();
 
@@ -12346,10 +11289,6 @@ async function sendMessage() {
     catch (
         error
     ) {
-
-        // ======================================
-        // إلغاء المؤقت عند الخطأ
-        // ======================================
 
         if (
             renderTimer !==
@@ -12367,10 +11306,6 @@ async function sendMessage() {
         }
 
 
-        // ======================================
-        // إزالة فقاعة التحميل
-        // ======================================
-
         if (
             loading &&
             loading.parentNode
@@ -12381,23 +11316,6 @@ async function sendMessage() {
         }
 
 
-        // ======================================
-        // استخراج رسالة الخطأ
-        // ======================================
-
-        const errorMessage =
-            (
-                error &&
-                error.message
-            )
-                ? error.message
-                : "حدث خطأ غير معروف.";
-
-
-        // ======================================
-        // حفظ رسالة الخطأ داخل المحادثة
-        // ======================================
-
         currentChat.messages.push({
 
             role:
@@ -12405,7 +11323,12 @@ async function sendMessage() {
 
             text:
                 "خطأ: " +
-                errorMessage
+                (
+                    error &&
+                    error.message
+                        ? error.message
+                        : "حدث خطأ غير معروف"
+                )
 
         });
 
@@ -12413,27 +11336,16 @@ async function sendMessage() {
         saveChats();
 
 
-        // ======================================
-        // تحديث الواجهة بعد الخطأ
-        // ======================================
-
         renderChat();
+
 
         renderChatList();
 
+
         renderSidebarChats();
 
+
         renderRecentChats();
-
-
-        // ======================================
-        // سجل تشخيصي
-        // ======================================
-
-        console.error(
-            "فشل إرسال الرسالة:",
-            error
-        );
 
     }
 
@@ -12441,98 +11353,84 @@ async function sendMessage() {
 
 
 // =====================================================
-// Sidebar Pin
-// يبقى خارج Office.onReady
+// SEND BUTTON
 // =====================================================
 
-const sidebar =
-    document.querySelector(
-        ".sidebar"
-    );
-
-
-const pinSidebar =
-    document.getElementById(
-        "pin-sidebar"
-    );
-
-
 if (
-    pinSidebar &&
-    sidebar
+    sendBtn
 ) {
 
-    let sidebarPinned =
-        localStorage.getItem(
-            "sidebarPinned"
-        ) ===
-        "true";
-
-
-    if (
-        sidebarPinned
-    ) {
-
-        sidebar.classList.add(
-            "pinned"
-        );
-
-
-        pinSidebar.classList.add(
-            "pinned"
-        );
-
-
-        document.body.classList.add(
-            "sidebar-is-pinned"
-        );
-
-    }
-
-
-    pinSidebar.addEventListener(
-        "click",
-        function (e) {
+    sendBtn.onclick =
+        function (
+            e
+        ) {
 
             e.preventDefault();
             e.stopPropagation();
 
 
-            sidebarPinned =
-                !sidebarPinned;
+            sendMessage();
 
-
-            sidebar.classList.toggle(
-                "pinned",
-                sidebarPinned
-            );
-
-
-            pinSidebar.classList.toggle(
-                "pinned",
-                sidebarPinned
-            );
-
-
-            document.body.classList.toggle(
-                "sidebar-is-pinned",
-                sidebarPinned
-            );
-
-
-            localStorage.setItem(
-                "sidebarPinned",
-                sidebarPinned
-                    ? "true"
-                    : "false"
-            );
-
-        }
-    );
+        };
 
 }
 
 
 // =====================================================
-// PART 4 END
+// KEYBOARD
 // =====================================================
+
+if (
+    input
+) {
+
+    input.onkeydown =
+        function (
+            e
+        ) {
+
+            if (
+                e.key ===
+                    "Enter" &&
+                !e.shiftKey
+            ) {
+
+                e.preventDefault();
+
+
+                sendMessage();
+
+            }
+
+        };
+
+}
+
+
+// =====================================================
+// FINAL INITIALIZATION
+// =====================================================
+
+initializeSidebarSections();
+
+renderProjects();
+
+renderExpandedProjects();
+
+renderDocuments();
+
+renderChatList();
+
+renderSidebarChats();
+
+renderRecentChats();
+
+renderChat();
+
+loadSettings();
+
+
+// =====================================================
+// END OFFICE.ONREADY
+// =====================================================
+
