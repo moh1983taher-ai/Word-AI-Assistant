@@ -5774,6 +5774,87 @@ async function searchIndexedDocument(
                     25;
 
             }
+
+            // ==================================
+            // Relation Score
+            // قياس وجود علاقة صريحة بين مفاهيم المقارنة
+            // ==================================
+
+            let relationScore =
+                0;
+
+
+            if (
+                retrievalProfile ===
+                "comparison"
+            ) {
+
+                const relationPatterns = [
+
+                    /علاق[ةه]\s+بين/,
+                    /الفرق\s+بين/,
+                    /الفروق\s+بين/,
+                    /مقارن[ةه]\s+بين/,
+                    /يقارن\s+بين/,
+                    /التمييز\s+بين/,
+                    /يفترق/,
+                    /خلاف\s+بين/,
+                    /العلاق[ةه]\s+.*استصلاح.*عرف/,
+                    /العلاق[ةه]\s+.*عرف.*استصلاح/
+
+                ];
+
+
+                const hasRelationPattern =
+                    relationPatterns.some(
+                        function (
+                            pattern
+                        ) {
+
+                            return pattern.test(
+                                normalizeSearchText(
+                                    originalText
+                                )
+                            );
+
+                        }
+                    );
+
+
+                if (
+                    hasRelationPattern
+                ) {
+
+                    relationScore +=
+                        30;
+
+                }
+
+
+                // وجود المفهومين معًا
+                if (
+                    comparisonCoverage >=
+                    0.66
+                ) {
+
+                    relationScore +=
+                        20;
+
+                }
+
+
+                // وجودهما قريبين من بعض
+                if (
+                    proximityScore >
+                    0.5
+                ) {
+
+                    relationScore +=
+                        15;
+
+                }
+
+            }
             // ==================================
             // أقرب عنوان
             // ==================================
@@ -6074,6 +6155,13 @@ async function searchIndexedDocument(
             score +=
                 profileScore;
 
+            // ==================================
+            // تعزيز علاقة مفاهيم المقارنة
+            // ==================================
+
+            score +=
+                relationScore;
+
 
             // ==================================
             // نوع التطابق
@@ -6198,6 +6286,9 @@ async function searchIndexedDocument(
 
                 oramaScore:
                     item.oramaScore,
+                
+                relationScore:
+                    relationScore,
 
                 profile:
                     retrievalProfile,
@@ -7189,38 +7280,123 @@ async function buildRetrievalContext(
     // ==================================
 
     const results =
-        searchResult.results
-            .filter(
-                function (
-                    result
+    searchResult.results
+        .filter(
+            function (
+                result
+            ) {
+
+                return (
+                    result &&
+                    typeof result.text ===
+                        "string"
+                );
+
+            }
+        )
+        .slice()
+        .sort(
+            function (
+                a,
+                b
+            ) {
+
+                const scoreA =
+                    Number(
+                        a.score ||
+                        0
+                    );
+
+                const scoreB =
+                    Number(
+                        b.score ||
+                        0
+                    );
+
+
+                if (
+                    scoreB !==
+                    scoreA
                 ) {
 
                     return (
-                        result &&
-                        typeof result.text ===
-                            "string"
+                        scoreB -
+                        scoreA
                     );
 
                 }
-            )
-            .slice()
-            .sort(
-                function (
-                    a,
-                    b
+
+
+                // ==================================
+                // عند التعادل:
+                // نفضل نتيجة تجمع مفاهيم المقارنة
+                // ==================================
+
+                const relationA =
+                    Number(
+                        a.relationScore ||
+                        0
+                    );
+
+                const relationB =
+                    Number(
+                        b.relationScore ||
+                        0
+                    );
+
+
+                if (
+                    relationB !==
+                    relationA
                 ) {
 
                     return (
-                        Number(
-                            b.score || 0
-                        ) -
-                        Number(
-                            a.score || 0
-                        )
+                        relationB -
+                        relationA
                     );
 
                 }
-            );
+
+
+                const coverageA =
+                    Number(
+                        a.queryCoverage ||
+                        0
+                    );
+
+                const coverageB =
+                    Number(
+                        b.queryCoverage ||
+                        0
+                    );
+
+
+                if (
+                    coverageB !==
+                    coverageA
+                ) {
+
+                    return (
+                        coverageB -
+                        coverageA
+                    );
+
+                }
+
+
+                return (
+                    Number(
+                        a.paragraphIndex ||
+                        0
+                    ) -
+                    Number(
+                        b.paragraphIndex ||
+                        0
+                    )
+                );
+
+            }
+        );
 
 
     // ==================================
