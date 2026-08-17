@@ -5766,7 +5766,69 @@ async function buildRetrievalContext(
         };
 
     }
+    // ==================================
+    // خريطة فقرات المستند
+    // ==================================
 
+    const paragraphMap =
+        new Map();
+
+
+    if (
+        currentDocument
+    ) {
+
+        try {
+
+            const structureData =
+                await ensureDocumentStructure(
+                    currentDocument
+                );
+
+
+            if (
+                structureData &&
+                Array.isArray(
+                    structureData.paragraphs
+                )
+            ) {
+
+                structureData.paragraphs.forEach(
+                    function (
+                        paragraph
+                    ) {
+
+                        if (
+                            paragraph &&
+                            typeof paragraph.index !==
+                                "undefined"
+                        ) {
+
+                            paragraphMap.set(
+                                Number(
+                                    paragraph.index
+                                ),
+                                paragraph
+                            );
+
+                        }
+
+                    }
+                );
+
+            }
+
+        }
+        catch (error) {
+
+            console.warn(
+                "تعذر تحميل بنية الفقرات للسياق:",
+                error
+            );
+
+        }
+
+    }
 
     // ==================================
     // ترتيب النتائج
