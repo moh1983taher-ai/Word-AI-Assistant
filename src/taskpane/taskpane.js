@@ -4767,21 +4767,20 @@ function getHeadingParagraphRange(
 
 }
 
+
 // =====================================================
 // Analyze Search Query
 // المحلل العام للاستعلام
 //
-// الوظائف:
-// 1) فصل كلمات السؤال عن الكلمات الوظيفية.
-// 2) تحديد الكلمات الموضوعية دون قاموس فقهي.
-// 3) معالجة اللواصق العربية تلقائيًا.
-// 4) استخراج العائلات الصرفية.
-// 5) اكتشاف العبارات المركبة الموجودة في المستند.
-// 6) حساب وزن أولي للمصطلحات.
-// 7) إبقاء البنية متوافقة مع searchIndexedDocument().
+// الهدف:
+// 1) فصل أدوات السؤال عن مفاهيمه.
+// 2) استخراج المفهوم الأساسي من الكلمات الملصقة.
+// 3) الاحتفاظ بالصيغ الأصلية والبديلة للبحث.
+// 4) اكتشاف العائلات الصرفية.
+// 5) اكتشاف العبارات المركبة الموجودة فعليًا.
+// 6) حساب وزن المفهوم بحسب وجوده في المستند.
 //
-// ملاحظة:
-// لا توجد هنا قائمة بالمصطلحات الفقهية أو الأصولية.
+// لا يحتوي على قاموس فقهي أو أصولي.
 // =====================================================
 
 function analyzeSearchQuery(
@@ -4846,7 +4845,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // تطبيع الاستعلام
+    // تطبيع السؤال
     // ==================================
 
     const normalizedQuery =
@@ -4867,9 +4866,6 @@ function analyzeSearchQuery(
 
     // ==================================
     // الكلمات الوظيفية العامة
-    //
-    // لا نحذفها من السؤال الأصلي،
-    // وإنما لا نجعلها مصطلحات موضوعية.
     // ==================================
 
     const commonFunctionWords =
@@ -4885,6 +4881,7 @@ function analyzeSearchQuery(
             "متى",
             "أي",
             "اي",
+
             "في",
             "على",
             "عن",
@@ -4893,33 +4890,41 @@ function analyzeSearchQuery(
             "من",
             "مع",
             "بين",
+
             "ثم",
             "أو",
             "او",
+
             "و",
             "ف",
             "ب",
             "ك",
             "ل",
+
             "أن",
             "ان",
             "إن",
+
             "حتى",
             "قد",
             "لقد",
             "لم",
             "لن",
             "لا",
+
             "ليس",
             "ليست",
+
             "هذا",
             "هذه",
             "ذلك",
             "تلك",
+
             "الذي",
             "التي",
             "الذين",
             "اللاتي",
+
             "به",
             "بها",
             "له",
@@ -4928,14 +4933,15 @@ function analyzeSearchQuery(
             "منها",
             "عنه",
             "عنها"
+
         ]);
 
 
     // ==================================
-    // كلمات توجيه السؤال
+    // كلمات توجه السؤال
     //
-    // ليست مصطلحات موضوعية،
-    // لكنها مهمة لمعرفة طبيعة الاستعلام.
+    // لا نحذفها من السؤال،
+    // لكن لا نجعلها مفاهيم موضوعية.
     // ==================================
 
     const queryInstructionWords =
@@ -4943,30 +4949,39 @@ function analyzeSearchQuery(
 
             "المقصود",
             "مقصود",
+
             "معنى",
+
             "تعريف",
             "تعريفه",
             "تعريفها",
+
             "المراد",
             "مراد",
+
             "يقصد",
+
             "تفسير",
             "شرح",
 
             "أثر",
             "اثر",
+
             "تأثير",
             "تاثير",
+
             "نتيجة",
             "نتائج",
 
             "حكم",
             "أحكام",
+
             "حجية",
 
             "سبب",
             "أسباب",
             "اسباب",
+
             "علة",
             "علل",
 
@@ -4975,6 +4990,7 @@ function analyzeSearchQuery(
 
             "فرق",
             "الفرق",
+
             "فروق",
             "الفروق",
 
@@ -4983,19 +4999,22 @@ function analyzeSearchQuery(
 
             "علاقة",
             "العلاقة",
+
             "صلة",
             "صلته",
             "صلتها",
 
             "كيفية",
+
             "موضع",
             "موضعه",
             "موضعها"
+
         ]);
 
 
     // ==================================
-    // استخراج النص الكامل للمستند
+    // النص الكامل للمستند
     // ==================================
 
     let documentText =
@@ -5053,7 +5072,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // استخراج توكنات المستند
+    // توكنات المستند
     // ==================================
 
     const documentTokens =
@@ -5109,62 +5128,25 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // تكرار العائلات في المستند
-    // ==================================
-
-    const familyFrequency =
-        new Map();
-
-
-    documentTokens.forEach(
-        function (
-            token
-        ) {
-
-            const family =
-                getConservativeFamilyKey(
-                    token,
-                    null
-                );
-
-
-            if (
-                !family
-            ) {
-
-                return;
-
-            }
-
-
-            familyFrequency.set(
-                family,
-                (
-                    familyFrequency.get(
-                        family
-                    ) ||
-                    0
-                ) +
-                1
-            );
-
-        }
-    );
-
-
-    // ==================================
-    // استخراج صيغ البحث العربية
+    // استخراج صيغ الكلمة
     //
-    // مثال:
-    // والاستحسان
-    // ↓
-    // والاستحسان
-    // الاستحسان
+    // أمثلة:
     //
-    // بالقياس
-    // ↓
-    // بالقياس
-    // القياس
+    // بالاستصلاح
+    // → بالاستصلاح
+    // → الاستصلاح
+    //
+    // والاستحسان
+    // → والاستحسان
+    // → الاستحسان
+    //
+    // وبالاستصلاح
+    // → وبالاستصلاح
+    // → بالاستصلاح
+    // → الاستصلاح
+    //
+    // للاستمصال / للاجتهاد ...
+    // نحاول الحفاظ على "ال" قدر الإمكان.
     // ==================================
 
     function getSearchTermVariants(
@@ -5175,7 +5157,7 @@ function analyzeSearchQuery(
             [];
 
 
-        let current =
+        const originalToken =
             String(
                 token ||
                 ""
@@ -5183,7 +5165,7 @@ function analyzeSearchQuery(
 
 
         if (
-            !current
+            !originalToken
         ) {
 
             return variants;
@@ -5203,9 +5185,17 @@ function analyzeSearchQuery(
 
 
             if (
-                !clean ||
+                !clean
+            ) {
+
+                return;
+
+            }
+
+
+            if (
                 clean.length <
-                    3
+                3
             ) {
 
                 return;
@@ -5229,14 +5219,83 @@ function analyzeSearchQuery(
 
 
         addVariant(
-            current
+            originalToken
+        );
+
+
+        let current =
+            originalToken;
+
+
+        // ==================================
+        // التركيبات الشائعة مع ال التعريف
+        // ==================================
+
+        const attachedDefinitePatterns = [
+
+            "وال",
+            "فال",
+            "بال",
+            "كال",
+            "لل"
+
+        ];
+
+
+        attachedDefinitePatterns.forEach(
+            function (
+                prefix
+            ) {
+
+                if (
+                    current.startsWith(
+                        prefix
+                    ) &&
+                    current.length >
+                    prefix.length +
+                    1
+                ) {
+
+                    const remainder =
+                        current.substring(
+                            prefix.length
+                        );
+
+
+                    // ----------------------------------
+                    // مثل:
+                    // والاستحسان
+                    // بالاستصلاح
+                    // كالقياس
+                    // فالاجتهاد
+                    // للاجتهاد
+                    //
+                    // نعيد "ال" إلى أصل الكلمة.
+                    // ----------------------------------
+
+                    const baseWithArticle =
+                        "ال" +
+                        remainder;
+
+
+                    addVariant(
+                        baseWithArticle
+                    );
+
+                }
+
+            }
         );
 
 
         // ==================================
-        // نزع اللواصق تدريجيًا
-        // بحد أقصى 3 عمليات
+        // نزع الواو والفاء والباء والكاف واللام
+        // إذا بقيت كلمة صالحة.
         // ==================================
+
+        let working =
+            current;
+
 
         let changed =
             true;
@@ -5249,7 +5308,7 @@ function analyzeSearchQuery(
         while (
             changed &&
             safety <
-                3
+            4
         ) {
 
             changed =
@@ -5260,180 +5319,35 @@ function analyzeSearchQuery(
                 1;
 
 
-            // ----------------------------------
-            // واو العطف
-            // ----------------------------------
+            const firstChar =
+                working.charAt(
+                    0
+                );
+
 
             if (
-                current.startsWith(
-                    "و"
-                ) &&
-                current.length >
-                    3
-            ) {
+                (
+                    firstChar ===
+                    "و" ||
 
-                const next =
-                    current.substring(
-                        1
-                    );
+                    firstChar ===
+                    "ف" ||
 
+                    firstChar ===
+                    "ب" ||
 
-                if (
-                    next.length >=
-                    3
-                ) {
+                    firstChar ===
+                    "ك" ||
 
-                    current =
-                        next;
-
-                    addVariant(
-                        current
-                    );
-
-                    changed =
-                        true;
-
-                    continue;
-
-                }
-
-            }
-
-
-            // ----------------------------------
-            // فاء العطف
-            // ----------------------------------
-
-            if (
-                current.startsWith(
-                    "ف"
-                ) &&
-                current.length >
-                    3
-            ) {
-
-                const next =
-                    current.substring(
-                        1
-                    );
-
-
-                if (
-                    next.length >=
-                    3
-                ) {
-
-                    current =
-                        next;
-
-                    addVariant(
-                        current
-                    );
-
-                    changed =
-                        true;
-
-                    continue;
-
-                }
-
-            }
-
-
-            // ----------------------------------
-            // باء الجر
-            // ----------------------------------
-
-            if (
-                current.startsWith(
-                    "ب"
-                ) &&
-                current.length >
-                    3
-            ) {
-
-                const next =
-                    current.substring(
-                        1
-                    );
-
-
-                if (
-                    next.length >=
-                    3
-                ) {
-
-                    current =
-                        next;
-
-                    addVariant(
-                        current
-                    );
-
-                    changed =
-                        true;
-
-                    continue;
-
-                }
-
-            }
-
-
-            // ----------------------------------
-            // كاف الجر
-            // ----------------------------------
-
-            if (
-                current.startsWith(
-                    "ك"
-                ) &&
-                current.length >
-                    3
-            ) {
-
-                const next =
-                    current.substring(
-                        1
-                    );
-
-
-                if (
-                    next.length >=
-                    3
-                ) {
-
-                    current =
-                        next;
-
-                    addVariant(
-                        current
-                    );
-
-                    changed =
-                        true;
-
-                    continue;
-
-                }
-
-            }
-
-
-            // ----------------------------------
-            // لام الجر
-            // ----------------------------------
-
-            if (
-                current.startsWith(
+                    firstChar ===
                     "ل"
                 ) &&
-                current.length >
-                    3
+                working.length >
+                3
             ) {
 
                 const next =
-                    current.substring(
+                    working.substring(
                         1
                     );
 
@@ -5443,17 +5357,60 @@ function analyzeSearchQuery(
                     3
                 ) {
 
-                    current =
+                    working =
                         next;
 
+
                     addVariant(
-                        current
+                        working
                     );
+
 
                     changed =
                         true;
 
                 }
+
+            }
+
+        }
+
+
+        // ==================================
+        // إذا وصلنا إلى صيغة تبدأ بـ "ا"
+        // وحُذفت اللام بسبب "لل..."
+        // نعيد احتمال "ال..."
+        // ==================================
+
+        if (
+            !variants.some(
+                function (
+                    value
+                ) {
+
+                    return value.startsWith(
+                        "ال"
+                    );
+
+                }
+            )
+        ) {
+
+            const candidateWithoutFirstPrefix =
+                originalToken.substring(
+                    1
+                );
+
+
+            if (
+                candidateWithoutFirstPrefix.startsWith(
+                    "ال"
+                )
+            ) {
+
+                addVariant(
+                    candidateWithoutFirstPrefix
+                );
 
             }
 
@@ -5466,18 +5423,102 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // كلمات السؤال الوظيفية
+    // تحديد المفهوم الأساسي
+    //
+    // نريد:
+    //
+    // بالاستصلاح
+    // → الاستصلاح
+    //
+    // والاستحسان
+    // → الاستحسان
+    //
+    // والقياس
+    // → القياس
+    // ==================================
+
+    function getBaseContentTerm(
+        token,
+        variants
+    ) {
+
+        if (
+            Array.isArray(
+                variants
+            )
+        ) {
+
+            // ----------------------------------
+            // الأفضلية لصيغة تبدأ بـ "ال"
+            // لأنها غالبًا الصيغة الأساسية
+            // ----------------------------------
+
+            for (
+                let i =
+                    0;
+
+                i <
+                    variants.length;
+
+                i++
+            ) {
+
+                const variant =
+                    variants[i];
+
+
+                if (
+                    variant &&
+                    variant.startsWith(
+                        "ال"
+                    ) &&
+                    variant.length >
+                    3
+                ) {
+
+                    return variant;
+
+                }
+
+            }
+
+
+            // ----------------------------------
+            // إذا لم نجد صيغة بالـ
+            // نستخدم آخر صيغة مجردة
+            // ----------------------------------
+
+            if (
+                variants.length >
+                1
+            ) {
+
+                return variants[
+                    variants.length - 1
+                ];
+
+            }
+
+        }
+
+
+        return String(
+            token ||
+            ""
+        ).trim();
+
+    }
+
+
+    // ==================================
+    // تصنيف كلمات السؤال
     // ==================================
 
     const functionTokens =
         [];
 
 
-    // ==================================
-    // الكلمات الموضوعية الخام
-    // ==================================
-
-    const rawContentTokens =
+    const rawContentTerms =
         [];
 
 
@@ -5560,35 +5601,67 @@ function analyzeSearchQuery(
             }
 
 
-            rawContentTokens.push(
-                cleanToken
-            );
+            const variants =
+                getSearchTermVariants(
+                    cleanToken
+                );
+
+
+            const baseTerm =
+                getBaseContentTerm(
+                    cleanToken,
+                    variants
+                );
+
+
+            rawContentTerms.push({
+
+                original:
+                    cleanToken,
+
+                base:
+                    baseTerm,
+
+                variants:
+                    variants
+
+            });
 
         }
     );
 
 
     // ==================================
-    // إزالة تكرار الكلمات الموضوعية
+    // إزالة التكرار بعد استخراج الأصل
     // ==================================
 
     const contentTokens =
         [];
 
 
-    rawContentTokens.forEach(
+    rawContentTerms.forEach(
         function (
-            token
+            item
         ) {
 
             if (
+                !item ||
+                !item.base
+            ) {
+
+                return;
+
+            }
+
+
+            if (
                 !contentTokens.includes(
-                    token
+                    item.base
                 )
             ) {
 
                 contentTokens.push(
-                    token
+                    item.base
                 );
 
             }
@@ -5598,7 +5671,130 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // العائلات
+    // بناء lookup للمصطلحات
+    // ==================================
+
+    const contentTermMap =
+        new Map();
+
+
+    rawContentTerms.forEach(
+        function (
+            item
+        ) {
+
+            if (
+                !item ||
+                !item.base
+            ) {
+
+                return;
+
+            }
+
+
+            const existing =
+                contentTermMap.get(
+                    item.base
+                );
+
+
+            if (
+                !existing
+            ) {
+
+                contentTermMap.set(
+                    item.base,
+                    {
+
+                        term:
+                            item.base,
+
+                        variants:
+                            Array.isArray(
+                                item.variants
+                            )
+                                ? item.variants.slice()
+                                : []
+
+                    }
+                );
+
+            }
+            else {
+
+                item.variants.forEach(
+                    function (
+                        variant
+                    ) {
+
+                        if (
+                            !existing.variants.includes(
+                                variant
+                            )
+                        ) {
+
+                            existing.variants.push(
+                                variant
+                            );
+
+                        }
+
+                    }
+                );
+
+            }
+
+        }
+    );
+
+
+    // ==================================
+    // تكرار العائلات
+    // ==================================
+
+    const familyFrequency =
+        new Map();
+
+
+    documentTokens.forEach(
+        function (
+            token
+        ) {
+
+            const family =
+                getConservativeFamilyKey(
+                    token,
+                    null
+                );
+
+
+            if (
+                !family
+            ) {
+
+                return;
+
+            }
+
+
+            familyFrequency.set(
+                family,
+                (
+                    familyFrequency.get(
+                        family
+                    ) ||
+                    0
+                ) +
+                1
+            );
+
+        }
+    );
+
+
+    // ==================================
+    // العائلات الموجودة في السؤال
     // ==================================
 
     const families =
@@ -5607,58 +5803,61 @@ function analyzeSearchQuery(
 
     contentTokens.forEach(
         function (
-            token
+            baseTerm
         ) {
 
-            const variants =
-                getSearchTermVariants(
-                    token
+            const item =
+                contentTermMap.get(
+                    baseTerm
                 );
+
+
+            if (
+                !item
+            ) {
+
+                return;
+
+            }
 
 
             let family =
                 getConservativeFamilyKey(
-                    token,
+                    baseTerm,
                     null
                 );
 
 
             // ----------------------------------
-            // إذا كانت الكلمة ملصقة،
-            // نجرب الصيغة المجردة
+            // تجربة الصيغ إن لم نحصل على عائلة
             // ----------------------------------
 
             if (
-                !family &&
-                variants.length >
-                    1
+                !family
             ) {
 
-                for (
-                    let i = 1;
-
-                    i <
-                        variants.length;
-
-                    i++
-                ) {
-
-                    family =
-                        getConservativeFamilyKey(
-                            variants[i],
-                            null
-                        );
-
-
-                    if (
-                        family
+                item.variants.forEach(
+                    function (
+                        variant
                     ) {
 
-                        break;
+                        if (
+                            family
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        family =
+                            getConservativeFamilyKey(
+                                variant,
+                                null
+                            );
 
                     }
-
-                }
+                );
 
             }
 
@@ -5690,74 +5889,52 @@ function analyzeSearchQuery(
 
     contentTokens.forEach(
         function (
-            token
+            baseTerm
         ) {
 
-            const variants =
-                getSearchTermVariants(
-                    token
-                );
-
-
-            let family =
-                getConservativeFamilyKey(
-                    token,
-                    null
+            const item =
+                contentTermMap.get(
+                    baseTerm
                 );
 
 
             if (
-                !family &&
-                variants.length >
-                    1
+                !item
             ) {
 
-                for (
-                    let i = 1;
-
-                    i <
-                        variants.length;
-
-                    i++
-                ) {
-
-                    const possibleFamily =
-                        getConservativeFamilyKey(
-                            variants[i],
-                            null
-                        );
-
-
-                    if (
-                        possibleFamily
-                    ) {
-
-                        family =
-                            possibleFamily;
-
-                        break;
-
-                    }
-
-                }
+                return;
 
             }
 
 
-            // ==================================
-            // تكرار الكلمة الأصلية
-            // ==================================
+            const variants =
+                Array.isArray(
+                    item.variants
+                ) &&
+                item.variants.length >
+                0
+
+                    ? item.variants
+
+                    : [
+                        baseTerm
+                    ];
+
+
+            // ----------------------------------
+            // تكرار المفهوم الأساسي
+            // ----------------------------------
 
             const exactFrequency =
                 termFrequency.get(
-                    token
+                    baseTerm
                 ) ||
                 0;
 
 
-            // ==================================
-            // أعلى تكرار لصيغها
-            // ==================================
+            // ----------------------------------
+            // أعلى تكرار للصيغ
+            // ----------------------------------
 
             let variantFrequency =
                 0;
@@ -5789,9 +5966,46 @@ function analyzeSearchQuery(
             );
 
 
-            // ==================================
-            // تكرار العائلة
-            // ==================================
+            // ----------------------------------
+            // العائلة
+            // ----------------------------------
+
+            let family =
+                getConservativeFamilyKey(
+                    baseTerm,
+                    null
+                );
+
+
+            if (
+                !family
+            ) {
+
+                variants.forEach(
+                    function (
+                        variant
+                    ) {
+
+                        if (
+                            family
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        family =
+                            getConservativeFamilyKey(
+                                variant,
+                                null
+                            );
+
+                    }
+                );
+
+            }
+
 
             const familyFreq =
                 familyFrequency.get(
@@ -5800,9 +6014,9 @@ function analyzeSearchQuery(
                 0;
 
 
-            // ==================================
-            // هل للمصطلح حضور في المستند؟
-            // ==================================
+            // ----------------------------------
+            // وجود المفهوم في المستند
+            // ----------------------------------
 
             let documentPresence =
                 0;
@@ -5843,13 +6057,9 @@ function analyzeSearchQuery(
             }
 
 
-            // ==================================
+            // ----------------------------------
             // وزن التكرار
-            // ==================================
-
-            let frequencyWeight =
-                0.60;
-
+            // ----------------------------------
 
             const strongestFrequency =
                 Math.max(
@@ -5857,6 +6067,10 @@ function analyzeSearchQuery(
                     variantFrequency,
                     familyFreq
                 );
+
+
+            let frequencyWeight =
+                0.60;
 
 
             if (
@@ -5878,10 +6092,6 @@ function analyzeSearchQuery(
             }
 
 
-            // ==================================
-            // الوزن العام
-            // ==================================
-
             const finalWeight =
                 documentPresence *
                 frequencyWeight;
@@ -5889,15 +6099,42 @@ function analyzeSearchQuery(
 
             weightedTerms.push({
 
+                // المفهوم الأساسي
                 term:
-                    token,
+                    baseTerm,
+
+                // الأصل الذي ظهر في السؤال
+                originalTerms:
+                    rawContentTerms
+                        .filter(
+                            function (
+                                rawItem
+                            ) {
+
+                                return (
+                                    rawItem.base ===
+                                    baseTerm
+                                );
+
+                            }
+                        )
+                        .map(
+                            function (
+                                rawItem
+                            ) {
+
+                                return rawItem.original;
+
+                            }
+                        ),
+
+                // صيغ البحث
+                variants:
+                    variants,
 
                 family:
                     family ||
                     "",
-
-                variants:
-                    variants,
 
                 exactFrequency:
                     exactFrequency,
@@ -5930,8 +6167,10 @@ function analyzeSearchQuery(
     // ==================================
     // اكتشاف العبارات المركبة
     //
-    // نستخدم صيغ الكلمات الأساسية،
-    // لكن لا ننشئ قاموسًا مسبقًا.
+    // مهم:
+    // لا نخترع عبارة مركبة.
+    // لا نسجلها إلا إذا كانت موجودة
+    // فعليًا في المستند.
     // ==================================
 
     const phraseCandidates =
@@ -5939,16 +6178,16 @@ function analyzeSearchQuery(
 
 
     // ----------------------------------
-    // ترتيب الكلمات الأصلية حسب السؤال
+    // ترتيب المفاهيم كما وردت في السؤال
     // ----------------------------------
 
-    const phraseBaseTokens =
+    const phraseTerms =
         contentTokens.slice();
 
 
     // ==================================
-    // عبارات من كلمتين
-    // ثم ثلاث كلمات
+    // البحث عن عبارات من 3 كلمات
+    // ثم كلمتين
     // ==================================
 
     for (
@@ -5960,7 +6199,7 @@ function analyzeSearchQuery(
     ) {
 
         if (
-            phraseBaseTokens.length <
+            phraseTerms.length <
             phraseLength
         ) {
 
@@ -5974,13 +6213,13 @@ function analyzeSearchQuery(
 
             i +
                 phraseLength <=
-                phraseBaseTokens.length;
+                phraseTerms.length;
 
             i++
         ) {
 
             const sequence =
-                phraseBaseTokens.slice(
+                phraseTerms.slice(
                     i,
                     i +
                     phraseLength
@@ -5997,40 +6236,26 @@ function analyzeSearchQuery(
             }
 
 
-            const variantsPerToken =
-                sequence.map(
-                    function (
-                        token
-                    ) {
-
-                        return getSearchTermVariants(
-                            token
-                        );
-
-                    }
-                );
-
-
             // ==================================
-            // العبارة الأصلية
+            // تجربة الصيغ الأساسية
             // ==================================
 
-            const originalPhrase =
+            const candidatePhrase =
                 sequence.join(
                     " "
                 );
 
 
-            const normalizedOriginalPhrase =
+            const normalizedCandidate =
                 normalizeSearchText(
-                    originalPhrase
+                    candidatePhrase
                 );
 
 
             if (
-                normalizedOriginalPhrase &&
+                normalizedCandidate &&
                 normalizedDocumentText.includes(
-                    normalizedOriginalPhrase
+                    normalizedCandidate
                 )
             ) {
 
@@ -6042,7 +6267,7 @@ function analyzeSearchQuery(
 
                             return (
                                 item.phrase ===
-                                normalizedOriginalPhrase
+                                normalizedCandidate
                             );
 
                         }
@@ -6052,7 +6277,7 @@ function analyzeSearchQuery(
                     phraseCandidates.push({
 
                         phrase:
-                            normalizedOriginalPhrase,
+                            normalizedCandidate,
 
                         tokens:
                             sequence,
@@ -6067,7 +6292,7 @@ function analyzeSearchQuery(
                                 : 1.00,
 
                         source:
-                            "original"
+                            "base"
 
                     });
 
@@ -6077,118 +6302,136 @@ function analyzeSearchQuery(
 
 
             // ==================================
-            // تجربة الصيغ المجردة
-            // مثال:
-            // القياس والاستحسان
-            // ↓
-            // القياس الاستحسان
+            // تجربة الصيغ البديلة
+            // لكل مفهوم
             // ==================================
 
-            const normalizedVariants =
-                [];
+            const variantsSets =
+                sequence.map(
+                    function (
+                        term
+                    ) {
+
+                        const item =
+                            contentTermMap.get(
+                                term
+                            );
 
 
-            for (
-                let j = 0;
+                        return (
+                            item &&
+                            Array.isArray(
+                                item.variants
+                            ) &&
+                            item.variants.length >
+                                0
 
-                j <
-                    variantsPerToken.length;
+                                ? item.variants
 
-                j++
-            ) {
+                                : [
+                                    term
+                                ]
+                        );
 
-                const variants =
-                    variantsPerToken[j];
+                    }
+                );
 
 
-                if (
-                    variants.length >
-                    1
-                ) {
+            // ==================================
+            // نأخذ الصيغة الأقرب إلى الأصل
+            // التي تبدأ بـ "ال" إن وجدت.
+            // ==================================
 
-                    normalizedVariants.push(
-                        variants[variants.length - 1]
-                    );
+            const normalizedSequence =
+                variantsSets.map(
+                    function (
+                        variants
+                    ) {
 
-                }
-                else if (
-                    variants.length ===
-                    1
-                ) {
+                        for (
+                            let j = 0;
 
-                    normalizedVariants.push(
-                        variants[0]
-                    );
+                            j <
+                                variants.length;
 
-                }
+                            j++
+                        ) {
 
-            }
+                            if (
+                                variants[j] &&
+                                variants[j].startsWith(
+                                    "ال"
+                                )
+                            ) {
+
+                                return variants[j];
+
+                            }
+
+                        }
+
+
+                        return variants[
+                            variants.length - 1
+                        ];
+
+                    }
+                );
+
+
+            const normalizedPhrase =
+                normalizeSearchText(
+                    normalizedSequence.join(
+                        " "
+                    )
+                );
 
 
             if (
-                normalizedVariants.length >=
-                2
+                normalizedPhrase &&
+                normalizedPhrase !==
+                    normalizedCandidate &&
+                normalizedDocumentText.includes(
+                    normalizedPhrase
+                )
             ) {
 
-                const variantPhrase =
-                    normalizedVariants.join(
-                        " "
-                    );
-
-
-                const normalizedVariantPhrase =
-                    normalizeSearchText(
-                        variantPhrase
-                    );
-
-
                 if (
-                    normalizedVariantPhrase &&
-                    normalizedVariantPhrase !==
-                        normalizedOriginalPhrase &&
-                    normalizedDocumentText.includes(
-                        normalizedVariantPhrase
+                    !phraseCandidates.some(
+                        function (
+                            item
+                        ) {
+
+                            return (
+                                item.phrase ===
+                                normalizedPhrase
+                            );
+
+                        }
                     )
                 ) {
 
-                    if (
-                        !phraseCandidates.some(
-                            function (
-                                item
-                            ) {
+                    phraseCandidates.push({
 
-                                return (
-                                    item.phrase ===
-                                    normalizedVariantPhrase
-                                );
+                        phrase:
+                            normalizedPhrase,
 
-                            }
-                        )
-                    ) {
+                        tokens:
+                            sequence,
 
-                        phraseCandidates.push({
+                        length:
+                            sequence.length,
 
-                            phrase:
-                                normalizedVariantPhrase,
+                        weight:
+                            phraseLength ===
+                            3
+                                ? 1.20
+                                : 1.00,
 
-                            tokens:
-                                sequence,
+                        source:
+                            "normalized"
 
-                            length:
-                                sequence.length,
-
-                            weight:
-                                phraseLength ===
-                                3
-                                    ? 1.20
-                                    : 1.00,
-
-                            source:
-                                "normalized"
-
-                        });
-
-                    }
+                    });
 
                 }
 
@@ -6290,7 +6533,7 @@ function analyzeSearchQuery(
 
 
     // ==================================
-    // النتيجة النهائية
+    // النتيجة
     // ==================================
 
     return {
@@ -6304,6 +6547,8 @@ function analyzeSearchQuery(
         allTokens:
             allTokens,
 
+        // الآن هذه هي المفاهيم الأساسية
+        // وليس الصيغ الملحقة
         contentTokens:
             contentTokens,
 
