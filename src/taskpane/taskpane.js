@@ -12090,13 +12090,30 @@ async function buildRetrievalContext(
 
 // =====================================================
 // Build AI Document Context
+//
+// الوظيفة:
+// 1) استقبال سؤال المستخدم.
+// 2) تشغيل محرك الاسترجاع العام.
+// 3) بناء سياق مناسب للذكاء الاصطناعي.
+// 4) حفظ مصادر الإحالات.
+// 5) إعادة بيانات الاسترجاع والتحليل مع السياق.
+//
+// مبدأ مهم:
+// المحرك يسترجع الأدلة.
+// الذكاء الاصطناعي يفهم السؤال ويصوغ الإجابة.
 // =====================================================
 
 async function buildAIDocumentContext(
     query
 ) {
 
-    if (!currentDocument) {
+    // ==================================
+    // التحقق من وجود مستند
+    // ==================================
+
+    if (
+        !currentDocument
+    ) {
 
         currentCitationSources =
             [];
@@ -12113,8 +12130,29 @@ async function buildAIDocumentContext(
             profile:
                 "general",
 
+            resultCount:
+                0,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                0,
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            contexts:
+                [],
+
             text:
-                ""
+                "",
+
+            queryAnalysis:
+                null
 
         };
 
@@ -12123,14 +12161,25 @@ async function buildAIDocumentContext(
 
     try {
 
+        // ==================================
+        // تحديد نوع السؤال
+        // ==================================
+
         const retrievalProfile =
             getRetrievalProfile(
                 query
             );
 
 
+        const profileType =
+            retrievalProfile &&
+            retrievalProfile.type
+                ? retrievalProfile.type
+                : "general";
+
+
         // ==================================
-        // البحث عبر Orama
+        // البحث في الفهرس
         // ==================================
 
         const searchResult =
@@ -12140,14 +12189,21 @@ async function buildAIDocumentContext(
                 {
 
                     profile:
-                        retrievalProfile.type,
+                        profileType,
 
-                    maxResults:
-                        retrievalProfile.maxResults
+                    // نطلب عددًا واسعًا من المرشحين
+                    // ثم تقتطع buildRetrievalContext
+                    // العدد المناسب للسياق النهائي.
+                    candidateLimit:
+                        50
 
                 }
             );
 
+
+        // ==================================
+        // التحقق من نتيجة البحث
+        // ==================================
 
         if (
             !searchResult ||
@@ -12171,10 +12227,44 @@ async function buildAIDocumentContext(
                     query,
 
                 profile:
-                    retrievalProfile.type,
+                    profileType,
+
+                resultCount:
+                    0,
+
+                selectedCount:
+                    0,
+
+                totalOccurrences:
+                    0,
+
+                matchedTerms:
+                    searchResult &&
+                    Array.isArray(
+                        searchResult.matchedTerms
+                    )
+                        ? searchResult.matchedTerms
+                        : [],
+
+                matchedFamilies:
+                    searchResult &&
+                    Array.isArray(
+                        searchResult.matchedFamilies
+                    )
+                        ? searchResult.matchedFamilies
+                        : [],
+
+                contexts:
+                    [],
 
                 text:
-                    ""
+                    "",
+
+                queryAnalysis:
+                    searchResult &&
+                    searchResult.queryAnalysis
+                        ? searchResult.queryAnalysis
+                        : null
 
             };
 
@@ -12182,40 +12272,105 @@ async function buildAIDocumentContext(
 
 
         // ==================================
-        // إعدادات المزود
+        // إعدادات المزود والنموذج
         // ==================================
 
         const settings =
             getSavedSettings();
 
 
+        const provider =
+            settings &&
+            settings.provider
+                ? settings.provider
+                : "";
+
+
+        const model =
+            settings &&
+            settings.model
+                ? settings.model
+                : "";
+
+
+        // ==================================
+        // حدود الاسترجاع
+        // ==================================
+
         const retrievalLimits =
             getRetrievalLimits(
-                settings.provider,
-                settings.model
+                provider,
+                model
             );
 
 
         let maxResults =
             Math.min(
-                retrievalLimits.maxResults,
-                retrievalProfile.maxResults
+                Number(
+                    retrievalLimits.maxResults ||
+                    6
+                ),
+                Number(
+                    retrievalProfile.maxResults ||
+                    6
+                )
             );
 
 
         let maxChars =
             Math.min(
-                retrievalLimits.maxChars,
-                retrievalProfile.maxChars
+                Number(
+                    retrievalLimits.maxChars ||
+                    6000
+                ),
+                Number(
+                    retrievalProfile.maxChars ||
+                    6000
+                )
             );
 
 
         // ==================================
-        // المقارنة تحتاج مساحة أكبر
+        // حماية الحدود
         // ==================================
 
         if (
-            retrievalProfile.type ===
+            !Number.isFinite(
+                maxResults
+            ) ||
+            maxResults <=
+                0
+        ) {
+
+            maxResults =
+                6;
+
+        }
+
+
+        if (
+            !Number.isFinite(
+                maxChars
+            ) ||
+            maxChars <=
+                0
+        ) {
+
+            maxChars =
+                6000;
+
+        }
+
+
+        // ==================================
+        // المقارنة تحتاج مساحة إضافية
+        //
+        // هذه ليست قاعدة للبحث نفسه.
+        // فقط للسياق النهائي المرسل للـAI.
+        // ==================================
+
+        if (
+            profileType ===
             "comparison"
         ) {
 
@@ -12236,13 +12391,14 @@ async function buildAIDocumentContext(
 
 
         // ==================================
-        // بناء السياق
+        // بناء السياق النهائي
         // ==================================
 
         const retrieval =
             await buildRetrievalContext(
                 searchResult,
                 {
+
                     maxResults:
                         maxResults,
 
@@ -12251,13 +12407,20 @@ async function buildAIDocumentContext(
 
                     includeNeighbors:
                         true
+
                 }
             );
 
 
+        // ==================================
+        // التحقق من السياق
+        // ==================================
+
         if (
             !retrieval ||
-            !retrieval.text
+            typeof retrieval.text !==
+                "string" ||
+            !retrieval.text.trim()
         ) {
 
             currentCitationSources =
@@ -12273,10 +12436,46 @@ async function buildAIDocumentContext(
                     query,
 
                 profile:
-                    retrievalProfile.type,
+                    profileType,
+
+                resultCount:
+                    Number(
+                        searchResult.count ||
+                        0
+                    ),
+
+                selectedCount:
+                    0,
+
+                totalOccurrences:
+                    Number(
+                        searchResult.indexedOccurrences ||
+                        0
+                    ),
+
+                matchedTerms:
+                    Array.isArray(
+                        searchResult.matchedTerms
+                    )
+                        ? searchResult.matchedTerms
+                        : [],
+
+                matchedFamilies:
+                    Array.isArray(
+                        searchResult.matchedFamilies
+                    )
+                        ? searchResult.matchedFamilies
+                        : [],
+
+                contexts:
+                    [],
 
                 text:
-                    ""
+                    "",
+
+                queryAnalysis:
+                    searchResult.queryAnalysis ||
+                    null
 
             };
 
@@ -12284,58 +12483,120 @@ async function buildAIDocumentContext(
 
 
         // ==================================
-        // حفظ مصادر الإحالات
+        // مصادر الإحالات
+        //
+        // نأخذها من السياق النهائي نفسه
+        // حتى يكون ما يظهر للـAI
+        // متوافقًا مع ما سنعرضه كمصدر.
         // ==================================
 
-        currentCitationSources =
+        const retrievedContexts =
             Array.isArray(
                 retrieval.contexts
             )
-                ? retrieval.contexts.map(
-                    function (
-                        item
-                    ) {
-
-                        return {
-
-                            rank:
-                                item.rank,
-
-                            paragraphIndex:
-                                item.paragraphIndex,
-
-                            paragraphId:
-                                item.paragraphId,
-
-                            heading:
-                                item.heading ||
-                                "",
-
-                            mainParagraph:
-                                item.mainParagraph ||
-                                "",
-
-                            text:
-                                item.context ||
-                                item.mainParagraph ||
-                                "",
-
-                            score:
-                                Number(
-                                    item.score ||
-                                    0
-                                ),
-
-                            matchType:
-                                item.matchType ||
-                                "family"
-
-                        };
-
-                    }
-                )
+                ? retrieval.contexts
                 : [];
 
+
+        currentCitationSources =
+            retrievedContexts.map(
+                function (
+                    item,
+                    index
+                ) {
+
+                    const paragraphIndex =
+                        Number(
+                            item.paragraphIndex
+                        );
+
+
+                    const paragraphId =
+                        item.paragraphId !==
+                            undefined &&
+                        item.paragraphId !==
+                            null
+
+                            ? String(
+                                item.paragraphId
+                            )
+
+                            : String(
+                                paragraphIndex
+                            );
+
+
+                    const mainParagraph =
+                        String(
+                            item.mainParagraph ||
+                            ""
+                        ).trim();
+
+
+                    const contextText =
+                        String(
+                            item.context ||
+                            mainParagraph ||
+                            ""
+                        ).trim();
+
+
+                    return {
+
+                        // ----------------------------------
+                        // رقم الإحالة
+                        // ----------------------------------
+
+                        citationIndex:
+                            index + 1,
+
+                        rank:
+                            Number(
+                                item.rank ||
+                                index + 1
+                            ),
+
+                        paragraphIndex:
+                            Number.isFinite(
+                                paragraphIndex
+                            )
+                                ? paragraphIndex
+                                : null,
+
+                        paragraphId:
+                            paragraphId,
+
+                        heading:
+                            String(
+                                item.heading ||
+                                ""
+                            ).trim(),
+
+                        mainParagraph:
+                            mainParagraph,
+
+                        text:
+                            contextText,
+
+                        score:
+                            Number(
+                                item.score ||
+                                0
+                            ),
+
+                        matchType:
+                            item.matchType ||
+                            "word"
+
+                    };
+
+                }
+            );
+
+
+        // ==================================
+        // النتيجة النهائية
+        // ==================================
 
         return {
 
@@ -12346,7 +12607,11 @@ async function buildAIDocumentContext(
                 query,
 
             profile:
-                retrievalProfile.type,
+                profileType,
+
+            // ----------------------------------
+            // معلومات الاسترجاع
+            // ----------------------------------
 
             resultCount:
                 Number(
@@ -12356,22 +12621,19 @@ async function buildAIDocumentContext(
 
             selectedCount:
                 Number(
-                    retrieval.selectedCount ||
-                    0
+                    retrievedContexts.length
                 ),
 
             totalOccurrences:
                 Number(
+                    searchResult.indexedOccurrences ||
                     retrieval.totalOccurrences ||
                     0
                 ),
 
-            matchedFamilies:
-                Array.isArray(
-                    searchResult.matchedFamilies
-                )
-                    ? searchResult.matchedFamilies
-                    : [],
+            // ----------------------------------
+            // الكلمات والعائلات
+            // ----------------------------------
 
             matchedTerms:
                 Array.isArray(
@@ -12380,26 +12642,71 @@ async function buildAIDocumentContext(
                     ? searchResult.matchedTerms
                     : [],
 
+            matchedFamilies:
+                Array.isArray(
+                    searchResult.matchedFamilies
+                )
+                    ? searchResult.matchedFamilies
+                    : [],
+
+            // ----------------------------------
+            // تحليل السؤال
+            // ----------------------------------
+
+            queryAnalysis:
+                searchResult.queryAnalysis ||
+                null,
+
+            // ----------------------------------
+            // النتائج الخام
+            //
+            // مفيدة للطبقات اللاحقة،
+            // لكنها لا تُرسل كلها للـAI.
+            // ----------------------------------
+
+            results:
+                Array.isArray(
+                    searchResult.results
+                )
+                    ? searchResult.results
+                    : [],
+
+            // ----------------------------------
+            // السياق النهائي
+            // ----------------------------------
+
             contexts:
-                retrieval.contexts ||
-                [],
+                retrievedContexts,
 
             text:
-                retrieval.text ||
-                ""
+                String(
+                    retrieval.text ||
+                    ""
+                ),
+
+            // ----------------------------------
+            // الإحالات
+            // ----------------------------------
+
+            citations:
+                currentCitationSources
 
         };
 
     }
-    catch (error) {
+    catch (
+        error
+    ) {
 
         currentCitationSources =
             [];
+
 
         console.error(
             "❌ خطأ buildAIDocumentContext:",
             error
         );
+
 
         console.error(
             "رسالة الخطأ:",
@@ -12409,6 +12716,7 @@ async function buildAIDocumentContext(
                 : error
         );
 
+
         console.error(
             "Stack:",
             error &&
@@ -12416,6 +12724,7 @@ async function buildAIDocumentContext(
                 ? error.stack
                 : "لا يوجد Stack"
         );
+
 
         return {
 
@@ -12428,14 +12737,37 @@ async function buildAIDocumentContext(
             profile:
                 "general",
 
+            resultCount:
+                0,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                0,
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            contexts:
+                [],
+
             text:
                 "",
+
+            queryAnalysis:
+                null,
 
             error:
                 error &&
                 error.message
                     ? error.message
-                    : String(error)
+                    : String(
+                        error
+                    )
 
         };
 
