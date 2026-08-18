@@ -13800,11 +13800,9 @@ async function searchCitationInWord(
 
 
 
+
 // =====================================================
 // Open Citation In Word
-//
-// source هو مصدر الإحالة الخاص بالرسالة نفسها.
-// لا تعتمد هذه الدالة على currentCitationSources.
 // =====================================================
 
 async function openCitationInWord(
@@ -13874,7 +13872,7 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // 1) الانتقال بواسطة موضع الفقرة
+                // 1) الأولوية لموضع الفقرة
                 // ==================================
 
                 const paragraphIndex =
@@ -13931,30 +13929,6 @@ async function openCitationInWord(
                     );
 
 
-                    const sourceText =
-                        String(
-                            source.mainParagraph ||
-                            source.text ||
-                            ""
-                        ).trim();
-
-
-                    const normalizedSource =
-                        normalizeSearchText(
-                            sourceText
-                        );
-
-
-                    const sourcePrefix =
-                        normalizedSource.substring(
-                            0,
-                            Math.min(
-                                120,
-                                normalizedSource.length
-                            )
-                        );
-
-
                     for (
                         let i =
                             0;
@@ -14001,9 +13975,42 @@ async function openCitationInWord(
                         }
 
 
+                        const sourceText =
+                            String(
+                                source.mainParagraph ||
+                                source.text ||
+                                ""
+                            ).trim();
+
+
+                        if (
+                            !sourceText
+                        ) {
+
+                            continue;
+
+                        }
+
+
+                        const normalizedSource =
+                            normalizeSearchText(
+                                sourceText
+                            );
+
+
                         const normalizedParagraph =
                             normalizeSearchText(
                                 paragraphText
+                            );
+
+
+                        const sourcePrefix =
+                            normalizedSource.substring(
+                                0,
+                                Math.min(
+                                    120,
+                                    normalizedSource.length
+                                )
                             );
 
 
@@ -14017,11 +14024,7 @@ async function openCitationInWord(
                             );
 
 
-                        // ==================================
-                        // تطابق النص
-                        // ==================================
-
-                        const textMatches =
+                        if (
                             (
                                 sourcePrefix &&
                                 paragraphPrefix &&
@@ -14033,21 +14036,9 @@ async function openCitationInWord(
                                         paragraphPrefix
                                     )
                                 )
-                            );
-
-
-                        // ==================================
-                        // إذا كان الفهرس مباشرًا
-                        // ==================================
-
-                        const directMatch =
+                            ) ||
                             index ===
-                            paragraphIndex;
-
-
-                        if (
-                            textMatches ||
-                            directMatch
+                            paragraphIndex
                         ) {
 
                             paragraph.select(
@@ -14068,7 +14059,7 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // 2) البحث بالنص الأصلي
+                // 2) البحث بالنص
                 // ==================================
 
                 let searchText =
@@ -14164,7 +14155,7 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // 3) البحث بمقتطف أقصر
+                // 3) مقتطف أقصر
                 // ==================================
 
                 let fallback =
@@ -14237,7 +14228,7 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // 4) البحث بالنص المنظف
+                // 4) النص المنظف
                 // ==================================
 
                 const normalized =
