@@ -22202,17 +22202,58 @@ function renderProjects() {
 
 
             item.innerHTML = `
+                <div class="project-header">
 
-                <span class="project-title">
-                    ${projectIcon}
-                    ${project.name}
-                </span>
+                    <button
+                        class="project-expand-toggle"
+                        type="button"
+                        aria-label="فتح المشروع"
+                        aria-expanded="false">
+                        ▸
+                    </button>
 
-                <button
-                    class="project-menu"
-                    type="button">
-                    ⋮
-                </button>
+                    <span class="project-title">
+                        ${projectIcon}
+                        ${project.name}
+                    </span>
+
+                    <button
+                        class="project-menu"
+                        type="button">
+                        ⋮
+                    </button>
+
+                </div>
+
+                <div
+                    class="project-resources"
+                    style="display:none;">
+
+                    <div class="project-resource-section">
+                        <div class="project-resource-header">
+                            <span>▤ المستندات</span>
+                            <span class="project-resource-arrow">›</span>
+                        </div>
+                        <div class="project-resource-content"></div>
+                    </div>
+
+                    <div class="project-resource-section">
+                        <div class="project-resource-header">
+                            <span>◯ المحادثات</span>
+                            <span class="project-resource-arrow">›</span>
+                        </div>
+                        <div class="project-resource-content"></div>
+                    </div>
+
+                    <div class="project-resource-section">
+                        <div class="project-resource-header">
+                            <span>≡ المراجع</span>
+                            <span class="project-resource-arrow">›</span>
+                        </div>
+                        <div class="project-resource-content"></div>
+                    </div>
+
+                </div>
 
                 <div class="project-options-menu">
 
@@ -22225,10 +22266,85 @@ function renderProjects() {
                     </div>
 
                 </div>
-
             `;
 
+            const projectExpandToggle =
+                item.querySelector(
+                    ".project-expand-toggle"
+                );
 
+
+            const projectResources =
+                item.querySelector(
+                    ".project-resources"
+                );
+
+
+            if (
+                projectExpandToggle &&
+                projectResources
+            ) {
+
+                projectExpandToggle.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        const isOpen =
+                            projectResources.style.display !==
+                            "none";
+
+
+                        if (
+                            isOpen
+                        ) {
+
+                            projectResources.style.display =
+                                "none";
+
+
+                            projectExpandToggle.textContent =
+                                "▸";
+
+
+                            projectExpandToggle.setAttribute(
+                                "aria-expanded",
+                                "false"
+                            );
+
+                        }
+                        else {
+
+                            projectResources.style.display =
+                                "block";
+
+
+                            projectExpandToggle.textContent =
+                                "▾";
+
+
+                            projectExpandToggle.setAttribute(
+                                "aria-expanded",
+                                "true"
+                            );
+
+
+                            // اختيار المشروع فقط،
+                            // دون تغيير المستند أو الدردشة الآن.
+                            setCurrentProject(
+                                project
+                            );
+
+                        }
+
+                    };
+
+            }
+            
             item.onclick =
                 function (e) {
 
