@@ -13272,9 +13272,20 @@ async function ensureOramaDocumentReady(
 // =====================================================
 
 
+
 // =====================================================
 // Format AI Message
-// تحويل Markdown + إحالات المقاطع
+// Markdown + Interactive Citations
+//
+// يدعم:
+// [مقطع 1]
+// [مقطع 1، مقطع 5]
+// [مقطع 1, مقطع 5]
+// [مقطع 1 و5]
+// [مقطع 1، 5]
+// [مقطع 1 و مقطع 5]
+//
+// كل إحالة تتحول إلى زر مستقل.
 // =====================================================
 
 function formatAIMessage(
@@ -13282,7 +13293,9 @@ function formatAIMessage(
     citationSources
 ) {
 
-    if (!text) {
+    if (
+        !text
+    ) {
 
         return "";
 
@@ -13293,8 +13306,16 @@ function formatAIMessage(
         Array.isArray(
             citationSources
         )
+
             ? citationSources
-            : currentCitationSources;
+
+            : (
+                Array.isArray(
+                    currentCitationSources
+                )
+                    ? currentCitationSources
+                    : []
+            );
 
 
     try {
@@ -13317,95 +13338,112 @@ function formatAIMessage(
 
 
         // ==================================
-        // تحويل الإحالات
-        // [مقطع 1]
-        // [مقطع 1، 2]
-        // [مقطع 1, 2]
+        // تحويل مجموعة أرقام الإحالات
+        // إلى أزرار مستقلة
         // ==================================
 
         html =
             html.replace(
-                /\[مقطع\s*([0-9٠-٩\s،,]+)\]/g,
+                /\[(مقطع\s*[0-9٠-٩]+(?:\s*(?:،|,|و)\s*(?:مقطع\s*)?[0-9٠-٩]+)*)\]/g,
                 function (
                     match,
-                    ranksText
+                    citationBody
                 ) {
+
+                    // ==================================
+                    // استخراج جميع الأرقام
+                    //
+                    // لا نهتم بكيفية فصلها:
+                    // مقطع 1، مقطع 5
+                    // مقطع 1 و5
+                    // مقطع 1,5
+                    // ==================================
 
                     const normalized =
                         String(
-                            ranksText
+                            citationBody
                         )
                             .replace(
-                                /٠/g,
-                                "0"
-                            )
-                            .replace(
-                                /١/g,
-                                "1"
-                            )
-                            .replace(
-                                /٢/g,
-                                "2"
-                            )
-                            .replace(
-                                /٣/g,
-                                "3"
-                            )
-                            .replace(
-                                /٤/g,
-                                "4"
-                            )
-                            .replace(
-                                /٥/g,
-                                "5"
-                            )
-                            .replace(
-                                /٦/g,
-                                "6"
-                            )
-                            .replace(
-                                /٧/g,
-                                "7"
-                            )
-                            .replace(
-                                /٨/g,
-                                "8"
-                            )
-                            .replace(
-                                /٩/g,
-                                "9"
-                            );
-
-
-                    const ranks =
-                        normalized
-                            .split(
-                                /[،,]+/
-                            )
-                            .map(
+                                /[٠-٩]/g,
                                 function (
-                                    value
+                                    digit
                                 ) {
 
-                                    return Number(
-                                        value.trim()
-                                    );
-
-                                }
-                            )
-                            .filter(
-                                function (
-                                    value
-                                ) {
-
-                                    return (
-                                        !Number.isNaN(
-                                            value
+                                    return String(
+                                        "٠١٢٣٤٥٦٧٨٩".indexOf(
+                                            digit
                                         )
                                     );
 
                                 }
                             );
+
+
+                    const rankMatches =
+                        normalized.match(
+                            /\d+/g
+                        );
+
+
+                    if (
+                        !Array.isArray(
+                            rankMatches
+                        ) ||
+                        rankMatches.length ===
+                            0
+                    ) {
+
+                        return match;
+
+                    }
+
+
+                    // ==================================
+                    // إزالة التكرار
+                    // ==================================
+
+                    const ranks =
+                        [];
+
+
+                    rankMatches.forEach(
+                        function (
+                            value
+                        ) {
+
+                            const rank =
+                                Number(
+                                    value
+                                );
+
+
+                            if (
+                                !Number.isFinite(
+                                    rank
+                                ) ||
+                                rank <=
+                                    0
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            if (
+                                !ranks.includes(
+                                    rank
+                                )
+                            ) {
+
+                                ranks.push(
+                                    rank
+                                );
+
+                            }
+
+                        }
+                    );
 
 
                     if (
@@ -13418,56 +13456,84 @@ function formatAIMessage(
                     }
 
 
-                    const citationButtons =
-                        ranks
-                            .map(
-                                function (
-                                    rank
+                    // ==================================
+                    // تحويل كل إحالة إلى زر مستقل
+                    // ==================================
+
+                    const buttons =
+                        ranks.map(
+                            function (
+                                rank
+                            ) {
+
+                                const source =
+                                    sources.find(
+                                        function (
+                                            item
+                                        ) {
+
+                                            return (
+                                                Number(
+                                                    item.rank
+                                                ) ===
+                                                rank
+                                            );
+
+                                        }
+                                    );
+
+
+                                // ----------------------------------
+                                // إذا لم يوجد المصدر
+                                // نحافظ على النص بدل إخفائه.
+                                // ----------------------------------
+
+                                if (
+                                    !source
                                 ) {
 
-                                    const source =
-                                        sources.find(
-                                            function (
-                                                item
-                                            ) {
-
-                                                return (
-                                                    Number(
-                                                        item.rank
-                                                    ) ===
-                                                    rank
-                                                );
-
-                                            }
-                                        );
-
-
-                                    if (!source) {
-
-                                        return (
-                                            "[مقطع " +
-                                            rank +
-                                            "]"
-                                        );
-
-                                    }
-
-
-                                    return `
-                                        <button
-                                            type="button"
-                                            class="document-citation"
-                                            data-citation-rank="${rank}"
-                                            title="الانتقال إلى المقطع ${rank}">
-                                            [مقطع ${rank}]
-                                        </button>
-                                    `;
+                                    return (
+                                        "[مقطع " +
+                                        rank +
+                                        "]"
+                                    );
 
                                 }
-                            );
 
 
-                    return citationButtons.join(
+                                return (
+
+                                    '<button ' +
+
+                                    'type="button" ' +
+
+                                    'class="document-citation" ' +
+
+                                    'data-citation-rank="' +
+                                    rank +
+                                    '" ' +
+
+                                    'title="الانتقال إلى المقطع ' +
+                                    rank +
+                                    '">' +
+
+                                    "[مقطع " +
+                                    rank +
+                                    "]" +
+
+                                    "</button>"
+
+                                );
+
+                            }
+                        );
+
+
+                    // ==================================
+                    // فصل الأزرار
+                    // ==================================
+
+                    return buttons.join(
                         " "
                     );
 
@@ -13478,20 +13544,23 @@ function formatAIMessage(
         return html;
 
     }
-    catch (error) {
+    catch (
+        error
+    ) {
 
-        console.error(
-            "Markdown formatting error:",
+        console.warn(
+            "فشل تنسيق رسالة الذكاء الاصطناعي:",
             error
         );
 
 
         return String(
             text
-        ).replace(
-            /\n/g,
-            "<br>"
-        );
+        )
+            .replace(
+                /\n/g,
+                "<br>"
+            );
 
     }
 
