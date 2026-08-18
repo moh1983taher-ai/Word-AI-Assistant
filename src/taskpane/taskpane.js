@@ -6555,7 +6555,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // تحليل الاستعلام الجديد
+    // تحليل الاستعلام
     // ==================================
 
     const queryAnalysis =
@@ -6563,49 +6563,55 @@ async function searchIndexedDocument(
             searchTerm,
             structureData
         );
+
+
     console.log(
-            "======================================"
-        );
+        "======================================"
+    );
 
-        console.log(
-            "تحليل الاستعلام:",
-            searchTerm
-        );
+    console.log(
+        "تحليل الاستعلام:",
+        searchTerm
+    );
 
-        console.log(
-            "كل الكلمات:",
-            queryAnalysis.allTokens
-        );
+    console.log(
+        "كل الكلمات:",
+        queryAnalysis.allTokens
+    );
 
-        console.log(
-            "كلمات المحتوى:",
-            queryAnalysis.contentTokens
-        );
+    console.log(
+        "كلمات المحتوى:",
+        queryAnalysis.contentTokens
+    );
 
-        console.log(
-            "الكلمات الوظيفية:",
-            queryAnalysis.functionTokens
-        );
+    console.log(
+        "الكلمات الوظيفية:",
+        queryAnalysis.functionTokens
+    );
 
-        console.log(
-            "العبارات المركبة:",
-            queryAnalysis.phraseCandidates
-        );
+    console.log(
+        "العبارات المركبة:",
+        queryAnalysis.phraseCandidates
+    );
 
-        console.log(
-            "العائلات:",
-            queryAnalysis.families
-        );
+    console.log(
+        "العائلات:",
+        queryAnalysis.families
+    );
 
-        console.log(
-            "المصطلحات الموزونة:",
-            queryAnalysis.weightedTerms
-        );
+    console.log(
+        "المصطلحات الموزونة:",
+        queryAnalysis.weightedTerms
+    );
 
-        console.log(
-            "======================================"
-        );
+    console.log(
+        "======================================"
+    );
 
+
+    // ==================================
+    // حماية المخرجات
+    // ==================================
 
     const queryTokens =
         Array.isArray(
@@ -6989,17 +6995,6 @@ async function searchIndexedDocument(
 
     // ==================================
     // 3) المصطلحات الموضوعية + الصيغ العربية
-    //
-    // مثال:
-    // والاستحسان
-    // ↓
-    // والاستحسان
-    // الاستحسان
-    //
-    // بالقياس
-    // ↓
-    // بالقياس
-    // القياس
     // ==================================
 
     weightedTerms.forEach(
@@ -7024,10 +7019,6 @@ async function searchIndexedDocument(
                 );
 
 
-            // ==================================
-            // الصيغ التي استخرجها المحلل
-            // ==================================
-
             const variants =
                 Array.isArray(
                     item.variants
@@ -7041,10 +7032,6 @@ async function searchIndexedDocument(
                         item.term
                     ];
 
-
-            // ==================================
-            // منع البحث المكرر
-            // ==================================
 
             const searchedVariants =
                 [];
@@ -7100,11 +7087,6 @@ async function searchIndexedDocument(
                     }
 
 
-                    // ==================================
-                    // الصيغة الأصلية أقوى قليلًا
-                    // من الصيغة المطَبَّعة
-                    // ==================================
-
                     let variantWeight =
                         termWeight;
 
@@ -7155,11 +7137,8 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // لا نحتاج الكلمات الوظيفية
-    // وحدها في استعلام Orama
-    //
-    // لكنها بقيت في queryAnalysis
-    // ويمكن استخدامها كعامل توجيهي لاحقًا.
+    // الكلمات الوظيفية لا تدخل البحث
+    // منفردة في Orama
     // ==================================
 
     void functionTokens;
@@ -7666,6 +7645,15 @@ async function searchIndexedDocument(
                 mergedItem.document;
 
 
+            if (
+                !paragraph
+            ) {
+
+                return;
+
+            }
+
+
             const originalText =
                 String(
                     paragraph.text ||
@@ -7730,19 +7718,41 @@ async function searchIndexedDocument(
                         }
 
 
-                        const normalizedTerm =
-                            normalizeSearchText(
-                                item.term
-                            );
+                        const variants =
+                            Array.isArray(
+                                item.variants
+                            ) &&
+                            item.variants.length >
+                                0
+
+                                ? item.variants
+
+                                : [
+                                    item.term
+                                ];
 
 
-                        return (
-                            normalizedText.includes(
-                                normalizedTerm
-                            ) ||
-                            normalizedHeading.includes(
-                                normalizedTerm
-                            )
+                        return variants.some(
+                            function (
+                                variant
+                            ) {
+
+                                const normalizedVariant =
+                                    normalizeSearchText(
+                                        variant
+                                    );
+
+
+                                return (
+                                    normalizedText.includes(
+                                        normalizedVariant
+                                    ) ||
+                                    normalizedHeading.includes(
+                                        normalizedVariant
+                                    )
+                                );
+
+                            }
                         );
 
                     }
@@ -7750,7 +7760,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // تغطية المصطلحات الموضوعية
+            // المصطلحات الموزونة
             // ==================================
 
             let weightedMatchedTotal =
@@ -7766,6 +7776,16 @@ async function searchIndexedDocument(
                     item
                 ) {
 
+                    if (
+                        !item ||
+                        !item.term
+                    ) {
+
+                        return;
+
+                    }
+
+
                     const weight =
                         Number(
                             item.weight ||
@@ -7777,19 +7797,47 @@ async function searchIndexedDocument(
                         weight;
 
 
-                    const normalizedTerm =
-                        normalizeSearchText(
-                            item.term
+                    const variants =
+                        Array.isArray(
+                            item.variants
+                        ) &&
+                        item.variants.length >
+                            0
+
+                            ? item.variants
+
+                            : [
+                                item.term
+                            ];
+
+
+                    const matched =
+                        variants.some(
+                            function (
+                                variant
+                            ) {
+
+                                const normalizedVariant =
+                                    normalizeSearchText(
+                                        variant
+                                    );
+
+
+                                return (
+                                    normalizedText.includes(
+                                        normalizedVariant
+                                    ) ||
+                                    normalizedHeading.includes(
+                                        normalizedVariant
+                                    )
+                                );
+
+                            }
                         );
 
 
                     if (
-                        normalizedText.includes(
-                            normalizedTerm
-                        ) ||
-                        normalizedHeading.includes(
-                            normalizedTerm
-                        )
+                        matched
                     ) {
 
                         weightedMatchedValue +=
@@ -7812,26 +7860,9 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // تغطية مفاهيم السؤال
-            //
-            // قاعدة عامة:
-            // كلما اجتمعت مفاهيم السؤال الأساسية
-            // في الفقرة نفسها ارتفعت قيمة الفقرة.
-            //
-            // لا يعتمد هذا على كون السؤال:
-            // تعريفًا أو أثرًا أو مقارنة.
-            // ==================================
-
-            const conceptCoverage =
-                contentTokens.length >
-                0
-
-                    ? directMatchedContentTokens.length /
-                    contentTokens.length
-
-                    : 0;
-            // ==================================
             // الكلمات الأساسية المباشرة
+            //
+            // نراعي صيغ الكلمات العربية أيضًا
             // ==================================
 
             const directMatchedContentTokens =
@@ -7840,19 +7871,33 @@ async function searchIndexedDocument(
                         token
                     ) {
 
-                        const normalizedToken =
-                            normalizeSearchText(
+                        const variants =
+                            getSearchTermVariantsForRanking(
                                 token
                             );
 
 
-                        return (
-                            normalizedText.includes(
-                                normalizedToken
-                            ) ||
-                            normalizedHeading.includes(
-                                normalizedToken
-                            )
+                        return variants.some(
+                            function (
+                                variant
+                            ) {
+
+                                const normalizedVariant =
+                                    normalizeSearchText(
+                                        variant
+                                    );
+
+
+                                return (
+                                    normalizedText.includes(
+                                        normalizedVariant
+                                    ) ||
+                                    normalizedHeading.includes(
+                                        normalizedVariant
+                                    )
+                                );
+
+                            }
                         );
 
                     }
@@ -7867,6 +7912,15 @@ async function searchIndexedDocument(
                       contentTokens.length
 
                     : 0;
+
+
+            // ==================================
+            // تغطية المفاهيم
+            // نفس تغطية المحتوى
+            // ==================================
+
+            const conceptCoverage =
+                directContentCoverage;
 
 
             // ==================================
@@ -7947,7 +8001,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // العبارات المركبة الموجودة
+            // العبارات المركبة
             // ==================================
 
             let matchedPhraseCount =
@@ -8011,16 +8065,30 @@ async function searchIndexedDocument(
                     token
                 ) {
 
-                    const normalizedToken =
-                        normalizeSearchText(
+                    const variants =
+                        getSearchTermVariantsForRanking(
                             token
                         );
 
 
+                    const found =
+                        variants.some(
+                            function (
+                                variant
+                            ) {
+
+                                return normalizedHeading.includes(
+                                    normalizeSearchText(
+                                        variant
+                                    )
+                                );
+
+                            }
+                        );
+
+
                     if (
-                        normalizedHeading.includes(
-                            normalizedToken
-                        )
+                        found
                     ) {
 
                         headingScore +=
@@ -8050,10 +8118,24 @@ async function searchIndexedDocument(
                         token
                     ) {
 
-                        return normalizedHeading.includes(
-                            normalizeSearchText(
+                        const variants =
+                            getSearchTermVariantsForRanking(
                                 token
-                            )
+                            );
+
+
+                        return variants.some(
+                            function (
+                                variant
+                            ) {
+
+                                return normalizedHeading.includes(
+                                    normalizeSearchText(
+                                        variant
+                                    )
+                                );
+
+                            }
                         );
 
                     }
@@ -8093,7 +8175,6 @@ async function searchIndexedDocument(
 
             // ==================================
             // الدرجة الأساسية
-            // Orama هو الأساس
             // ==================================
 
             let score =
@@ -8104,7 +8185,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // تغطية المصطلحات الموزونة
+            // تغطية المصطلحات
             // ==================================
 
             score +=
@@ -8113,22 +8194,22 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // تغطية المفاهيم الأساسية
+            // تغطية المفاهيم
             // ==================================
 
             score +=
-                directContentCoverage *
+                conceptCoverage *
                 18;
 
 
             // ==================================
-            // تعزيز اجتماع جميع المفاهيم
+            // اجتماع المفاهيم
             // ==================================
 
             if (
                 contentTokens.length >=
                     2 &&
-                directContentCoverage >=
+                conceptCoverage >=
                     1
             ) {
 
@@ -8204,9 +8285,6 @@ async function searchIndexedDocument(
                 profileScore;
 
 
-
-
-
             // ==================================
             // العبارة الكاملة
             // ==================================
@@ -8222,7 +8300,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // اجتماع أكثر من مفهوم
+            // اجتماع العائلات
             // ==================================
 
             if (
@@ -8248,7 +8326,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // فلترة عامة جدًا فقط
+            // فلترة عامة جدًا
             // ==================================
 
             if (
@@ -8266,7 +8344,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // نوع التطابق
+            // نوع المطابقة
             // ==================================
 
             let matchType =
@@ -8311,7 +8389,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // بناء السياق
+            // السياق
             // ==================================
 
             let context =
@@ -8335,28 +8413,55 @@ async function searchIndexedDocument(
                 i++
             ) {
 
-                const normalizedToken =
-                    normalizeSearchText(
+                const variants =
+                    getSearchTermVariantsForRanking(
                         contentTokens[i]
                     );
 
 
-                const position =
-                    normalizedText.indexOf(
-                        normalizedToken
-                    );
+                for (
+                    let j = 0;
+
+                    j <
+                        variants.length;
+
+                    j++
+                ) {
+
+                    const normalizedVariant =
+                        normalizeSearchText(
+                            variants[j]
+                        );
+
+
+                    const position =
+                        normalizedText.indexOf(
+                            normalizedVariant
+                        );
+
+
+                    if (
+                        position >=
+                        0
+                    ) {
+
+                        firstContentPosition =
+                            position;
+
+                        firstContentToken =
+                            normalizedVariant;
+
+                        break;
+
+                    }
+
+                }
 
 
                 if (
-                    position >=
+                    firstContentPosition >=
                     0
                 ) {
-
-                    firstContentPosition =
-                        position;
-
-                    firstContentToken =
-                        normalizedToken;
 
                     break;
 
@@ -8491,8 +8596,6 @@ async function searchIndexedDocument(
                 familyCoverage:
                     familyCoverage,
 
-                    
-
                 headingScore:
                     headingScore,
 
@@ -8543,6 +8646,27 @@ async function searchIndexedDocument(
                     ) -
                     Number(
                         a.score
+                    )
+                );
+
+            }
+
+
+            if (
+                Number(
+                    b.conceptCoverage
+                ) !==
+                Number(
+                    a.conceptCoverage
+                )
+            ) {
+
+                return (
+                    Number(
+                        b.conceptCoverage
+                    ) -
+                    Number(
+                        a.conceptCoverage
                     )
                 );
 
