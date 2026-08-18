@@ -13297,11 +13297,9 @@ function formatAIMessage(
 
 
     const sources =
-        Array.isArray(
+        cloneCitationSources(
             citationSources
-        )
-            ? citationSources
-            : [];
+        );
 
 
     // ==================================
@@ -14514,8 +14512,19 @@ function saveChat(
 }
 
 
+
 // =====================================================
-// Ensure Citation Sources Are Stable
+// Clone Citation Sources
+//
+// يحفظ جميع البيانات اللازمة للإحالة:
+// - rank
+// - paragraphIndex
+// - paragraphId
+// - heading
+// - mainParagraph
+// - text
+//
+// حتى تبقى الإحالة صالحة بعد إغلاق الدردشة وفتحها.
 // =====================================================
 
 function cloneCitationSources(
@@ -14538,6 +14547,15 @@ function cloneCitationSources(
             source
         ) {
 
+            if (
+                !source
+            ) {
+
+                return null;
+
+            }
+
+
             return {
 
                 rank:
@@ -14547,16 +14565,22 @@ function cloneCitationSources(
                     ),
 
                 paragraphIndex:
-                    Number(
-                        source.paragraphIndex ||
-                        0
-                    ),
+                    source.paragraphIndex !==
+                        undefined
+                        ? Number(
+                            source.paragraphIndex
+                        )
+                        : null,
 
                 paragraphId:
-                    String(
-                        source.paragraphId ||
-                        ""
-                    ),
+                    source.paragraphId !==
+                        undefined &&
+                    source.paragraphId !==
+                        null
+                        ? String(
+                            source.paragraphId
+                        )
+                        : "",
 
                 heading:
                     String(
@@ -14567,12 +14591,14 @@ function cloneCitationSources(
                 mainParagraph:
                     String(
                         source.mainParagraph ||
+                        source.text ||
                         ""
                     ),
 
                 text:
                     String(
                         source.text ||
+                        source.mainParagraph ||
                         ""
                     ),
 
@@ -14583,12 +14609,25 @@ function cloneCitationSources(
                     ),
 
                 matchType:
-                    String(
-                        source.matchType ||
-                        "family"
-                    )
+                    source.matchType ||
+                    "word"
 
             };
+
+        }
+    ).filter(
+        function (
+            source
+        ) {
+
+            return (
+                source &&
+                Number.isFinite(
+                    source.rank
+                ) &&
+                source.rank >
+                    0
+            );
 
         }
     );
