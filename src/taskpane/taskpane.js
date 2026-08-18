@@ -1833,19 +1833,20 @@ async function readCurrentWordDocument(
 
 
 
-// =====================================================
+
+// ======================================
 // Set Active Document
 //
-// وجود currentDocument يعني أن المستند فعّال للدردشة.
-// عدم وجوده يعني أن الدردشة عامة.
-// =====================================================
+// currentDocument هو المستند المفعّل
+// للدردشة والبحث.
+// ======================================
 
 function setCurrentDocument(
     documentItem
 ) {
 
     // ==================================
-    // إلغاء المستند
+    // إلغاء التفعيل
     // ==================================
 
     if (
@@ -1920,7 +1921,6 @@ function setCurrentDocument(
         documentItem;
 
 
-    // كل سؤال جديد يبدأ بإحالات جديدة
     currentCitationSources =
         [];
 
@@ -1936,7 +1936,7 @@ function setCurrentDocument(
 
 
     // ==================================
-    // تبديل فهرس Orama إلى المستند الحالي
+    // تبديل فهرس Orama
     // ==================================
 
     if (
@@ -1973,8 +1973,10 @@ function setCurrentDocument(
 
 
     // ==================================
-    // إذا كان المستند مقروءًا
-    // نجهز فهرسه مباشرة
+    // المستند مقروء مسبقًا
+    //
+    // لا نستدعي ensureDocumentIndex
+    // لأنها غير موجودة في النسخة الحالية.
     // ==================================
 
     if (
@@ -1982,34 +1984,7 @@ function setCurrentDocument(
         "read"
     ) {
 
-        ensureDocumentIndex(
-            documentItem
-        )
-        .then(
-            function () {
-
-                renderDocuments();
-
-            }
-        )
-        .catch(
-            function (
-                error
-            ) {
-
-                console.error(
-                    "تعذر تحديث فهرس المستند:",
-                    error
-                );
-
-                renderDocuments();
-
-            }
-        );
-
-
         renderDocuments();
-
 
         return;
 
