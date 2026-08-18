@@ -13709,9 +13709,19 @@ async function searchCitationInWord(
 }
 
 
+
 // =====================================================
 // Open Citation In Word
-// الانتقال إلى المقطع الأصلي في Word
+//
+// الأولوية:
+// 1) الانتقال بواسطة paragraphIndex.
+// 2) البحث بالنص الأصلي.
+// 3) البحث بمقتطف أقصر.
+// 4) البحث بالنص المنظف كخطة أخيرة.
+//
+// الهدف:
+// جعل الإحالة مرتبطة بموضع Word الحقيقي
+// وليس بنص السياق الذي أُرسل إلى AI.
 // =====================================================
 
 async function openCitationInWord(
@@ -13719,12 +13729,31 @@ async function openCitationInWord(
 ) {
 
     const source =
-        getCitationSource(
-            rank
-        );
+        Array.isArray(
+            currentCitationSources
+        )
+            ? currentCitationSources.find(
+                function (
+                    item
+                ) {
+
+                    return (
+                        Number(
+                            item.rank
+                        ) ===
+                        Number(
+                            rank
+                        )
+                    );
+
+                }
+            )
+            : null;
 
 
-    if (!source) {
+    if (
+        !source
+    ) {
 
         console.warn(
             "لم يتم العثور على مصدر الإحالة:",
@@ -13742,7 +13771,7 @@ async function openCitationInWord(
     ) {
 
         console.warn(
-            "Word API غير متاحة."
+            "Word غير متاح."
         );
 
         return;
@@ -13762,19 +13791,221 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // النص الأساسي للمقطع
+                // 1) الأولوية لموضع الفقرة
                 // ==================================
 
-                let searchText =
-                    prepareCitationSearchText(
-                        source.mainParagraph ||
-                        source.text ||
-                        "",
-                        180
+                const paragraphIndex =
+                    Number(
+                        source.paragraphIndex
                     );
 
 
-                if (!searchText) {
+                if (
+                    Number.isFinite(
+                        paragraphIndex
+                    )
+                ) {
+
+                    const paragraphs =
+                        body.paragraphs;
+
+
+                    paragraphs.load(
+                        "items/text"
+                    );
+
+
+                    await context.sync();
+
+
+                    const items =
+                        paragraphs.items;
+
+
+                    // ==================================
+                    // تجربة الفهرس كما هو
+                    // ==================================
+
+                    const directIndexes =
+                        [];
+
+
+                    directIndexes.push(
+                        paragraphIndex
+                    );
+
+
+                    // ==================================
+                    // تجربة احتمال اختلاف
+                    // الفهرسة بين 0 و1
+                    // ==================================
+
+                    if (
+                        paragraphIndex >
+                        0
+                    ) {
+
+                        directIndexes.push(
+                            paragraphIndex - 1
+                        );
+
+                    }
+
+
+                    directIndexes.push(
+                        paragraphIndex + 1
+                    );
+
+
+                    for (
+                        let i =
+                            0;
+
+                        i <
+                            directIndexes.length;
+
+                        i++
+                    ) {
+
+                        const index =
+                            directIndexes[i];
+
+
+                        if (
+                            index <
+                            0 ||
+                            index >=
+                            items.length
+                        ) {
+
+                            continue;
+
+                        }
+
+
+                        const paragraph =
+                            items[index];
+
+
+                        const paragraphText =
+                            String(
+                                paragraph.text ||
+                                ""
+                            ).trim();
+
+
+                        if (
+                            !paragraphText
+                        ) {
+
+                            continue;
+
+                        }
+
+
+                        // ----------------------------------
+                        // إذا كان النص قريبًا من المصدر
+                        // نستخدم الفقرة مباشرة.
+                        // ----------------------------------
+
+                        const sourceText =
+                            String(
+                                source.mainParagraph ||
+                                source.text ||
+                                ""
+                            ).trim();
+
+
+                        const normalizedSource =
+                            normalizeSearchText(
+                                sourceText
+                            );
+
+
+                        const normalizedParagraph =
+                            normalizeSearchText(
+                                paragraphText
+                            );
+
+
+                        const sourcePrefix =
+                            normalizedSource.substring(
+                                0,
+                                Math.min(
+                                    120,
+                                    normalizedSource.length
+                                )
+                            );
+
+
+                        const paragraphPrefix =
+                            normalizedParagraph.substring(
+                                0,
+                                Math.min(
+                                    120,
+                                    normalizedParagraph.length
+                                )
+                            );
+
+
+                        if (
+                            (
+                                sourcePrefix &&
+                                paragraphPrefix &&
+                                (
+                                    normalizedParagraph.includes(
+                                        sourcePrefix
+                                    ) ||
+                                    normalizedSource.includes(
+                                        paragraphPrefix
+                                    )
+                                )
+                            ) ||
+                            Number(
+                                index
+                            ) ===
+                            Number(
+                                paragraphIndex
+                            )
+                        ) {
+
+                            paragraph.select(
+                                "Select"
+                            );
+
+
+                            await context.sync();
+
+
+                            return;
+
+                        }
+
+                    }
+
+                }
+
+
+                // ==================================
+                // 2) البحث بالنص الأصلي
+                // ==================================
+
+                let searchText =
+                    String(
+                        source.mainParagraph ||
+                        source.text ||
+                        ""
+                    )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim();
+
+
+                if (
+                    !searchText
+                ) {
 
                     throw new Error(
                         "لا يوجد نص صالح للمقطع."
@@ -13784,27 +14015,76 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // المحاولة الأولى
+                // الاحتفاظ بالمصدر الأصلي
+                // قبل أي اختصار
                 // ==================================
 
+                const originalSearchText =
+                    searchText;
+
+
+                // ==================================
+                // لا نرسل نصًا ضخمًا إلى Word search
+                // ==================================
+
+                if (
+                    searchText.length >
+                    220
+                ) {
+
+                    searchText =
+                        searchText.substring(
+                            0,
+                            220
+                        ).trim();
+
+                }
+
+
                 let results =
-                    await searchCitationInWord(
-                        body,
-                        searchText
+                    body.search(
+                        searchText,
+                        {
+
+                            matchCase:
+                                false,
+
+                            matchWholeWord:
+                                false,
+
+                            matchWildcards:
+                                false,
+
+                            ignorePunct:
+                                true,
+
+                            ignoreSpace:
+                                true
+
+                        }
                     );
 
 
+                results.load(
+                    "items"
+                );
+
+
+                await context.sync();
+
+
                 if (
-                    results.length >
+                    results.items.length >
                     0
                 ) {
 
-                    results[0].select(
+                    results.items[0].select(
                         "Select"
                     );
 
 
                     await context.sync();
+
 
                     return;
 
@@ -13812,43 +14092,70 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // المحاولة الثانية
-                // نص أقصر
+                // 3) مقتطف أقصر
                 // ==================================
 
-                const fallbackText =
-                    prepareCitationSearchText(
-                        source.mainParagraph ||
-                        source.text ||
-                        "",
-                        80
-                    );
+                let fallback =
+                    originalSearchText
+                        .substring(
+                            0,
+                            Math.min(
+                                100,
+                                originalSearchText.length
+                            )
+                        )
+                        .trim();
 
 
                 if (
-                    fallbackText &&
-                    fallbackText !==
-                        searchText
+                    fallback.length >
+                    20
                 ) {
 
                     results =
-                        await searchCitationInWord(
-                            body,
-                            fallbackText
+                        body.search(
+                            fallback,
+                            {
+
+                                matchCase:
+                                    false,
+
+                                matchWholeWord:
+                                    false,
+
+                                matchWildcards:
+                                    false,
+
+                                ignorePunct:
+                                    true,
+
+                                ignoreSpace:
+                                    true
+
+                            }
                         );
 
 
+                    results.load(
+                        "items"
+                    );
+
+
+                    await context.sync();
+
+
                     if (
-                        results.length >
+                        results.items.length >
                         0
                     ) {
 
-                        results[0].select(
+                        results.items[0].select(
                             "Select"
                         );
 
 
                         await context.sync();
+
 
                         return;
 
@@ -13858,45 +14165,73 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // المحاولة الثالثة
-                // استخدام جزء من السياق
+                // 4) البحث بالنص المنظف
                 // ==================================
 
-                const contextText =
-                    prepareCitationSearchText(
-                        source.text ||
-                        source.mainParagraph ||
-                        "",
-                        50
+                const normalized =
+                    normalizeSearchText(
+                        originalSearchText
                     );
 
 
+                fallback =
+                    normalized.substring(
+                        0,
+                        Math.min(
+                            100,
+                            normalized.length
+                        )
+                    ).trim();
+
+
                 if (
-                    contextText &&
-                    contextText !==
-                        searchText &&
-                    contextText !==
-                        fallbackText
+                    fallback
                 ) {
 
                     results =
-                        await searchCitationInWord(
-                            body,
-                            contextText
+                        body.search(
+                            fallback,
+                            {
+
+                                matchCase:
+                                    false,
+
+                                matchWholeWord:
+                                    false,
+
+                                matchWildcards:
+                                    false,
+
+                                ignorePunct:
+                                    true,
+
+                                ignoreSpace:
+                                    true
+
+                            }
                         );
 
 
+                    results.load(
+                        "items"
+                    );
+
+
+                    await context.sync();
+
+
                     if (
-                        results.length >
+                        results.items.length >
                         0
                     ) {
 
-                        results[0].select(
+                        results.items[0].select(
                             "Select"
                         );
 
 
                         await context.sync();
+
 
                         return;
 
@@ -13913,7 +14248,9 @@ async function openCitationInWord(
         );
 
     }
-    catch (error) {
+    catch (
+        error
+    ) {
 
         console.error(
             "تعذر الانتقال إلى المقطع:",
