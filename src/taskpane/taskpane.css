@@ -767,15 +767,23 @@ body.expanded-sidebar-open .sidebar-hover-zone {
    ========================================================= */
 
 .projects-popup {
+
     display: none;
 
     position: absolute;
 
     top: 60px;
-    left: 70px;
 
-    width: 260px;
-    max-width: calc(100vw - 90px);
+    /* المسافة من الحافة تبقى آمنة */
+    left: 8px;
+
+    /* عرض النافذة يستفيد من المساحة المتاحة */
+    width: calc(100vw - 16px);
+
+    max-width: none;
+
+    /* منع خروج النافذة عموديًا */
+    max-height: calc(100vh - 76px);
 
     background: #ffffff;
 
@@ -783,16 +791,21 @@ body.expanded-sidebar-open .sidebar-hover-zone {
 
     padding: 8px;
 
+    box-sizing: border-box;
+
     box-shadow:
         0 4px 20px rgba(0, 0, 0, 0.15);
 
     z-index: 1000;
 
-    overflow: visible;
+    overflow: hidden;
 }
 
+
 .projects-popup.open {
+
     display: block;
+
 }
 
 .projects-header {
@@ -1287,20 +1300,7 @@ span {
     font-size: inherit;
 }
 
-/* ==================================
-   نافذة المشاريع
-   تستفيد من كامل العرض المتاح
-   ================================== */
 
-.projects-popup {
-
-    width: calc(100% - 16px);
-
-    max-width: none;
-
-    box-sizing: border-box;
-
-}
 /* ==================================
    قائمة خيارات المشروع
    ================================== */
