@@ -13274,12 +13274,10 @@ async function ensureOramaDocumentReady(
 
 
 
+
 // =====================================================
-// Format AI Message
+// FORMAT AI MESSAGE
 // Markdown + Interactive Citations
-//
-// كل رسالة تسجل إحالاتها في citationRegistry
-// بشكل مستقل عن بقية الرسائل.
 // =====================================================
 
 function formatAIMessage(
@@ -13297,28 +13295,38 @@ function formatAIMessage(
 
 
     const sources =
-        cloneCitationSources(
+        Array.isArray(
             citationSources
+        )
+            ? citationSources
+            : [];
+
+
+    // ==================================
+    // إنشاء هوية ثابتة لمجموعة الإحالات
+    // الخاصة بهذه الرسالة
+    // ==================================
+
+    const citationGroupId =
+        fixedCitationGroupId ||
+        (
+            "citation-" +
+            Date.now() +
+            "-" +
+            Math.random()
+                .toString(
+                    36
+                )
+                .substring(
+                    2,
+                    10
+                )
         );
 
 
     // ==================================
-    // معرف مستقل لهذه المجموعة
+    // حفظ مصادر هذه الرسالة
     // ==================================
-
-    const citationGroupId =
-        "citation-" +
-        Date.now() +
-        "-" +
-        Math.random()
-            .toString(
-                36
-            )
-            .substring(
-                2,
-                10
-            );
-
 
     citationRegistry.set(
         citationGroupId,
@@ -13336,10 +13344,16 @@ function formatAIMessage(
                         ),
 
                     paragraphIndex:
-                        source.paragraphIndex,
+                        source.paragraphIndex !==
+                            undefined
+                            ? Number(
+                                source.paragraphIndex
+                            )
+                            : null,
 
                     paragraphId:
-                        source.paragraphId,
+                        source.paragraphId ||
+                        "",
 
                     heading:
                         source.heading ||
@@ -13382,13 +13396,7 @@ function formatAIMessage(
 
 
         // ==================================
-        // الإحالات
-        //
-        // يدعم:
-        // [مقطع 1]
-        // [مقطع 1، مقطع 5]
-        // [مقطع 1 و5]
-        // [مقطع 1، 5]
+        // الإحالات المجمعة
         // ==================================
 
         html =
@@ -13428,9 +13436,7 @@ function formatAIMessage(
                     if (
                         !Array.isArray(
                             rankMatches
-                        ) ||
-                        rankMatches.length ===
-                            0
+                        )
                     ) {
 
                         return match;
@@ -13492,6 +13498,11 @@ function formatAIMessage(
                     }
 
 
+                    // ==================================
+                    // كل إحالة زر مستقل
+                    // لكن جميعها تحمل نفس المجموعة
+                    // ==================================
+
                     return ranks
                         .map(
                             function (
@@ -13531,16 +13542,15 @@ function formatAIMessage(
                                 return (
 
                                     '<button ' +
-
                                     'type="button" ' +
-
                                     'class="document-citation" ' +
-
                                     'data-citation-group="' +
                                     citationGroupId +
                                     '" ' +
-
                                     'data-citation-rank="' +
+                                    rank +
+                                    '" ' +
+                                    'title="الانتقال إلى المقطع ' +
                                     rank +
                                     '">' +
 
@@ -13589,6 +13599,16 @@ function formatAIMessage(
 
 // =====================================================
 // Citation Click Handler
+//
+// كل زر إحالة يحمل:
+// 1) رقم المقطع
+// 2) مجموعة الإحالات الخاصة برسالته
+//
+// لذلك يمكن أن تكون هناك:
+// [مقطع 1] في رسالة أولى
+// [مقطع 1] في رسالة ثانية
+//
+// ولكل واحدة مصدر مختلف.
 // =====================================================
 
 if (chatArea) {
@@ -13605,7 +13625,9 @@ if (chatArea) {
                 );
 
 
-            if (!citation) {
+            if (
+                !citation
+            ) {
 
                 return;
 
@@ -13617,6 +13639,20 @@ if (chatArea) {
             event.stopPropagation();
 
 
+            // ==================================
+            // مجموعة إحالات هذه الرسالة
+            // ==================================
+
+            const groupId =
+                citation.getAttribute(
+                    "data-citation-group"
+                );
+
+
+            // ==================================
+            // رقم المقطع
+            // ==================================
+
             const rank =
                 Number(
                     citation.getAttribute(
@@ -13626,16 +13662,116 @@ if (chatArea) {
 
 
             if (
-                !Number.isNaN(
+                !groupId ||
+                !Number.isFinite(
                     rank
                 )
             ) {
 
-                openCitationInWord(
-                    rank
+                console.warn(
+                    "بيانات الإحالة غير صالحة:",
+                    {
+                        groupId:
+                            groupId,
+
+                        rank:
+                            rank
+                    }
                 );
 
+                return;
+
             }
+
+
+            // ==================================
+            // استرجاع مصادر الرسالة نفسها
+            // ==================================
+
+            const sources =
+                citationRegistry.get(
+                    groupId
+                );
+
+
+            if (
+                !Array.isArray(
+                    sources
+                )
+            ) {
+
+                console.warn(
+                    "لم يتم العثور على مجموعة الإحالات:",
+                    groupId
+                );
+
+                return;
+
+            }
+
+
+            // ==================================
+            // البحث عن المقطع داخل
+            // مجموعة الرسالة نفسها
+            // ==================================
+
+            const source =
+                sources.find(
+                    function (
+                        item
+                    ) {
+
+                        return (
+                            item &&
+                            Number(
+                                item.rank
+                            ) ===
+                            rank
+                        );
+
+                    }
+                );
+
+
+            if (
+                !source
+            ) {
+
+                console.warn(
+                    "لم يتم العثور على مصدر الإحالة:",
+                    {
+                        groupId:
+                            groupId,
+
+                        rank:
+                            rank
+                    }
+                );
+
+                return;
+
+            }
+
+
+            // ==================================
+            // توافق مع openCitationInWord(rank)
+            //
+            // لا نغيّر الدالة التي ثبت أنها تعمل.
+            // نجعل currentCitationSources مؤقتًا
+            // يساوي مصادر الرسالة التي نقرنا عليها.
+            // ==================================
+
+            currentCitationSources =
+                sources;
+
+
+            // ==================================
+            // الانتقال إلى المقطع
+            // ==================================
+
+            openCitationInWord(
+                rank
+            );
 
         }
     );
@@ -20211,15 +20347,20 @@ window.testStreamingAI =
         }
 
     };
-    // =====================================================
+    
+// =====================================================
 // Research Tools
 // PART 8
 // Send Message + Streaming UI + Save AI Response
 // =====================================================
 
 
+
 // =====================================================
 // Render Streaming Text
+//
+// لكل رسالة أثناء البث مجموعة إحالات ثابتة واحدة.
+// لا يتم إنشاء citationGroupId جديد مع كل Chunk.
 // =====================================================
 
 function renderStreamingText(
@@ -20254,16 +20395,44 @@ function renderStreamingText(
     }
     else {
 
+        // ==================================
+        // إنشاء هوية ثابتة لهذه الرسالة
+        // أثناء البث
+        // ==================================
+
+        if (
+            !loadingElement.dataset.citationGroupId
+        ) {
+
+            loadingElement.dataset.citationGroupId =
+                "stream-citation-" +
+                Date.now() +
+                "-" +
+                Math.random()
+                    .toString(
+                        36
+                    )
+                    .substring(
+                        2,
+                        10
+                    );
+
+        }
+
+
         loadingElement.innerHTML =
             formatAIMessage(
                 value,
-                currentCitationSources
+                currentCitationSources,
+                loadingElement.dataset.citationGroupId
             );
 
     }
 
 
-    if (chatArea) {
+    if (
+        chatArea
+    ) {
 
         chatArea.scrollTop =
             chatArea.scrollHeight;
