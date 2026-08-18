@@ -21703,7 +21703,7 @@ function renderDocuments() {
             ) {
 
                 deleteDocument.onclick =
-                    async function (
+                    function (
                         e
                     ) {
 
@@ -21717,134 +21717,323 @@ function renderDocuments() {
                         );
 
 
-                        const confirmed =
-                            confirm(
-                                "هل تريد حذف المستند: " +
-                                documentItem.name +
-                                "؟"
+                        // ==================================
+                        // إزالة نافذة قديمة إن وجدت
+                        // ==================================
+
+                        const oldConfirm =
+                            document.querySelector(
+                                ".document-delete-confirm"
                             );
 
 
                         if (
-                            !confirmed
+                            oldConfirm
                         ) {
 
-                            return;
+                            oldConfirm.remove();
 
                         }
 
 
                         // ==================================
-                        // إذا كان المستند مفعّلًا
-                        // نلغيه أولًا
+                        // إنشاء نافذة التأكيد
                         // ==================================
 
-                        if (
-                            currentDocument &&
-                            String(
-                                currentDocument.id
-                            ) ===
-                            String(
-                                documentItem.id
-                            )
-                        ) {
-
-                            setCurrentDocument(
-                                null
+                        const confirmBox =
+                            document.createElement(
+                                "div"
                             );
 
-                        }
+
+                        confirmBox.className =
+                            "document-delete-confirm";
+
+
+                        confirmBox.innerHTML =
+                            `
+                            <div class="document-delete-dialog">
+
+                                <div class="document-delete-message">
+                                    هل تريد حذف المستند؟
+                                </div>
+
+                                <div class="document-delete-name">
+                                    ${documentItem.name}
+                                </div>
+
+                                <div class="document-delete-buttons">
+
+                                    <button
+                                        type="button"
+                                        class="confirm-document-delete">
+                                        حذف
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="cancel-document-delete">
+                                        إلغاء
+                                    </button>
+
+                                </div>
+
+                            </div>
+                            `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
 
 
                         // ==================================
-                        // حذف السجل المحلي فورًا
+                        // تأكيد الحذف
                         // ==================================
 
-                        documents =
-                            documents.filter(
-                                function (
-                                    doc
-                                ) {
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-document-delete"
+                            );
 
-                                    return (
-                                        String(
-                                            doc.id
-                                        ) !==
-                                        String(
-                                            documentItem.id
+
+                        if (
+                            confirmDelete
+                        ) {
+
+                            confirmDelete.onclick =
+                                async function () {
+
+                                    // ==========================
+                                    // حذف من قائمة المستندات
+                                    // ==========================
+
+                                    documents =
+                                        documents.filter(
+                                            function (
+                                                doc
+                                            ) {
+
+                                                return (
+                                                    String(
+                                                        doc.id
+                                                    ) !==
+                                                    String(
+                                                        documentItem.id
+                                                    )
+                                                );
+
+                                            }
+                                        );
+
+
+                                    // ==========================
+                                    // حذف من المشروع
+                                    // ==========================
+
+                                    if (
+                                        currentProject &&
+                                        Array.isArray(
+                                            currentProject.documents
                                         )
-                                    );
-
-                                }
-                            );
-
-
-                        // ==================================
-                        // إزالة المستند من المشروع
-                        // ==================================
-
-                        if (
-                            currentProject
-                        ) {
-
-                            currentProject.documents =
-                                (
-                                    currentProject.documents ||
-                                    []
-                                ).filter(
-                                    function (
-                                        id
                                     ) {
 
-                                        return (
-                                            String(
-                                                id
-                                            ) !==
-                                            String(
-                                                documentItem.id
-                                            )
+                                        currentProject.documents =
+                                            currentProject.documents.filter(
+                                                function (
+                                                    id
+                                                ) {
+
+                                                    return (
+                                                        String(
+                                                            id
+                                                        ) !==
+                                                        String(
+                                                            documentItem.id
+                                                        )
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        currentProject.updatedAt =
+                                            new Date()
+                                                .toISOString();
+
+
+                                        saveProjects();
+
+                                    }
+
+
+                                    // ==========================
+                                    // حذف نسخة Word المخزنة
+                                    // ==========================
+
+                                    try {
+
+                                        await deleteWorkingWordFile(
+                                            documentItem.storageId
                                         );
 
                                     }
-                                );
+                                    catch (
+                                        storageError
+                                    ) {
+
+                                        console.warn(
+                                            "تعذر حذف نسخة العمل:",
+                                            storageError
+                                        );
+
+                                    }
+
+
+                                    // ==========================
+                                    // إذا كان المستند مفعّلًا
+                                    // ==========================
+
+                                    if (
+                                        currentDocument &&
+                                        String(
+                                            currentDocument.id
+                                        ) ===
+                                        String(
+                                            documentItem.id
+                                        )
+                                    ) {
+
+                                        currentDocument =
+                                            null;
+
+
+                                        currentCitationSources =
+                                            [];
+
+
+                                        if (
+                                            documentTitle
+                                        ) {
+
+                                            documentTitle.textContent =
+                                                "لا يوجد مستند مفتوح";
+
+                                        }
+
+                                    }
+
+
+                                    // ==========================
+                                    // إعادة ضبط Orama
+                                    // ==========================
+
+                                    oramaRetrievalDb =
+                                        null;
+
+
+                                    oramaRetrievalCacheKey =
+                                        "";
+
+
+                                    oramaRetrievalDocumentId =
+                                        null;
+
+
+                                    // ==========================
+                                    // إعادة ترتيب المستندات
+                                    // ==========================
+
+                                    const remaining =
+                                        getProjectDocuments(
+                                            currentProject
+                                                ? currentProject.id
+                                                : null
+                                        );
+
+
+                                    remaining.forEach(
+                                        function (
+                                            doc,
+                                            newIndex
+                                        ) {
+
+                                            doc.order =
+                                                newIndex +
+                                                1;
+
+                                        }
+                                    );
+
+
+                                    // ==========================
+                                    // الحفظ
+                                    // ==========================
+
+                                    saveDocuments();
+
+
+                                    // ==========================
+                                    // إغلاق نافذة التأكيد
+                                    // ==========================
+
+                                    confirmBox.remove();
+
+
+                                    // ==========================
+                                    // إعادة رسم القائمة
+                                    // ==========================
+
+                                    renderDocuments();
+
+                                };
 
                         }
 
 
-                        saveDocuments();
-
-                        saveProjects();
-
-
                         // ==================================
-                        // إعادة الرسم فورًا
+                        // إلغاء الحذف
                         // ==================================
 
-                        renderDocuments();
-
-
-                        // ==================================
-                        // حذف ملف العمل في الخلفية
-                        // لا نعطل الواجهة بانتظاره
-                        // ==================================
-
-                        try {
-
-                            await deleteWorkingWordFile(
-                                documentItem.storageId
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-document-delete"
                             );
 
-                        }
-                        catch (
-                            error
+
+                        if (
+                            cancelDelete
                         ) {
 
-                            console.warn(
-                                "تعذر حذف ملف العمل المرتبط بالمستند:",
-                                error
-                            );
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
 
                         }
+
+
+                        // ==================================
+                        // النقر خارج النافذة
+                        // ==================================
+
+                        confirmBox.onclick =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.target ===
+                                    confirmBox
+                                ) {
+
+                                    confirmBox.remove();
+
+                                }
+
+                            };
 
                     };
 
