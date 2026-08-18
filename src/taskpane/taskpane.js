@@ -20949,13 +20949,21 @@ const chatIcon = `
 `;
 
 
+
 // =====================================================
 // RENDER DOCUMENTS
 //
-// النقر على المستند:
-// 1) غير مفعّل → تفعيل
-// 2) مفعّل بالفعل → إلغاء التفعيل
-// 3) اختيار مستند آخر → تبديل المستند النشط
+// التفعيل:
+// - النقر على مستند غير نشط = تفعيل
+// - النقر على المستند النشط = إلغاء
+// - اختيار مستند آخر = نقل التفعيل إليه
+//
+// العلامة:
+// - مستقلة عن اسم المستند
+//
+// الحذف:
+// - يحذف السجل من القائمة فورًا
+// - ثم يحاول حذف ملف العمل دون تعطيل الواجهة
 // =====================================================
 
 function renderDocuments() {
@@ -20996,8 +21004,11 @@ function renderDocuments() {
 
 
     if (
+        !Array.isArray(
+            projectDocuments
+        ) ||
         projectDocuments.length ===
-        0
+            0
     ) {
 
         documentsList.innerHTML =
@@ -21018,6 +21029,15 @@ function renderDocuments() {
             index
         ) {
 
+            if (
+                !documentItem
+            ) {
+
+                return;
+
+            }
+
+
             const item =
                 document.createElement(
                     "div"
@@ -21027,6 +21047,10 @@ function renderDocuments() {
             item.className =
                 "document-item";
 
+
+            // ==================================
+            // هل المستند مفعّل؟
+            // ==================================
 
             const isActive =
                 Boolean(
@@ -21040,10 +21064,6 @@ function renderDocuments() {
                 );
 
 
-            // ==================================
-            // حالة التفعيل
-            // ==================================
-
             if (
                 isActive
             ) {
@@ -21056,7 +21076,7 @@ function renderDocuments() {
 
 
             // ==================================
-            // عنوان المستند
+            // منطقة العنوان
             // ==================================
 
             const title =
@@ -21070,28 +21090,55 @@ function renderDocuments() {
 
 
             // ==================================
-            // علامة التفعيل
+            // علامة التفعيل مستقلة
             // ==================================
 
             const activeMark =
+                document.createElement(
+                    "span"
+                );
+
+
+            activeMark.className =
+                "document-active-mark";
+
+
+            activeMark.textContent =
                 isActive
                     ? "✓ "
                     : "";
 
 
-            title.textContent =
-                activeMark +
+            // ==================================
+            // اسم المستند
+            // ==================================
+
+            const titleText =
+                document.createElement(
+                    "span"
+                );
+
+
+            titleText.className =
+                "document-name";
+
+
+            titleText.textContent =
                 documentItem.name;
 
 
+            title.appendChild(
+                activeMark
+            );
+
+
+            title.appendChild(
+                titleText
+            );
+
+
             // ==================================
-            // النقر على المستند
-            //
-            // المستند نفسه إذا كان مفعّلًا
-            // → إلغاء التفعيل
-            //
-            // غير ذلك
-            // → تفعيل المستند
+            // تفعيل / إلغاء التفعيل
             // ==================================
 
             title.onclick =
@@ -21104,19 +21151,25 @@ function renderDocuments() {
                     e.stopPropagation();
 
 
+                    const sameDocument =
+                        Boolean(
+                            currentDocument &&
+                            String(
+                                currentDocument.id
+                            ) ===
+                            String(
+                                documentItem.id
+                            )
+                        );
+
+
                     if (
-                        currentDocument &&
-                        String(
-                            currentDocument.id
-                        ) ===
-                        String(
-                            documentItem.id
-                        )
+                        sameDocument
                     ) {
 
-                        // ==========================
+                        // ==================================
                         // إلغاء التفعيل
-                        // ==========================
+                        // ==================================
 
                         setCurrentDocument(
                             null
@@ -21125,9 +21178,9 @@ function renderDocuments() {
                     }
                     else {
 
-                        // ==========================
+                        // ==================================
                         // تفعيل المستند
-                        // ==========================
+                        // ==================================
 
                         setCurrentDocument(
                             documentItem
@@ -21160,7 +21213,7 @@ function renderDocuments() {
                 status.textContent =
                     "✓ مفهرس";
 
-                
+
                 if (
                     documentItem.indexTokenCount
                 ) {
@@ -21242,7 +21295,7 @@ function renderDocuments() {
 
 
             // ==================================
-            // زر خيارات المستند
+            // زر الخيارات
             // ==================================
 
             const menuButton =
@@ -21302,7 +21355,7 @@ function renderDocuments() {
 
 
             // ==================================
-            // إخفاء نقل لأعلى
+            // إخفاء النقل لأعلى
             // ==================================
 
             if (
@@ -21329,7 +21382,7 @@ function renderDocuments() {
 
 
             // ==================================
-            // إخفاء نقل لأسفل
+            // إخفاء النقل لأسفل
             // ==================================
 
             if (
@@ -21357,7 +21410,7 @@ function renderDocuments() {
 
 
             // ==================================
-            // زر القائمة
+            // فتح / إغلاق قائمة الخيارات
             // ==================================
 
             menuButton.onclick =
@@ -21370,7 +21423,6 @@ function renderDocuments() {
                     e.stopPropagation();
 
 
-                    // إغلاق بقية القوائم
                     document
                         .querySelectorAll(
                             ".document-options-menu.open"
@@ -21421,7 +21473,10 @@ function renderDocuments() {
                         e
                     ) {
 
+                        e.preventDefault();
+
                         e.stopPropagation();
+
 
                         options.classList.remove(
                             "open"
@@ -21464,8 +21519,10 @@ function renderDocuments() {
 
 
                                 documentItem.name =
-                                    save &&
-                                    value
+                                    (
+                                        save &&
+                                        value
+                                    )
                                         ? value
                                         : oldName;
 
@@ -21554,6 +21611,8 @@ function renderDocuments() {
                         e
                     ) {
 
+                        e.preventDefault();
+
                         e.stopPropagation();
 
 
@@ -21611,6 +21670,8 @@ function renderDocuments() {
                     function (
                         e
                     ) {
+
+                        e.preventDefault();
 
                         e.stopPropagation();
 
@@ -21671,6 +21732,8 @@ function renderDocuments() {
                         e
                     ) {
 
+                        e.preventDefault();
+
                         e.stopPropagation();
 
 
@@ -21679,12 +21742,16 @@ function renderDocuments() {
                         );
 
 
-                        if (
-                            !confirm(
+                        const confirmed =
+                            confirm(
                                 "هل تريد حذف المستند: " +
                                 documentItem.name +
                                 "؟"
-                            )
+                            );
+
+
+                        if (
+                            !confirmed
                         ) {
 
                             return;
@@ -21692,60 +21759,10 @@ function renderDocuments() {
                         }
 
 
-                        documents =
-                            documents.filter(
-                                function (
-                                    doc
-                                ) {
-
-                                    return (
-                                        doc.id !==
-                                        documentItem.id
-                                    );
-
-                                }
-                            );
-
-
-                        if (
-                            currentProject
-                        ) {
-
-                            currentProject.documents =
-                                (
-                                    currentProject.documents ||
-                                    []
-                                ).filter(
-                                    function (
-                                        id
-                                    ) {
-
-                                        return (
-                                            id !==
-                                            documentItem.id
-                                        );
-
-                                    }
-                                );
-
-
-                            saveProjects();
-
-                        }
-
-
-                        await deleteWorkingWordFile(
-                            documentItem.storageId
-                        )
-                        .catch(
-                            function () {
-
-                                // لا نوقف حذف
-                                // السجل المحلي
-
-                            }
-                        );
-
+                        // ==================================
+                        // إذا كان المستند مفعّلًا
+                        // نلغيه أولًا
+                        // ==================================
 
                         if (
                             currentDocument &&
@@ -21764,10 +21781,95 @@ function renderDocuments() {
                         }
 
 
+                        // ==================================
+                        // حذف السجل المحلي فورًا
+                        // ==================================
+
+                        documents =
+                            documents.filter(
+                                function (
+                                    doc
+                                ) {
+
+                                    return (
+                                        String(
+                                            doc.id
+                                        ) !==
+                                        String(
+                                            documentItem.id
+                                        )
+                                    );
+
+                                }
+                            );
+
+
+                        // ==================================
+                        // إزالة المستند من المشروع
+                        // ==================================
+
+                        if (
+                            currentProject
+                        ) {
+
+                            currentProject.documents =
+                                (
+                                    currentProject.documents ||
+                                    []
+                                ).filter(
+                                    function (
+                                        id
+                                    ) {
+
+                                        return (
+                                            String(
+                                                id
+                                            ) !==
+                                            String(
+                                                documentItem.id
+                                            )
+                                        );
+
+                                    }
+                                );
+
+                        }
+
+
                         saveDocuments();
 
+                        saveProjects();
+
+
+                        // ==================================
+                        // إعادة الرسم فورًا
+                        // ==================================
 
                         renderDocuments();
+
+
+                        // ==================================
+                        // حذف ملف العمل في الخلفية
+                        // لا نعطل الواجهة بانتظاره
+                        // ==================================
+
+                        try {
+
+                            await deleteWorkingWordFile(
+                                documentItem.storageId
+                            );
+
+                        }
+                        catch (
+                            error
+                        ) {
+
+                            console.warn(
+                                "تعذر حذف ملف العمل المرتبط بالمستند:",
+                                error
+                            );
+
+                        }
 
                     };
 
