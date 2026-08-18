@@ -126,7 +126,14 @@ if (
     );
 
 }
+// =====================================================
+// تثبيت موضع زر الشريط الجانبي الأصلي
+// =====================================================
 
+const sidebarToggleOriginalParent =
+    sidebarToggleBtn
+        ? sidebarToggleBtn.parentNode
+        : null;
 const input =
     document.getElementById("user-input");
 
@@ -23070,30 +23077,26 @@ if (newProjectBtn) {
 }
 
 
+
 // =====================================================
-// Expanded Sidebar Toggle
+// Sidebar Toggle
+// مستقل تمامًا عن المستندات
 // =====================================================
 
 if (
     sidebarToggleBtn &&
-    expandedSidebar
+    expandedSidebar &&
+    expandedSidebarToggleSlot
 ) {
 
     sidebarToggleBtn.onclick =
-        function (e) {
+        function (
+            e
+        ) {
 
             e.preventDefault();
+
             e.stopPropagation();
-
-
-            if (
-                !expandedSidebar ||
-                !expandedSidebarToggleSlot
-            ) {
-
-                return;
-
-            }
 
 
             const isOpening =
@@ -23102,7 +23105,13 @@ if (
                 );
 
 
-            if (isOpening) {
+            // ==================================
+            // فتح الشريط
+            // ==================================
+
+            if (
+                isOpening
+            ) {
 
                 expandedSidebar.classList.add(
                     "open"
@@ -23123,45 +23132,61 @@ if (
                 );
 
 
-                expandedSidebarToggleSlot.appendChild(
-                    sidebarToggleBtn
-                );
-
-            }
-            else {
-
-                expandedSidebar.classList.remove(
-                    "open"
-                );
-
-
-                document.body.classList.remove(
-                    "expanded-sidebar-open"
-                );
-
-
-                sidebarToggleBtn.title =
-                    "إظهار القائمة";
-
-
-                sidebarToggleBtn.classList.remove(
-                    "sidebar-open"
-                );
-
-
+                // نقل الزر إلى مكانه داخل
+                // الشريط الموسع
                 if (
-                    sidebarTogglePlaceholder.parentNode
+                    sidebarToggleBtn.parentNode !==
+                    expandedSidebarToggleSlot
                 ) {
 
-                    sidebarTogglePlaceholder
-                        .parentNode
-                        .insertBefore(
-                            sidebarToggleBtn,
-                            sidebarTogglePlaceholder
-                                .nextSibling
-                        );
+                    expandedSidebarToggleSlot.appendChild(
+                        sidebarToggleBtn
+                    );
 
                 }
+
+
+                return;
+
+            }
+
+
+            // ==================================
+            // إغلاق الشريط
+            // ==================================
+
+            expandedSidebar.classList.remove(
+                "open"
+            );
+
+
+            document.body.classList.remove(
+                "expanded-sidebar-open"
+            );
+
+
+            sidebarToggleBtn.title =
+                "إظهار القائمة";
+
+
+            sidebarToggleBtn.classList.remove(
+                "sidebar-open"
+            );
+
+
+            // ==================================
+            // إعادة الزر إلى موضعه الأصلي
+            // ==================================
+
+            if (
+                sidebarToggleOriginalParent &&
+                sidebarTogglePlaceholder
+            ) {
+
+                sidebarToggleOriginalParent.insertBefore(
+                    sidebarToggleBtn,
+                    sidebarTogglePlaceholder.nextSibling
+                );
 
             }
 
