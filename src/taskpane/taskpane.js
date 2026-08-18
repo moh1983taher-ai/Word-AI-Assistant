@@ -13808,15 +13808,39 @@ async function searchCitationInWord(
 // =====================================================
 
 async function openCitationInWord(
-    source
+    rank
 ) {
+
+    const source =
+        Array.isArray(
+            currentCitationSources
+        )
+            ? currentCitationSources.find(
+                function (
+                    item
+                ) {
+
+                    return (
+                        Number(
+                            item.rank
+                        ) ===
+                        Number(
+                            rank
+                        )
+                    );
+
+                }
+            )
+            : null;
+
 
     if (
         !source
     ) {
 
         console.warn(
-            "لم يتم العثور على مصدر الإحالة."
+            "لم يتم العثور على مصدر الإحالة:",
+            rank
         );
 
         return;
