@@ -13273,19 +13273,13 @@ async function ensureOramaDocumentReady(
 
 
 
+
 // =====================================================
 // Format AI Message
 // Markdown + Interactive Citations
 //
-// يدعم:
-// [مقطع 1]
-// [مقطع 1، مقطع 5]
-// [مقطع 1, مقطع 5]
-// [مقطع 1 و5]
-// [مقطع 1، 5]
-// [مقطع 1 و مقطع 5]
-//
-// كل إحالة تتحول إلى زر مستقل.
+// كل رسالة تسجل إحالاتها في citationRegistry
+// بشكل مستقل عن بقية الرسائل.
 // =====================================================
 
 function formatAIMessage(
@@ -13306,16 +13300,68 @@ function formatAIMessage(
         Array.isArray(
             citationSources
         )
-
             ? citationSources
+            : [];
 
-            : (
-                Array.isArray(
-                    currentCitationSources
-                )
-                    ? currentCitationSources
-                    : []
+
+    // ==================================
+    // معرف مستقل لهذه المجموعة
+    // ==================================
+
+    const citationGroupId =
+        "citation-" +
+        Date.now() +
+        "-" +
+        Math.random()
+            .toString(
+                36
+            )
+            .substring(
+                2,
+                10
             );
+
+
+    citationRegistry.set(
+        citationGroupId,
+        sources.map(
+            function (
+                source
+            ) {
+
+                return {
+
+                    rank:
+                        Number(
+                            source.rank ||
+                            0
+                        ),
+
+                    paragraphIndex:
+                        source.paragraphIndex,
+
+                    paragraphId:
+                        source.paragraphId,
+
+                    heading:
+                        source.heading ||
+                        "",
+
+                    mainParagraph:
+                        source.mainParagraph ||
+                        source.text ||
+                        "",
+
+                    text:
+                        source.text ||
+                        source.mainParagraph ||
+                        ""
+
+                };
+
+            }
+        )
+    );
 
 
     try {
@@ -13338,8 +13384,13 @@ function formatAIMessage(
 
 
         // ==================================
-        // تحويل مجموعة أرقام الإحالات
-        // إلى أزرار مستقلة
+        // الإحالات
+        //
+        // يدعم:
+        // [مقطع 1]
+        // [مقطع 1، مقطع 5]
+        // [مقطع 1 و5]
+        // [مقطع 1، 5]
         // ==================================
 
         html =
@@ -13349,15 +13400,6 @@ function formatAIMessage(
                     match,
                     citationBody
                 ) {
-
-                    // ==================================
-                    // استخراج جميع الأرقام
-                    //
-                    // لا نهتم بكيفية فصلها:
-                    // مقطع 1، مقطع 5
-                    // مقطع 1 و5
-                    // مقطع 1,5
-                    // ==================================
 
                     const normalized =
                         String(
@@ -13397,10 +13439,6 @@ function formatAIMessage(
 
                     }
 
-
-                    // ==================================
-                    // إزالة التكرار
-                    // ==================================
 
                     const ranks =
                         [];
@@ -13456,12 +13494,8 @@ function formatAIMessage(
                     }
 
 
-                    // ==================================
-                    // تحويل كل إحالة إلى زر مستقل
-                    // ==================================
-
-                    const buttons =
-                        ranks.map(
+                    return ranks
+                        .map(
                             function (
                                 rank
                             ) {
@@ -13482,11 +13516,6 @@ function formatAIMessage(
                                         }
                                     );
 
-
-                                // ----------------------------------
-                                // إذا لم يوجد المصدر
-                                // نحافظ على النص بدل إخفائه.
-                                // ----------------------------------
 
                                 if (
                                     !source
@@ -13509,11 +13538,11 @@ function formatAIMessage(
 
                                     'class="document-citation" ' +
 
-                                    'data-citation-rank="' +
-                                    rank +
+                                    'data-citation-group="' +
+                                    citationGroupId +
                                     '" ' +
 
-                                    'title="الانتقال إلى المقطع ' +
+                                    'data-citation-rank="' +
                                     rank +
                                     '">' +
 
@@ -13526,16 +13555,10 @@ function formatAIMessage(
                                 );
 
                             }
+                        )
+                        .join(
+                            " "
                         );
-
-
-                    // ==================================
-                    // فصل الأزرار
-                    // ==================================
-
-                    return buttons.join(
-                        " "
-                    );
 
                 }
             );
@@ -13556,11 +13579,10 @@ function formatAIMessage(
 
         return String(
             text
-        )
-            .replace(
-                /\n/g,
-                "<br>"
-            );
+        ).replace(
+            /\n/g,
+            "<br>"
+        );
 
     }
 
@@ -13779,54 +13801,24 @@ async function searchCitationInWord(
 
 
 
+
 // =====================================================
 // Open Citation In Word
 //
-// الأولوية:
-// 1) الانتقال بواسطة paragraphIndex.
-// 2) البحث بالنص الأصلي.
-// 3) البحث بمقتطف أقصر.
-// 4) البحث بالنص المنظف كخطة أخيرة.
-//
-// الهدف:
-// جعل الإحالة مرتبطة بموضع Word الحقيقي
-// وليس بنص السياق الذي أُرسل إلى AI.
+// source هو مصدر الإحالة الخاص بالرسالة نفسها.
+// لا تعتمد هذه الدالة على currentCitationSources.
 // =====================================================
 
 async function openCitationInWord(
-    rank
+    source
 ) {
-
-    const source =
-        Array.isArray(
-            currentCitationSources
-        )
-            ? currentCitationSources.find(
-                function (
-                    item
-                ) {
-
-                    return (
-                        Number(
-                            item.rank
-                        ) ===
-                        Number(
-                            rank
-                        )
-                    );
-
-                }
-            )
-            : null;
-
 
     if (
         !source
     ) {
 
         console.warn(
-            "لم يتم العثور على مصدر الإحالة:",
-            rank
+            "لم يتم العثور على مصدر الإحالة."
         );
 
         return;
@@ -13860,7 +13852,7 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // 1) الأولوية لموضع الفقرة
+                // 1) الانتقال بواسطة موضع الفقرة
                 // ==================================
 
                 const paragraphIndex =
@@ -13891,10 +13883,6 @@ async function openCitationInWord(
                         paragraphs.items;
 
 
-                    // ==================================
-                    // تجربة الفهرس كما هو
-                    // ==================================
-
                     const directIndexes =
                         [];
 
@@ -13903,11 +13891,6 @@ async function openCitationInWord(
                         paragraphIndex
                     );
 
-
-                    // ==================================
-                    // تجربة احتمال اختلاف
-                    // الفهرسة بين 0 و1
-                    // ==================================
 
                     if (
                         paragraphIndex >
@@ -13924,6 +13907,30 @@ async function openCitationInWord(
                     directIndexes.push(
                         paragraphIndex + 1
                     );
+
+
+                    const sourceText =
+                        String(
+                            source.mainParagraph ||
+                            source.text ||
+                            ""
+                        ).trim();
+
+
+                    const normalizedSource =
+                        normalizeSearchText(
+                            sourceText
+                        );
+
+
+                    const sourcePrefix =
+                        normalizedSource.substring(
+                            0,
+                            Math.min(
+                                120,
+                                normalizedSource.length
+                            )
+                        );
 
 
                     for (
@@ -13972,38 +13979,9 @@ async function openCitationInWord(
                         }
 
 
-                        // ----------------------------------
-                        // إذا كان النص قريبًا من المصدر
-                        // نستخدم الفقرة مباشرة.
-                        // ----------------------------------
-
-                        const sourceText =
-                            String(
-                                source.mainParagraph ||
-                                source.text ||
-                                ""
-                            ).trim();
-
-
-                        const normalizedSource =
-                            normalizeSearchText(
-                                sourceText
-                            );
-
-
                         const normalizedParagraph =
                             normalizeSearchText(
                                 paragraphText
-                            );
-
-
-                        const sourcePrefix =
-                            normalizedSource.substring(
-                                0,
-                                Math.min(
-                                    120,
-                                    normalizedSource.length
-                                )
                             );
 
 
@@ -14017,7 +13995,11 @@ async function openCitationInWord(
                             );
 
 
-                        if (
+                        // ==================================
+                        // تطابق النص
+                        // ==================================
+
+                        const textMatches =
                             (
                                 sourcePrefix &&
                                 paragraphPrefix &&
@@ -14029,13 +14011,21 @@ async function openCitationInWord(
                                         paragraphPrefix
                                     )
                                 )
-                            ) ||
-                            Number(
-                                index
-                            ) ===
-                            Number(
-                                paragraphIndex
-                            )
+                            );
+
+
+                        // ==================================
+                        // إذا كان الفهرس مباشرًا
+                        // ==================================
+
+                        const directMatch =
+                            index ===
+                            paragraphIndex;
+
+
+                        if (
+                            textMatches ||
+                            directMatch
                         ) {
 
                             paragraph.select(
@@ -14083,18 +14073,9 @@ async function openCitationInWord(
                 }
 
 
-                // ==================================
-                // الاحتفاظ بالمصدر الأصلي
-                // قبل أي اختصار
-                // ==================================
-
                 const originalSearchText =
                     searchText;
 
-
-                // ==================================
-                // لا نرسل نصًا ضخمًا إلى Word search
-                // ==================================
 
                 if (
                     searchText.length >
@@ -14161,7 +14142,7 @@ async function openCitationInWord(
 
 
                 // ==================================
-                // 3) مقتطف أقصر
+                // 3) البحث بمقتطف أقصر
                 // ==================================
 
                 let fallback =
@@ -14835,6 +14816,20 @@ function saveProjects() {
 // =====================================================
 
 let chats = [];
+
+// =====================================================
+// Citation Registry
+//
+// كل مجموعة إحالات مرتبطة برسالة معينة.
+// لا نعتمد على currentCitationSources
+// عند إعادة عرض الرسائل القديمة.
+// =====================================================
+
+const citationRegistry =
+    new Map();
+
+
+let currentChat = null;
 
 try {
 
