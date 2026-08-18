@@ -1832,37 +1832,71 @@ async function readCurrentWordDocument(
 }
 
 
-// ======================================
+
+// =====================================================
 // Set Active Document
-// ======================================
+//
+// وجود currentDocument يعني أن المستند فعّال للدردشة.
+// عدم وجوده يعني أن الدردشة عامة.
+// =====================================================
 
 function setCurrentDocument(
     documentItem
 ) {
 
-    if (!documentItem) {
+    // ==================================
+    // إلغاء المستند
+    // ==================================
+
+    if (
+        !documentItem
+    ) {
 
         currentDocument =
             null;
 
 
-        oramaDocumentDb =
-            null;
+        currentCitationSources =
+            [];
 
 
-        oramaDocumentId =
-            null;
+        // إعادة ضبط فهرس Orama الحالي
+        if (
+            typeof oramaRetrievalDb !==
+            "undefined"
+        ) {
+
+            oramaRetrievalDb =
+                null;
+
+        }
 
 
-        oramaRetrievalDb =
-            null;
+        if (
+            typeof oramaRetrievalCacheKey !==
+            "undefined"
+        ) {
+
+            oramaRetrievalCacheKey =
+                "";
+
+        }
 
 
-        oramaRetrievalCacheKey =
-            "";
+        if (
+            typeof oramaRetrievalDocumentId !==
+            "undefined"
+        ) {
+
+            oramaRetrievalDocumentId =
+                null;
+
+        }
 
 
-        if (documentTitle) {
+        if (
+            documentTitle
+        ) {
 
             documentTitle.textContent =
                 "لا يوجد مستند مفتوح";
@@ -1878,11 +1912,22 @@ function setCurrentDocument(
     }
 
 
+    // ==================================
+    // تفعيل المستند
+    // ==================================
+
     currentDocument =
         documentItem;
 
 
-    if (documentTitle) {
+    // كل سؤال جديد يبدأ بإحالات جديدة
+    currentCitationSources =
+        [];
+
+
+    if (
+        documentTitle
+    ) {
 
         documentTitle.textContent =
             documentItem.name;
@@ -1891,7 +1936,45 @@ function setCurrentDocument(
 
 
     // ==================================
-    // إعادة استخدام البنية الموجودة
+    // تبديل فهرس Orama إلى المستند الحالي
+    // ==================================
+
+    if (
+        typeof oramaRetrievalDb !==
+        "undefined"
+    ) {
+
+        oramaRetrievalDb =
+            null;
+
+    }
+
+
+    if (
+        typeof oramaRetrievalCacheKey !==
+        "undefined"
+    ) {
+
+        oramaRetrievalCacheKey =
+            "";
+
+    }
+
+
+    if (
+        typeof oramaRetrievalDocumentId !==
+        "undefined"
+    ) {
+
+        oramaRetrievalDocumentId =
+            null;
+
+    }
+
+
+    // ==================================
+    // إذا كان المستند مقروءًا
+    // نجهز فهرسه مباشرة
     // ==================================
 
     if (
@@ -1899,7 +1982,7 @@ function setCurrentDocument(
         "read"
     ) {
 
-        ensureDocumentStructure(
+        ensureDocumentIndex(
             documentItem
         )
         .then(
@@ -1910,10 +1993,12 @@ function setCurrentDocument(
             }
         )
         .catch(
-            function (error) {
+            function (
+                error
+            ) {
 
                 console.error(
-                    "تعذر تحديث بنية المستند:",
+                    "تعذر تحديث فهرس المستند:",
                     error
                 );
 
@@ -1932,26 +2017,37 @@ function setCurrentDocument(
 
 
     // ==================================
-    // قراءة المستند الجديد
+    // المستند جديد
     // ==================================
 
     readCurrentWordDocument(
         documentItem
     )
     .then(
-        function () {
+        function (
+            text
+        ) {
+
+            console.log(
+                "محتوى نسخة العمل:",
+                text
+            );
+
 
             renderDocuments();
 
         }
     )
     .catch(
-        function (error) {
+        function (
+            error
+        ) {
 
             console.error(
                 "تعذر قراءة نسخة العمل:",
                 error
             );
+
 
             renderDocuments();
 
