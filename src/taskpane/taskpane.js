@@ -13282,7 +13282,8 @@ async function ensureOramaDocumentReady(
 
 function formatAIMessage(
     text,
-    citationSources
+    citationSources,
+    fixedCitationGroupId
 ) {
 
     if (
