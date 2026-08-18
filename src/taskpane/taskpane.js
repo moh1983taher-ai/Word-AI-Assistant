@@ -22308,7 +22308,7 @@ function renderProjects() {
 
 
                             projectExpandToggle.textContent =
-                                "▸";
+                                "◂";
 
 
                             projectExpandToggle.setAttribute(
