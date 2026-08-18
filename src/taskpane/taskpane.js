@@ -6399,14 +6399,15 @@ window.testAnalyzeSearchQuery =
 // 1) analyzeSearchQuery()
 // 2) Orama
 // 3) QPS داخل فهرس Orama
-// 4) العائلات الصرفية
-// 5) العبارات المركبة
-// 6) أولوية العنوان
-// 7) إعادة ترتيب عامة
+// 4) الصيغ العربية التي استخرجها المحلل
+// 5) العائلات الصرفية
+// 6) العبارات المركبة
+// 7) تغطية مفاهيم السؤال
+// 8) أولوية العنوان
 //
 // الهدف:
-// استخراج أفضل الأدلة للذكاء الاصطناعي.
-// لا يحاول المحرك بناء الإجابة.
+// استخراج أفضل المرشحين للذكاء الاصطناعي.
+// لا يحاول المحرك الإجابة عن السؤال.
 // =====================================================
 
 async function searchIndexedDocument(
@@ -6415,13 +6416,17 @@ async function searchIndexedDocument(
     options
 ) {
 
+    // ==================================
+    // الإعدادات
+    // ==================================
+
     const settings =
         options || {};
 
 
     // ==================================
     // نوع السؤال
-    // استخدام خفيف فقط في الترجيح
+    // يستخدم كعامل ترجيح خفيف فقط
     // ==================================
 
     const profileInfo =
@@ -6477,7 +6482,16 @@ async function searchIndexedDocument(
             phraseCandidates:
                 [],
 
+            queryAnalysis:
+                null,
+
             totalQueryTerms:
+                0,
+
+            contentTermCount:
+                0,
+
+            functionTermCount:
                 0,
 
             indexTokenCount:
@@ -6565,6 +6579,68 @@ async function searchIndexedDocument(
         );
 
 
+    // ==================================
+    // حماية مخرجات المحلل
+    // ==================================
+
+    const queryTokens =
+        Array.isArray(
+            queryAnalysis &&
+            queryAnalysis.allTokens
+        )
+            ? queryAnalysis.allTokens
+            : [];
+
+
+    const contentTokens =
+        Array.isArray(
+            queryAnalysis &&
+            queryAnalysis.contentTokens
+        )
+            ? queryAnalysis.contentTokens
+            : [];
+
+
+    const functionTokens =
+        Array.isArray(
+            queryAnalysis &&
+            queryAnalysis.functionTokens
+        )
+            ? queryAnalysis.functionTokens
+            : [];
+
+
+    const phraseCandidates =
+        Array.isArray(
+            queryAnalysis &&
+            queryAnalysis.phraseCandidates
+        )
+            ? queryAnalysis.phraseCandidates
+            : [];
+
+
+    const weightedTerms =
+        Array.isArray(
+            queryAnalysis &&
+            queryAnalysis.weightedTerms
+        )
+            ? queryAnalysis.weightedTerms
+            : [];
+
+
+    const queryFamilies =
+        Array.isArray(
+            queryAnalysis &&
+            queryAnalysis.families
+        )
+            ? queryAnalysis.families
+            : [];
+
+
+    // ==================================
+    // سجل التحليل
+    // ==================================
+
     console.log(
         "======================================"
     );
@@ -6576,89 +6652,37 @@ async function searchIndexedDocument(
 
     console.log(
         "كل الكلمات:",
-        queryAnalysis.allTokens
+        queryTokens
     );
 
     console.log(
         "كلمات المحتوى:",
-        queryAnalysis.contentTokens
+        contentTokens
     );
 
     console.log(
         "الكلمات الوظيفية:",
-        queryAnalysis.functionTokens
+        functionTokens
     );
 
     console.log(
         "العبارات المركبة:",
-        queryAnalysis.phraseCandidates
+        phraseCandidates
     );
 
     console.log(
         "العائلات:",
-        queryAnalysis.families
+        queryFamilies
     );
 
     console.log(
         "المصطلحات الموزونة:",
-        queryAnalysis.weightedTerms
+        weightedTerms
     );
 
     console.log(
         "======================================"
     );
-
-
-    // ==================================
-    // حماية المخرجات
-    // ==================================
-
-    const queryTokens =
-        Array.isArray(
-            queryAnalysis.allTokens
-        )
-            ? queryAnalysis.allTokens
-            : [];
-
-
-    const contentTokens =
-        Array.isArray(
-            queryAnalysis.contentTokens
-        )
-            ? queryAnalysis.contentTokens
-            : [];
-
-
-    const functionTokens =
-        Array.isArray(
-            queryAnalysis.functionTokens
-        )
-            ? queryAnalysis.functionTokens
-            : [];
-
-
-    const phraseCandidates =
-        Array.isArray(
-            queryAnalysis.phraseCandidates
-        )
-            ? queryAnalysis.phraseCandidates
-            : [];
-
-
-    const weightedTerms =
-        Array.isArray(
-            queryAnalysis.weightedTerms
-        )
-            ? queryAnalysis.weightedTerms
-            : [];
-
-
-    const queryFamilies =
-        Array.isArray(
-            queryAnalysis.families
-        )
-            ? queryAnalysis.families
-            : [];
 
 
     if (
@@ -6689,8 +6713,17 @@ async function searchIndexedDocument(
             phraseCandidates:
                 phraseCandidates,
 
+            queryAnalysis:
+                queryAnalysis,
+
             totalQueryTerms:
                 0,
+
+            contentTermCount:
+                contentTokens.length,
+
+            functionTermCount:
+                functionTokens.length,
 
             indexTokenCount:
                 documentItem.indexTokenCount ||
@@ -6744,8 +6777,15 @@ async function searchIndexedDocument(
         limit
     ) {
 
+        const cleanTerm =
+            String(
+                term ||
+                ""
+            ).trim();
+
+
         if (
-            !term
+            !cleanTerm
         ) {
 
             return {
@@ -6789,7 +6829,7 @@ async function searchIndexedDocument(
                     {
 
                         term:
-                            term,
+                            cleanTerm,
 
                         properties: [
 
@@ -6845,7 +6885,7 @@ async function searchIndexedDocument(
 
             console.warn(
                 "فشل بحث Orama:",
-                term,
+                cleanTerm,
                 error
             );
 
@@ -6874,7 +6914,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // 1) العبارة الكاملة
+    // 1) البحث في السؤال كاملًا
     // ==================================
 
     const fullQueryResult =
@@ -6925,12 +6965,12 @@ async function searchIndexedDocument(
 
     phraseCandidates.forEach(
         function (
-            phrase
+            phraseItem
         ) {
 
             if (
-                !phrase ||
-                !phrase.phrase
+                !phraseItem ||
+                !phraseItem.phrase
             ) {
 
                 return;
@@ -6940,7 +6980,7 @@ async function searchIndexedDocument(
 
             const phraseResult =
                 runOramaSearch(
-                    phrase.phrase,
+                    phraseItem.phrase,
                     false,
                     100
                 );
@@ -6960,7 +7000,7 @@ async function searchIndexedDocument(
 
             const phraseWeight =
                 Number(
-                    phrase.weight ||
+                    phraseItem.weight ||
                     1
                 );
 
@@ -6979,7 +7019,7 @@ async function searchIndexedDocument(
                             "phrase",
 
                         searchTerm:
-                            phrase.phrase,
+                            phraseItem.phrase,
 
                         queryWeight:
                             phraseWeight
@@ -6994,17 +7034,21 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // 3) المصطلحات الموضوعية + الصيغ العربية
+    // 3) المصطلحات الموضوعية وصيغها
+    //
+    // لا نعيد تحليل الكلمة هنا.
+    // نستخدم variants التي خرجت من
+    // analyzeSearchQuery().
     // ==================================
 
     weightedTerms.forEach(
         function (
-            item
+            termItem
         ) {
 
             if (
-                !item ||
-                !item.term
+                !termItem ||
+                !termItem.term
             ) {
 
                 return;
@@ -7012,29 +7056,29 @@ async function searchIndexedDocument(
             }
 
 
-            const termWeight =
+            const baseWeight =
                 Number(
-                    item.weight ||
+                    termItem.weight ||
                     0.5
                 );
 
 
             const variants =
                 Array.isArray(
-                    item.variants
+                    termItem.variants
                 ) &&
-                item.variants.length >
+                termItem.variants.length >
                     0
 
-                    ? item.variants
+                    ? termItem.variants
 
                     : [
-                        item.term
+                        termItem.term
                     ];
 
 
             const searchedVariants =
-                [];
+                new Set();
 
 
             variants.forEach(
@@ -7052,7 +7096,7 @@ async function searchIndexedDocument(
 
                     if (
                         !cleanVariant ||
-                        searchedVariants.includes(
+                        searchedVariants.has(
                             cleanVariant
                         )
                     ) {
@@ -7062,7 +7106,7 @@ async function searchIndexedDocument(
                     }
 
 
-                    searchedVariants.push(
+                    searchedVariants.add(
                         cleanVariant
                     );
 
@@ -7088,9 +7132,11 @@ async function searchIndexedDocument(
 
 
                     let variantWeight =
-                        termWeight;
+                        baseWeight;
 
 
+                    // الصيغة الأساسية أقوى
+                    // قليلًا من الصيغة الملحقة
                     if (
                         variantIndex >
                         0
@@ -7115,7 +7161,9 @@ async function searchIndexedDocument(
                                 source:
                                     variantIndex ===
                                     0
+
                                         ? "term"
+
                                         : "variant",
 
                                 searchTerm:
@@ -7137,8 +7185,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // الكلمات الوظيفية لا تدخل البحث
-    // منفردة في Orama
+    // الكلمات الوظيفية لا تبحث منفردة
     // ==================================
 
     void functionTokens;
@@ -7318,7 +7365,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // أقرب عنوان
+    // الحصول على أقرب عنوان
     // ==================================
 
     function getNearestHeading(
@@ -7367,7 +7414,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // وزن بسيط لنوع السؤال
+    // ترجيح عام بحسب نوع السؤال
     // ==================================
 
     function getProfileScore(
@@ -7541,7 +7588,8 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // حساب قرب عناصر الاستعلام
+    // حساب قرب مفاهيم السؤال
+    // باستخدام variants من المحلل
     // ==================================
 
     function calculateQueryProximity(
@@ -7557,25 +7605,85 @@ async function searchIndexedDocument(
                 token
             ) {
 
-                const normalizedToken =
-                    normalizeSearchText(
-                        token
+                const termItem =
+                    weightedTerms.find(
+                        function (
+                            item
+                        ) {
+
+                            return (
+                                item &&
+                                item.term ===
+                                token
+                            );
+
+                        }
                     );
 
 
-                const position =
-                    normalizedText.indexOf(
-                        normalizedToken
-                    );
+                const variants =
+                    termItem &&
+                    Array.isArray(
+                        termItem.variants
+                    ) &&
+                    termItem.variants.length >
+                        0
+
+                        ? termItem.variants
+
+                        : [
+                            token
+                        ];
+
+
+                let bestPosition =
+                    -1;
+
+
+                variants.forEach(
+                    function (
+                        variant
+                    ) {
+
+                        const normalizedVariant =
+                            normalizeSearchText(
+                                variant
+                            );
+
+
+                        const position =
+                            normalizedText.indexOf(
+                                normalizedVariant
+                            );
+
+
+                        if (
+                            position >=
+                            0 &&
+                            (
+                                bestPosition <
+                                    0 ||
+                                position <
+                                    bestPosition
+                            )
+                        ) {
+
+                            bestPosition =
+                                position;
+
+                        }
+
+                    }
+                );
 
 
                 if (
-                    position >=
+                    bestPosition >=
                     0
                 ) {
 
                     positions.push(
-                        position
+                        bestPosition
                     );
 
                 }
@@ -7705,12 +7813,12 @@ async function searchIndexedDocument(
             const paragraphMatchedTerms =
                 weightedTerms.filter(
                     function (
-                        item
+                        termItem
                     ) {
 
                         if (
-                            !item ||
-                            !item.term
+                            !termItem ||
+                            !termItem.term
                         ) {
 
                             return false;
@@ -7720,15 +7828,15 @@ async function searchIndexedDocument(
 
                         const variants =
                             Array.isArray(
-                                item.variants
+                                termItem.variants
                             ) &&
-                            item.variants.length >
+                            termItem.variants.length >
                                 0
 
-                                ? item.variants
+                                ? termItem.variants
 
                                 : [
-                                    item.term
+                                    termItem.term
                                 ];
 
 
@@ -7760,7 +7868,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // المصطلحات الموزونة
+            // التغطية الموزونة
             // ==================================
 
             let weightedMatchedTotal =
@@ -7773,12 +7881,12 @@ async function searchIndexedDocument(
 
             weightedTerms.forEach(
                 function (
-                    item
+                    termItem
                 ) {
 
                     if (
-                        !item ||
-                        !item.term
+                        !termItem ||
+                        !termItem.term
                     ) {
 
                         return;
@@ -7788,7 +7896,7 @@ async function searchIndexedDocument(
 
                     const weight =
                         Number(
-                            item.weight ||
+                            termItem.weight ||
                             0
                         );
 
@@ -7799,19 +7907,19 @@ async function searchIndexedDocument(
 
                     const variants =
                         Array.isArray(
-                            item.variants
+                            termItem.variants
                         ) &&
-                        item.variants.length >
+                        termItem.variants.length >
                             0
 
-                            ? item.variants
+                            ? termItem.variants
 
                             : [
-                                item.term
+                                termItem.term
                             ];
 
 
-                    const matched =
+                    const isMatched =
                         variants.some(
                             function (
                                 variant
@@ -7837,7 +7945,7 @@ async function searchIndexedDocument(
 
 
                     if (
-                        matched
+                        isMatched
                     ) {
 
                         weightedMatchedValue +=
@@ -7860,9 +7968,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // الكلمات الأساسية المباشرة
-            //
-            // نراعي صيغ الكلمات العربية أيضًا
+            // المفاهيم المباشرة
             // ==================================
 
             const directMatchedContentTokens =
@@ -7871,10 +7977,35 @@ async function searchIndexedDocument(
                         token
                     ) {
 
-                        const variants =
-                            getSearchTermVariantsForRanking(
-                                token
+                        const termItem =
+                            weightedTerms.find(
+                                function (
+                                    item
+                                ) {
+
+                                    return (
+                                        item &&
+                                        item.term ===
+                                        token
+                                    );
+
+                                }
                             );
+
+
+                        const variants =
+                            termItem &&
+                            Array.isArray(
+                                termItem.variants
+                            ) &&
+                            termItem.variants.length >
+                                0
+
+                                ? termItem.variants
+
+                                : [
+                                    token
+                                ];
 
 
                         return variants.some(
@@ -7916,7 +8047,6 @@ async function searchIndexedDocument(
 
             // ==================================
             // تغطية المفاهيم
-            // نفس تغطية المحتوى
             // ==================================
 
             const conceptCoverage =
@@ -8001,7 +8131,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // العبارات المركبة
+            // العبارات المركبة المطابقة
             // ==================================
 
             let matchedPhraseCount =
@@ -8014,12 +8144,12 @@ async function searchIndexedDocument(
 
             phraseCandidates.forEach(
                 function (
-                    phrase
+                    phraseItem
                 ) {
 
                     if (
-                        !phrase ||
-                        !phrase.phrase
+                        !phraseItem ||
+                        !phraseItem.phrase
                     ) {
 
                         return;
@@ -8027,12 +8157,18 @@ async function searchIndexedDocument(
                     }
 
 
+                    const phrase =
+                        normalizeSearchText(
+                            phraseItem.phrase
+                        );
+
+
                     if (
                         normalizedText.includes(
-                            phrase.phrase
+                            phrase
                         ) ||
                         normalizedHeading.includes(
-                            phrase.phrase
+                            phrase
                         )
                     ) {
 
@@ -8042,7 +8178,7 @@ async function searchIndexedDocument(
 
                         matchedPhraseWeight +=
                             Number(
-                                phrase.weight ||
+                                phraseItem.weight ||
                                 1
                             );
 
@@ -8065,13 +8201,38 @@ async function searchIndexedDocument(
                     token
                 ) {
 
-                    const variants =
-                        getSearchTermVariantsForRanking(
-                            token
+                    const termItem =
+                        weightedTerms.find(
+                            function (
+                                item
+                            ) {
+
+                                return (
+                                    item &&
+                                    item.term ===
+                                    token
+                                );
+
+                            }
                         );
 
 
-                    const found =
+                    const variants =
+                        termItem &&
+                        Array.isArray(
+                            termItem.variants
+                        ) &&
+                        termItem.variants.length >
+                            0
+
+                            ? termItem.variants
+
+                            : [
+                                token
+                            ];
+
+
+                    const matched =
                         variants.some(
                             function (
                                 variant
@@ -8088,7 +8249,7 @@ async function searchIndexedDocument(
 
 
                     if (
-                        found
+                        matched
                     ) {
 
                         headingScore +=
@@ -8118,10 +8279,35 @@ async function searchIndexedDocument(
                         token
                     ) {
 
-                        const variants =
-                            getSearchTermVariantsForRanking(
-                                token
+                        const termItem =
+                            weightedTerms.find(
+                                function (
+                                    item
+                                ) {
+
+                                    return (
+                                        item &&
+                                        item.term ===
+                                        token
+                                    );
+
+                                }
                             );
+
+
+                        const variants =
+                            termItem &&
+                            Array.isArray(
+                                termItem.variants
+                            ) &&
+                            termItem.variants.length >
+                                0
+
+                                ? termItem.variants
+
+                                : [
+                                    token
+                                ];
 
 
                         return variants.some(
@@ -8203,7 +8389,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // اجتماع المفاهيم
+            // اجتماع جميع المفاهيم
             // ==================================
 
             if (
@@ -8300,7 +8486,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // اجتماع العائلات
+            // اجتماع أكثر من عائلة
             // ==================================
 
             if (
@@ -8344,7 +8530,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // نوع المطابقة
+            // نوع التطابق
             // ==================================
 
             let matchType =
@@ -8389,7 +8575,7 @@ async function searchIndexedDocument(
 
 
             // ==================================
-            // السياق
+            // بناء السياق
             // ==================================
 
             let context =
@@ -8413,10 +8599,39 @@ async function searchIndexedDocument(
                 i++
             ) {
 
-                const variants =
-                    getSearchTermVariantsForRanking(
-                        contentTokens[i]
+                const token =
+                    contentTokens[i];
+
+
+                const termItem =
+                    weightedTerms.find(
+                        function (
+                            item
+                        ) {
+
+                            return (
+                                item &&
+                                item.term ===
+                                token
+                            );
+
+                        }
                     );
+
+
+                const variants =
+                    termItem &&
+                    Array.isArray(
+                        termItem.variants
+                    ) &&
+                    termItem.variants.length >
+                        0
+
+                        ? termItem.variants
+
+                        : [
+                            token
+                        ];
 
 
                 for (
@@ -8442,7 +8657,13 @@ async function searchIndexedDocument(
 
                     if (
                         position >=
-                        0
+                        0 &&
+                        (
+                            firstContentPosition <
+                                0 ||
+                            position <
+                                firstContentPosition
+                        )
                     ) {
 
                         firstContentPosition =
@@ -8451,19 +8672,7 @@ async function searchIndexedDocument(
                         firstContentToken =
                             normalizedVariant;
 
-                        break;
-
                     }
-
-                }
-
-
-                if (
-                    firstContentPosition >=
-                    0
-                ) {
-
-                    break;
 
                 }
 
@@ -8775,7 +8984,7 @@ async function searchIndexedDocument(
 
 
     // ==================================
-    // حساب الظهورات
+    // عدد الظهورات
     // ==================================
 
     let indexedOccurrences =
