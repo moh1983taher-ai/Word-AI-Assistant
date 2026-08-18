@@ -949,6 +949,302 @@ body.expanded-sidebar-open .sidebar-hover-zone {
     font-size: 13px;
     font-weight: 400;
 }
+/* =====================================================
+   Project Hierarchy
+   المستندات والمحادثات والمراجع داخل المشروع
+   ===================================================== */
+
+.project-item {
+    display: block;
+    padding: 0;
+}
+
+
+/* ==================================
+   رأس المشروع
+   ================================== */
+
+.project-header {
+    display: flex;
+
+    align-items: center;
+
+    width: 100%;
+
+    min-height: 40px;
+
+    padding: 8px 10px;
+
+    box-sizing: border-box;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    position: relative;
+}
+
+
+/* ==================================
+   عند المرور على المشروع
+   ================================== */
+
+.project-header:hover {
+    background: #f4f4f4;
+}
+
+
+/* ==================================
+   زر فتح وإغلاق المشروع
+   ================================== */
+
+.project-expand-toggle {
+    border: none;
+
+    background: transparent;
+
+    padding: 0;
+
+    margin: 0 4px 0 0;
+
+    width: 20px;
+
+    min-width: 20px;
+
+    height: 24px;
+
+    cursor: pointer;
+
+    font-size: 15px;
+
+    line-height: 24px;
+
+    color: #666;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+}
+
+
+.project-expand-toggle:hover {
+    color: #111;
+}
+
+
+/* ==================================
+   عنوان المشروع
+   ================================== */
+
+.project-title {
+    display: flex !important;
+
+    align-items: center;
+
+    gap: 7px;
+
+    flex: 1;
+
+    min-width: 0;
+
+    font-size: 13px;
+
+    font-weight: 500;
+}
+
+
+/* ==================================
+   زر خيارات المشروع
+   ================================== */
+
+.project-menu {
+    border: none;
+
+    background: transparent;
+
+    padding: 0;
+
+    margin: 0;
+
+    width: 28px;
+
+    min-width: 28px;
+
+    height: 28px;
+
+    cursor: pointer;
+
+    font-size: 18px;
+
+    color: #777;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+}
+
+
+.project-menu:hover {
+    color: #111;
+}
+
+
+/* ==================================
+   محتوى المشروع
+   ================================== */
+
+.project-resources {
+
+    display: none;
+
+    margin: 0 0 4px 24px;
+
+    padding: 0 0 2px 0;
+
+    border-left: 1px solid #e5e5e5;
+}
+
+
+/* ==================================
+   قسم داخل المشروع
+   ================================== */
+
+.project-resource-section {
+
+    width: 100%;
+
+    box-sizing: border-box;
+}
+
+
+/* ==================================
+   عنوان:
+   المستندات / المحادثات / المراجع
+   ================================== */
+
+.project-resource-header {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    width: 100%;
+
+    min-height: 34px;
+
+    padding: 6px 9px 6px 10px;
+
+    box-sizing: border-box;
+
+    border-radius: 6px;
+
+    cursor: pointer;
+
+    font-size: 12.5px;
+
+    color: #444;
+}
+
+
+.project-resource-header:hover {
+    background: #f7f7f7;
+}
+
+
+/* ==================================
+   سهم القسم
+   ================================== */
+
+.project-resource-arrow {
+
+    width: 18px;
+
+    min-width: 18px;
+
+    text-align: center;
+
+    font-size: 16px;
+
+    color: #888;
+
+    transition:
+        transform 0.15s ease;
+}
+
+
+/* ==================================
+   القسم المفتوح
+   ================================== */
+
+.project-resource-header.open {
+
+    font-weight: 500;
+
+    color: #222;
+}
+
+
+.project-resource-header.open
+.project-resource-arrow {
+
+    color: #444;
+}
+
+
+/* ==================================
+   محتوى القسم
+   ================================== */
+
+.project-resource-content {
+
+    display: none;
+
+    margin: 0;
+
+    padding: 2px 0 4px 10px;
+
+    box-sizing: border-box;
+}
+
+
+/* ==================================
+   عند فتح القسم
+   ================================== */
+
+.project-resource-header.open
++ .project-resource-content {
+
+    display: block;
+}
+
+
+/* ==================================
+   منع تنسيق .project-item span
+   القديمة من إفساد العناصر الداخلية
+   ================================== */
+
+.project-item
+.project-resources
+span {
+
+    font-size: inherit;
+}
+
+
+/* ==================================
+   قائمة خيارات المشروع
+   ================================== */
+
+.project-options-menu {
+
+    z-index: 999999;
+}
 
 .folder-icon {
     display: inline-flex;
