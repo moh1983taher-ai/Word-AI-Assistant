@@ -8491,6 +8491,8 @@ async function searchIndexedDocument(
                 familyCoverage:
                     familyCoverage,
 
+                    
+
                 headingScore:
                     headingScore,
 
