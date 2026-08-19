@@ -770,19 +770,18 @@ body.expanded-sidebar-open .sidebar-hover-zone {
 
     display: none;
 
-    position: absolute;
+    position: fixed;
 
     top: 60px;
 
-    /* المسافة من الحافة تبقى آمنة */
-    left: 8px;
+    left: 50%;
 
-    /* عرض النافذة يستفيد من المساحة المتاحة */
-    width: calc(100vw - 16px);
+    transform: translateX(-50%);
+
+    width: calc(100vw - 32px);
 
     max-width: none;
 
-    /* منع خروج النافذة عموديًا */
     max-height: calc(100vh - 76px);
 
     background: #ffffff;
