@@ -1618,6 +1618,18 @@ body.expanded-sidebar-open .sidebar-hover-zone {
 }
 
 
+
+.project-document-options .delete-project-document {
+    color: #c62828;
+}
+
+.project-document-options .delete-project-document:hover {
+    background: #fff1f1;
+    color: #b71c1c;
+}
+
+
+
 /* =========================================================
    صندوق إضافة المستند
    ========================================================= */
@@ -1626,20 +1638,24 @@ body.expanded-sidebar-open .sidebar-hover-zone {
 
     width: 100%;
 
-    margin: 3px 0 5px 0;
+    margin: 5px 0 7px 0;
 
-    padding: 0 2px;
+    padding: 0 4px;
 
     box-sizing: border-box;
 
 }
 
 
+/* =========================================================
+   زر إضافة المستند
+   ========================================================= */
+
 .project-add-document {
 
     width: 100%;
 
-    min-height: 30px;
+    min-height: 34px;
 
     display: flex;
 
@@ -1647,37 +1663,77 @@ body.expanded-sidebar-open .sidebar-hover-zone {
 
     justify-content: flex-start;
 
-    gap: 6px;
+    gap: 8px;
 
-    padding: 5px 8px;
+    padding: 6px 10px;
 
     box-sizing: border-box;
 
-    border: none;
+    border: 1px dashed #d8d8d8;
 
-    border-radius: 6px;
+    border-radius: 8px;
 
-    background: transparent;
+    background: #fafafa;
 
     color: #666;
 
     font-size: 12px;
 
+    font-weight: 400;
+
     cursor: pointer;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        box-shadow 0.15s ease;
 
 }
 
+
+/* =========================================================
+   عند المرور
+   ========================================================= */
 
 .project-add-document:hover {
 
     background: #f5f5f5;
 
+    border-color: #c8c8c8;
+
     color: #222;
+
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.05);
 
 }
 
 
+/* =========================================================
+   عند الضغط
+   ========================================================= */
+
+.project-add-document:active {
+
+    background: #eeeeee;
+
+    box-shadow: none;
+
+}
+
+
+/* =========================================================
+   علامة +
+   ========================================================= */
+
 .project-add-document-icon {
+
+    width: 20px;
+
+    min-width: 20px;
+
+    height: 20px;
 
     display: inline-flex;
 
@@ -1685,22 +1741,59 @@ body.expanded-sidebar-open .sidebar-hover-zone {
 
     justify-content: center;
 
-    width: 18px;
+    box-sizing: border-box;
 
-    min-width: 18px;
+    border: 1px solid #d0d0d0;
 
-    font-size: 17px;
+    border-radius: 50%;
+
+    background: #ffffff;
+
+    color: #555;
+
+    font-size: 15px;
+
+    font-weight: 400;
 
     line-height: 1;
 
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease,
+        color 0.15s ease;
+
 }
 
+
+/* =========================================================
+   شكل +
+   عند المرور
+   ========================================================= */
+
+.project-add-document:hover
+.project-add-document-icon {
+
+    border-color: #bdbdbd;
+
+    background: #ffffff;
+
+    color: #222;
+
+}
+
+
+/* =========================================================
+   النص
+   ========================================================= */
 
 .project-add-document-text {
 
     font-size: 12px;
 
+    line-height: 1.4;
+
 }
+
 
 /* ==================================
    منع تنسيق .project-item span
