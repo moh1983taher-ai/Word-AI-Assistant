@@ -21941,7 +21941,7 @@ function renderProjects() {
 
                             const oldConfirm =
                                 document.querySelector(
-                                    ".project-document-delete-confirm"
+                                    ".document-delete-confirm"
                                 );
 
 
@@ -21961,7 +21961,7 @@ function renderProjects() {
 
 
                             confirmBox.className =
-                                "project-document-delete-confirm";
+                                "document-delete-confirm";
 
 
                             confirmBox.innerHTML =
