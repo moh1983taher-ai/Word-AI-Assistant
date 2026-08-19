@@ -22322,6 +22322,147 @@ function renderProjects() {
                 );
 
 
+            
+            // ==================================
+            // ربط أقسام موارد المشروع
+            // ==================================
+
+            if (
+                projectResources
+            ) {
+
+                const resourceSections =
+                    projectResources.querySelectorAll(
+                        ".project-resource-section"
+                    );
+
+
+                // ==================================
+                // قسم المستندات
+                // ==================================
+
+                if (
+                    resourceSections.length >=
+                    1
+                ) {
+
+                    const documentsSection =
+                        resourceSections[0];
+
+
+                    const documentsHeader =
+                        documentsSection.querySelector(
+                            ".project-resource-header"
+                        );
+
+
+                    const documentsContent =
+                        documentsSection.querySelector(
+                            ".project-resource-content"
+                        );
+
+
+                    if (
+                        documentsHeader &&
+                        documentsContent
+                    ) {
+
+                        // ------------------------------
+                        // فتح / إغلاق قسم المستندات
+                        // ------------------------------
+
+                        documentsHeader.onclick =
+                            function (
+                                e
+                            ) {
+
+                                e.preventDefault();
+
+                                e.stopPropagation();
+
+
+                                const isOpen =
+                                    documentsHeader.classList.contains(
+                                        "open"
+                                    );
+
+
+                                if (
+                                    isOpen
+                                ) {
+
+                                    documentsHeader.classList.remove(
+                                        "open"
+                                    );
+
+
+                                    documentsContent.style.display =
+                                        "none";
+
+
+                                    const arrow =
+                                        documentsHeader.querySelector(
+                                            ".project-resource-arrow"
+                                        );
+
+
+                                    if (
+                                        arrow
+                                    ) {
+
+                                        arrow.textContent =
+                                            "›";
+
+                                    }
+
+                                }
+                                else {
+
+                                    documentsHeader.classList.add(
+                                        "open"
+                                    );
+
+
+                                    documentsContent.style.display =
+                                        "block";
+
+
+                                    const arrow =
+                                        documentsHeader.querySelector(
+                                            ".project-resource-arrow"
+                                        );
+
+
+                                    if (
+                                        arrow
+                                    ) {
+
+                                        arrow.textContent =
+                                            "⌄";
+
+                                    }
+
+
+                                    // ------------------------------
+                                    // عرض مستندات هذا المشروع
+                                    // ------------------------------
+
+                                    renderDocuments(
+                                        documentsContent,
+                                        project
+                                    );
+
+                                }
+
+                            };
+
+                    }
+
+                }
+
+            }
+
+
             if (
                 projectExpandToggle &&
                 projectResources
