@@ -1629,6 +1629,51 @@ body.expanded-sidebar-open .sidebar-hover-zone {
 }
 
 
+/* =========================================================
+   زر حذف المستند داخل نافذة التأكيد
+   ========================================================= */
+
+.project-document-delete-confirm
+.confirm-project-document-delete {
+
+    background: #d32f2f;
+
+    color: #ffffff;
+
+    border: none;
+
+    border-radius: 6px;
+
+    padding: 7px 16px;
+
+    font-size: 12px;
+
+    font-weight: 500;
+
+    cursor: pointer;
+
+    transition:
+        background 0.15s ease,
+        transform 0.1s ease;
+}
+
+
+.project-document-delete-confirm
+.confirm-project-document-delete:hover {
+
+    background: #b71c1c;
+
+}
+
+
+.project-document-delete-confirm
+.confirm-project-document-delete:active {
+
+    transform: scale(0.97);
+
+}
+
+
 
 /* =========================================================
    صندوق إضافة المستند
