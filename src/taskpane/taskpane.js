@@ -2256,6 +2256,8 @@ if (
 
 
                 renderDocuments();
+                
+                renderProjects();
 
 
                 console.log(
@@ -22358,8 +22360,19 @@ function renderProjects() {
                                 ▤ المستندات
                             </span>
 
-                            <span class="project-resource-arrow">
-                                ›
+                            <span class="project-resource-actions">
+
+                                <button
+                                    type="button"
+                                    class="project-add-document"
+                                    title="إضافة مستند">
+                                    +
+                                </button>
+
+                                <span class="project-resource-arrow">
+                                    ›
+                                </span>
+
                             </span>
 
                         </div>
@@ -22545,6 +22558,61 @@ function renderProjects() {
                         section.querySelector(
                             ".project-resource-arrow"
                         );
+
+                    const addDocumentButton =
+                        section.querySelector(
+                            ".project-add-document"
+                        );
+
+
+
+                    // =================================================
+                    // زر إضافة مستند
+                    // =================================================
+
+                    if (
+                        addDocumentButton &&
+                        sectionIndex === 0
+                    ) {
+
+                        addDocumentButton.onclick =
+                            function (
+                                e
+                            ) {
+
+                                e.preventDefault();
+
+                                e.stopPropagation();
+
+
+                                // هذا المشروع هو المشروع المستهدف
+                                setCurrentProject(
+                                    project
+                                );
+
+
+                                if (
+                                    !wordDocumentPicker
+                                ) {
+
+                                    console.warn(
+                                        "لم يتم العثور على أداة اختيار ملف Word."
+                                    );
+
+                                    return;
+
+                                }
+
+
+                                wordDocumentPicker.value =
+                                    "";
+
+
+                                wordDocumentPicker.click();
+
+                            };
+
+                    }
 
 
                     header.onclick =
