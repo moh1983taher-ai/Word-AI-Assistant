@@ -20948,10 +20948,27 @@ const chatIcon = `
 // - ثم يحاول حذف ملف العمل دون تعطيل الواجهة
 // =====================================================
 
-function renderDocuments() {
+function renderDocuments(
+    targetContainer,
+    targetProject
+) {
+
+    // ==================================
+    // الحاوية والمشروع
+    // ==================================
+
+    const container =
+        targetContainer ||
+        documentsList;
+
+
+    const project =
+        targetProject ||
+        currentProject;
+
 
     if (
-        !documentsList
+        !container
     ) {
 
         return;
@@ -20959,15 +20976,19 @@ function renderDocuments() {
     }
 
 
-    documentsList.innerHTML =
+    container.innerHTML =
         "";
 
 
+    // ==================================
+    // لا يوجد مشروع
+    // ==================================
+
     if (
-        !currentProject
+        !project
     ) {
 
-        documentsList.innerHTML =
+        container.innerHTML =
             `
             <div class="empty-document">
                 اختر مشروعًا لعرض مستنداته
@@ -20979,9 +21000,13 @@ function renderDocuments() {
     }
 
 
+    // ==================================
+    // مستندات المشروع
+    // ==================================
+
     const projectDocuments =
         getProjectDocuments(
-            currentProject.id
+            project.id
         );
 
 
@@ -20993,7 +21018,7 @@ function renderDocuments() {
             0
     ) {
 
-        documentsList.innerHTML =
+        container.innerHTML =
             `
             <div class="empty-document">
                 لا توجد مستندات
@@ -21004,6 +21029,10 @@ function renderDocuments() {
 
     }
 
+
+    // ==================================
+    // رسم المستندات
+    // ==================================
 
     projectDocuments.forEach(
         function (
@@ -21072,7 +21101,7 @@ function renderDocuments() {
 
 
             // ==================================
-            // علامة التفعيل مستقلة
+            // علامة التفعيل
             // ==================================
 
             const activeMark =
@@ -21149,9 +21178,9 @@ function renderDocuments() {
                         sameDocument
                     ) {
 
-                        // ==================================
+                        // ==========================
                         // إلغاء التفعيل
-                        // ==================================
+                        // ==========================
 
                         setCurrentDocument(
                             null
@@ -21160,9 +21189,9 @@ function renderDocuments() {
                     }
                     else {
 
-                        // ==================================
+                        // ==========================
                         // تفعيل المستند
-                        // ==================================
+                        // ==========================
 
                         setCurrentDocument(
                             documentItem
@@ -21370,7 +21399,7 @@ function renderDocuments() {
             if (
                 index ===
                 projectDocuments.length -
-                1
+                    1
             ) {
 
                 const moveDown =
@@ -21534,7 +21563,10 @@ function renderDocuments() {
                                 }
 
 
-                                renderDocuments();
+                                renderDocuments(
+                                    container,
+                                    project
+                                );
 
                             };
 
@@ -21627,7 +21659,10 @@ function renderDocuments() {
                         saveDocuments();
 
 
-                        renderDocuments();
+                        renderDocuments(
+                            container,
+                            project
+                        );
 
                     };
 
@@ -21661,7 +21696,7 @@ function renderDocuments() {
                         if (
                             index >=
                             projectDocuments.length -
-                            1
+                                1
                         ) {
 
                             return;
@@ -21688,7 +21723,10 @@ function renderDocuments() {
                         saveDocuments();
 
 
-                        renderDocuments();
+                        renderDocuments(
+                            container,
+                            project
+                        );
 
                     };
 
@@ -21839,14 +21877,14 @@ function renderDocuments() {
                                     // ==========================
 
                                     if (
-                                        currentProject &&
+                                        project &&
                                         Array.isArray(
-                                            currentProject.documents
+                                            project.documents
                                         )
                                     ) {
 
-                                        currentProject.documents =
-                                            currentProject.documents.filter(
+                                        project.documents =
+                                            project.documents.filter(
                                                 function (
                                                     id
                                                 ) {
@@ -21864,7 +21902,7 @@ function renderDocuments() {
                                             );
 
 
-                                        currentProject.updatedAt =
+                                        project.updatedAt =
                                             new Date()
                                                 .toISOString();
 
@@ -21953,8 +21991,8 @@ function renderDocuments() {
 
                                     const remaining =
                                         getProjectDocuments(
-                                            currentProject
-                                                ? currentProject.id
+                                            project
+                                                ? project.id
                                                 : null
                                         );
 
@@ -21988,10 +22026,13 @@ function renderDocuments() {
 
 
                                     // ==========================
-                                    // إعادة رسم القائمة
+                                    // إعادة الرسم
                                     // ==========================
 
-                                    renderDocuments();
+                                    renderDocuments(
+                                        container,
+                                        project
+                                    );
 
                                 };
 
@@ -22071,7 +22112,7 @@ function renderDocuments() {
             );
 
 
-            documentsList.appendChild(
+            container.appendChild(
                 item
             );
 
@@ -22079,6 +22120,7 @@ function renderDocuments() {
     );
 
 }
+
 
 
 // =====================================================
