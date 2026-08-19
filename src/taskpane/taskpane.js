@@ -2153,37 +2153,7 @@ if (
     wordDocumentPicker
 ) {
 
-    addDocumentBtn.onclick =
-        function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            if (!currentProject) {
-
-                if (documentsList) {
-
-                    documentsList.innerHTML = `
-                        <div class="empty-document">
-                            اختر مشروعًا أولًا لإضافة مستند
-                        </div>
-                    `;
-
-                }
-
-                return;
-
-            }
-
-
-            wordDocumentPicker.value =
-                "";
-
-
-            wordDocumentPicker.click();
-
-        };
+    
 
 
     wordDocumentPicker.onchange =
