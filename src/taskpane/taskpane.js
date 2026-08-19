@@ -22476,19 +22476,8 @@ function renderProjects() {
                                 ▤ المستندات
                             </span>
 
-                            <span class="project-resource-actions">
-
-                                <button
-                                    type="button"
-                                    class="project-add-document"
-                                    title="إضافة مستند">
-                                    +
-                                </button>
-
-                                <span class="project-resource-arrow">
-                                    ›
-                                </span>
-
+                            <span class="project-resource-arrow">
+                                ›
                             </span>
 
                         </div>
