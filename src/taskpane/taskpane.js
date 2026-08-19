@@ -22218,20 +22218,120 @@ function initializeSidebarSections() {
 // Render Projects
 // =====================================================
 
-function renderProjects() {
+function renderDocuments(
+    targetContainer,
+    targetProject
+) {
 
-    if (!projectsList)
+    // ==================================
+    // تحديد مكان عرض المستندات
+    //
+    // بدون معاملات:
+    // → القائمة القديمة
+    //
+    // بمعاملات:
+    // → داخل المشروع
+    // ==================================
+
+    const targetList =
+        targetContainer ||
+        documentsList;
+
+
+    // ==================================
+    // تحديد المشروع
+    // ==================================
+
+    const targetProjectData =
+        targetProject ||
+        currentProject;
+
+
+    if (
+        !targetList
+    ) {
+
         return;
 
+    }
 
-    projectsList.innerHTML =
+
+    targetList.innerHTML =
         "";
 
 
-    projects.forEach(
+    // ==================================
+    // لا يوجد مشروع
+    // ==================================
+
+    if (
+        !targetProjectData
+    ) {
+
+        targetList.innerHTML =
+            `
+            <div class="empty-document">
+                اختر مشروعًا لعرض مستنداته
+            </div>
+            `;
+
+        return;
+
+    }
+
+
+    // ==================================
+    // الحصول على مستندات المشروع
+    // ==================================
+
+    const projectDocuments =
+        getProjectDocuments(
+            targetProjectData.id
+        );
+
+
+    if (
+        !Array.isArray(
+            projectDocuments
+        ) ||
+        projectDocuments.length ===
+            0
+    ) {
+
+        targetList.innerHTML =
+            `
+            <div class="empty-document">
+                لا توجد مستندات
+            </div>
+            `;
+
+        return;
+
+    }
+
+
+    // ==================================
+    // رسم المستندات
+    // ==================================
+
+    projectDocuments.forEach(
         function (
-            project
+            documentItem,
+            index
         ) {
+
+            if (
+                !documentItem
+            ) {
+
+                return;
+
+            }
+
+
+            // ==================================
+            // العنصر الرئيسي
+            // ==================================
 
             const item =
                 document.createElement(
@@ -22240,309 +22340,145 @@ function renderProjects() {
 
 
             item.className =
-                "project-item";
+                "document-item";
 
 
-            item.innerHTML = `
-                <div class="project-header">
+            // ==================================
+            // هل المستند مفعّل؟
+            // ==================================
 
-                    <button
-                        class="project-expand-toggle"
-                        type="button"
-                        aria-label="فتح المشروع"
-                        aria-expanded="false">
-                        ▸
-                    </button>
-
-                    <span class="project-title">
-                        ${projectIcon}
-                        ${project.name}
-                    </span>
-
-                    <button
-                        class="project-menu"
-                        type="button">
-                        ⋮
-                    </button>
-
-                </div>
-
-                <div
-                    class="project-resources"
-                    style="display:none;">
-
-                    <div class="project-resource-section">
-                        <div class="project-resource-header">
-                            <span>▤ المستندات</span>
-                            <span class="project-resource-arrow">›</span>
-                        </div>
-                        <div class="project-resource-content"></div>
-                    </div>
-
-                    <div class="project-resource-section">
-                        <div class="project-resource-header">
-                            <span>◯ المحادثات</span>
-                            <span class="project-resource-arrow">›</span>
-                        </div>
-                        <div class="project-resource-content"></div>
-                    </div>
-
-                    <div class="project-resource-section">
-                        <div class="project-resource-header">
-                            <span>≡ المراجع</span>
-                            <span class="project-resource-arrow">›</span>
-                        </div>
-                        <div class="project-resource-content"></div>
-                    </div>
-
-                </div>
-
-                <div class="project-options-menu">
-
-                    <div class="rename-project">
-                        ✏ إعادة تسمية
-                    </div>
-
-                    <div class="delete-project">
-                        🗑 حذف
-                    </div>
-
-                </div>
-            `;
-
-            const projectExpandToggle =
-                item.querySelector(
-                    ".project-expand-toggle"
+            const isActive =
+                Boolean(
+                    currentDocument &&
+                    String(
+                        currentDocument.id
+                    ) ===
+                    String(
+                        documentItem.id
+                    )
                 );
 
-
-            const projectResources =
-                item.querySelector(
-                    ".project-resources"
-                );
-
-
-            
-            // ==================================
-            // ربط أقسام موارد المشروع
-            // ==================================
 
             if (
-                projectResources
+                isActive
             ) {
 
-                const resourceSections =
-                    projectResources.querySelectorAll(
-                        ".project-resource-section"
-                    );
+                item.classList.add(
+                    "active-document"
+                );
+
+            }
 
 
-                // ==================================
-                // قسم المستندات
-                // ==================================
+            // ==================================
+            // منطقة العنوان
+            // ==================================
 
-                if (
-                    resourceSections.length >=
-                    1
+            const title =
+                document.createElement(
+                    "span"
+                );
+
+
+            title.className =
+                "document-title";
+
+
+            // ==================================
+            // علامة التفعيل
+            // ==================================
+
+            const activeMark =
+                document.createElement(
+                    "span"
+                );
+
+
+            activeMark.className =
+                "document-active-mark";
+
+
+            activeMark.textContent =
+                isActive
+                    ? "✓ "
+                    : "";
+
+
+            // ==================================
+            // اسم المستند
+            // ==================================
+
+            const titleText =
+                document.createElement(
+                    "span"
+                );
+
+
+            titleText.className =
+                "document-name";
+
+
+            titleText.textContent =
+                documentItem.name;
+
+
+            title.appendChild(
+                activeMark
+            );
+
+
+            title.appendChild(
+                titleText
+            );
+
+
+            // ==================================
+            // تفعيل / إلغاء التفعيل
+            // ==================================
+
+            title.onclick =
+                function (
+                    e
                 ) {
 
-                    const documentsSection =
-                        resourceSections[0];
-
-
-                    const documentsHeader =
-                        documentsSection.querySelector(
-                            ".project-resource-header"
-                        );
-
-
-                    const documentsContent =
-                        documentsSection.querySelector(
-                            ".project-resource-content"
-                        );
-
-
-                    if (
-                        documentsHeader &&
-                        documentsContent
-                    ) {
-
-                        // ------------------------------
-                        // فتح / إغلاق قسم المستندات
-                        // ------------------------------
-
-                        documentsHeader.onclick =
-                            function (
-                                e
-                            ) {
-
-                                e.preventDefault();
-
-                                e.stopPropagation();
-
-
-                                const isOpen =
-                                    documentsHeader.classList.contains(
-                                        "open"
-                                    );
-
-
-                                if (
-                                    isOpen
-                                ) {
-
-                                    documentsHeader.classList.remove(
-                                        "open"
-                                    );
-
-
-                                    documentsContent.style.display =
-                                        "none";
-
-
-                                    const arrow =
-                                        documentsHeader.querySelector(
-                                            ".project-resource-arrow"
-                                        );
-
-
-                                    if (
-                                        arrow
-                                    ) {
-
-                                        arrow.textContent =
-                                            "›";
-
-                                    }
-
-                                }
-                                else {
-
-                                    documentsHeader.classList.add(
-                                        "open"
-                                    );
-
-
-                                    documentsContent.style.display =
-                                        "block";
-
-
-                                    const arrow =
-                                        documentsHeader.querySelector(
-                                            ".project-resource-arrow"
-                                        );
-
-
-                                    if (
-                                        arrow
-                                    ) {
-
-                                        arrow.textContent =
-                                            "⌄";
-
-                                    }
-
-
-                                    // ------------------------------
-                                    // عرض مستندات هذا المشروع
-                                    // ------------------------------
-
-                                    renderDocuments(
-                                        documentsContent,
-                                        project
-                                    );
-
-                                }
-
-                            };
-
-                    }
-
-                }
-
-            }
-
-
-            if (
-                projectExpandToggle &&
-                projectResources
-            ) {
-
-                projectExpandToggle.onclick =
-                    function (
-                        e
-                    ) {
-
-                        e.preventDefault();
-                        e.stopPropagation();
-
-
-                        const isOpen =
-                            projectResources.style.display !==
-                            "none";
-
-
-                        if (
-                            isOpen
-                        ) {
-
-                            projectResources.style.display =
-                                "none";
-
-
-                            projectExpandToggle.textContent =
-                                "◂";
-
-
-                            projectExpandToggle.setAttribute(
-                                "aria-expanded",
-                                "false"
-                            );
-
-                        }
-                        else {
-
-                            projectResources.style.display =
-                                "block";
-
-
-                            projectExpandToggle.textContent =
-                                "▾";
-
-
-                            projectExpandToggle.setAttribute(
-                                "aria-expanded",
-                                "true"
-                            );
-
-
-                            // اختيار المشروع فقط،
-                            // دون تغيير المستند أو الدردشة الآن.
-                            setCurrentProject(
-                                project
-                            );
-
-                        }
-
-                    };
-
-            }
-            
-            item.onclick =
-                function (e) {
+                    e.preventDefault();
 
                     e.stopPropagation();
 
 
-                    setCurrentProject(
-                        project
-                    );
+                    const sameDocument =
+                        Boolean(
+                            currentDocument &&
+                            String(
+                                currentDocument.id
+                            ) ===
+                            String(
+                                documentItem.id
+                            )
+                        );
 
 
-                    if (projectsPopup) {
+                    if (
+                        sameDocument
+                    ) {
 
-                        projectsPopup.classList.remove(
-                            "open"
+                        // ==========================
+                        // إلغاء التفعيل
+                        // ==========================
+
+                        setCurrentDocument(
+                            null
+                        );
+
+                    }
+                    else {
+
+                        // ==========================
+                        // تفعيل المستند
+                        // ==========================
+
+                        setCurrentDocument(
+                            documentItem
                         );
 
                     }
@@ -22550,225 +22486,319 @@ function renderProjects() {
                 };
 
 
-            const menu =
-                item.querySelector(
-                    ".project-menu"
+            // ==================================
+            // حالة القراءة والفهرسة
+            // ==================================
+
+            const status =
+                document.createElement(
+                    "span"
                 );
 
 
-            if (menu) {
-
-                menu.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
+            status.className =
+                "document-read-status";
 
 
-                        document
-                            .querySelectorAll(
-                                ".project-options-menu"
-                            )
-                            .forEach(
-                                function (
-                                    m
-                                ) {
+            if (
+                documentItem.indexStatus ===
+                "indexed"
+            ) {
 
-                                    m.classList.remove(
-                                        "open"
-                                    );
-
-                                }
-                            );
+                status.textContent =
+                    "✓ مفهرس";
 
 
-                        const options =
-                            item.querySelector(
-                                ".project-options-menu"
-                            );
+                if (
+                    documentItem.indexTokenCount
+                ) {
+
+                    status.textContent +=
+                        " · " +
+                        documentItem.indexTokenCount +
+                        " كلمة";
+
+                }
 
 
-                        if (!options)
-                            return;
+                if (
+                    documentItem.indexUniqueTerms
+                ) {
+
+                    status.textContent +=
+                        " · " +
+                        documentItem.indexUniqueTerms +
+                        " فريدة";
+
+                }
 
 
-                        options.classList.add(
-                            "open"
-                        );
+                if (
+                    documentItem.indexUniqueFamilies
+                ) {
 
+                    status.textContent +=
+                        " · " +
+                        documentItem.indexUniqueFamilies +
+                        " عائلة";
 
-                        const rect =
-                            menu.getBoundingClientRect();
+                }
 
+            }
+            else if (
+                documentItem.indexStatus ===
+                "indexing"
+            ) {
 
-                        const menuWidth =
-                            140;
+                status.textContent =
+                    "جارٍ الفهرسة...";
 
+            }
+            else if (
+                documentItem.indexStatus ===
+                "error"
+            ) {
 
-                        const menuHeight =
-                            options.offsetHeight ||
-                            80;
+                status.textContent =
+                    "⚠ فشل الفهرسة";
 
+            }
+            else if (
+                documentItem.readStatus ===
+                "reading"
+            ) {
 
-                        const margin =
-                            8;
+                status.textContent =
+                    "جارٍ القراءة...";
 
+            }
+            else if (
+                documentItem.readStatus ===
+                "read"
+            ) {
 
-                        let left =
-                            rect.left -
-                            menuWidth -
-                            margin;
+                status.textContent =
+                    "✓ تمت القراءة";
 
+            }
+            else {
 
-                        let top =
-                            rect.bottom +
-                            margin;
-
-
-                        if (
-                            left <
-                            margin
-                        ) {
-
-                            left =
-                                rect.right +
-                                margin;
-
-                        }
-
-
-                        if (
-                            left +
-                                menuWidth >
-                            window.innerWidth -
-                                margin
-                        ) {
-
-                            left =
-                                window.innerWidth -
-                                menuWidth -
-                                margin;
-
-                        }
-
-
-                        if (
-                            top +
-                                menuHeight >
-                            window.innerHeight -
-                                margin
-                        ) {
-
-                            top =
-                                rect.top -
-                                menuHeight -
-                                margin;
-
-                        }
-
-
-                        if (
-                            top <
-                            margin
-                        ) {
-
-                            top =
-                                margin;
-
-                        }
-
-
-                        options.style.position =
-                            "fixed";
-
-
-                        options.style.left =
-                            left +
-                            "px";
-
-
-                        options.style.top =
-                            top +
-                            "px";
-
-
-                        options.style.right =
-                            "auto";
-
-
-                        options.style.bottom =
-                            "auto";
-
-
-                        options.style.zIndex =
-                            "999999";
-
-                    };
+                status.textContent =
+                    "جديد";
 
             }
 
 
             // ==================================
-            // Rename Project
+            // زر الخيارات
             // ==================================
 
-            const renameProject =
-                item.querySelector(
-                    ".rename-project"
+            const menuButton =
+                document.createElement(
+                    "button"
                 );
 
 
-            if (renameProject) {
+            menuButton.className =
+                "document-menu";
 
-                renameProject.onclick =
-                    function (e) {
+
+            menuButton.type =
+                "button";
+
+
+            menuButton.title =
+                "خيارات المستند";
+
+
+            menuButton.textContent =
+                "⋮";
+
+
+            // ==================================
+            // قائمة الخيارات
+            // ==================================
+
+            const options =
+                document.createElement(
+                    "div"
+                );
+
+
+            options.className =
+                "document-options-menu";
+
+
+            options.innerHTML =
+                `
+                <div class="rename-document">
+                    ✏ إعادة تسمية
+                </div>
+
+                <div class="move-document-up">
+                    ↑ نقل إلى أعلى
+                </div>
+
+                <div class="move-document-down">
+                    ↓ نقل إلى أسفل
+                </div>
+
+                <div class="delete-document">
+                    🗑 حذف
+                </div>
+                `;
+
+
+            // ==================================
+            // إخفاء النقل لأعلى
+            // ==================================
+
+            if (
+                index ===
+                0
+            ) {
+
+                const moveUp =
+                    options.querySelector(
+                        ".move-document-up"
+                    );
+
+
+                if (
+                    moveUp
+                ) {
+
+                    moveUp.style.display =
+                        "none";
+
+                }
+
+            }
+
+
+            // ==================================
+            // إخفاء النقل لأسفل
+            // ==================================
+
+            if (
+                index ===
+                projectDocuments.length -
+                    1
+            ) {
+
+                const moveDown =
+                    options.querySelector(
+                        ".move-document-down"
+                    );
+
+
+                if (
+                    moveDown
+                ) {
+
+                    moveDown.style.display =
+                        "none";
+
+                }
+
+            }
+
+
+            // ==================================
+            // فتح / إغلاق قائمة الخيارات
+            // ==================================
+
+            menuButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+
+                    e.stopPropagation();
+
+
+                    document
+                        .querySelectorAll(
+                            ".document-options-menu.open"
+                        )
+                        .forEach(
+                            function (
+                                menu
+                            ) {
+
+                                if (
+                                    menu !==
+                                    options
+                                ) {
+
+                                    menu.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+
+                            }
+                        );
+
+
+                    options.classList.toggle(
+                        "open"
+                    );
+
+                };
+
+
+            // ==================================
+            // إعادة التسمية
+            // ==================================
+
+            const renameDocument =
+                options.querySelector(
+                    ".rename-document"
+                );
+
+
+            if (
+                renameDocument
+            ) {
+
+                renameDocument.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
 
                         e.stopPropagation();
 
 
-                        const options =
-                            item.querySelector(
-                                ".project-options-menu"
-                            );
-
-
-                        if (options) {
-
-                            options.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        const title =
-                            item.querySelector(
-                                ".project-title"
-                            );
-
-
-                        if (!title)
-                            return;
+                        options.classList.remove(
+                            "open"
+                        );
 
 
                         const oldName =
-                            project.name;
-
-
-                        title.innerHTML = `
-                            <input
-                                class="edit-project-title"
-                                value="${oldName}">
-                        `;
+                            documentItem.name;
 
 
                         const edit =
-                            title.querySelector(
-                                ".edit-project-title"
+                            document.createElement(
+                                "input"
                             );
 
 
-                        if (!edit)
-                            return;
+                        edit.className =
+                            "edit-document-title";
+
+
+                        edit.value =
+                            oldName;
+
+
+                        title.replaceWith(
+                            edit
+                        );
 
 
                         edit.focus();
@@ -22780,53 +22810,582 @@ function renderProjects() {
                         );
 
 
-                        edit.onkeydown =
+                        const finish =
+                            function (
+                                save
+                            ) {
+
+                                const value =
+                                    edit.value.trim();
+
+
+                                documentItem.name =
+                                    (
+                                        save &&
+                                        value
+                                    )
+                                        ? value
+                                        : oldName;
+
+
+                                documentItem.updatedAt =
+                                    new Date()
+                                        .toISOString();
+
+
+                                saveDocuments();
+
+
+                                if (
+                                    currentDocument &&
+                                    String(
+                                        currentDocument.id
+                                    ) ===
+                                    String(
+                                        documentItem.id
+                                    ) &&
+                                    documentTitle
+                                ) {
+
+                                    documentTitle.textContent =
+                                        documentItem.name;
+
+                                }
+
+
+                                renderDocuments(
+                                    targetContainer,
+                                    targetProjectData
+                                );
+
+                            };
+
+
+                        edit.addEventListener(
+                            "keydown",
+                            function (
+                                ev
+                            ) {
+
+                                if (
+                                    ev.key ===
+                                    "Enter"
+                                ) {
+
+                                    finish(
+                                        true
+                                    );
+
+                                }
+                                else if (
+                                    ev.key ===
+                                    "Escape"
+                                ) {
+
+                                    finish(
+                                        false
+                                    );
+
+                                }
+
+                            }
+                        );
+
+                    };
+
+            }
+
+
+            // ==================================
+            // نقل لأعلى
+            // ==================================
+
+            const moveUp =
+                options.querySelector(
+                    ".move-document-up"
+                );
+
+
+            if (
+                moveUp
+            ) {
+
+                moveUp.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        if (
+                            index <=
+                            0
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const previous =
+                            projectDocuments[
+                                index - 1
+                            ];
+
+
+                        [
+                            documentItem.order,
+                            previous.order
+                        ] =
+                        [
+                            previous.order,
+                            documentItem.order
+                        ];
+
+
+                        saveDocuments();
+
+
+                        renderDocuments(
+                            targetContainer,
+                            targetProjectData
+                        );
+
+                    };
+
+            }
+
+
+            // ==================================
+            // نقل لأسفل
+            // ==================================
+
+            const moveDown =
+                options.querySelector(
+                    ".move-document-down"
+                );
+
+
+            if (
+                moveDown
+            ) {
+
+                moveDown.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        if (
+                            index >=
+                            projectDocuments.length -
+                                1
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const next =
+                            projectDocuments[
+                                index + 1
+                            ];
+
+
+                        [
+                            documentItem.order,
+                            next.order
+                        ] =
+                        [
+                            next.order,
+                            documentItem.order
+                        ];
+
+
+                        saveDocuments();
+
+
+                        renderDocuments(
+                            targetContainer,
+                            targetProjectData
+                        );
+
+                    };
+
+            }
+
+
+            // ==================================
+            // حذف المستند
+            // ==================================
+
+            const deleteDocument =
+                options.querySelector(
+                    ".delete-document"
+                );
+
+
+            if (
+                deleteDocument
+            ) {
+
+                deleteDocument.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        options.classList.remove(
+                            "open"
+                        );
+
+
+                        // ==================================
+                        // إزالة نافذة تأكيد قديمة
+                        // ==================================
+
+                        const oldConfirm =
+                            document.querySelector(
+                                ".document-delete-confirm"
+                            );
+
+
+                        if (
+                            oldConfirm
+                        ) {
+
+                            oldConfirm.remove();
+
+                        }
+
+
+                        // ==================================
+                        // إنشاء نافذة التأكيد
+                        // ==================================
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "document-delete-confirm";
+
+
+                        confirmBox.innerHTML =
+                            `
+                            <div class="document-delete-dialog">
+
+                                <div class="document-delete-message">
+                                    هل تريد حذف المستند؟
+                                </div>
+
+                                <div class="document-delete-name">
+                                    ${documentItem.name}
+                                </div>
+
+                                <div class="document-delete-buttons">
+
+                                    <button
+                                        type="button"
+                                        class="confirm-document-delete">
+                                        حذف
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="cancel-document-delete">
+                                        إلغاء
+                                    </button>
+
+                                </div>
+
+                            </div>
+                            `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        // ==================================
+                        // تأكيد الحذف
+                        // ==================================
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-document-delete"
+                            );
+
+
+                        if (
+                            confirmDelete
+                        ) {
+
+                            confirmDelete.onclick =
+                                async function () {
+
+                                    // ==========================
+                                    // حذف من قائمة المستندات
+                                    // ==========================
+
+                                    documents =
+                                        documents.filter(
+                                            function (
+                                                doc
+                                            ) {
+
+                                                return (
+                                                    String(
+                                                        doc.id
+                                                    ) !==
+                                                    String(
+                                                        documentItem.id
+                                                    )
+                                                );
+
+                                            }
+                                        );
+
+
+                                    // ==========================
+                                    // حذف من المشروع
+                                    // ==========================
+
+                                    if (
+                                        targetProjectData &&
+                                        Array.isArray(
+                                            targetProjectData.documents
+                                        )
+                                    ) {
+
+                                        targetProjectData.documents =
+                                            targetProjectData.documents.filter(
+                                                function (
+                                                    id
+                                                ) {
+
+                                                    return (
+                                                        String(
+                                                            id
+                                                        ) !==
+                                                        String(
+                                                            documentItem.id
+                                                        )
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        targetProjectData.updatedAt =
+                                            new Date()
+                                                .toISOString();
+
+
+                                        saveProjects();
+
+                                    }
+
+
+                                    // ==========================
+                                    // حذف نسخة Word المخزنة
+                                    // ==========================
+
+                                    try {
+
+                                        await deleteWorkingWordFile(
+                                            documentItem.storageId
+                                        );
+
+                                    }
+                                    catch (
+                                        storageError
+                                    ) {
+
+                                        console.warn(
+                                            "تعذر حذف نسخة العمل:",
+                                            storageError
+                                        );
+
+                                    }
+
+
+                                    // ==========================
+                                    // إذا كان المستند مفعّلًا
+                                    // ==========================
+
+                                    if (
+                                        currentDocument &&
+                                        String(
+                                            currentDocument.id
+                                        ) ===
+                                        String(
+                                            documentItem.id
+                                        )
+                                    ) {
+
+                                        currentDocument =
+                                            null;
+
+
+                                        currentCitationSources =
+                                            [];
+
+
+                                        if (
+                                            documentTitle
+                                        ) {
+
+                                            documentTitle.textContent =
+                                                "لا يوجد مستند مفتوح";
+
+                                        }
+
+                                    }
+
+
+                                    // ==========================
+                                    // إعادة ضبط Orama
+                                    // ==========================
+
+                                    oramaRetrievalDb =
+                                        null;
+
+
+                                    oramaRetrievalCacheKey =
+                                        "";
+
+
+                                    oramaRetrievalDocumentId =
+                                        null;
+
+
+                                    // ==========================
+                                    // إعادة ترتيب المستندات
+                                    // ==========================
+
+                                    const remaining =
+                                        getProjectDocuments(
+                                            targetProjectData
+                                                ? targetProjectData.id
+                                                : null
+                                        );
+
+
+                                    remaining.forEach(
+                                        function (
+                                            doc,
+                                            newIndex
+                                        ) {
+
+                                            doc.order =
+                                                newIndex +
+                                                1;
+
+                                        }
+                                    );
+
+
+                                    // ==========================
+                                    // الحفظ
+                                    // ==========================
+
+                                    saveDocuments();
+
+                                    saveProjects();
+
+
+                                    // ==========================
+                                    // إغلاق التأكيد
+                                    // ==========================
+
+                                    confirmBox.remove();
+
+
+                                    // ==========================
+                                    // إعادة رسم المكان الحالي
+                                    // ==========================
+
+                                    renderDocuments(
+                                        targetContainer,
+                                        targetProjectData
+                                    );
+
+
+                                    // ==========================
+                                    // تحديث القائمة القديمة
+                                    // إذا كانت موجودة
+                                    // ==========================
+
+                                    if (
+                                        documentsList &&
+                                        targetList !==
+                                            documentsList
+                                    ) {
+
+                                        renderDocuments();
+
+                                    }
+
+                                };
+
+                        }
+
+
+                        // ==================================
+                        // إلغاء الحذف
+                        // ==================================
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-document-delete"
+                            );
+
+
+                        if (
+                            cancelDelete
+                        ) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        // ==================================
+                        // النقر خارج نافذة التأكيد
+                        // ==================================
+
+                        confirmBox.onclick =
                             function (
                                 event
                             ) {
 
                                 if (
-                                    event.key ===
-                                    "Enter"
+                                    event.target ===
+                                    confirmBox
                                 ) {
 
-                                    const value =
-                                        edit.value.trim();
-
-
-                                    project.name =
-                                        value !==
-                                            ""
-                                            ? value
-                                            : oldName;
-
-
-                                    project.updatedAt =
-                                        new Date()
-                                            .toISOString();
-
-
-                                    saveProjects();
-
-
-                                    renderProjects();
-
-
-                                    renderExpandedProjects();
-
-                                }
-
-
-                                if (
-                                    event.key ===
-                                    "Escape"
-                                ) {
-
-                                    project.name =
-                                        oldName;
-
-
-                                    renderProjects();
+                                    confirmBox.remove();
 
                                 }
 
@@ -22838,247 +23397,30 @@ function renderProjects() {
 
 
             // ==================================
-            // Delete Project
+            // بناء عنصر المستند
             // ==================================
 
-            const deleteProject =
-                item.querySelector(
-                    ".delete-project"
-                );
+            item.appendChild(
+                title
+            );
 
 
-            if (deleteProject) {
+            item.appendChild(
+                status
+            );
 
-                deleteProject.onclick =
-                    function (e) {
 
-                        e.stopPropagation();
+            item.appendChild(
+                menuButton
+            );
 
 
-                        const options =
-                            item.querySelector(
-                                ".project-options-menu"
-                            );
+            item.appendChild(
+                options
+            );
 
 
-                        if (options) {
-
-                            options.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        const confirmBox =
-                            document.createElement(
-                                "div"
-                            );
-
-
-                        confirmBox.className =
-                            "project-delete-confirm";
-
-
-                        confirmBox.innerHTML = `
-
-                            <div class="confirm-dialog">
-
-                                <p>
-                                    هل تريد حذف المشروع:
-                                    <br>
-
-                                    <strong>
-                                        ${project.name}
-                                    </strong>
-
-                                    ؟
-                                </p>
-
-                                <button
-                                    class="confirm-project-delete"
-                                    type="button">
-                                    حذف
-                                </button>
-
-                                <button
-                                    class="cancel-project-delete"
-                                    type="button">
-                                    إلغاء
-                                </button>
-
-                            </div>
-
-                        `;
-
-
-                        document.body.appendChild(
-                            confirmBox
-                        );
-
-
-                        const confirmDelete =
-                            confirmBox.querySelector(
-                                ".confirm-project-delete"
-                            );
-
-
-                        if (confirmDelete) {
-
-                            confirmDelete.onclick =
-                                async function () {
-
-                                    const projectDocumentIds =
-                                        Array.isArray(
-                                            project.documents
-                                        )
-                                            ? project.documents
-                                            : [];
-
-
-                                    for (
-                                        let i = 0;
-                                        i <
-                                        projectDocumentIds.length;
-                                        i++
-                                    ) {
-
-                                        const id =
-                                            projectDocumentIds[i];
-
-
-                                        const doc =
-                                            documents.find(
-                                                function (
-                                                    d
-                                                ) {
-
-                                                    return (
-                                                        d &&
-                                                        d.id ===
-                                                            id
-                                                    );
-
-                                                }
-                                            );
-
-
-                                        if (!doc) {
-
-                                            continue;
-
-                                        }
-
-
-                                        try {
-
-                                            await deleteWorkingWordFile(
-                                                doc.storageId
-                                            );
-
-                                        }
-                                        catch (
-                                            error
-                                        ) {
-
-                                            console.warn(
-                                                "تعذر حذف نسخة العمل:",
-                                                error
-                                            );
-
-                                        }
-
-                                    }
-
-
-                                    documents =
-                                        documents.filter(
-                                            function (
-                                                doc
-                                            ) {
-
-                                                return !projectDocumentIds.includes(
-                                                    doc.id
-                                                );
-
-                                            }
-                                        );
-
-
-                                    projects =
-                                        projects.filter(
-                                            function (
-                                                p
-                                            ) {
-
-                                                return (
-                                                    p.id !==
-                                                    project.id
-                                                );
-
-                                            }
-                                        );
-
-
-                                    if (
-                                        currentProject &&
-                                        currentProject.id ===
-                                            project.id
-                                    ) {
-
-                                        currentProject =
-                                            null;
-
-
-                                        setCurrentDocument(
-                                            null
-                                        );
-
-                                    }
-
-
-                                    saveDocuments();
-
-                                    saveProjects();
-
-
-                                    renderProjects();
-
-                                    renderExpandedProjects();
-
-                                    renderDocuments();
-
-
-                                    confirmBox.remove();
-
-                                };
-
-                        }
-
-
-                        const cancelDelete =
-                            confirmBox.querySelector(
-                                ".cancel-project-delete"
-                            );
-
-
-                        if (cancelDelete) {
-
-                            cancelDelete.onclick =
-                                function () {
-
-                                    confirmBox.remove();
-
-                                };
-
-                        }
-
-                    };
-
-            }
-
-
-            projectsList.appendChild(
+            targetList.appendChild(
                 item
             );
 
@@ -23086,6 +23428,7 @@ function renderProjects() {
     );
 
 }
+
 
 
 // =====================================================
