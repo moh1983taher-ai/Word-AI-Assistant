@@ -2225,7 +2225,7 @@ if (
                 );
 
 
-                renderDocuments();
+            
 
                 renderProjects();
 
@@ -23454,7 +23454,7 @@ function renderProjects() {
 
                             renderExpandedProjects();
 
-                            renderDocuments();
+                
 
                             renderChatList();
 
@@ -25313,7 +25313,7 @@ renderProjects();
 
 renderExpandedProjects();
 
-renderDocuments();
+
 
 renderChatList();
 
@@ -25332,7 +25332,7 @@ loadSettings();
 
 if (currentProject) {
 
-    renderDocuments();
+    renderProjects();
 
 }
 
