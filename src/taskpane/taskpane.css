@@ -1357,6 +1357,351 @@ body.expanded-sidebar-open .sidebar-hover-zone {
 }
 
 
+/* =========================================================
+   مستندات المشروع
+   ========================================================= */
+
+.project-document-item {
+
+    display: flex;
+
+    align-items: center;
+
+    width: 100%;
+
+    min-height: 34px;
+
+    margin: 2px 0;
+
+    padding: 5px 6px 5px 8px;
+
+    box-sizing: border-box;
+
+    border-radius: 6px;
+
+    color: #444;
+
+    font-size: 12px;
+
+    cursor: pointer;
+
+    position: relative;
+
+    gap: 6px;
+
+}
+
+
+.project-document-item:hover {
+
+    background: #f7f7f7;
+
+}
+
+
+/* المستند المفعّل */
+
+.project-document-item.active-document {
+
+    background: #f5f5f5;
+
+}
+
+
+/* عنوان المستند */
+
+.project-document-title {
+
+    display: flex;
+
+    align-items: center;
+
+    flex: 1 1 auto;
+
+    min-width: 0;
+
+    gap: 2px;
+
+    overflow: hidden;
+
+}
+
+
+/* اسم المستند */
+
+.project-document-title .document-name {
+
+    display: block;
+
+    min-width: 0;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+
+    font-size: 12px;
+
+}
+
+
+/* علامة التفعيل */
+
+.project-document-title .document-active-mark {
+
+    flex: 0 0 auto;
+
+    font-size: 12px;
+
+    line-height: 1;
+
+}
+
+
+/* حالة القراءة والفهرسة */
+
+.project-document-status {
+
+    flex: 0 0 auto;
+
+    max-width: 42%;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    text-overflow: ellipsis;
+
+    font-size: 10.5px;
+
+    color: #888;
+
+    text-align: left;
+
+}
+
+
+/* زر الخيارات */
+
+.project-document-menu {
+
+    width: 24px;
+
+    min-width: 24px;
+
+    height: 24px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex: 0 0 24px;
+
+    padding: 0;
+
+    border: none;
+
+    background: transparent;
+
+    color: #888;
+
+    font-size: 16px;
+
+    line-height: 1;
+
+    border-radius: 5px;
+
+    cursor: pointer;
+
+}
+
+
+.project-document-menu:hover {
+
+    background: #eeeeee;
+
+    color: #222;
+
+}
+
+
+/* قائمة الخيارات */
+
+.project-document-options {
+
+    display: none;
+
+    position: fixed;
+
+    min-width: 140px;
+
+    padding: 4px;
+
+    box-sizing: border-box;
+
+    background: #fff;
+
+    border: 1px solid #e5e5e5;
+
+    border-radius: 8px;
+
+    box-shadow:
+        0 4px 18px rgba(0, 0, 0, 0.14);
+
+    z-index: 999999;
+
+}
+
+
+.project-document-options.open {
+
+    display: block;
+
+}
+
+
+/* عناصر قائمة الخيارات */
+
+.project-document-options > div {
+
+    padding: 7px 9px;
+
+    border-radius: 6px;
+
+    white-space: nowrap;
+
+    font-size: 12px;
+
+    color: #444;
+
+    cursor: pointer;
+
+}
+
+
+.project-document-options > div:hover {
+
+    background: #f4f4f4;
+
+    color: #111;
+
+}
+
+
+/* حقل إعادة التسمية */
+
+.edit-project-document-title {
+
+    flex: 1 1 auto;
+
+    min-width: 0;
+
+    width: 100%;
+
+    padding: 4px 6px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #ddd;
+
+    border-radius: 5px;
+
+    outline: none;
+
+    font-size: 12px;
+
+    background: #fff;
+
+}
+
+
+/* =========================================================
+   صندوق إضافة المستند
+   ========================================================= */
+
+.project-add-document-box {
+
+    width: 100%;
+
+    margin: 3px 0 5px 0;
+
+    padding: 0 2px;
+
+    box-sizing: border-box;
+
+}
+
+
+.project-add-document {
+
+    width: 100%;
+
+    min-height: 30px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-start;
+
+    gap: 6px;
+
+    padding: 5px 8px;
+
+    box-sizing: border-box;
+
+    border: none;
+
+    border-radius: 6px;
+
+    background: transparent;
+
+    color: #666;
+
+    font-size: 12px;
+
+    cursor: pointer;
+
+}
+
+
+.project-add-document:hover {
+
+    background: #f5f5f5;
+
+    color: #222;
+
+}
+
+
+.project-add-document-icon {
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 18px;
+
+    min-width: 18px;
+
+    font-size: 17px;
+
+    line-height: 1;
+
+}
+
+
+.project-add-document-text {
+
+    font-size: 12px;
+
+}
+
 /* ==================================
    منع تنسيق .project-item span
    القديمة من إفساد العناصر الداخلية
