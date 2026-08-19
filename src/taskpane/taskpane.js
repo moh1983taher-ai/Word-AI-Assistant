@@ -22218,6 +22218,7 @@ function initializeSidebarSections() {
 // Render Projects
 // =====================================================
 
+
 function renderDocuments(
     targetContainer,
     targetProject
@@ -23429,7 +23430,2948 @@ function renderDocuments(
 
 }
 
+// =====================================================
+// RENDER PROJECTS
+//
+// المشروع هو الحاوية الأساسية:
+//    المشروع
+//      ├─ المستندات
+//      ├─ المحادثات
+//      └─ المراجع
+//
+// لا نحذف القائمة القديمة الآن.
+// هذا النقل تدريجي، ولذلك تبقى الوظائف القديمة تعمل.
+// =====================================================
 
+function renderProjects() {
+
+    if (
+        !projectsList
+    ) {
+
+        return;
+
+    }
+
+
+    projectsList.innerHTML =
+        "";
+
+
+    if (
+        !Array.isArray(
+            projects
+        ) ||
+        projects.length ===
+            0
+    ) {
+
+        projectsList.innerHTML =
+            `
+            <div class="empty-project">
+                لا توجد مشاريع
+            </div>
+            `;
+
+        return;
+
+    }
+
+
+    // =================================================
+    // أدوات مشتركة داخل المشروع
+    // =================================================
+
+    function renderProjectDocuments(
+        container,
+        project
+    ) {
+
+        if (
+            !container ||
+            !project
+        ) {
+
+            return;
+
+        }
+
+
+        container.innerHTML =
+            "";
+
+
+        const projectDocuments =
+            getProjectDocuments(
+                project.id
+            );
+
+
+        if (
+            !Array.isArray(
+                projectDocuments
+            ) ||
+            projectDocuments.length ===
+                0
+        ) {
+
+            container.innerHTML =
+                `
+                <div class="empty-document">
+                    لا توجد مستندات
+                </div>
+                `;
+
+            return;
+
+        }
+
+
+        projectDocuments.forEach(
+            function (
+                documentItem,
+                index
+            ) {
+
+                if (
+                    !documentItem
+                ) {
+
+                    return;
+
+                }
+
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                item.className =
+                    "document-item";
+
+
+                // ==================================
+                // حالة التفعيل
+                // ==================================
+
+                const isActive =
+                    Boolean(
+                        currentDocument &&
+                        String(
+                            currentDocument.id
+                        ) ===
+                        String(
+                            documentItem.id
+                        )
+                    );
+
+
+                if (
+                    isActive
+                ) {
+
+                    item.classList.add(
+                        "active-document"
+                    );
+
+                }
+
+
+                // ==================================
+                // العنوان
+                // ==================================
+
+                const title =
+                    document.createElement(
+                        "span"
+                    );
+
+
+                title.className =
+                    "document-title";
+
+
+                const activeMark =
+                    document.createElement(
+                        "span"
+                    );
+
+
+                activeMark.className =
+                    "document-active-mark";
+
+
+                activeMark.textContent =
+                    isActive
+                        ? "✓ "
+                        : "";
+
+
+                const titleText =
+                    document.createElement(
+                        "span"
+                    );
+
+
+                titleText.className =
+                    "document-name";
+
+
+                titleText.textContent =
+                    documentItem.name;
+
+
+                title.appendChild(
+                    activeMark
+                );
+
+
+                title.appendChild(
+                    titleText
+                );
+
+
+                // ==================================
+                // تفعيل / إلغاء التفعيل
+                // ==================================
+
+                title.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        const sameDocument =
+                            Boolean(
+                                currentDocument &&
+                                String(
+                                    currentDocument.id
+                                ) ===
+                                String(
+                                    documentItem.id
+                                )
+                            );
+
+
+                        if (
+                            sameDocument
+                        ) {
+
+                            setCurrentDocument(
+                                null
+                            );
+
+                        }
+                        else {
+
+                            setCurrentDocument(
+                                documentItem
+                            );
+
+                        }
+
+
+                        renderProjectDocuments(
+                            container,
+                            project
+                        );
+
+                    };
+
+
+                // ==================================
+                // حالة الفهرسة والقراءة
+                // ==================================
+
+                const status =
+                    document.createElement(
+                        "span"
+                    );
+
+
+                status.className =
+                    "document-read-status";
+
+
+                if (
+                    documentItem.indexStatus ===
+                    "indexed"
+                ) {
+
+                    status.textContent =
+                        "✓ مفهرس";
+
+
+                    if (
+                        documentItem.indexTokenCount
+                    ) {
+
+                        status.textContent +=
+                            " · " +
+                            documentItem.indexTokenCount +
+                            " كلمة";
+
+                    }
+
+
+                    if (
+                        documentItem.indexUniqueTerms
+                    ) {
+
+                        status.textContent +=
+                            " · " +
+                            documentItem.indexUniqueTerms +
+                            " فريدة";
+
+                    }
+
+
+                    if (
+                        documentItem.indexUniqueFamilies
+                    ) {
+
+                        status.textContent +=
+                            " · " +
+                            documentItem.indexUniqueFamilies +
+                            " عائلة";
+
+                    }
+
+                }
+                else if (
+                    documentItem.indexStatus ===
+                    "indexing"
+                ) {
+
+                    status.textContent =
+                        "جارٍ الفهرسة...";
+
+                }
+                else if (
+                    documentItem.indexStatus ===
+                    "error"
+                ) {
+
+                    status.textContent =
+                        "⚠ فشل الفهرسة";
+
+                }
+                else if (
+                    documentItem.readStatus ===
+                    "reading"
+                ) {
+
+                    status.textContent =
+                        "جارٍ القراءة...";
+
+                }
+                else if (
+                    documentItem.readStatus ===
+                    "read"
+                ) {
+
+                    status.textContent =
+                        "✓ تمت القراءة";
+
+                }
+                else {
+
+                    status.textContent =
+                        "جديد";
+
+                }
+
+
+                // ==================================
+                // زر الخيارات
+                // ==================================
+
+                const menuButton =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                menuButton.className =
+                    "document-menu";
+
+
+                menuButton.type =
+                    "button";
+
+
+                menuButton.title =
+                    "خيارات المستند";
+
+
+                menuButton.textContent =
+                    "⋮";
+
+
+                // ==================================
+                // قائمة الخيارات
+                // ==================================
+
+                const options =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                options.className =
+                    "document-options-menu";
+
+
+                options.innerHTML =
+                    `
+                    <div class="rename-document">
+                        ✏ إعادة تسمية
+                    </div>
+
+                    <div class="move-document-up">
+                        ↑ نقل إلى أعلى
+                    </div>
+
+                    <div class="move-document-down">
+                        ↓ نقل إلى أسفل
+                    </div>
+
+                    <div class="delete-document">
+                        🗑 حذف
+                    </div>
+                    `;
+
+
+                // ==================================
+                // إخفاء النقل لأعلى
+                // ==================================
+
+                if (
+                    index ===
+                    0
+                ) {
+
+                    const moveUp =
+                        options.querySelector(
+                            ".move-document-up"
+                        );
+
+
+                    if (
+                        moveUp
+                    ) {
+
+                        moveUp.style.display =
+                            "none";
+
+                    }
+
+                }
+
+
+                // ==================================
+                // إخفاء النقل لأسفل
+                // ==================================
+
+                if (
+                    index ===
+                    projectDocuments.length -
+                        1
+                ) {
+
+                    const moveDown =
+                        options.querySelector(
+                            ".move-document-down"
+                        );
+
+
+                    if (
+                        moveDown
+                    ) {
+
+                        moveDown.style.display =
+                            "none";
+
+                    }
+
+                }
+
+
+                // ==================================
+                // فتح قائمة الخيارات
+                // ==================================
+
+                menuButton.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        document
+                            .querySelectorAll(
+                                ".document-options-menu.open"
+                            )
+                            .forEach(
+                                function (
+                                    menu
+                                ) {
+
+                                    if (
+                                        menu !==
+                                        options
+                                    ) {
+
+                                        menu.classList.remove(
+                                            "open"
+                                        );
+
+                                    }
+
+                                }
+                            );
+
+
+                        options.classList.toggle(
+                            "open"
+                        );
+
+                    };
+
+
+                // ==================================
+                // إعادة التسمية
+                // ==================================
+
+                const renameDocument =
+                    options.querySelector(
+                        ".rename-document"
+                    );
+
+
+                if (
+                    renameDocument
+                ) {
+
+                    renameDocument.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+
+                            e.stopPropagation();
+
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+
+                            const oldName =
+                                documentItem.name;
+
+
+                            const edit =
+                                document.createElement(
+                                    "input"
+                                );
+
+
+                            edit.className =
+                                "edit-document-title";
+
+
+                            edit.value =
+                                oldName;
+
+
+                            title.replaceWith(
+                                edit
+                            );
+
+
+                            edit.focus();
+
+
+                            edit.setSelectionRange(
+                                edit.value.length,
+                                edit.value.length
+                            );
+
+
+                            function finishRename(
+                                save
+                            ) {
+
+                                const value =
+                                    edit.value.trim();
+
+
+                                documentItem.name =
+                                    (
+                                        save &&
+                                        value
+                                    )
+                                        ? value
+                                        : oldName;
+
+
+                                documentItem.updatedAt =
+                                    new Date()
+                                        .toISOString();
+
+
+                                saveDocuments();
+
+
+                                if (
+                                    currentDocument &&
+                                    String(
+                                        currentDocument.id
+                                    ) ===
+                                    String(
+                                        documentItem.id
+                                    ) &&
+                                    documentTitle
+                                ) {
+
+                                    documentTitle.textContent =
+                                        documentItem.name;
+
+                                }
+
+
+                                renderProjectDocuments(
+                                    container,
+                                    project
+                                );
+
+                            }
+
+
+                            edit.addEventListener(
+                                "keydown",
+                                function (
+                                    event
+                                ) {
+
+                                    if (
+                                        event.key ===
+                                        "Enter"
+                                    ) {
+
+                                        event.preventDefault();
+
+                                        finishRename(
+                                            true
+                                        );
+
+                                    }
+                                    else if (
+                                        event.key ===
+                                        "Escape"
+                                    ) {
+
+                                        event.preventDefault();
+
+                                        finishRename(
+                                            false
+                                        );
+
+                                    }
+
+                                }
+                            );
+
+                        };
+
+                }
+
+
+                // ==================================
+                // نقل لأعلى
+                // ==================================
+
+                const moveUp =
+                    options.querySelector(
+                        ".move-document-up"
+                    );
+
+
+                if (
+                    moveUp
+                ) {
+
+                    moveUp.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+
+                            e.stopPropagation();
+
+
+                            if (
+                                index <=
+                                0
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            const previous =
+                                projectDocuments[
+                                    index - 1
+                                ];
+
+
+                            [
+                                documentItem.order,
+                                previous.order
+                            ] =
+                            [
+                                previous.order,
+                                documentItem.order
+                            ];
+
+
+                            saveDocuments();
+
+
+                            renderProjectDocuments(
+                                container,
+                                project
+                            );
+
+                        };
+
+                }
+
+
+                // ==================================
+                // نقل لأسفل
+                // ==================================
+
+                const moveDown =
+                    options.querySelector(
+                        ".move-document-down"
+                    );
+
+
+                if (
+                    moveDown
+                ) {
+
+                    moveDown.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+
+                            e.stopPropagation();
+
+
+                            if (
+                                index >=
+                                projectDocuments.length -
+                                    1
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            const next =
+                                projectDocuments[
+                                    index + 1
+                                ];
+
+
+                            [
+                                documentItem.order,
+                                next.order
+                            ] =
+                            [
+                                next.order,
+                                documentItem.order
+                            ];
+
+
+                            saveDocuments();
+
+
+                            renderProjectDocuments(
+                                container,
+                                project
+                            );
+
+                        };
+
+                }
+
+
+                // ==================================
+                // حذف المستند
+                // ==================================
+
+                const deleteDocument =
+                    options.querySelector(
+                        ".delete-document"
+                    );
+
+
+                if (
+                    deleteDocument
+                ) {
+
+                    deleteDocument.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+
+                            e.stopPropagation();
+
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+
+                            const oldConfirm =
+                                document.querySelector(
+                                    ".document-delete-confirm"
+                                );
+
+
+                            if (
+                                oldConfirm
+                            ) {
+
+                                oldConfirm.remove();
+
+                            }
+
+
+                            const confirmBox =
+                                document.createElement(
+                                    "div"
+                                );
+
+
+                            confirmBox.className =
+                                "document-delete-confirm";
+
+
+                            confirmBox.innerHTML =
+                                `
+                                <div class="document-delete-dialog">
+
+                                    <div class="document-delete-message">
+                                        هل تريد حذف المستند؟
+                                    </div>
+
+                                    <div class="document-delete-name">
+                                        ${documentItem.name}
+                                    </div>
+
+                                    <div class="document-delete-buttons">
+
+                                        <button
+                                            type="button"
+                                            class="confirm-document-delete">
+                                            حذف
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            class="cancel-document-delete">
+                                            إلغاء
+                                        </button>
+
+                                    </div>
+
+                                </div>
+                                `;
+
+
+                            document.body.appendChild(
+                                confirmBox
+                            );
+
+
+                            const confirmDelete =
+                                confirmBox.querySelector(
+                                    ".confirm-document-delete"
+                                );
+
+
+                            if (
+                                confirmDelete
+                            ) {
+
+                                confirmDelete.onclick =
+                                    async function () {
+
+                                        documents =
+                                            documents.filter(
+                                                function (
+                                                    doc
+                                                ) {
+
+                                                    return (
+                                                        String(
+                                                            doc.id
+                                                        ) !==
+                                                        String(
+                                                            documentItem.id
+                                                        )
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        if (
+                                            Array.isArray(
+                                                project.documents
+                                            )
+                                        ) {
+
+                                            project.documents =
+                                                project.documents.filter(
+                                                    function (
+                                                        id
+                                                    ) {
+
+                                                        return (
+                                                            String(
+                                                                id
+                                                            ) !==
+                                                            String(
+                                                                documentItem.id
+                                                            )
+                                                        );
+
+                                                    }
+                                                );
+
+                                        }
+
+
+                                        project.updatedAt =
+                                            new Date()
+                                                .toISOString();
+
+
+                                        try {
+
+                                            await deleteWorkingWordFile(
+                                                documentItem.storageId
+                                            );
+
+                                        }
+                                        catch (
+                                            error
+                                        ) {
+
+                                            console.warn(
+                                                "تعذر حذف نسخة العمل:",
+                                                error
+                                            );
+
+                                        }
+
+
+                                        if (
+                                            currentDocument &&
+                                            String(
+                                                currentDocument.id
+                                            ) ===
+                                            String(
+                                                documentItem.id
+                                            )
+                                        ) {
+
+                                            currentDocument =
+                                                null;
+
+
+                                            currentCitationSources =
+                                                [];
+
+
+                                            if (
+                                                documentTitle
+                                            ) {
+
+                                                documentTitle.textContent =
+                                                    "لا يوجد مستند مفتوح";
+
+                                            }
+
+                                        }
+
+
+                                        oramaRetrievalDb =
+                                            null;
+
+
+                                        oramaRetrievalCacheKey =
+                                            "";
+
+
+                                        oramaRetrievalDocumentId =
+                                            null;
+
+
+                                        const remaining =
+                                            getProjectDocuments(
+                                                project.id
+                                            );
+
+
+                                        remaining.forEach(
+                                            function (
+                                                doc,
+                                                newIndex
+                                            ) {
+
+                                                doc.order =
+                                                    newIndex +
+                                                    1;
+
+                                            }
+                                        );
+
+
+                                        saveDocuments();
+
+                                        saveProjects();
+
+
+                                        confirmBox.remove();
+
+
+                                        renderProjectDocuments(
+                                            container,
+                                            project
+                                        );
+
+                                    };
+
+                            }
+
+
+                            const cancelDelete =
+                                confirmBox.querySelector(
+                                    ".cancel-document-delete"
+                                );
+
+
+                            if (
+                                cancelDelete
+                            ) {
+
+                                cancelDelete.onclick =
+                                    function () {
+
+                                        confirmBox.remove();
+
+                                    };
+
+                            }
+
+
+                            confirmBox.onclick =
+                                function (
+                                    event
+                                ) {
+
+                                    if (
+                                        event.target ===
+                                        confirmBox
+                                    ) {
+
+                                        confirmBox.remove();
+
+                                    }
+
+                                };
+
+                        };
+
+                }
+
+
+                item.appendChild(
+                    title
+                );
+
+
+                item.appendChild(
+                    status
+                );
+
+
+                item.appendChild(
+                    menuButton
+                );
+
+
+                item.appendChild(
+                    options
+                );
+
+
+                container.appendChild(
+                    item
+                );
+
+            }
+        );
+
+    }
+
+
+    // =================================================
+    // عرض محادثات المشروع
+    // =================================================
+
+    function renderProjectChats(
+        container,
+        project
+    ) {
+
+        if (
+            !container ||
+            !project
+        ) {
+
+            return;
+
+        }
+
+
+        container.innerHTML =
+            "";
+
+
+        const projectChatIds =
+            Array.isArray(
+                project.chatIds
+            )
+                ? project.chatIds
+                : [];
+
+
+        const projectChats =
+            chats.filter(
+                function (
+                    chat
+                ) {
+
+                    if (
+                        !chat
+                    ) {
+
+                        return false;
+
+                    }
+
+
+                    // العلاقة الأساسية
+                    if (
+                        chat.projectId !==
+                        undefined &&
+                        chat.projectId !==
+                        null
+                    ) {
+
+                        return (
+                            String(
+                                chat.projectId
+                            ) ===
+                            String(
+                                project.id
+                            )
+                        );
+
+                    }
+
+
+                    // دعم البيانات القديمة
+                    return projectChatIds.some(
+                        function (
+                            id
+                        ) {
+
+                            return (
+                                String(
+                                    id
+                                ) ===
+                                String(
+                                    chat.id
+                                )
+                            );
+
+                        }
+                    );
+
+                }
+            );
+
+
+        if (
+            projectChats.length ===
+            0
+        ) {
+
+            container.innerHTML =
+                `
+                <div class="empty-chat">
+                    لا توجد محادثات لهذا المشروع
+                </div>
+                `;
+
+            return;
+
+        }
+
+
+        projectChats.forEach(
+            function (
+                chat
+            ) {
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                item.className =
+                    "project-chat-item";
+
+
+                item.innerHTML =
+                    `
+                    <span class="project-chat-title">
+                        ${chatIcon}
+                        ${chat.title || "محادثة جديدة"}
+                    </span>
+
+                    <button
+                        type="button"
+                        class="project-chat-menu"
+                        title="خيارات المحادثة">
+                        ⋮
+                    </button>
+
+                    <div
+                        class="project-chat-options">
+
+                        <div class="rename-project-chat">
+                            ✏ إعادة تسمية
+                        </div>
+
+                        <div class="delete-project-chat">
+                            🗑 حذف
+                        </div>
+
+                    </div>
+                    `;
+
+
+                // ==================================
+                // فتح المحادثة
+                // ==================================
+
+                item.onclick =
+                    function (
+                        e
+                    ) {
+
+                        if (
+                            e.target.closest(
+                                ".project-chat-menu"
+                            ) ||
+                            e.target.closest(
+                                ".project-chat-options"
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        e.stopPropagation();
+
+
+                        currentChat =
+                            chat;
+
+
+                        currentProject =
+                            project;
+
+
+                        renderChat();
+
+
+                        if (
+                            projectsPopup
+                        ) {
+
+                            projectsPopup.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+                    };
+
+
+                // ==================================
+                // قائمة المحادثة
+                // ==================================
+
+                const chatMenu =
+                    item.querySelector(
+                        ".project-chat-menu"
+                    );
+
+
+                const chatOptions =
+                    item.querySelector(
+                        ".project-chat-options"
+                    );
+
+
+                if (
+                    chatMenu &&
+                    chatOptions
+                ) {
+
+                    chatMenu.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+
+                            e.stopPropagation();
+
+
+                            document
+                                .querySelectorAll(
+                                    ".project-chat-options.open"
+                                )
+                                .forEach(
+                                    function (
+                                        menu
+                                    ) {
+
+                                        if (
+                                            menu !==
+                                            chatOptions
+                                        ) {
+
+                                            menu.classList.remove(
+                                                "open"
+                                            );
+
+                                        }
+
+                                    }
+                                );
+
+
+                            chatOptions.classList.toggle(
+                                "open"
+                            );
+
+                        };
+
+                }
+
+
+                // ==================================
+                // إعادة تسمية المحادثة
+                // ==================================
+
+                const renameChat =
+                    item.querySelector(
+                        ".rename-project-chat"
+                    );
+
+
+                if (
+                    renameChat
+                ) {
+
+                    renameChat.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+
+                            e.stopPropagation();
+
+
+                            chatOptions.classList.remove(
+                                "open"
+                            );
+
+
+                            const titleElement =
+                                item.querySelector(
+                                    ".project-chat-title"
+                                );
+
+
+                            if (
+                                !titleElement
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            const oldName =
+                                chat.title;
+
+
+                            titleElement.innerHTML =
+                                `
+                                <input
+                                    class="edit-project-chat-title"
+                                    value="${oldName}">
+                                `;
+
+
+                            const edit =
+                                titleElement.querySelector(
+                                    ".edit-project-chat-title"
+                                );
+
+
+                            if (
+                                !edit
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            edit.focus();
+
+
+                            edit.setSelectionRange(
+                                edit.value.length,
+                                edit.value.length
+                            );
+
+
+                            edit.onkeydown =
+                                function (
+                                    event
+                                ) {
+
+                                    if (
+                                        event.key ===
+                                        "Enter"
+                                    ) {
+
+                                        event.preventDefault();
+
+
+                                        const value =
+                                            edit.value.trim();
+
+
+                                        chat.title =
+                                            value ||
+                                            oldName;
+
+
+                                        chat.updatedAt =
+                                            new Date()
+                                                .toISOString();
+
+
+                                        saveChats();
+
+
+                                        renderProjectChats(
+                                            container,
+                                            project
+                                        );
+
+
+                                        renderChatList();
+
+                                        renderSidebarChats();
+
+                                        renderRecentChats();
+
+                                    }
+                                    else if (
+                                        event.key ===
+                                        "Escape"
+                                    ) {
+
+                                        event.preventDefault();
+
+
+                                        renderProjectChats(
+                                            container,
+                                            project
+                                        );
+
+                                    }
+
+                                };
+
+                        };
+
+                }
+
+
+                // ==================================
+                // حذف المحادثة
+                // ==================================
+
+                const deleteChat =
+                    item.querySelector(
+                        ".delete-project-chat"
+                    );
+
+
+                if (
+                    deleteChat
+                ) {
+
+                    deleteChat.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+
+                            e.stopPropagation();
+
+
+                            chatOptions.classList.remove(
+                                "open"
+                            );
+
+
+                            const confirmBox =
+                                document.createElement(
+                                    "div"
+                                );
+
+
+                            confirmBox.className =
+                                "delete-confirm";
+
+
+                            confirmBox.innerHTML =
+                                `
+                                <div class="confirm-dialog">
+
+                                    <p>
+                                        هل تريد حذف المحادثة:
+                                        <br>
+
+                                        <strong>
+                                            ${chat.title}
+                                        </strong>
+
+                                        ؟
+                                    </p>
+
+                                    <button
+                                        class="confirm-delete"
+                                        type="button">
+                                        حذف
+                                    </button>
+
+                                    <button
+                                        class="cancel-delete"
+                                        type="button">
+                                        إلغاء
+                                    </button>
+
+                                </div>
+                                `;
+
+
+                            document.body.appendChild(
+                                confirmBox
+                            );
+
+
+                            const confirmDelete =
+                                confirmBox.querySelector(
+                                    ".confirm-delete"
+                                );
+
+
+                            if (
+                                confirmDelete
+                            ) {
+
+                                confirmDelete.onclick =
+                                    function () {
+
+                                        chats =
+                                            chats.filter(
+                                                function (
+                                                    c
+                                                ) {
+
+                                                    return (
+                                                        String(
+                                                            c.id
+                                                        ) !==
+                                                        String(
+                                                            chat.id
+                                                        )
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        if (
+                                            Array.isArray(
+                                                project.chatIds
+                                            )
+                                        ) {
+
+                                            project.chatIds =
+                                                project.chatIds.filter(
+                                                    function (
+                                                        id
+                                                    ) {
+
+                                                        return (
+                                                            String(
+                                                                id
+                                                            ) !==
+                                                            String(
+                                                                chat.id
+                                                            )
+                                                        );
+
+                                                    }
+                                                );
+
+                                        }
+
+
+                                        if (
+                                            currentChat &&
+                                            String(
+                                                currentChat.id
+                                            ) ===
+                                            String(
+                                                chat.id
+                                            )
+                                        ) {
+
+                                            currentChat =
+                                                null;
+
+
+                                            renderChat();
+
+                                        }
+
+
+                                        saveChats();
+
+                                        saveProjects();
+
+
+                                        renderProjectChats(
+                                            container,
+                                            project
+                                        );
+
+
+                                        renderChatList();
+
+                                        renderSidebarChats();
+
+                                        renderRecentChats();
+
+
+                                        confirmBox.remove();
+
+                                    };
+
+                            }
+
+
+                            const cancelDelete =
+                                confirmBox.querySelector(
+                                    ".cancel-delete"
+                                );
+
+
+                            if (
+                                cancelDelete
+                            ) {
+
+                                cancelDelete.onclick =
+                                    function () {
+
+                                        confirmBox.remove();
+
+                                    };
+
+                            }
+
+                        };
+
+                }
+
+
+                container.appendChild(
+                    item
+                );
+
+            }
+        );
+
+    }
+
+
+    // =================================================
+    // بناء المشاريع
+    // =================================================
+
+    projects.forEach(
+        function (
+            project
+        ) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "project-item";
+
+
+            item.innerHTML =
+                `
+                <div class="project-header">
+
+                    <button
+                        class="project-expand-toggle"
+                        type="button"
+                        aria-label="فتح المشروع"
+                        aria-expanded="false">
+                        ◂
+                    </button>
+
+                    <span class="project-title">
+                        ${projectIcon}
+                        ${project.name}
+                    </span>
+
+                    <button
+                        class="project-menu"
+                        type="button">
+                        ⋮
+                    </button>
+
+                </div>
+
+
+                <div
+                    class="project-resources"
+                    style="display:none;">
+
+                    <div class="project-resource-section">
+
+                        <div
+                            class="project-resource-header"
+                            data-resource="documents">
+
+                            <span>
+                                ▤ المستندات
+                            </span>
+
+                            <span class="project-resource-arrow">
+                                ›
+                            </span>
+
+                        </div>
+
+                        <div
+                            class="project-resource-content"
+                            data-content="documents">
+                        </div>
+
+                    </div>
+
+
+                    <div class="project-resource-section">
+
+                        <div
+                            class="project-resource-header"
+                            data-resource="chats">
+
+                            <span>
+                                ◯ المحادثات
+                            </span>
+
+                            <span class="project-resource-arrow">
+                                ›
+                            </span>
+
+                        </div>
+
+                        <div
+                            class="project-resource-content"
+                            data-content="chats">
+                        </div>
+
+                    </div>
+
+
+                    <div class="project-resource-section">
+
+                        <div
+                            class="project-resource-header"
+                            data-resource="references">
+
+                            <span>
+                                ≡ المراجع
+                            </span>
+
+                            <span class="project-resource-arrow">
+                                ›
+                            </span>
+
+                        </div>
+
+                        <div
+                            class="project-resource-content"
+                            data-content="references">
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="project-options-menu">
+
+                    <div class="rename-project">
+                        ✏ إعادة تسمية
+                    </div>
+
+                    <div class="delete-project">
+                        🗑 حذف
+                    </div>
+
+                </div>
+                `;
+
+
+            const projectExpandToggle =
+                item.querySelector(
+                    ".project-expand-toggle"
+                );
+
+
+            const projectResources =
+                item.querySelector(
+                    ".project-resources"
+                );
+
+
+            // =================================================
+            // فتح / إغلاق المشروع
+            // =================================================
+
+            if (
+                projectExpandToggle &&
+                projectResources
+            ) {
+
+                projectExpandToggle.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        const isOpen =
+                            projectResources.style.display !==
+                            "none";
+
+
+                        if (
+                            isOpen
+                        ) {
+
+                            projectResources.style.display =
+                                "none";
+
+
+                            projectExpandToggle.textContent =
+                                "◂";
+
+
+                            projectExpandToggle.setAttribute(
+                                "aria-expanded",
+                                "false"
+                            );
+
+                        }
+                        else {
+
+                            projectResources.style.display =
+                                "block";
+
+
+                            projectExpandToggle.textContent =
+                                "▾";
+
+
+                            projectExpandToggle.setAttribute(
+                                "aria-expanded",
+                                "true"
+                            );
+
+
+                            setCurrentProject(
+                                project
+                            );
+
+                        }
+
+                    };
+
+            }
+
+
+            // =================================================
+            // أقسام المشروع
+            // =================================================
+
+            const sections =
+                item.querySelectorAll(
+                    ".project-resource-section"
+                );
+
+
+            sections.forEach(
+                function (
+                    section,
+                    sectionIndex
+                ) {
+
+                    const header =
+                        section.querySelector(
+                            ".project-resource-header"
+                        );
+
+
+                    const content =
+                        section.querySelector(
+                            ".project-resource-content"
+                        );
+
+
+                    const arrow =
+                        section.querySelector(
+                            ".project-resource-arrow"
+                        );
+
+
+                    if (
+                        !header ||
+                        !content
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    header.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+
+                            e.stopPropagation();
+
+
+                            const isOpen =
+                                header.classList.contains(
+                                    "open"
+                                );
+
+
+                            if (
+                                isOpen
+                            ) {
+
+                                header.classList.remove(
+                                    "open"
+                                );
+
+
+                                content.style.display =
+                                    "none";
+
+
+                                if (
+                                    arrow
+                                ) {
+
+                                    arrow.textContent =
+                                        "›";
+
+                                }
+
+
+                                return;
+
+                            }
+
+
+                            // إغلاق بقية أقسام المشروع
+                            sections.forEach(
+                                function (
+                                    otherSection
+                                ) {
+
+                                    const otherHeader =
+                                        otherSection.querySelector(
+                                            ".project-resource-header"
+                                        );
+
+
+                                    const otherContent =
+                                        otherSection.querySelector(
+                                            ".project-resource-content"
+                                        );
+
+
+                                    const otherArrow =
+                                        otherSection.querySelector(
+                                            ".project-resource-arrow"
+                                        );
+
+
+                                    if (
+                                        otherHeader &&
+                                        otherHeader !==
+                                            header
+                                    ) {
+
+                                        otherHeader.classList.remove(
+                                            "open"
+                                        );
+
+                                    }
+
+
+                                    if (
+                                        otherContent &&
+                                        otherContent !==
+                                            content
+                                    ) {
+
+                                        otherContent.style.display =
+                                            "none";
+
+                                    }
+
+
+                                    if (
+                                        otherArrow &&
+                                        otherArrow !==
+                                            arrow
+                                    ) {
+
+                                        otherArrow.textContent =
+                                            "›";
+
+                                    }
+
+                                }
+                            );
+
+
+                            header.classList.add(
+                                "open"
+                            );
+
+
+                            content.style.display =
+                                "block";
+
+
+                            if (
+                                arrow
+                            ) {
+
+                                arrow.textContent =
+                                    "⌄";
+
+                            }
+
+
+                            // ==================================
+                            // المستندات
+                            // ==================================
+
+                            if (
+                                sectionIndex ===
+                                0
+                            ) {
+
+                                renderProjectDocuments(
+                                    content,
+                                    project
+                                );
+
+                            }
+
+
+                            // ==================================
+                            // المحادثات
+                            // ==================================
+
+                            else if (
+                                sectionIndex ===
+                                1
+                            ) {
+
+                                renderProjectChats(
+                                    content,
+                                    project
+                                );
+
+                            }
+
+
+                            // ==================================
+                            // المراجع
+                            // ==================================
+
+                            else if (
+                                sectionIndex ===
+                                2
+                            ) {
+
+                                content.innerHTML =
+                                    `
+                                    <div class="empty-reference">
+                                        لا توجد مراجع لهذا المشروع حاليًا
+                                    </div>
+                                    `;
+
+                            }
+
+                        };
+
+                }
+            );
+
+
+            // =================================================
+            // اختيار المشروع بالنقر على الرأس
+            // =================================================
+
+            item.onclick =
+                function (
+                    e
+                ) {
+
+                    if (
+                        e.target.closest(
+                            ".project-expand-toggle"
+                        ) ||
+                        e.target.closest(
+                            ".project-menu"
+                        ) ||
+                        e.target.closest(
+                            ".project-options-menu"
+                        ) ||
+                        e.target.closest(
+                            ".project-resource-header"
+                        ) ||
+                        e.target.closest(
+                            ".project-resource-content"
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    e.stopPropagation();
+
+
+                    setCurrentProject(
+                        project
+                    );
+
+
+                    if (
+                        projectsPopup
+                    ) {
+
+                        projectsPopup.classList.remove(
+                            "open"
+                        );
+
+                    }
+
+                };
+
+
+            // =================================================
+            // قائمة خيارات المشروع
+            // =================================================
+
+            const menu =
+                item.querySelector(
+                    ".project-menu"
+                );
+
+
+            if (
+                menu
+            ) {
+
+                menu.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        document
+                            .querySelectorAll(
+                                ".project-options-menu.open"
+                            )
+                            .forEach(
+                                function (
+                                    openMenu
+                                ) {
+
+                                    openMenu.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+                            );
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (
+                            !options
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        options.classList.add(
+                            "open"
+                        );
+
+
+                        const rect =
+                            menu.getBoundingClientRect();
+
+
+                        const menuWidth =
+                            140;
+
+
+                        const menuHeight =
+                            options.offsetHeight ||
+                            80;
+
+
+                        const margin =
+                            8;
+
+
+                        let left =
+                            rect.left -
+                            menuWidth -
+                            margin;
+
+
+                        let top =
+                            rect.bottom +
+                            margin;
+
+
+                        if (
+                            left <
+                            margin
+                        ) {
+
+                            left =
+                                rect.right +
+                                margin;
+
+                        }
+
+
+                        if (
+                            left +
+                                menuWidth >
+                            window.innerWidth -
+                                margin
+                        ) {
+
+                            left =
+                                window.innerWidth -
+                                menuWidth -
+                                margin;
+
+                        }
+
+
+                        if (
+                            top +
+                                menuHeight >
+                            window.innerHeight -
+                                margin
+                        ) {
+
+                            top =
+                                rect.top -
+                                menuHeight -
+                                margin;
+
+                        }
+
+
+                        if (
+                            top <
+                            margin
+                        ) {
+
+                            top =
+                                margin;
+
+                        }
+
+
+                        options.style.position =
+                            "fixed";
+
+
+                        options.style.left =
+                            left +
+                            "px";
+
+
+                        options.style.top =
+                            top +
+                            "px";
+
+
+                        options.style.right =
+                            "auto";
+
+
+                        options.style.bottom =
+                            "auto";
+
+
+                        options.style.zIndex =
+                            "999999";
+
+                    };
+
+            }
+
+
+            // =================================================
+            // إعادة تسمية المشروع
+            // =================================================
+
+            const renameProject =
+                item.querySelector(
+                    ".rename-project"
+                );
+
+
+            if (
+                renameProject
+            ) {
+
+                renameProject.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (
+                            options
+                        ) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const title =
+                            item.querySelector(
+                                ".project-title"
+                            );
+
+
+                        if (
+                            !title
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const oldName =
+                            project.name;
+
+
+                        title.innerHTML =
+                            `
+                            <input
+                                class="edit-project-title"
+                                value="${oldName}">
+                            `;
+
+
+                        const edit =
+                            title.querySelector(
+                                ".edit-project-title"
+                            );
+
+
+                        if (
+                            !edit
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        edit.focus();
+
+
+                        edit.setSelectionRange(
+                            edit.value.length,
+                            edit.value.length
+                        );
+
+
+                        edit.onkeydown =
+                            function (
+                                event
+                            ) {
+
+                                if (
+                                    event.key ===
+                                    "Enter"
+                                ) {
+
+                                    event.preventDefault();
+
+
+                                    const value =
+                                        edit.value.trim();
+
+
+                                    project.name =
+                                        value ||
+                                        oldName;
+
+
+                                    project.updatedAt =
+                                        new Date()
+                                            .toISOString();
+
+
+                                    saveProjects();
+
+
+                                    renderProjects();
+
+
+                                    renderExpandedProjects();
+
+                                }
+                                else if (
+                                    event.key ===
+                                    "Escape"
+                                ) {
+
+                                    event.preventDefault();
+
+
+                                    project.name =
+                                        oldName;
+
+
+                                    renderProjects();
+
+                                }
+
+                            };
+
+                    };
+
+            }
+
+
+            // =================================================
+            // حذف المشروع
+            // =================================================
+
+            const deleteProject =
+                item.querySelector(
+                    ".delete-project"
+                );
+
+
+            if (
+                deleteProject
+            ) {
+
+                deleteProject.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+
+                        e.stopPropagation();
+
+
+                        const options =
+                            item.querySelector(
+                                ".project-options-menu"
+                            );
+
+
+                        if (
+                            options
+                        ) {
+
+                            options.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        const confirmBox =
+                            document.createElement(
+                                "div"
+                            );
+
+
+                        confirmBox.className =
+                            "project-delete-confirm";
+
+
+                        confirmBox.innerHTML =
+                            `
+                            <div class="confirm-dialog">
+
+                                <p>
+                                    هل تريد حذف المشروع:
+                                    <br>
+
+                                    <strong>
+                                        ${project.name}
+                                    </strong>
+
+                                    ؟
+                                </p>
+
+                                <button
+                                    class="confirm-project-delete"
+                                    type="button">
+                                    حذف
+                                </button>
+
+                                <button
+                                    class="cancel-project-delete"
+                                    type="button">
+                                    إلغاء
+                                </button>
+
+                            </div>
+                            `;
+
+
+                        document.body.appendChild(
+                            confirmBox
+                        );
+
+
+                        const confirmDelete =
+                            confirmBox.querySelector(
+                                ".confirm-project-delete"
+                            );
+
+
+                        if (
+                            confirmDelete
+                        ) {
+
+                            confirmDelete.onclick =
+                                async function () {
+
+                                    const projectDocumentIds =
+                                        Array.isArray(
+                                            project.documents
+                                        )
+                                            ? project.documents
+                                            : [];
+
+
+                                    // ==================================
+                                    // حذف ملفات المستندات
+                                    // ==================================
+
+                                    for (
+                                        let i =
+                                            0;
+
+                                        i <
+                                            projectDocumentIds.length;
+
+                                        i++
+                                    ) {
+
+                                        const id =
+                                            projectDocumentIds[
+                                                i
+                                            ];
+
+
+                                        const doc =
+                                            documents.find(
+                                                function (
+                                                    d
+                                                ) {
+
+                                                    return (
+                                                        d &&
+                                                        String(
+                                                            d.id
+                                                        ) ===
+                                                        String(
+                                                            id
+                                                        )
+                                                    );
+
+                                                }
+                                            );
+
+
+                                        if (
+                                            !doc
+                                        ) {
+
+                                            continue;
+
+                                        }
+
+
+                                        try {
+
+                                            await deleteWorkingWordFile(
+                                                doc.storageId
+                                            );
+
+                                        }
+                                        catch (
+                                            error
+                                        ) {
+
+                                            console.warn(
+                                                "تعذر حذف نسخة العمل:",
+                                                error
+                                            );
+
+                                        }
+
+                                    }
+
+
+                                    // ==================================
+                                    // حذف المستندات من التخزين المحلي
+                                    // ==================================
+
+                                    documents =
+                                        documents.filter(
+                                            function (
+                                                doc
+                                            ) {
+
+                                                return !projectDocumentIds.some(
+                                                    function (
+                                                        id
+                                                    ) {
+
+                                                        return (
+                                                            String(
+                                                                id
+                                                            ) ===
+                                                            String(
+                                                                doc.id
+                                                            )
+                                                        );
+
+                                                    }
+                                                );
+
+                                            }
+                                        );
+
+
+                                    // ==================================
+                                    // حذف محادثات المشروع
+                                    // ==================================
+
+                                    chats =
+                                        chats.filter(
+                                            function (
+                                                chat
+                                            ) {
+
+                                                return !(
+                                                    chat &&
+                                                    String(
+                                                        chat.projectId
+                                                    ) ===
+                                                    String(
+                                                        project.id
+                                                    )
+                                                );
+
+                                            }
+                                        );
+
+
+                                    // ==================================
+                                    // حذف المشروع
+                                    // ==================================
+
+                                    projects =
+                                        projects.filter(
+                                            function (
+                                                p
+                                            ) {
+
+                                                return (
+                                                    String(
+                                                        p.id
+                                                    ) !==
+                                                    String(
+                                                        project.id
+                                                    )
+                                                );
+
+                                            }
+                                        );
+
+
+                                    // ==================================
+                                    // تصفير الحالة الحالية
+                                    // ==================================
+
+                                    if (
+                                        currentProject &&
+                                        String(
+                                            currentProject.id
+                                        ) ===
+                                        String(
+                                            project.id
+                                        )
+                                    ) {
+
+                                        currentProject =
+                                            null;
+
+
+                                        currentDocument =
+                                            null;
+
+
+                                        currentChat =
+                                            null;
+
+
+                                        currentCitationSources =
+                                            [];
+
+
+                                        if (
+                                            documentTitle
+                                        ) {
+
+                                            documentTitle.textContent =
+                                                "لا يوجد مستند مفتوح";
+
+                                        }
+
+
+                                        if (
+                                            chatArea
+                                        ) {
+
+                                            chatArea.innerHTML =
+                                                "";
+
+                                        }
+
+                                    }
+
+
+                                    oramaRetrievalDb =
+                                        null;
+
+
+                                    oramaRetrievalCacheKey =
+                                        "";
+
+
+                                    oramaRetrievalDocumentId =
+                                        null;
+
+
+                                    saveDocuments();
+
+                                    saveChats();
+
+                                    saveProjects();
+
+
+                                    renderProjects();
+
+                                    renderExpandedProjects();
+
+                                    renderDocuments();
+
+                                    renderChatList();
+
+                                    renderSidebarChats();
+
+                                    renderRecentChats();
+
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+
+                        const cancelDelete =
+                            confirmBox.querySelector(
+                                ".cancel-project-delete"
+                            );
+
+
+                        if (
+                            cancelDelete
+                        ) {
+
+                            cancelDelete.onclick =
+                                function () {
+
+                                    confirmBox.remove();
+
+                                };
+
+                        }
+
+                    };
+
+            }
+
+
+            projectsList.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
 
 // =====================================================
 // Projects Button
