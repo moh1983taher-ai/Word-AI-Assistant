@@ -2256,7 +2256,7 @@ if (
 
 
                 renderDocuments();
-                
+
                 renderProjects();
 
 
@@ -21100,15 +21100,133 @@ function renderProjects() {
         }
 
 
+        // =========================================
+        // تنظيف المحتوى
+        // =========================================
+
         container.innerHTML =
             "";
 
+
+        // =========================================
+        // صندوق إضافة مستند
+        // =========================================
+
+        const addDocumentBox =
+            document.createElement(
+                "div"
+            );
+
+
+        addDocumentBox.className =
+            "project-add-document-box";
+
+
+        const addDocumentButton =
+            document.createElement(
+                "button"
+            );
+
+
+        addDocumentButton.type =
+            "button";
+
+
+        addDocumentButton.className =
+            "project-add-document";
+
+
+        addDocumentButton.title =
+            "إضافة مستند Word";
+
+
+        addDocumentButton.innerHTML =
+            `
+            <span class="project-add-document-icon">
+                +
+            </span>
+
+            <span class="project-add-document-text">
+                إضافة مستند
+            </span>
+            `;
+
+
+        addDocumentBox.appendChild(
+            addDocumentButton
+        );
+
+
+        container.appendChild(
+            addDocumentBox
+        );
+
+
+        // =========================================
+        // زر إضافة مستند
+        // =========================================
+
+        addDocumentButton.onclick =
+            function (
+                e
+            ) {
+
+                e.preventDefault();
+
+                e.stopPropagation();
+
+
+                // =====================================
+                // هذا هو المشروع الذي سيضاف إليه
+                // المستند
+                // =====================================
+
+                setCurrentProject(
+                    project
+                );
+
+
+                // =====================================
+                // أداة اختيار ملف Word الموجودة أصلًا
+                // =====================================
+
+                if (
+                    !wordDocumentPicker
+                ) {
+
+                    console.warn(
+                        "لم يتم العثور على أداة اختيار ملف Word."
+                    );
+
+                    return;
+
+                }
+
+
+                wordDocumentPicker.value =
+                    "";
+
+
+                wordDocumentPicker.click();
+
+            };
+
+
+        // =========================================
+        // مستندات المشروع
+        // =========================================
 
         const projectDocuments =
             getProjectDocuments(
                 project.id
             );
 
+
+        // =========================================
+        // لا توجد مستندات
+        //
+        // صندوق الإضافة يبقى ظاهرًا
+        // =========================================
 
         if (
             !Array.isArray(
@@ -21118,17 +21236,33 @@ function renderProjects() {
                 0
         ) {
 
-            container.innerHTML =
-                `
-                <div class="empty-document">
-                    لا توجد مستندات
-                </div>
-                `;
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+
+            empty.className =
+                "empty-document";
+
+
+            empty.textContent =
+                "لا توجد مستندات";
+
+
+            container.appendChild(
+                empty
+            );
+
 
             return;
 
         }
 
+
+        // =========================================
+        // رسم مستندات المشروع
+        // =========================================
 
         projectDocuments.forEach(
             function (
@@ -21447,6 +21581,10 @@ function renderProjects() {
                     `;
 
 
+                // =========================================
+                // إخفاء النقل لأعلى
+                // =========================================
+
                 if (
                     index ===
                     0
@@ -21469,6 +21607,10 @@ function renderProjects() {
 
                 }
 
+
+                // =========================================
+                // إخفاء النقل لأسفل
+                // =========================================
 
                 if (
                     index ===
@@ -21540,7 +21682,7 @@ function renderProjects() {
 
 
                 // =========================================
-                // إعادة تسمية
+                // إعادة التسمية
                 // =========================================
 
                 const renameDocument =
@@ -22098,6 +22240,10 @@ function renderProjects() {
 
                 }
 
+
+                // =========================================
+                // بناء المستند
+                // =========================================
 
                 item.appendChild(
                     title
