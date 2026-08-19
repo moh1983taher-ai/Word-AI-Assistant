@@ -1912,7 +1912,7 @@ function setCurrentDocument(
         }
 
 
-        renderDocuments();
+        renderProjects();
 
 
         return;
@@ -1991,7 +1991,7 @@ function setCurrentDocument(
         "read"
     ) {
 
-        renderDocuments();
+        renderProjects();
 
         return;
 
@@ -2016,7 +2016,7 @@ function setCurrentDocument(
             );
 
 
-            renderDocuments();
+            renderProjects();
 
         }
     )
@@ -2031,13 +2031,13 @@ function setCurrentDocument(
             );
 
 
-            renderDocuments();
+            renderProjects();
 
         }
     );
 
 
-    renderDocuments();
+    renderProjects();
 
 }
 
@@ -2127,7 +2127,7 @@ function setCurrentProject(
             null;
 
 
-        renderDocuments();
+        renderProjects();
 
 
         return;
@@ -2139,7 +2139,7 @@ function setCurrentProject(
         project;
 
 
-    renderDocuments();
+    renderProjects();
 
 }
 
