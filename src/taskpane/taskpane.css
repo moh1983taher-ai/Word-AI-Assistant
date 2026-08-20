@@ -3188,7 +3188,257 @@ span {
 
 }
 
+/* =========================================================
+   SCOPE OPTIONS
+   خيارات نطاق البحث
+   ========================================================= */
 
+.scope-panel-content {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 8px;
+
+    padding-top: 10px;
+
+}
+
+
+/* =========================================================
+   SCOPE OPTION
+   ========================================================= */
+
+.scope-option {
+
+    min-height: 58px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-start;
+
+    gap: 10px;
+
+    padding: 8px 10px;
+
+    border: 1px solid #e3e3e3;
+
+    border-radius: 12px;
+
+    background: #ffffff;
+
+    color: #222222;
+
+    cursor: pointer;
+
+    text-align: right;
+
+    direction: rtl;
+
+    box-sizing: border-box;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.12s ease;
+
+}
+
+
+/* =========================================================
+   عند المرور
+   ========================================================= */
+
+.scope-option:hover {
+
+    background: #f7f7f7;
+
+    border-color: #cfcfcf;
+
+    transform: translateY(-1px);
+
+}
+
+
+/* =========================================================
+   عند الضغط
+   ========================================================= */
+
+.scope-option:active {
+
+    background: #eeeeee;
+
+    transform: translateY(0);
+
+}
+
+
+/* =========================================================
+   الأيقونة
+   ========================================================= */
+
+.scope-option-icon {
+
+    width: 30px;
+
+    height: 30px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border: 1px solid #e5e5e5;
+
+    border-radius: 8px;
+
+    background: #fafafa;
+
+    color: #333333;
+
+    font-size: 16px;
+
+    line-height: 1;
+
+}
+
+
+/* =========================================================
+   النص
+   ========================================================= */
+
+.scope-option-text {
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+    white-space: nowrap;
+
+}
+/* =========================================================
+   SCOPE PANEL
+   لوحة نطاق البحث
+   ========================================================= */
+
+.scope-panel {
+
+    position: absolute;
+
+    right: 3px;
+    bottom: calc(100% + 8px);
+
+    width: 300px;
+    max-width: calc(100vw - 24px);
+
+    background: #ffffff;
+
+    border: 1px solid #d9d9d9;
+
+    border-radius: 16px;
+
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.10);
+
+    padding: 10px;
+
+    box-sizing: border-box;
+
+    z-index: 1000;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transform:
+        translateY(6px)
+        scale(0.98);
+
+    transform-origin:
+        bottom right;
+
+    transition:
+        opacity 0.16s ease,
+        transform 0.16s ease,
+        visibility 0.16s ease;
+}
+
+
+/* =========================================================
+   لوحة مفتوحة
+   ========================================================= */
+
+.scope-panel.open {
+
+    opacity: 1;
+
+    visibility: visible;
+
+    pointer-events: auto;
+
+    transform:
+        translateY(0)
+        scale(1);
+}
+
+
+/* =========================================================
+   رأس اللوحة
+   ========================================================= */
+
+.scope-panel-header {
+
+    display: flex;
+
+    align-items: center;
+
+    min-height: 34px;
+
+    padding:
+        2px
+        8px
+        8px;
+
+    box-sizing: border-box;
+
+    border-bottom:
+        1px solid #eeeeee;
+}
+
+
+/* =========================================================
+   عنوان اللوحة
+   ========================================================= */
+
+.scope-panel-title {
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+    color: #333333;
+
+}
+
+
+/* =========================================================
+   محتوى اللوحة
+   ========================================================= */
+
+.scope-panel-content {
+
+    padding-top: 10px;
+
+    box-sizing: border-box;
+
+}
 /* =========================================================
 SEND BUTTON HOVER
 ========================================================= */
