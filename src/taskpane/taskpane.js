@@ -79,11 +79,6 @@ const projectsPopup =
 const projectsList =
     document.getElementById("projects-list");
 
-const documentsList =
-    document.getElementById("documents-list");
-
-const addDocumentBtn =
-    document.getElementById("add-document-btn");
 
 const wordDocumentPicker =
     document.getElementById(
@@ -99,41 +94,14 @@ const chatBtn =
 const newChatBtn =
     document.getElementById("new-chat-btn");
 
-const expandedSidebar =
-    document.getElementById("expanded-sidebar");
 
-const sidebarToggleBtn =
-    document.getElementById("sidebar-toggle-btn");
 
-const expandedSidebarToggleSlot =
-    document.getElementById(
-        "expanded-sidebar-toggle-slot"
-    );
 
-const sidebarTogglePlaceholder =
-    document.createComment(
-        "sidebar-toggle-placeholder"
-    );
-
-if (
-    sidebarToggleBtn &&
-    sidebarToggleBtn.parentNode
-) {
-
-    sidebarToggleBtn.parentNode.insertBefore(
-        sidebarTogglePlaceholder,
-        sidebarToggleBtn
-    );
-
-}
 // =====================================================
 // تثبيت موضع زر الشريط الجانبي الأصلي
 // =====================================================
 
-const sidebarToggleOriginalParent =
-    sidebarToggleBtn
-        ? sidebarToggleBtn.parentNode
-        : null;
+
 const input =
     document.getElementById("user-input");
 
@@ -2121,25 +2089,9 @@ function setCurrentProject(
     project
 ) {
 
-    if (!project) {
-
-        currentProject =
-            null;
-
-
-        renderProjects();
-
-
-        return;
-
-    }
-
-
     currentProject =
-        project;
-
-
-    renderProjects();
+        project ||
+        null;
 
 }
 
@@ -2149,7 +2101,6 @@ function setCurrentProject(
 // ======================================
 
 if (
-    addDocumentBtn &&
     wordDocumentPicker
 ) {
 
@@ -2253,15 +2204,7 @@ if (
                 );
 
 
-                if (documentsList) {
-
-                    documentsList.innerHTML = `
-                        <div class="empty-document">
-                            تعذر استيراد المستند
-                        </div>
-                    `;
-
-                }
+                renderProjects();
 
             }
 
@@ -15268,9 +15211,7 @@ function createNewChat() {
             true,
 
         projectId:
-            currentProject
-                ? currentProject.id
-                : null,
+            null,
 
         createdAt:
             new Date().toISOString(),
@@ -15337,9 +15278,25 @@ function finalizeCurrentChat(
         false;
 
 
-    currentChat.projectId =
-        currentProject
-            ? currentProject.id
+    const chatProject =
+        currentChat.projectId
+            ? projects.find(
+                function (
+                    project
+                ) {
+
+                    return (
+                        project &&
+                        String(
+                            project.id
+                        ) ===
+                        String(
+                            currentChat.projectId
+                        )
+                    );
+
+                }
+            )
             : null;
 
 
@@ -15386,35 +15343,33 @@ function finalizeCurrentChat(
     // ==================================
 
     if (
-        currentProject &&
-        currentChat.projectId ===
-            currentProject.id
+        chatProject
     ) {
 
         if (
             !Array.isArray(
-                currentProject.chatIds
+                chatProject.chatIds
             )
         ) {
 
-            currentProject.chatIds =
+            chatProject.chatIds =
                 [];
 
         }
 
 
         if (
-            !currentProject.chatIds.includes(
+            !chatProject.chatIds.includes(
                 currentChat.id
             )
         ) {
 
-            currentProject.chatIds.push(
+            chatProject.chatIds.push(
                 currentChat.id
             );
 
 
-            currentProject.updatedAt =
+            chatProject.updatedAt =
                 new Date().toISOString();
 
 
@@ -15518,7 +15473,6 @@ function createProject(
     renderProjects();
 
 
-    renderExpandedProjects();
 
 
     return project;
@@ -20359,9 +20313,7 @@ async function sendMessage() {
                 true,
 
             projectId:
-                currentProject
-                    ? currentProject.id
-                    : null,
+                null,
 
             createdAt:
                 new Date().toISOString(),
@@ -20405,7 +20357,7 @@ async function sendMessage() {
 
     renderChat();
 
-    renderChatList();
+   
 
     renderSidebarChats();
 
@@ -20660,7 +20612,7 @@ async function sendMessage() {
 
         renderChat();
 
-        renderChatList();
+        
 
         renderSidebarChats();
 
@@ -20723,7 +20675,7 @@ async function sendMessage() {
 
         renderChat();
 
-        renderChatList();
+        
 
         renderSidebarChats();
 
@@ -20901,105 +20853,6 @@ const chatIcon = `
 
     </svg>
 `;
-
-
-
-
-
-
-
-// =====================================================
-// Initialize Sidebar Sections
-// =====================================================
-
-function initializeSidebarSections() {
-
-    const headers =
-        document.querySelectorAll(
-            ".section-title[data-target], .section-toggle[data-target]"
-        );
-
-
-    headers.forEach(
-        function (
-            header
-        ) {
-
-            const targetId =
-                header.getAttribute(
-                    "data-target"
-                );
-
-
-            if (!targetId)
-                return;
-
-
-            const target =
-                document.getElementById(
-                    targetId
-                );
-
-
-            if (!target)
-                return;
-
-
-            target.classList.remove(
-                "open"
-            );
-
-
-            header.classList.remove(
-                "open"
-            );
-
-
-            header.onclick =
-                function (e) {
-
-                    e.preventDefault();
-                    e.stopPropagation();
-
-
-                    const isOpen =
-                        target.classList.contains(
-                            "open"
-                        );
-
-
-                    if (isOpen) {
-
-                        target.classList.remove(
-                            "open"
-                        );
-
-                        header.classList.remove(
-                            "open"
-                        );
-
-                    }
-                    else {
-
-                        target.classList.add(
-                            "open"
-                        );
-
-                        header.classList.add(
-                            "open"
-                        );
-
-                    }
-
-                };
-
-        }
-    );
-
-}
-
-
-
 
 
 
@@ -23194,7 +23047,6 @@ function renderProjects() {
 
                                     renderProjects();
 
-                                    renderExpandedProjects();
 
                                 }
                                 else if (
@@ -23530,9 +23382,9 @@ function renderProjects() {
 
                                     renderProjects();
 
-                                    renderExpandedProjects();
+                                    
 
-                                    renderChatList();
+                                    
 
                                     renderSidebarChats();
 
@@ -23868,187 +23720,6 @@ if (newProjectBtn) {
 
 
 
-// =====================================================
-// Sidebar Toggle
-// مستقل تمامًا عن المستندات
-// =====================================================
-
-if (
-    sidebarToggleBtn &&
-    expandedSidebar &&
-    expandedSidebarToggleSlot
-) {
-
-    sidebarToggleBtn.onclick =
-        function (
-            e
-        ) {
-
-            e.preventDefault();
-
-            e.stopPropagation();
-
-
-            const isOpening =
-                !expandedSidebar.classList.contains(
-                    "open"
-                );
-
-
-            // ==================================
-            // فتح الشريط
-            // ==================================
-
-            if (
-                isOpening
-            ) {
-
-                expandedSidebar.classList.add(
-                    "open"
-                );
-
-
-                document.body.classList.add(
-                    "expanded-sidebar-open"
-                );
-
-
-                sidebarToggleBtn.title =
-                    "إخفاء القائمة";
-
-
-                sidebarToggleBtn.classList.add(
-                    "sidebar-open"
-                );
-
-
-                // نقل الزر إلى مكانه داخل
-                // الشريط الموسع
-                if (
-                    sidebarToggleBtn.parentNode !==
-                    expandedSidebarToggleSlot
-                ) {
-
-                    expandedSidebarToggleSlot.appendChild(
-                        sidebarToggleBtn
-                    );
-
-                }
-
-
-                return;
-
-            }
-
-
-            // ==================================
-            // إغلاق الشريط
-            // ==================================
-
-            expandedSidebar.classList.remove(
-                "open"
-            );
-
-
-            document.body.classList.remove(
-                "expanded-sidebar-open"
-            );
-
-
-            sidebarToggleBtn.title =
-                "إظهار القائمة";
-
-
-            sidebarToggleBtn.classList.remove(
-                "sidebar-open"
-            );
-
-
-            // ==================================
-            // إعادة الزر إلى موضعه الأصلي
-            // ==================================
-
-            if (
-                sidebarToggleOriginalParent &&
-                sidebarTogglePlaceholder
-            ) {
-
-                sidebarToggleOriginalParent.insertBefore(
-                    sidebarToggleBtn,
-                    sidebarTogglePlaceholder.nextSibling
-                );
-
-            }
-
-        };
-
-}
-
-
-// =====================================================
-// Render Projects In Expanded Sidebar
-// =====================================================
-
-function renderExpandedProjects() {
-
-    const list =
-        document.getElementById(
-            "expanded-projects-list"
-        );
-
-
-    if (!list)
-        return;
-
-
-    list.innerHTML =
-        "";
-
-
-    projects.forEach(
-        function (
-            project
-        ) {
-
-            const item =
-                document.createElement(
-                    "div"
-                );
-
-
-            item.className =
-                "expanded-project-item";
-
-
-            item.innerHTML = `
-                <span>
-                    ${projectIcon}
-                    ${project.name}
-                </span>
-            `;
-
-
-            item.onclick =
-                function (e) {
-
-                    e.stopPropagation();
-
-
-                    setCurrentProject(
-                        project
-                    );
-
-                };
-
-
-            list.appendChild(
-                item
-            );
-
-        }
-    );
-
-}
 
 
 // =====================================================
@@ -24171,529 +23842,6 @@ function renderSidebarChats() {
 }
 
 
-// =====================================================
-// Render Chat List
-// =====================================================
-
-function renderChatList() {
-
-    const list =
-        document.getElementById(
-            "chat-list"
-        );
-
-
-    if (!list)
-        return;
-
-
-    list.innerHTML =
-        "";
-
-
-    if (
-        chats.length ===
-        0
-    ) {
-
-        list.innerHTML =
-            "<div class='empty-chat'>لا توجد محادثات</div>";
-
-        return;
-
-    }
-
-
-    chats.forEach(
-        function (
-            chat
-        ) {
-
-            const item =
-                document.createElement(
-                    "div"
-                );
-
-
-            item.className =
-                "chat-history-item";
-
-
-            item.innerHTML = `
-                <span class="chat-title">
-                    ${chatIcon}
-                    ${chat.title}
-                </span>
-
-                <button
-                    class="chat-menu"
-                    type="button">
-                    ⋮
-                </button>
-
-                <div class="chat-options-menu">
-
-                    <div class="rename-chat">
-                        ✏ إعادة تسمية
-                    </div>
-
-                    <div class="delete-chat">
-                        🗑 حذف
-                    </div>
-
-                </div>
-            `;
-
-
-            const title =
-                item.querySelector(
-                    ".chat-title"
-                );
-
-
-            if (title) {
-
-                title.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        currentChat =
-                            chat;
-
-
-                        renderChat();
-
-
-                        if (
-                            expandedSidebar
-                        ) {
-
-                            expandedSidebar.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-                    };
-
-            }
-
-
-            const menu =
-                item.querySelector(
-                    ".chat-menu"
-                );
-
-
-            if (menu) {
-
-                menu.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        document
-                            .querySelectorAll(
-                                ".chat-options-menu"
-                            )
-                            .forEach(
-                                function (
-                                    m
-                                ) {
-
-                                    m.classList.remove(
-                                        "open"
-                                    );
-
-                                }
-                            );
-
-
-                        const options =
-                            item.querySelector(
-                                ".chat-options-menu"
-                            );
-
-
-                        if (!options)
-                            return;
-
-
-                        options.classList.add(
-                            "open"
-                        );
-
-
-                        const rect =
-                            menu.getBoundingClientRect();
-
-
-                        options.style.position =
-                            "fixed";
-
-
-                        options.style.left =
-                            Math.max(
-                                8,
-                                rect.left -
-                                140 -
-                                8
-                            ) +
-                            "px";
-
-
-                        options.style.top =
-                            rect.bottom +
-                            8 +
-                            "px";
-
-
-                        options.style.zIndex =
-                            "999999";
-
-                    };
-
-            }
-
-
-            // ==================================
-            // Rename Chat
-            // ==================================
-
-            const renameBtn =
-                item.querySelector(
-                    ".rename-chat"
-                );
-
-
-            if (renameBtn) {
-
-                renameBtn.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        const options =
-                            item.querySelector(
-                                ".chat-options-menu"
-                            );
-
-
-                        if (options) {
-
-                            options.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        const titleSpan =
-                            item.querySelector(
-                                ".chat-title"
-                            );
-
-
-                        if (!titleSpan)
-                            return;
-
-
-                        const oldName =
-                            chat.title;
-
-
-                        titleSpan.innerHTML = `
-                            <input
-                                class="edit-chat-title"
-                                value="${oldName}">
-                        `;
-
-
-                        const editInput =
-                            titleSpan.querySelector(
-                                ".edit-chat-title"
-                            );
-
-
-                        if (!editInput)
-                            return;
-
-
-                        editInput.focus();
-
-
-                        editInput.setSelectionRange(
-                            editInput.value.length,
-                            editInput.value.length
-                        );
-
-
-                        editInput.onkeydown =
-                            function (
-                                event
-                            ) {
-
-                                if (
-                                    event.key ===
-                                    "Enter"
-                                ) {
-
-                                    const value =
-                                        editInput.value.trim();
-
-
-                                    chat.title =
-                                        value !==
-                                            ""
-                                            ? value
-                                            : oldName;
-
-
-                                    chat.updatedAt =
-                                        new Date()
-                                            .toISOString();
-
-
-                                    saveChats();
-
-
-                                    renderChatList();
-
-                                    renderSidebarChats();
-
-                                    renderRecentChats();
-
-                                }
-
-
-                                if (
-                                    event.key ===
-                                    "Escape"
-                                ) {
-
-                                    chat.title =
-                                        oldName;
-
-
-                                    renderChatList();
-
-                                }
-
-                            };
-
-                    };
-
-            }
-
-
-            // ==================================
-            // Delete Chat
-            // ==================================
-
-            const deleteBtn =
-                item.querySelector(
-                    ".delete-chat"
-                );
-
-
-            if (deleteBtn) {
-
-                deleteBtn.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        const options =
-                            item.querySelector(
-                                ".chat-options-menu"
-                            );
-
-
-                        if (options) {
-
-                            options.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        const confirmBox =
-                            document.createElement(
-                                "div"
-                            );
-
-
-                        confirmBox.className =
-                            "delete-confirm";
-
-
-                        confirmBox.innerHTML = `
-
-                            <div class="confirm-dialog">
-
-                                <p>
-                                    هل تريد حذف المحادثة:
-                                    <br>
-
-                                    <strong>
-                                        ${chat.title}
-                                    </strong>
-
-                                    ؟
-                                </p>
-
-                                <button
-                                    class="confirm-delete"
-                                    type="button">
-                                    حذف
-                                </button>
-
-                                <button
-                                    class="cancel-delete"
-                                    type="button">
-                                    إلغاء
-                                </button>
-
-                            </div>
-
-                        `;
-
-
-                        document.body.appendChild(
-                            confirmBox
-                        );
-
-
-                        const confirmDelete =
-                            confirmBox.querySelector(
-                                ".confirm-delete"
-                            );
-
-
-                        if (confirmDelete) {
-
-                            confirmDelete.onclick =
-                                function () {
-
-                                    chats =
-                                        chats.filter(
-                                            function (
-                                                c
-                                            ) {
-
-                                                return (
-                                                    c.id !==
-                                                    chat.id
-                                                );
-
-                                            }
-                                        );
-
-
-                                    if (
-                                        currentChat &&
-                                        currentChat.id ===
-                                            chat.id
-                                    ) {
-
-                                        currentChat =
-                                            null;
-
-
-                                        currentCitationSources =
-                                            [];
-
-
-                                        renderChat();
-
-                                    }
-
-
-                                    if (
-                                        currentProject &&
-                                        Array.isArray(
-                                            currentProject.chatIds
-                                        )
-                                    ) {
-
-                                        currentProject.chatIds =
-                                            currentProject.chatIds.filter(
-                                                function (
-                                                    id
-                                                ) {
-
-                                                    return (
-                                                        id !==
-                                                        chat.id
-                                                    );
-
-                                                }
-                                            );
-
-
-                                        currentProject.updatedAt =
-                                            new Date()
-                                                .toISOString();
-
-
-                                        saveProjects();
-
-                                    }
-
-
-                                    saveChats();
-
-
-                                    renderChatList();
-
-                                    renderSidebarChats();
-
-                                    renderRecentChats();
-
-
-                                    confirmBox.remove();
-
-                                };
-
-                        }
-
-
-                        const cancelDelete =
-                            confirmBox.querySelector(
-                                ".cancel-delete"
-                            );
-
-
-                        if (cancelDelete) {
-
-                            cancelDelete.onclick =
-                                function () {
-
-                                    confirmBox.remove();
-
-                                };
-
-                        }
-
-                    };
-
-            }
-
-
-            list.appendChild(
-                item
-            );
-
-        }
-    );
-
-}
 
 
 // =====================================================
@@ -24841,7 +23989,7 @@ if (chatBtn) {
             }
 
 
-            renderChatList();
+            
 
 
             chatPopup.classList.add(
@@ -25400,11 +24548,11 @@ initializeSidebarSections();
 
 renderProjects();
 
-renderExpandedProjects();
 
 
 
-renderChatList();
+
+
 
 renderSidebarChats();
 
