@@ -3027,7 +3027,7 @@ span {
 
 /* =========================================================
    SEND BUTTON
-   زر الإرسال — يبقى في اليسار
+   زر الإرسال — الجهة اليسرى
    ========================================================= */
 
 #send-btn {
@@ -3035,55 +3035,61 @@ span {
     position: absolute;
 
     left: 3px;
-
     bottom: 4px;
 
-    transform: none;
-
     width: 34px;
-
     height: 34px;
 
     min-width: 34px;
-
     min-height: 34px;
 
     margin: 0;
-
     padding: 0;
 
     border: none;
-
     border-radius: 50%;
 
     background: #222;
-
     color: #fff;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     cursor: pointer;
 
     box-sizing: border-box;
 
-    z-index: 20;
+    z-index: 100;
+
+    pointer-events: auto;
+
+    transform: none !important;
 
     transition:
-        background 0.2s ease,
-        transform 0.15s ease;
-
+        background 0.15s ease,
+        transform 0.12s ease;
 }
 
+
+/* عند المرور */
 
 #send-btn:hover {
 
     background: #111;
 
-    transform: scale(1.03);
+    transform: scale(1.03) !important;
+
+}
+
+
+/* عند الضغط */
+
+#send-btn:active {
+
+    background: #000;
+
+    transform: scale(0.96) !important;
 
 }
 
@@ -3099,11 +3105,11 @@ span {
 
     right: 3px;
 
-    bottom: 5px;
+    bottom: 4px;
 
-    width: 32px;
+    width: 34px;
 
-    height: 32px;
+    height: 34px;
 
     display: flex;
 
@@ -3127,9 +3133,9 @@ span {
 
 #scope-btn {
 
-    width: 32px;
+    width: 34px;
 
-    height: 32px;
+    height: 34px;
 
     margin: 0;
 
@@ -3440,6 +3446,10 @@ span {
 
     box-sizing: border-box;
 
+}
+
+#scope-panel {
+    pointer-events: auto;
 }
 /* =========================================================
 SEND BUTTON HOVER
