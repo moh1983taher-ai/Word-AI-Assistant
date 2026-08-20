@@ -21104,6 +21104,33 @@ if (
 
                                 }
 
+                                else if (
+                                    type ===
+                                    "document"
+                                ) {
+
+                                    showDocumentScopePicker();
+
+                                }
+                                
+                                else if (
+                                    type ===
+                                    "reference"
+                                ) {
+
+                                    showReferenceScopePicker();
+
+                                }
+
+                                else if (
+                                    type ===
+                                    "library"
+                                ) {
+
+                                    showLibraryScopePicker();
+
+                                }
+
                             }
 
                         };
@@ -21270,6 +21297,287 @@ if (
 
             }
         );
+
+    }
+
+    function showDocumentScopePicker() {
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                اختيار المستند
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            "";
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeType(
+                        "document"
+                    );
+
+                };
+
+        }
+
+
+        if (
+            !Array.isArray(
+                documents
+            ) ||
+            documents.length ===
+                0
+        ) {
+
+            scopePanelContent.innerHTML =
+                `
+                <div class="scope-empty">
+                    لا توجد مستندات
+                </div>
+                `;
+
+            return;
+
+        }
+
+
+        documents.forEach(
+            function (
+                documentItem
+            ) {
+
+                if (
+                    !documentItem
+                ) {
+
+                    return;
+
+                }
+
+
+                const button =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                button.type =
+                    "button";
+
+
+                button.className =
+                    "scope-project-item";
+
+
+                button.innerHTML =
+                    `
+                    <span
+                        class="scope-project-icon">
+                        ▤
+                    </span>
+
+                    <span
+                        class="scope-project-name">
+                        ${documentItem.name}
+                    </span>
+                    `;
+
+
+                button.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        researchScope = {
+
+                            type:
+                                "document",
+
+                            scope:
+                                "specific",
+
+                            id:
+                                documentItem.id
+
+                        };
+
+
+                        setCurrentDocument(
+                            documentItem
+                        );
+
+
+                        scopePanel.classList.remove(
+                            "open"
+                        );
+
+                        scopePanel.setAttribute(
+                            "aria-hidden",
+                            "true"
+                        );
+
+
+                        console.log(
+                            "نطاق البحث الحالي:",
+                            researchScope
+                        );
+
+                    };
+
+
+                scopePanelContent.appendChild(
+                    button
+                );
+
+            }
+        );
+
+    }
+
+    function showReferenceScopePicker() {
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                اختيار المرجع
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            "";
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeType(
+                        "reference"
+                    );
+
+                };
+
+        }
+
+
+        // المراجع غير مبنية بعد في النظام الحالي
+        scopePanelContent.innerHTML =
+            `
+            <div class="scope-empty">
+                لا توجد مراجع متاحة حاليًا
+            </div>
+            `;
+
+    }
+
+    function showLibraryScopePicker() {
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                اختيار المكتبة
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            "";
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeType(
+                        "library"
+                    );
+
+                };
+
+        }
+
+
+        // المكتبات غير مبنية بعد في النظام الحالي
+        scopePanelContent.innerHTML =
+            `
+            <div class="scope-empty">
+                لا توجد مكتبات متاحة حاليًا
+            </div>
+            `;
 
     }
 
