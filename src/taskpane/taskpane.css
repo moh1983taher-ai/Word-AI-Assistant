@@ -2924,7 +2924,7 @@ span {
 
     max-width: none;
 
-    min-height: 46px;
+    min-height: 44px;
 
     max-height: 140px;
 
@@ -2936,12 +2936,15 @@ span {
 
     border: 1px solid #d9d9d9;
 
-    border-radius: 23px;
+    border-radius: 22px;
 
     direction: rtl;
 
-    /* مساحة صغيرة فقط للأزرار */
-    padding: 3px 42px 3px 42px;
+    /*
+       مساحة كافية للزرين،
+       مع إبقاء أكبر مساحة ممكنة للكتابة.
+    */
+    padding: 2px 42px 2px 42px;
 
     margin: 0 2px;
 
@@ -2958,6 +2961,7 @@ span {
     overflow: hidden;
 
 }
+
 
 /* =========================================================
    MESSAGE BOX FOCUS
@@ -2981,9 +2985,9 @@ span {
 
     width: 100%;
 
-    height: 38px;
+    height: 36px;
 
-    min-height: 38px;
+    min-height: 36px;
 
     max-height: 120px;
 
@@ -2995,7 +2999,7 @@ span {
 
     background: transparent;
 
-    padding: 8px 5px;
+    padding: 7px 5px;
 
     box-sizing: border-box;
 
@@ -3012,16 +3016,16 @@ span {
 }
 
 
-
 #user-input::placeholder {
 
     color: #999;
 
 }
 
+
 /* =========================================================
    SEND BUTTON
-   زر الإرسال — الجهة اليسرى
+   زر الإرسال — يبقى في اليسار
    ========================================================= */
 
 #send-btn {
@@ -3035,8 +3039,11 @@ span {
     transform: none;
 
     width: 34px;
+
     height: 34px;
+
     min-width: 34px;
+
     min-height: 34px;
 
     margin: 0;
@@ -3061,7 +3068,7 @@ span {
 
     box-sizing: border-box;
 
-    z-index: 2;
+    z-index: 20;
 
     transition:
         background 0.2s ease,
@@ -3070,55 +3077,47 @@ span {
 }
 
 
-#scope-btn {
-    width: 30px;
-    height: 30px;
+#send-btn:hover {
 
-    margin: 0;
-    padding: 0;
+    background: #111;
+
+    transform: scale(1.03);
+
+}
+
+
+/* =========================================================
+   SCOPE TOOL
+   أداة نطاق البحث — تبقى في اليمين
+   ========================================================= */
+
+.input-tools {
+
+    position: absolute;
+
+    right: 8px;
+
+    bottom: 4px;
+
+    width: 32px;
+
+    height: 32px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
-    border: 1px solid #d0d0d0;
-    border-radius: 50%;
+    z-index: 20;
 
-    background: #ffffff;
-    color: #222222;
-
-    font-size: 21px;
-    font-weight: 300;
-    line-height: 1;
-
-    cursor: pointer;
-
-    box-sizing: border-box;
-
-    transition:
-        background 0.15s ease,
-        color 0.15s ease,
-        border-color 0.15s ease,
-        transform 0.15s ease;
 }
 
 
-#scope-btn:hover {
-    background: #222222;
-    color: #ffffff;
-    border-color: #222222;
-
-    transform: scale(1.05);
-}
-
-
-#scope-btn:active {
-    transform: scale(0.96);
-}
-
-/* =====================================
-   زر نطاق البحث +
-   ===================================== */
+/* =========================================================
+   SCOPE BUTTON
+   زر +
+   ========================================================= */
 
 #scope-btn {
 
@@ -3156,7 +3155,7 @@ span {
 
     position: relative;
 
-    z-index: 100000;
+    z-index: 21;
 
     transition:
         background 0.15s ease,
@@ -3166,7 +3165,7 @@ span {
 }
 
 
-/* عند الاقتراب من الزر */
+/* دائرة خفيفة فقط عند الاقتراب */
 
 #scope-btn:hover {
 
@@ -3177,7 +3176,7 @@ span {
 }
 
 
-/* عند الضغط */
+/* الضغط */
 
 #scope-btn:active {
 
@@ -3186,6 +3185,8 @@ span {
     transform: scale(0.94);
 
 }
+
+
 /* =========================================================
 SEND BUTTON HOVER
 ========================================================= */
