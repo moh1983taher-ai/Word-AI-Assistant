@@ -20804,6 +20804,294 @@ if (scopeBtn && scopePanel) {
 }
 
 // =====================================================
+// Scope Options
+// التنقل داخل لوحة نطاق البحث
+// =====================================================
+
+if (
+    scopePanel
+) {
+
+    const scopePanelContent =
+        scopePanel.querySelector(
+            ".scope-panel-content"
+        );
+
+    const scopePanelTitle =
+        scopePanel.querySelector(
+            ".scope-panel-title"
+        );
+
+
+    function showScopeHome() {
+
+        scopePanelTitle.textContent =
+            "نطاق البحث";
+
+
+        scopePanelContent.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-option"
+                data-scope-type="project">
+
+                <span class="scope-option-icon">
+                    ▱
+                </span>
+
+                <span class="scope-option-text">
+                    المشاريع
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-option"
+                data-scope-type="document">
+
+                <span class="scope-option-icon">
+                    ▤
+                </span>
+
+                <span class="scope-option-text">
+                    المستندات
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-option"
+                data-scope-type="reference">
+
+                <span class="scope-option-icon">
+                    ≡
+                </span>
+
+                <span class="scope-option-text">
+                    المراجع
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-option"
+                data-scope-type="library">
+
+                <span class="scope-option-icon">
+                    ▥
+                </span>
+
+                <span class="scope-option-text">
+                    المكتبة
+                </span>
+
+            </button>
+            `;
+
+
+        bindScopeOptions();
+
+    }
+
+
+    function showScopeType(
+        type
+    ) {
+
+        const titles = {
+
+            project:
+                "المشاريع",
+
+            document:
+                "المستندات",
+
+            reference:
+                "المراجع",
+
+            library:
+                "المكتبة"
+
+        };
+
+
+        const labels = {
+
+            project:
+                "مشروع",
+
+            document:
+                "مستند",
+
+            reference:
+                "مرجع",
+
+            library:
+                "مكتبة"
+
+        };
+
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                ${titles[type] || "نطاق البحث"}
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-mode-option"
+                data-scope-mode="all">
+
+                <span class="scope-mode-mark">
+                    ◉
+                </span>
+
+                <span>
+                    جميع ${labels[type] || ""}
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-mode-option"
+                data-scope-mode="specific"
+                data-scope-type="${type}">
+
+                <span class="scope-mode-mark">
+                    ⊙
+                </span>
+
+                <span>
+                    ${labels[type] || ""} محدد
+                </span>
+
+            </button>
+            `;
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeHome();
+
+                };
+
+        }
+
+
+        scopePanelContent
+            .querySelectorAll(
+                ".scope-mode-option"
+            )
+            .forEach(
+                function (
+                    button
+                ) {
+
+                    button.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            // مؤقتًا:
+                            // سنضيف منطق الاختيار الحقيقي لاحقًا.
+                            console.log(
+                                "اختيار نطاق:",
+                                type,
+                                button.getAttribute(
+                                    "data-scope-mode"
+                                )
+                            );
+
+                        };
+
+                }
+            );
+
+    }
+
+
+    function bindScopeOptions() {
+
+        scopePanelContent
+            .querySelectorAll(
+                ".scope-option"
+            )
+            .forEach(
+                function (
+                    button
+                ) {
+
+                    button.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+                            e.stopPropagation();
+
+
+                            const type =
+                                button.getAttribute(
+                                    "data-scope-type"
+                                );
+
+
+                            showScopeType(
+                                type
+                            );
+
+                        };
+
+                }
+            );
+
+    }
+
+
+    bindScopeOptions();
+
+}
+// =====================================================
 // Keyboard
 // =====================================================
 
