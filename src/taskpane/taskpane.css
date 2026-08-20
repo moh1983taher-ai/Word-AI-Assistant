@@ -2885,23 +2885,26 @@ span {
     margin-right: 2px;
     margin-left: 2px;
 }
+
 /* =========================================================
-18. INPUT AREA
-========================================================= */
+   18. INPUT AREA
+   ========================================================= */
 
 .input-area {
+
     min-height: 68px;
     height: 68px;
 
     border-top: 1px solid #eee;
 
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
 
     padding: 5px 10px 13px;
 
     box-sizing: border-box;
+
 }
 
 
@@ -2918,7 +2921,6 @@ span {
 
     max-width: none;
 
-    height: auto;
     min-height: 46px;
     max-height: 140px;
 
@@ -2933,7 +2935,8 @@ span {
 
     direction: rtl;
 
-    padding: 3px 55px 3px 88px;
+    /* + في اليمين — زر الإرسال في اليسار */
+    padding: 3px 88px 3px 55px;
 
     margin: 0 2px;
 
@@ -2948,8 +2951,8 @@ span {
         height 0.15s ease;
 
     overflow: hidden;
-}
 
+}
 
 /* =========================================================
    MESSAGE BOX FOCUS
@@ -2977,7 +2980,7 @@ span {
 
     min-height: 38px;
 
-    max-height: 128px;
+    max-height: 120px;
 
     resize: none;
 
@@ -3004,38 +3007,38 @@ span {
 }
 
 
+
 #user-input::placeholder {
 
     color: #999;
 
 }
 
-
 /* =========================================================
-SEND BUTTON
-زر الإرسال داخل الجهة اليسرى للصندوق
-========================================================= */
+   SEND BUTTON
+   زر الإرسال — الجهة اليسرى
+   ========================================================= */
 
 #send-btn {
+
     position: absolute;
 
-    /*
-       نضع الدائرة داخل الصندوق من الجهة اليسرى.
-       3px = دخول بسيط إلى الداخل.
-    */
     left: 3px;
 
-    top: 50%;
+    bottom: 3px;
 
-    transform: translateY(-50%);
+    transform: none;
 
     width: 38px;
+
     height: 38px;
 
     min-width: 38px;
+
     min-height: 38px;
 
     margin: 0;
+
     padding: 0;
 
     border: none;
@@ -3047,7 +3050,9 @@ SEND BUTTON
     color: #fff;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
     cursor: pointer;
@@ -3059,28 +3064,34 @@ SEND BUTTON
     transition:
         background 0.2s ease,
         transform 0.15s ease;
+
 }
 
-/* =====================================
+/* =========================================================
    أداة نطاق البحث +
-   ===================================== */
+   الجهة اليمنى
+   ========================================================= */
 
 .input-tools {
+
     position: absolute;
 
-    left: 47px;
-    top: 50%;
+    right: 47px;
 
-    transform: translateY(-50%);
+    bottom: 6px;
 
     width: 32px;
+
     height: 32px;
 
     display: flex;
+
     align-items: center;
+
     justify-content: center;
 
     z-index: 2;
+
 }
 
 
