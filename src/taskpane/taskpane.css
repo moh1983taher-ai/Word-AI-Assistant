@@ -3111,6 +3111,10 @@ span {
 
     z-index: 20;
 
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+
 }
 
 
@@ -4381,32 +4385,7 @@ body.sidebar-is-pinned .message-box {
     opacity: 0.85;
 }
 
-/* TEST SCOPE BUTTON */
 
-.input-tools {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: absolute !important;
-    right: 8px !important;
-    bottom: 7px !important;
-    width: 32px !important;
-    height: 32px !important;
-    z-index: 99999 !important;
-}
-
-#scope-btn {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative !important;
-    width: 30px !important;
-    height: 30px !important;
-    z-index: 100000 !important;
-    background: #ffffff !important;
-    color: #222222 !important;
-    border: 1px solid #222222 !important;
-}
 
 /* =========================================================
    END
