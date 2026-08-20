@@ -2890,6 +2890,11 @@ span {
    18. INPUT AREA
    ========================================================= */
 
+/* =========================================================
+   INPUT AREA
+   منطقة الإدخال
+   ========================================================= */
+
 .input-area {
 
     position: relative;
@@ -2902,16 +2907,152 @@ span {
 
     display: flex;
 
-    align-items: flex-end;
+    flex-direction: column;
 
-    justify-content: center;
+    align-items: stretch;
 
-    padding: 5px 10px 13px;
+    justify-content: flex-end;
+
+    padding: 0 10px 13px;
 
     box-sizing: border-box;
 
 }
 
+/* =========================================================
+   SCOPE STATUS
+   حالة نطاق البحث فوق مربع الكتابة
+   ========================================================= */
+
+.scope-status {
+
+    width: 100%;
+
+    max-height: 0;
+
+    min-height: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: flex-end;
+
+    gap: 5px;
+
+    padding: 0 8px;
+
+    margin: 0;
+
+    box-sizing: border-box;
+
+    overflow: hidden;
+
+    opacity: 0;
+
+    visibility: hidden;
+
+    transition:
+        max-height 0.20s ease,
+        padding 0.20s ease,
+        opacity 0.16s ease,
+        visibility 0.20s ease;
+
+}
+
+
+/* الحالة النشطة */
+
+.scope-status.active {
+
+    max-height: 34px;
+
+    padding-top: 5px;
+
+    padding-bottom: 5px;
+
+    opacity: 1;
+
+    visibility: visible;
+
+}
+
+
+/* =========================================================
+   نص النطاق
+   ========================================================= */
+
+.scope-label {
+
+    max-width: 180px;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    color: #666;
+
+    font-size: 12px;
+
+    font-weight: 500;
+
+    line-height: 1;
+
+    direction: rtl;
+
+    text-align: right;
+
+}
+
+
+/* =========================================================
+   زر إلغاء النطاق
+   ========================================================= */
+
+.scope-clear {
+
+    width: 20px;
+
+    height: 20px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 0;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background: transparent;
+
+    color: #777;
+
+    font-size: 14px;
+
+    line-height: 1;
+
+    cursor: pointer;
+
+    box-sizing: border-box;
+
+}
+
+
+.scope-clear:hover {
+
+    background: #f1f1f1;
+
+    color: #333;
+
+}
 
 /* =========================================================
    MESSAGE BOX

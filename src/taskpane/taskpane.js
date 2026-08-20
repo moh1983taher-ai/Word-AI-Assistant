@@ -20750,6 +20750,73 @@ const scopePanel =
 const scopeLabel =
     document.getElementById("scope-label");
 
+const scopeStatus =
+    document.getElementById("scope-status");
+
+const scopeClear =
+    document.getElementById("scope-clear");
+
+
+function updateScopeStatus() {
+
+    if (
+        !scopeStatus ||
+        !scopeLabel
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        researchScope &&
+        researchScope.name
+    ) {
+
+        scopeLabel.textContent =
+            researchScope.name;
+
+
+        scopeStatus.classList.add(
+            "active"
+        );
+
+    }
+
+    else {
+
+        scopeLabel.textContent =
+            "";
+
+        scopeStatus.classList.remove(
+            "active"
+        );
+
+    }
+
+}
+
+// =====================================================
+// Clear Scope
+// إلغاء نطاق البحث
+// =====================================================
+
+if (scopeClear) {
+
+    scopeClear.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            researchScope = null;
+
+            updateScopeStatus();
+
+        };
+
+}
 // =====================================================
 // Scope Button
 // فتح وإغلاق لوحة نطاق البحث
@@ -21113,12 +21180,7 @@ if (
 
                                 };
 
-                                if (scopeLabel) {
-
-                                    scopeLabel.textContent =
-                                        researchScope.name;
-
-                                }
+                                updateScopeStatus();
 
 
                                 scopePanel.classList.remove(
@@ -21332,6 +21394,8 @@ if (
 
                         };
 
+                        updateScopeStatus();
+
 
                         scopePanel.classList.remove(
                             "open"
@@ -21494,6 +21558,8 @@ if (
                                 documentItem.name
 
                         };
+
+                        updateScopeStatus();
 
 
                         setCurrentDocument(
