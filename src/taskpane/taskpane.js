@@ -109,7 +109,12 @@ const scopeBtn =
     document.getElementById("scope-btn");
 
 const scopePanel =
-    document.getElementById("scope-panel");
+   
+console.log(
+        "SCOPE CHECK:",
+        scopeBtn,
+        scopePanel
+    );
 
 const sendBtn =
     document.getElementById("send-btn");
