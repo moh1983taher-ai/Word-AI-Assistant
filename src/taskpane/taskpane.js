@@ -20747,6 +20747,9 @@ const scopeBtn =
 const scopePanel =
     document.getElementById("scope-panel");
 
+const scopeLabel =
+    document.getElementById("scope-label");
+
 // =====================================================
 // Scope Button
 // فتح وإغلاق لوحة نطاق البحث
@@ -21110,6 +21113,13 @@ if (
 
                                 };
 
+                                if (scopeLabel) {
+
+                                    scopeLabel.textContent =
+                                        researchScope.name;
+
+                                }
+
 
                                 scopePanel.classList.remove(
                                     "open"
@@ -21315,7 +21325,10 @@ if (
                                 "specific",
 
                             id:
-                                project.id
+                                project.id,
+
+                            name:
+                                project.name
 
                         };
 
@@ -21475,7 +21488,10 @@ if (
                                 "specific",
 
                             id:
-                                documentItem.id
+                                documentItem.id,
+
+                            name:
+                                documentItem.name
 
                         };
 
