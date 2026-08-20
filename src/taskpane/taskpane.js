@@ -58,7 +58,18 @@ const AppState = {
 let currentProject = null;
 let currentDocument = null;
 let currentChat = null;
-let researchScope = null;
+
+let researchScope = {
+
+    type: "project",
+
+    scope: "all",
+
+    id: null,
+
+    name: "جميع المشاريع"
+
+};
 
 // ======================================
 // Office Initialization
@@ -21049,15 +21060,38 @@ if (
                             e.preventDefault();
                             e.stopPropagation();
 
+
                             const mode =
                                 button.getAttribute(
                                     "data-scope-mode"
                                 );
 
+
+                            // =========================================
+                            // جميع
+                            // =========================================
+
                             if (
                                 mode ===
                                 "all"
                             ) {
+
+                                const scopeNames = {
+
+                                    project:
+                                        "جميع المشاريع",
+
+                                    document:
+                                        "جميع المستندات",
+
+                                    reference:
+                                        "جميع المراجع",
+
+                                    library:
+                                        "جميع المكتبة"
+
+                                };
+
 
                                 researchScope = {
 
@@ -21068,7 +21102,11 @@ if (
                                         "all",
 
                                     id:
-                                        null
+                                        null,
+
+                                    name:
+                                        scopeNames[type] ||
+                                        "نطاق البحث"
 
                                 };
 
@@ -21076,6 +21114,7 @@ if (
                                 scopePanel.classList.remove(
                                     "open"
                                 );
+
 
                                 scopePanel.setAttribute(
                                     "aria-hidden",
@@ -21088,7 +21127,15 @@ if (
                                     researchScope
                                 );
 
+
+                                return;
+
                             }
+
+
+                            // =========================================
+                            // محدد
+                            // =========================================
 
                             if (
                                 mode ===
@@ -21112,7 +21159,7 @@ if (
                                     showDocumentScopePicker();
 
                                 }
-                                
+
                                 else if (
                                     type ===
                                     "reference"
