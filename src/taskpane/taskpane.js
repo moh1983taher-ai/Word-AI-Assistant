@@ -20734,7 +20734,7 @@ const scopeBtn =
 
 const scopePanel =
     document.getElementById("scope-panel");
-    
+
 // =====================================================
 // Scope Button
 // فتح وإغلاق لوحة نطاق البحث
@@ -20750,6 +20750,10 @@ if (scopeBtn && scopePanel) {
 
     scopeBtn.onclick =
         function (e) {
+
+            console.log(
+                "SCOPE CLICK"
+            );
 
             e.preventDefault();
             e.stopPropagation();
