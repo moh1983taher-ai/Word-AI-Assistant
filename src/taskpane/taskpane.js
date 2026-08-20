@@ -21104,243 +21104,140 @@ function renderProjects() {
                     "project-document-item";
 
 
-                // =========================================
-                // حالة التفعيل
-                // =========================================
+                                // =========================================
+                                // العنوان
+                                // =========================================
 
-                const isActive =
-                    Boolean(
-                        currentDocument &&
-                        String(
-                            currentDocument.id
-                        ) ===
-                        String(
-                            documentItem.id
-                        )
-                    );
+                                const title =
+                                    document.createElement(
+                                        "span"
+                                    );
 
 
-                if (
-                    isActive
-                ) {
+                                title.className =
+                                    "project-document-title";
 
-                    item.classList.add(
-                        "active-document"
-                    );
 
-                }
+                                const titleText =
+                                    document.createElement(
+                                        "span"
+                                    );
 
 
-                // =========================================
-                // العنوان
-                // =========================================
+                                titleText.className =
+                                    "document-name";
 
-                const title =
-                    document.createElement(
-                        "span"
-                    );
 
+                                titleText.textContent =
+                                    documentItem.name;
 
-                title.className =
-                    "project-document-title";
 
+                                title.appendChild(
+                                    titleText
+                                );
 
-                const activeMark =
-                    document.createElement(
-                        "span"
-                    );
 
+                                // =========================================
+                                // حالة المستند
+                                // =========================================
 
-                activeMark.className =
-                    "document-active-mark";
+                                const status =
+                                    document.createElement(
+                                        "span"
+                                    );
 
 
-                activeMark.textContent =
-                    isActive
-                        ? "✓ "
-                        : "";
+                                status.className =
+                                    "project-document-status";
 
 
-                const titleText =
-                    document.createElement(
-                        "span"
-                    );
+                                if (
+                                    documentItem.indexStatus ===
+                                    "indexed"
+                                ) {
 
+                                    status.textContent =
+                                        "✓ مفهرس";
 
-                titleText.className =
-                    "document-name";
 
+                                    if (
+                                        documentItem.indexTokenCount
+                                    ) {
 
-                titleText.textContent =
-                    documentItem.name;
+                                        status.textContent +=
+                                            " · " +
+                                            documentItem.indexTokenCount +
+                                            " كلمة";
 
+                                    }
 
-                title.appendChild(
-                    activeMark
-                );
 
+                                    if (
+                                        documentItem.indexUniqueTerms
+                                    ) {
 
-                title.appendChild(
-                    titleText
-                );
+                                        status.textContent +=
+                                            " · " +
+                                            documentItem.indexUniqueTerms +
+                                            " فريدة";
 
+                                    }
 
-                // =========================================
-                // تفعيل / إلغاء التفعيل
-                // =========================================
 
-                title.onclick =
-                    function (
-                        e
-                    ) {
+                                    if (
+                                        documentItem.indexUniqueFamilies
+                                    ) {
 
-                        e.preventDefault();
+                                        status.textContent +=
+                                            " · " +
+                                            documentItem.indexUniqueFamilies +
+                                            " عائلة";
 
-                        e.stopPropagation();
+                                    }
 
+                                }
+                                else if (
+                                    documentItem.indexStatus ===
+                                    "indexing"
+                                ) {
 
-                        const sameDocument =
-                            Boolean(
-                                currentDocument &&
-                                String(
-                                    currentDocument.id
-                                ) ===
-                                String(
-                                    documentItem.id
-                                )
-                            );
+                                    status.textContent =
+                                        "جارٍ الفهرسة...";
 
-
-                        if (
-                            sameDocument
-                        ) {
-
-                            setCurrentDocument(
-                                null
-                            );
-
-                        }
-                        else {
-
-                            setCurrentDocument(
-                                documentItem
-                            );
-
-                        }
-
-
-                        // تحديث محتوى هذا القسم فقط
-                        // دون إعادة بناء قائمة المشاريع كلها
-                        renderProjectDocuments(
-                            container,
-                            project
-                        );
-
-                    };
-
-
-                // =========================================
-                // حالة المستند
-                // =========================================
-
-                const status =
-                    document.createElement(
-                        "span"
-                    );
-
-
-                status.className =
-                    "project-document-status";
-
-
-                if (
-                    documentItem.indexStatus ===
-                    "indexed"
-                ) {
-
-                    status.textContent =
-                        "✓ مفهرس";
-
-
-                    if (
-                        documentItem.indexTokenCount
-                    ) {
-
-                        status.textContent +=
-                            " · " +
-                            documentItem.indexTokenCount +
-                            " كلمة";
-
-                    }
-
-
-                    if (
-                        documentItem.indexUniqueTerms
-                    ) {
-
-                        status.textContent +=
-                            " · " +
-                            documentItem.indexUniqueTerms +
-                            " فريدة";
-
-                    }
-
-
-                    if (
-                        documentItem.indexUniqueFamilies
-                    ) {
-
-                        status.textContent +=
-                            " · " +
-                            documentItem.indexUniqueFamilies +
-                            " عائلة";
-
-                    }
-
-                }
-                else if (
-                    documentItem.indexStatus ===
-                    "indexing"
-                ) {
-
-                    status.textContent =
-                        "جارٍ الفهرسة...";
-
-                }
-                else if (
-                    documentItem.indexStatus ===
-                    "error"
-                ) {
-
-                    status.textContent =
-                        "⚠ فشل الفهرسة";
-
-                }
-                else if (
-                    documentItem.readStatus ===
-                    "reading"
-                ) {
-
-                    status.textContent =
-                        "جارٍ القراءة...";
-
-                }
-                else if (
-                    documentItem.readStatus ===
-                    "read"
-                ) {
-
-                    status.textContent =
-                        "✓ تمت القراءة";
-
-                }
-                else {
-
-                    status.textContent =
-                        "جديد";
-
-                }
-
+                                }
+                                else if (
+                                    documentItem.indexStatus ===
+                                    "error"
+                                ) {
+
+                                    status.textContent =
+                                        "⚠ فشل الفهرسة";
+
+                                }
+                                else if (
+                                    documentItem.readStatus ===
+                                    "reading"
+                                ) {
+
+                                    status.textContent =
+                                        "جارٍ القراءة...";
+
+                                }
+                                else if (
+                                    documentItem.readStatus ===
+                                    "read"
+                                ) {
+
+                                    status.textContent =
+                                        "✓ تمت القراءة";
+
+                                }
+                                else {
+
+                                    status.textContent =
+                                        "جديد";
+
+                                }
 
                 // =========================================
                 // قائمة المستند
@@ -21589,22 +21486,6 @@ function renderProjects() {
 
                                         saveDocuments();
 
-
-                                        if (
-                                            currentDocument &&
-                                            String(
-                                                currentDocument.id
-                                            ) ===
-                                            String(
-                                                documentItem.id
-                                            ) &&
-                                            documentTitle
-                                        ) {
-
-                                            documentTitle.textContent =
-                                                documentItem.name;
-
-                                        }
 
 
                                         renderProjectDocuments(
