@@ -3097,7 +3097,7 @@ span {
 
     right: 8px;
 
-    bottom: 4px;
+    bottom: 8px;
 
     width: 32px;
 
@@ -3145,11 +3145,9 @@ span {
 
     background: transparent;
 
-    color: #222;
-
+    color: #555;
     font-size: 24px;
-
-    font-weight: 400;
+    font-weight: 500;
 
     line-height: 1;
 
