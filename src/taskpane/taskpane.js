@@ -24803,15 +24803,8 @@ window.testIstislahIndex =
 // التهيئة النهائية للتطبيق
 // =====================================================
 
-initializeSidebarSections();
 
 renderProjects();
-
-
-
-
-
-
 
 renderSidebarChats();
 
