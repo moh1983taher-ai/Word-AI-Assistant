@@ -58,6 +58,7 @@ const AppState = {
 let currentProject = null;
 let currentDocument = null;
 let currentChat = null;
+let researchScope = null;
 
 // ======================================
 // Office Initialization
@@ -21048,20 +21049,227 @@ if (
                             e.preventDefault();
                             e.stopPropagation();
 
-                            // مؤقتًا:
-                            // سنضيف منطق الاختيار الحقيقي لاحقًا.
-                            console.log(
-                                "اختيار نطاق:",
-                                type,
+                            const mode =
                                 button.getAttribute(
                                     "data-scope-mode"
-                                )
-                            );
+                                );
+
+                            if (
+                                mode ===
+                                "all"
+                            ) {
+
+                                researchScope = {
+
+                                    type:
+                                        type,
+
+                                    scope:
+                                        "all",
+
+                                    id:
+                                        null
+
+                                };
+
+
+                                scopePanel.classList.remove(
+                                    "open"
+                                );
+
+                                scopePanel.setAttribute(
+                                    "aria-hidden",
+                                    "true"
+                                );
+
+
+                                console.log(
+                                    "نطاق البحث الحالي:",
+                                    researchScope
+                                );
+
+                            }
+
+                            if (
+                                mode ===
+                                "specific"
+                            ) {
+
+                                if (
+                                    type ===
+                                    "project"
+                                ) {
+
+                                    showProjectScopePicker();
+
+                                }
+
+                            }
 
                         };
 
                 }
             );
+
+    }
+
+    function showProjectScopePicker() {
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                اختيار المشروع
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            "";
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeType(
+                        "project"
+                    );
+
+                };
+
+        }
+
+
+        if (
+            !Array.isArray(
+                projects
+            ) ||
+            projects.length ===
+                0
+        ) {
+
+            scopePanelContent.innerHTML =
+                `
+                <div class="scope-empty">
+                    لا توجد مشاريع
+                </div>
+                `;
+
+            return;
+
+        }
+
+
+        projects.forEach(
+            function (
+                project
+            ) {
+
+                if (
+                    !project
+                ) {
+
+                    return;
+
+                }
+
+
+                const button =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                button.type =
+                    "button";
+
+
+                button.className =
+                    "scope-project-item";
+
+
+                button.innerHTML =
+                    `
+                    <span
+                        class="scope-project-icon">
+                        ▱
+                    </span>
+
+                    <span
+                        class="scope-project-name">
+                        ${project.name}
+                    </span>
+                    `;
+
+
+                button.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        researchScope = {
+
+                            type:
+                                "project",
+
+                            scope:
+                                "specific",
+
+                            id:
+                                project.id
+
+                        };
+
+
+                        scopePanel.classList.remove(
+                            "open"
+                        );
+
+                        scopePanel.setAttribute(
+                            "aria-hidden",
+                            "true"
+                        );
+
+
+                        console.log(
+                            "نطاق البحث الحالي:",
+                            researchScope
+                        );
+
+                    };
+
+
+                scopePanelContent.appendChild(
+                    button
+                );
+
+            }
+        );
 
     }
 

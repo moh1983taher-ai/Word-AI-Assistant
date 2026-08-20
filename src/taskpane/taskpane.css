@@ -3399,7 +3399,140 @@ span {
     transform: translateX(0);
 
 }
+/* =========================================================
+   PROJECT SCOPE PICKER
+   اختيار مشروع محدد
+   ========================================================= */
 
+.scope-project-item {
+
+    width: 100%;
+
+    min-height: 48px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin: 0 0 7px;
+
+    padding: 8px 10px;
+
+    border: 1px solid #e3e3e3;
+
+    border-radius: 11px;
+
+    background: #ffffff;
+
+    color: #222222;
+
+    cursor: pointer;
+
+    direction: rtl;
+
+    text-align: right;
+
+    box-sizing: border-box;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.12s ease;
+
+}
+
+
+.scope-project-item:hover {
+
+    background: #f7f7f7;
+
+    border-color: #cfcfcf;
+
+    transform: translateX(-1px);
+
+}
+
+
+.scope-project-item:active {
+
+    background: #eeeeee;
+
+    transform: translateX(0);
+
+}
+
+
+/* =========================================================
+   أيقونة المشروع
+   ========================================================= */
+
+.scope-project-icon {
+
+    width: 30px;
+
+    height: 30px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border: 1px solid #e5e5e5;
+
+    border-radius: 8px;
+
+    background: #fafafa;
+
+    color: #333333;
+
+    font-size: 16px;
+
+}
+
+
+/* =========================================================
+   اسم المشروع
+   ========================================================= */
+
+.scope-project-name {
+
+    flex: 1;
+
+    min-width: 0;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+}
+
+
+/* =========================================================
+   لا توجد مشاريع
+   ========================================================= */
+
+.scope-empty {
+
+    padding: 18px 10px;
+
+    text-align: center;
+
+    color: #777777;
+
+    font-size: 13px;
+
+}
 
 /* =========================================================
    علامة الاختيار
