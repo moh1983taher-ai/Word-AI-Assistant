@@ -20753,7 +20753,7 @@ if (input) {
 
 // =====================================================
 // Input Auto Height
-// الحفاظ على سلوك صندوق الإدخال
+// تمدد صندوق الإدخال مع الكتابة
 // =====================================================
 
 if (input) {
@@ -20765,12 +20765,23 @@ if (input) {
                 "auto";
 
 
+            const maxHeight =
+                120;
+
+
             input.style.height =
                 Math.min(
                     input.scrollHeight,
-                    180
+                    maxHeight
                 ) +
                 "px";
+
+
+            input.style.overflowY =
+                input.scrollHeight >
+                maxHeight
+                    ? "auto"
+                    : "hidden";
 
         };
 
