@@ -3099,23 +3099,27 @@ span {
    أداة نطاق البحث — تبقى في اليمين
    ========================================================= */
 
+/* =====================================
+   أداة نطاق البحث
+   ===================================== */
+
 .input-tools {
 
     position: absolute;
 
     right: 3px;
+    bottom: 3px;
 
-    bottom: 4px;
-
-    width: 34px;
-
-    height: 34px;
+    width: auto;
+    height: 32px;
 
     display: flex;
 
     align-items: center;
 
-    justify-content: center;
+    gap: 4px;
+
+    direction: rtl;
 
     z-index: 20;
 
@@ -3124,7 +3128,35 @@ span {
     opacity: 1;
 
 }
+/* =====================================
+   اسم نطاق البحث
+   ===================================== */
 
+.scope-label {
+
+    max-width: 120px;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    color: #666;
+
+    font-size: 12px;
+
+    font-weight: 400;
+
+    line-height: 1;
+
+    direction: rtl;
+
+    text-align: right;
+
+    cursor: default;
+
+}
 
 /* =========================================================
    SCOPE BUTTON
