@@ -2936,7 +2936,7 @@ span {
 
     align-items: center;
 
-    justify-content: flex-end;
+    justify-content: flex-start;
 
     gap: 5px;
 
@@ -2952,6 +2952,8 @@ span {
 
     visibility: hidden;
 
+    direction: rtl;
+
     transition:
         max-height 0.20s ease,
         padding 0.20s ease,
@@ -2959,6 +2961,7 @@ span {
         visibility 0.20s ease;
 
 }
+
 
 
 /* الحالة النشطة */
@@ -3267,35 +3270,6 @@ span {
     pointer-events: auto;
     visibility: visible;
     opacity: 1;
-
-}
-/* =====================================
-   اسم نطاق البحث
-   ===================================== */
-
-.scope-label {
-
-    max-width: 120px;
-
-    overflow: hidden;
-
-    text-overflow: ellipsis;
-
-    white-space: nowrap;
-
-    color: #666;
-
-    font-size: 12px;
-
-    font-weight: 400;
-
-    line-height: 1;
-
-    direction: rtl;
-
-    text-align: right;
-
-    cursor: default;
 
 }
 
