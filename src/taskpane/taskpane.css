@@ -3034,13 +3034,10 @@ span {
 
     transform: none;
 
-    width: 38px;
-
-    height: 38px;
-
-    min-width: 38px;
-
-    min-height: 38px;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
 
     margin: 0;
 
@@ -3069,32 +3066,6 @@ span {
     transition:
         background 0.2s ease,
         transform 0.15s ease;
-
-}
-
-/* =====================================
-   أداة نطاق البحث +
-   ===================================== */
-
-.input-tools {
-
-    position: absolute;
-
-    right: 8px;
-
-    bottom: 7px;
-
-    width: 32px;
-
-    height: 32px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    z-index: 10;
 
 }
 
@@ -3145,6 +3116,76 @@ span {
     transform: scale(0.96);
 }
 
+/* =====================================
+   زر نطاق البحث +
+   ===================================== */
+
+#scope-btn {
+
+    width: 32px;
+
+    height: 32px;
+
+    margin: 0;
+
+    padding: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background: transparent;
+
+    color: #222;
+
+    font-size: 24px;
+
+    font-weight: 400;
+
+    line-height: 1;
+
+    cursor: pointer;
+
+    box-sizing: border-box;
+
+    position: relative;
+
+    z-index: 100000;
+
+    transition:
+        background 0.15s ease,
+        color 0.15s ease,
+        transform 0.15s ease;
+
+}
+
+
+/* عند الاقتراب من الزر */
+
+#scope-btn:hover {
+
+    background: #f1f1f1;
+
+    color: #111;
+
+}
+
+
+/* عند الضغط */
+
+#scope-btn:active {
+
+    background: #e7e7e7;
+
+    transform: scale(0.94);
+
+}
 /* =========================================================
 SEND BUTTON HOVER
 ========================================================= */
