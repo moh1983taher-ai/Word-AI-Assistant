@@ -2941,7 +2941,7 @@ span {
     direction: rtl;
 
     /* مساحة صغيرة فقط للأزرار */
-    padding: 3px 50px 3px 50px;
+    padding: 3px 42px 3px 42px;
 
     margin: 0 2px;
 
@@ -3145,16 +3145,18 @@ span {
 #scope-btn:active {
     transform: scale(0.96);
 }
+
 /* =========================================================
 SEND BUTTON HOVER
 ========================================================= */
 
 #send-btn:hover {
+
     background: #111;
 
     transform:
-        translateY(-50%)
         scale(1.03);
+
 }
 
 
