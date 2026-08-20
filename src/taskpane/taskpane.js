@@ -20736,6 +20736,12 @@ if (sendBtn) {
 
 if (scopeBtn && scopePanel) {
 
+    console.log(
+        "SCOPE:",
+        scopeBtn,
+        scopePanel
+    );
+
     scopeBtn.onclick =
         function (e) {
 
