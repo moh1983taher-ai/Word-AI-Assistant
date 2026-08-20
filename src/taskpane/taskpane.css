@@ -2893,12 +2893,15 @@ span {
 .input-area {
 
     min-height: 68px;
-    height: 68px;
+
+    height: auto;
 
     border-top: 1px solid #eee;
 
     display: flex;
+
     align-items: flex-end;
+
     justify-content: center;
 
     padding: 5px 10px 13px;
@@ -2922,9 +2925,11 @@ span {
     max-width: none;
 
     min-height: 46px;
+
     max-height: 140px;
 
     display: flex;
+
     align-items: flex-end;
 
     background: #ffffff;
@@ -2935,8 +2940,8 @@ span {
 
     direction: rtl;
 
-    /* + في اليمين — زر الإرسال في اليسار */
-    padding: 3px 88px 3px 55px;
+    /* مساحة صغيرة فقط للأزرار */
+    padding: 3px 50px 3px 50px;
 
     margin: 0 2px;
 
