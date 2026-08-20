@@ -105,17 +105,7 @@ const newChatBtn =
 const input =
     document.getElementById("user-input");
 
-const scopeBtn =
-    document.getElementById("scope-btn");
 
-const scopePanel =
-    document.getElementById("scope-panel");
-   
-console.log(
-        "SCOPE CHECK:",
-        scopeBtn,
-        scopePanel
-    );
 
 const sendBtn =
     document.getElementById("send-btn");
@@ -20728,13 +20718,23 @@ if (sendBtn) {
             e.preventDefault();
             e.stopPropagation();
 
-
             sendMessage();
 
         };
 
 }
 
+
+// =====================================================
+// Scope Elements
+// =====================================================
+
+const scopeBtn =
+    document.getElementById("scope-btn");
+
+const scopePanel =
+    document.getElementById("scope-panel");
+    
 // =====================================================
 // Scope Button
 // فتح وإغلاق لوحة نطاق البحث
