@@ -2892,6 +2892,8 @@ span {
 
 .input-area {
 
+    position: relative;
+
     min-height: 68px;
 
     height: auto;
