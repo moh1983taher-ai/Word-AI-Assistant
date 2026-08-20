@@ -105,6 +105,12 @@ const newChatBtn =
 const input =
     document.getElementById("user-input");
 
+const scopeBtn =
+    document.getElementById("scope-btn");
+
+const scopePanel =
+    document.getElementById("scope-panel");
+
 const sendBtn =
     document.getElementById("send-btn");
 
@@ -20723,6 +20729,79 @@ if (sendBtn) {
 
 }
 
+// =====================================================
+// Scope Button
+// فتح وإغلاق لوحة نطاق البحث
+// =====================================================
+
+if (scopeBtn && scopePanel) {
+
+    scopeBtn.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            const isOpen =
+                scopePanel.classList.contains(
+                    "open"
+                );
+
+
+            if (isOpen) {
+
+                scopePanel.classList.remove(
+                    "open"
+                );
+
+                scopePanel.setAttribute(
+                    "aria-hidden",
+                    "true"
+                );
+
+                return;
+
+            }
+
+
+            scopePanel.classList.add(
+                "open"
+            );
+
+            scopePanel.setAttribute(
+                "aria-hidden",
+                "false"
+            );
+
+        };
+
+
+    // إغلاق اللوحة عند النقر خارجها
+    document.addEventListener(
+        "click",
+        function (e) {
+
+            if (
+                !scopePanel.contains(e.target) &&
+                !scopeBtn.contains(e.target)
+            ) {
+
+                scopePanel.classList.remove(
+                    "open"
+                );
+
+                scopePanel.setAttribute(
+                    "aria-hidden",
+                    "true"
+                );
+
+            }
+
+        }
+    );
+
+}
 
 // =====================================================
 // Keyboard
