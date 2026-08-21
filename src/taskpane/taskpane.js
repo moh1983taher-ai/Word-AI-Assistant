@@ -1404,58 +1404,41 @@ function processReferenceSources(referenceSources) {
         return records;
     }
 
-
     // =====================================================
-    // 1. تنظيف النص الخام
+    // أدوات التنظيف الأساسية
     // =====================================================
 
     function cleanRawText(value) {
 
-        let text =
-            String(value || "");
+        let text = String(value || "");
 
+        // إزالة رموز التحكم غير المرغوبة
+        text = text.replace(
+            /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,
+            " "
+        );
 
-        // رموز التحكم غير المفيدة،
-        // مع الإبقاء على النص العربي والأرقام
-        text =
-            text.replace(
-                /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,
-                " "
-            );
+        // إزالة رمز الاستبدال
+        text = text.replace(
+            /\uFFFD/g,
+            " "
+        );
 
+        // إزالة الرمز الغريب الذي قد يظهر من Word
+        text = text.replace(
+            /\u0002/g,
+            " "
+        );
 
-        // رمز الاستبدال الذي قد يظهر من Word
-        text =
-            text.replace(
-                /\uFFFD/g,
-                " "
-            );
-
-
-        // الرمز الغريب الذي ظهر في نتائج الحواشي
-        text =
-            text.replace(
-                //g,
-                " "
-            );
-
-
-        // مسافات زائدة
-        text =
-            text.replace(
-                /\s+/g,
-                " "
-            );
-
+        // توحيد الأسطر والمسافات
+        text = text.replace(
+            /\s+/g,
+            " "
+        );
 
         return text.trim();
-
     }
 
-
-    // =====================================================
-    // 2. تحويل الأرقام العربية إلى أرقام قياسية
-    // =====================================================
 
     function normalizeArabicDigits(value) {
 
@@ -1476,368 +1459,60 @@ function processReferenceSources(referenceSources) {
     }
 
 
-    // =====================================================
-    // 3. توحيد المسافات والعلامات
-    // =====================================================
-
-    function normalizeSpacing(value) {
-
-        let text =
-            String(value || "");
-
-
-        text =
-            text.replace(
-                /\s*([،,:؛])\s*/g,
-                "$1 "
-            );
-
-
-        text =
-            text.replace(
-                /\s*\/\s*/g,
-                "/"
-            );
-
-
-        text =
-            text.replace(
-                /\s*([–—-])\s*/g,
-                "$1"
-            );
-
-
-        text =
-            text.replace(
-                /\(\s+/g,
-                "("
-            );
-
-
-        text =
-            text.replace(
-                /\s+\)/g,
-                ")"
-            );
-
-
-        text =
-            text.replace(
-                /\[\s+/g,
-                "["
-            );
-
-
-        text =
-            text.replace(
-                /\s+\]/g,
-                "]"
-            );
-
-
-        text =
-            text.replace(
-                /\s+/g,
-                " "
-            );
-
-
-        return text.trim();
-
-    }
-
-
-    // =====================================================
-    // 4. التنظيف النهائي لنص المرجع
-    // =====================================================
-
     function normalizeReferenceText(value) {
 
         let text =
             cleanRawText(value);
 
-
         text =
-            normalizeArabicDigits(
-                text
-            );
+            normalizeArabicDigits(text);
 
-
-        text =
-            normalizeSpacing(
-                text
-            );
-
-
-        // إزالة علامات البداية الزائدة
-        text =
-            text.replace(
-                /^[\s,،;؛:.\-–—]+/,
-                ""
-            );
-
-
-        // إزالة علامات النهاية الزائدة
-        text =
-            text.replace(
-                /[\s,،;؛:.\-–—]+$/,
-                ""
-            );
-
-
-        return text.trim();
-
-    }
-
-
-    // =====================================================
-    // 5. الإحالة الداخلية إلى صفحات الدراسة
-    // =====================================================
-
-    function isInternalReference(text) {
-
-        const value =
-            normalizeReferenceText(
-                text
-            );
-
-
-        if (!value) {
-            return false;
-        }
-
-
-        // في هذه الدراسة ص 67
-        if (
-            /في\s+هذه\s+الدراسة/i.test(
-                value
-            )
-        ) {
-            return true;
-        }
-
-
-        // ص 65
-        // ص 65-85
-        // ص 448-449
-        if (
-            /^ص\.?\s*\d+(?:\s*[-–—]\s*\d+)?$/i.test(
-                value
-            )
-        ) {
-            return true;
-        }
-
-
-        // ص 25-26، ص 45-46
-        if (
-            /^ص\.?\s*\d+(?:\s*[-–—]\s*\d+)?(?:\s*[,،]\s*ص?\.?\s*\d+(?:\s*[-–—]\s*\d+)?)*$/i.test(
-                value
-            )
-        ) {
-            return true;
-        }
-
-
-        return false;
-
-    }
-
-
-    // =====================================================
-    // 6. المصدر نفسه
-    // =====================================================
-
-    function isIbid(text) {
-
-        const value =
-            normalizeReferenceText(
-                text
-            );
-
-
-        return (
-            /^(?:المصدر\s+نفسه|المرجع\s+نفسه)$/i.test(
-                value
-            )
+        // توحيد بعض المسافات حول علامات الترقيم
+        text = text.replace(
+            /\s*([،,:؛])\s*/g,
+            "$1 "
         );
 
-    }
-
-
-    // =====================================================
-    // 7. المصدر نفسه مع رقم جزء/صفحة
-    // =====================================================
-
-    function isIbidWithLocation(text) {
-
-        const value =
-            normalizeReferenceText(
-                text
-            );
-
-
-        return (
-            /^(?:المصدر\s+نفسه|المرجع\s+نفسه)(?:\s*[,،:]?\s*(?:ج|جزء|جلد)?\.?\s*\d+(?:\s*\/\s*\d+)?|\s*[,،:]?\s*\d+\s*\/\s*\d+)$/i
-                .test(
-                    value
-                )
+        text = text.replace(
+            /\s*\/\s*/g,
+            "/"
         );
 
-    }
-
-
-    // =====================================================
-    // 8. تخريج الحديث
-    // =====================================================
-
-    function isHadithReference(text) {
-
-        const value =
-            normalizeReferenceText(
-                text
-            );
-
-
-        return (
-            /^(?:رواه|أخرجه)\s+/i.test(
-                value
-            )
-            ||
-            /(?:حديث\s+رقم|الحديث\s+رقم)/i.test(
-                value
-            )
+        text = text.replace(
+            /\s*([–—-])\s*/g,
+            "$1"
         );
 
+        text =
+            text.trim();
+
+        return text;
     }
 
 
     // =====================================================
-    // 9. وجود بيانات مرجعية
+    // إضافة مادة خام واحدة
+    //
+    // لا نحكم هنا هل هي:
+    // مرجع / شرح / إحالة / حديث / مصدر نفسه
+    //
+    // الذكاء الاصطناعي هو الذي سيقرر ذلك.
     // =====================================================
 
-    function hasLocationData(text) {
-
-        const value =
-            normalizeReferenceText(
-                text
-            );
-
-
-        return (
-            /\d+\s*\/\s*\d+/.test(
-                value
-            )
-            ||
-            /(?:ص|ج|جزء|جلد)\.?\s*\d+/i.test(
-                value
-            )
-            ||
-            /\b\d{1,4}\s*$/.test(
-                value
-            )
-        );
-
-    }
-
-
-    // =====================================================
-    // 10. هل المادة تبدو مرجعًا خارجيًا؟
-    // =====================================================
-
-    function looksLikeReference(text) {
-
-        const value =
-            normalizeReferenceText(
-                text
-            );
-
-
-        if (!value) {
-            return false;
-        }
-
-
-        if (
-            isInternalReference(
-                value
-            )
-        ) {
-            return false;
-        }
-
-
-        if (
-            isIbid(value)
-            ||
-            isIbidWithLocation(value)
-            ||
-            isHadithReference(value)
-        ) {
-            return true;
-        }
-
-
-        if (
-            hasLocationData(value)
-        ) {
-            return true;
-        }
-
-
-        // مؤشرات توثيق واضحة
-        if (
-            /^(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]/i.test(
-                value
-            )
-        ) {
-            return true;
-        }
-
-
-        // أسماء كتب/مصادر شائعة في العربية
-        if (
-            /(?:الخصائص|الاقتراح|لمع الأدلة|الإغراب|الكليات|الكتاب|الأصول|معاني القرآن وإعرابه|لسان العرب|كتاب العين|البحر المحيط|المجموع|الأشباه والنظائر|المنثور|البرهان|المحصول|نهاية المطلب|قواطع الأدلة|الصحاح|مختار الصحاح|الإبهاج|اللمع|الحاوي الكبير|أساس القياس|ضوابط المصلحة|أثر الأدلة|فتح الباري)/i.test(
-                value
-            )
-        ) {
-            return true;
-        }
-
-
-        return false;
-
-    }
-
-
-    // =====================================================
-    // 11. إضافة سجل موحد
-    // =====================================================
-
-    function addRecord(
+    function addRawMaterial(
         source,
-        kind,
-        originalText,
-        context,
+        text,
         metadata = {}
     ) {
 
-        const original =
-            String(
-                originalText || ""
-            ).trim();
-
-
-        const cleaned =
+        const cleanedText =
             normalizeReferenceText(
-                original
+                text
             );
 
-
-        if (!cleaned) {
+        if (!cleanedText) {
             return;
         }
-
 
         records.push({
 
@@ -1848,18 +1523,18 @@ function processReferenceSources(referenceSources) {
                 source,
 
             kind:
-                kind,
+                "raw",
 
             originalText:
-                original,
+                String(
+                    text || ""
+                ).trim(),
 
             cleanedText:
-                cleaned,
+                cleanedText,
 
             context:
-                normalizeReferenceText(
-                    context || original
-                ),
+                cleanedText,
 
             ...metadata
 
@@ -1869,322 +1544,10 @@ function processReferenceSources(referenceSources) {
 
 
     // =====================================================
-    // 12. تحليل مادة واحدة
+    // 1. المتن
     //
-    // هنا لا نهتم هل جاءت من المتن أو الحاشية.
-    // =====================================================
-
-    function processMaterial(
-        source,
-        text,
-        metadata = {}
-    ) {
-
-        const raw =
-            cleanRawText(
-                text
-            );
-
-
-        if (!raw) {
-            return;
-        }
-
-
-        // -----------------------------------------------
-        // إحالة داخلية
-        // -----------------------------------------------
-
-        if (
-            isInternalReference(
-                raw
-            )
-        ) {
-
-            addRecord(
-                source,
-                "internal",
-                raw,
-                raw,
-                metadata
-            );
-
-            return;
-
-        }
-
-
-        // -----------------------------------------------
-        // المصدر نفسه
-        // -----------------------------------------------
-
-        if (
-            isIbid(raw)
-            ||
-            isIbidWithLocation(raw)
-        ) {
-
-            addRecord(
-                source,
-                "ibid",
-                raw,
-                raw,
-                metadata
-            );
-
-            return;
-
-        }
-
-
-        // -----------------------------------------------
-        // تخريج حديث
-        // -----------------------------------------------
-
-        if (
-            isHadithReference(
-                raw
-            )
-        ) {
-
-            addRecord(
-                source,
-                "hadith",
-                raw,
-                raw,
-                metadata
-            );
-
-            // نكمل لأن الحاشية قد تحتوي معلومات إضافية
-        }
-
-
-        let foundReference =
-            false;
-
-
-        // -----------------------------------------------
-        // استخراج إحالات تبدأ بـ:
-        // انظر / ينظر / نقلًا عن
-        // -----------------------------------------------
-
-        const verbalMatches =
-            raw.match(
-                /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*[^.؛]+/gi
-            );
-
-
-        if (
-            verbalMatches
-            &&
-            verbalMatches.length
-        ) {
-
-            verbalMatches.forEach(
-                function (
-                    item
-                ) {
-
-                    const value =
-                        normalizeReferenceText(
-                            item
-                        );
-
-
-                    if (
-                        isInternalReference(
-                            value
-                        )
-                    ) {
-
-                        addRecord(
-                            source,
-                            "internal",
-                            value,
-                            raw,
-                            metadata
-                        );
-
-                        return;
-
-                    }
-
-
-                    if (
-                        looksLikeReference(
-                            value
-                        )
-                    ) {
-
-                        addRecord(
-                            source,
-                            "reference",
-                            value,
-                            raw,
-                            metadata
-                        );
-
-                        foundReference = true;
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        // -----------------------------------------------
-        // فصل المراجع المتعددة داخل المادة
-        // مثال:
-        // المحصول، 1/229، السبكي، الإبهاج، 1/275
-        // -----------------------------------------------
-
-        const parts =
-            raw.split(
-                /\s*[؛;]\s*|\s+(?=(?:ابن|أبو|السبكي|السيوطي|الزركشي|الجويني|الرازي|النووي|الغزالي|السمعاني|الشافعي|البوطي|العز|الماوردي|البخاري|الترمذي|البيهقي|الآمدي|الإسنوي)\s*[,،:])/
-            );
-
-
-        if (
-            parts.length > 1
-        ) {
-
-            parts.forEach(
-                function (
-                    part
-                ) {
-
-                    const value =
-                        normalizeReferenceText(
-                            part
-                        );
-
-
-                    if (!value) {
-                        return;
-                    }
-
-
-                    if (
-                        isInternalReference(
-                            value
-                        )
-                    ) {
-
-                        addRecord(
-                            source,
-                            "internal",
-                            value,
-                            raw,
-                            metadata
-                        );
-
-                        return;
-
-                    }
-
-
-                    if (
-                        isIbid(value)
-                        ||
-                        isIbidWithLocation(value)
-                    ) {
-
-                        addRecord(
-                            source,
-                            "ibid",
-                            value,
-                            raw,
-                            metadata
-                        );
-
-                        return;
-
-                    }
-
-
-                    if (
-                        looksLikeReference(
-                            value
-                        )
-                    ) {
-
-                        addRecord(
-                            source,
-                            "reference",
-                            value,
-                            raw,
-                            metadata
-                        );
-
-                        foundReference = true;
-
-                    }
-
-                }
-            );
-
-        }
-
-
-        // -----------------------------------------------
-        // النص الذي يحتوي مرجعًا واضحًا بدون كلمة انظر
-        // -----------------------------------------------
-
-        if (
-            !foundReference
-            &&
-            looksLikeReference(
-                raw
-            )
-        ) {
-
-            addRecord(
-                source,
-                "reference",
-                raw,
-                raw,
-                metadata
-            );
-
-            foundReference = true;
-
-        }
-
-
-        // -----------------------------------------------
-        // لم نستطع حسم المادة
-        // نحتفظ بها للمراجعة
-        // -----------------------------------------------
-
-        if (
-            !foundReference
-            &&
-            !isHadithReference(raw)
-            &&
-            !isInternalReference(raw)
-            &&
-            !isIbid(raw)
-            &&
-            !isIbidWithLocation(raw)
-        ) {
-
-            addRecord(
-                source,
-                "review",
-                raw,
-                raw,
-                metadata
-            );
-
-        }
-
-    }
-
-
-    // =====================================================
-    // 13. المتن
+    // نلتقط فقط المواضع التي تبدو كإحالات،
+    // ونترك الحكم النهائي للذكاء الاصطناعي.
     // =====================================================
 
     const mainText =
@@ -2196,76 +1559,109 @@ function processReferenceSources(referenceSources) {
     if (mainText) {
 
         // -----------------------------------------------
-        // التوثيق بين الأقواس
+        // الإحالات الموجودة بين الأقواس
+        //
+        // (الخصائص، 1/33-34)
+        // （الكتاب، 3/22）
+        // [الصحاح، 2/619]
         // -----------------------------------------------
 
-        const parentheticalPattern =
-            /(?:\(([^()\n]{2,300})\)|（([^（）\n]{2,300})）)/g;
+        const parentheticalPatterns = [
+
+            /[([]([^()[\]\n]{2,400})[)\]]/g,
+
+            /（([^（）\n]{2,400})）/g,
+
+            /【([^【】\n]{2,400})】/g
+
+        ];
 
 
-        let match;
+        parentheticalPatterns.forEach(
+            function (pattern) {
 
+                let match;
 
-        while (
-            (
-                match =
-                    parentheticalPattern.exec(
-                        mainText
-                    )
-            ) !== null
-        ) {
+                while (
+                    (
+                        match =
+                            pattern.exec(
+                                mainText
+                            )
+                    ) !== null
+                ) {
 
-            const value =
-                (
-                    match[1]
-                    ||
-                    match[2]
-                    ||
-                    ""
-                ).trim();
+                    const value =
+                        String(
+                            match[1] || ""
+                        ).trim();
 
+                    if (!value) {
+                        continue;
+                    }
 
-            processMaterial(
-                "main-text",
-                value,
-                {
-                    position:
-                        match.index
+                    addRawMaterial(
+                        "main-text",
+                        value,
+                        {
+                            position:
+                                match.index,
+
+                            extraction:
+                                "parenthetical"
+                        }
+                    );
+
                 }
-            );
 
-        }
+            }
+        );
 
 
         // -----------------------------------------------
-        // الإحالات اللفظية في المتن
+        // الإحالات اللفظية
+        //
+        // انظر:
+        // ينظر:
+        // راجع:
+        // نقلاً عن:
+        // نقلًا عن:
+        // المصدر:
         // -----------------------------------------------
 
         const verbalPattern =
-            /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*[^.؛\n]+/gi;
+            /(?:انظر|ينظر|راجع|المصدر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,400})/gi;
 
+
+        let verbalMatch;
 
         while (
             (
-                match =
+                verbalMatch =
                     verbalPattern.exec(
                         mainText
                     )
             ) !== null
         ) {
 
-            const value =
+            const fullText =
                 String(
-                    match[0] || ""
+                    verbalMatch[0] || ""
                 ).trim();
 
+            if (!fullText) {
+                continue;
+            }
 
-            processMaterial(
+            addRawMaterial(
                 "main-text",
-                value,
+                fullText,
                 {
                     position:
-                        match.index
+                        verbalMatch.index,
+
+                    extraction:
+                        "verbal"
                 }
             );
 
@@ -2275,10 +1671,18 @@ function processReferenceSources(referenceSources) {
 
 
     // =====================================================
-    // 14. الحواشي السفلية
+    // 2. الحواشي السفلية
     //
-    // نعالج نص الحاشية كما هو،
-    // ولا نهتم بشكل رقم الحاشية.
+    // الحاشية نفسها هي وحدة التحليل.
+    //
+    // لا نهتم:
+    // ( )
+    // [ ]
+    // { }
+    // 【 】
+    // أو أي علامة تحيط بالنص.
+    //
+    // نأخذ نص الحاشية كاملًا كما أعاده Word.
     // =====================================================
 
     if (
@@ -2293,25 +1697,26 @@ function processReferenceSources(referenceSources) {
                 index
             ) {
 
-                processMaterial(
-                    "footnote",
-                    note.rawText
-                    ||
-                    note.text
-                    ||
-                    "",
-                    {
+                const noteText =
+                    note?.rawText ||
+                    note?.text ||
+                    "";
 
+
+                addRawMaterial(
+                    "footnote",
+                    noteText,
+                    {
                         noteNumber:
-                            note.number
-                            ||
+                            note?.number ||
                             index + 1,
 
                         marker:
-                            note.reference
-                            ||
-                            ""
+                            note?.reference ||
+                            "",
 
+                        extraction:
+                            "whole-footnote"
                     }
                 );
 
@@ -2322,7 +1727,11 @@ function processReferenceSources(referenceSources) {
 
 
     // =====================================================
-    // 15. الحواشي الختامية
+    // 3. الحواشي الختامية
+    //
+    // نفس الفكرة تمامًا:
+    // الحاشية وحدة واحدة،
+    // والذكاء الاصطناعي هو الذي يقرر ما بداخلها.
     // =====================================================
 
     if (
@@ -2337,25 +1746,26 @@ function processReferenceSources(referenceSources) {
                 index
             ) {
 
-                processMaterial(
-                    "endnote",
-                    note.rawText
-                    ||
-                    note.text
-                    ||
-                    "",
-                    {
+                const noteText =
+                    note?.rawText ||
+                    note?.text ||
+                    "";
 
+
+                addRawMaterial(
+                    "endnote",
+                    noteText,
+                    {
                         noteNumber:
-                            note.number
-                            ||
+                            note?.number ||
                             index + 1,
 
                         marker:
-                            note.reference
-                            ||
-                            ""
+                            note?.reference ||
+                            "",
 
+                        extraction:
+                            "whole-endnote"
                     }
                 );
 
@@ -2366,10 +1776,14 @@ function processReferenceSources(referenceSources) {
 
 
     // =====================================================
-    // 16. إزالة التكرار الحرفي فقط
+    // 4. إزالة التكرار التقني فقط
     //
-    // لا نحذف التكرارات الحقيقية هنا؛
-    // التوحيد وكشف التكرار مرحلة لاحقة.
+    // لا ندمج مراجع متشابهة هنا.
+    // لا نحذف "المصدر نفسه".
+    // لا نحذف الإحالات.
+    //
+    // نحذف فقط نفس المادة المكررة تقنيًا داخل
+    // نفس المصدر ونفس رقم الحاشية.
     // =====================================================
 
     const seen =
@@ -2384,12 +1798,15 @@ function processReferenceSources(referenceSources) {
             const key =
                 [
                     record.source,
-                    record.kind,
-                    record.cleanedText,
-                    record.noteNumber
-                    ||
-                    ""
-                ].join("|");
+
+                    record.noteNumber ||
+                        "",
+
+                    record.cleanedText
+
+                ].join(
+                    "|"
+                );
 
 
             if (
@@ -2401,10 +1818,7 @@ function processReferenceSources(referenceSources) {
             }
 
 
-            seen.add(
-                key
-            );
-
+            seen.add(key);
 
             return true;
 
