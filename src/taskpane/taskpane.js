@@ -97,6 +97,9 @@ const referencesBtn =
 const referencesWorkspace =
     document.getElementById("references-workspace");
 
+const closeReferences =
+    document.getElementById("close-references");
+
 const referencesContent =
     document.getElementById("references-content");
 
@@ -20783,6 +20786,54 @@ if (referencesBtn && referencesWorkspace) {
 
                 inputArea.style.display =
                     "none";
+
+            }
+
+        };
+
+}
+
+// =====================================================
+// Close References
+// =====================================================
+
+if (closeReferences) {
+
+    closeReferences.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            if (referencesWorkspace) {
+
+                referencesWorkspace.style.display =
+                    "none";
+
+            }
+
+
+            if (chatArea) {
+
+                chatArea.style.display =
+                    "";
+
+            }
+
+
+            if (documentTitle) {
+
+                documentTitle.style.display =
+                    "";
+
+            }
+
+
+            if (inputArea) {
+
+                inputArea.style.display =
+                    "";
 
             }
 
