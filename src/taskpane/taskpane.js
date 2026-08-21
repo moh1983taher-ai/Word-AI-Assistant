@@ -22047,6 +22047,17 @@ other
                 answer
             );
 
+        console.log(
+            "نتيجة parseUnifiedReferenceAIResult:",
+            parsed
+        );
+
+        console.log(
+            "عدد المراجع قبل التطبيع:",
+            Array.isArray(parsed?.references)
+                ? parsed.references.length
+                : 0
+        );
 
         return normalizeUnifiedReferenceResult(
             parsed,
@@ -22200,6 +22211,17 @@ other
             answer
         );
 
+    console.log(
+        "نتيجة parseUnifiedReferenceAIResult:",
+        parsed
+    );
+
+    console.log(
+        "عدد المراجع قبل التطبيع:",
+        Array.isArray(parsed?.references)
+            ? parsed.references.length
+            : 0
+    );
 
     return normalizeUnifiedReferenceResult(
         parsed,
@@ -22876,159 +22898,109 @@ function normalizeUnifiedReferenceResult(
     return normalized;
 }
 
-function parseUnifiedReferenceAIResult(
-    answer
-) {
+function parseUnifiedReferenceAIResult(answer) {
 
-    // =====================================================
-    // 1. الحصول على النص الخام
-    // =====================================================
+    let parsed;
 
-    let rawText =
+    const raw =
         String(
             answer ?? ""
-        )
-            .trim();
+        ).trim();
 
 
-    if (
-        !rawText
-    ) {
-
+    if (!raw) {
         throw new Error(
             "أعاد الذكاء الاصطناعي استجابة فارغة."
         );
-
     }
-
-
-    // =====================================================
-    // 2. تنظيف Markdown / code fence
-    // =====================================================
-
-    rawText =
-        rawText
-            .replace(
-                /^\uFEFF/,
-                ""
-            )
-            .trim();
-
-
-    if (
-        rawText.startsWith(
-            "```"
-        )
-    ) {
-
-        rawText =
-            rawText.replace(
-                /^```(?:json|javascript|js)?\s*/i,
-                ""
-            );
-
-
-        rawText =
-            rawText.replace(
-                /\s*```\s*$/i,
-                ""
-            )
-            .trim();
-
-    }
-
-
-    // =====================================================
-    // 3. محاولة قراءة JSON مباشرة
-    // =====================================================
-
-    let parsed = null;
 
 
     try {
 
         parsed =
-            JSON.parse(
-                rawText
-            );
+            JSON.parse(raw);
 
     }
-    catch (
-        firstError
-    ) {
+    catch (error) {
 
-        // =================================================
-        // 4. محاولة استخراج الكائن JSON من داخل النص
-        // =================================================
-
-        const firstBrace =
-            rawText.indexOf(
-                "{"
-            );
-
-
-        const lastBrace =
-            rawText.lastIndexOf(
-                "}"
-            );
-
-
-        if (
-            firstBrace === -1 ||
-            lastBrace === -1 ||
-            lastBrace <= firstBrace
-        ) {
-
-            throw new Error(
-                "تعذر قراءة JSON الصادر من الذكاء الاصطناعي."
-            );
-
-        }
-
-
-        const jsonCandidate =
-            rawText.slice(
-                firstBrace,
-                lastBrace + 1
-            )
+        const cleaned =
+            raw
+                .replace(
+                    /^\s*```(?:json)?\s*/i,
+                    ""
+                )
+                .replace(
+                    /\s*```\s*$/i,
+                    ""
+                )
                 .trim();
 
 
         try {
 
             parsed =
-                JSON.parse(
-                    jsonCandidate
-                );
+                JSON.parse(cleaned);
 
         }
-        catch (
-            secondError
-        ) {
+        catch (secondError) {
 
-            console.error(
-                "JSON الصادر من الذكاء الاصطناعي:",
-                rawText
-            );
+            const start =
+                cleaned.indexOf("{");
+
+            const end =
+                cleaned.lastIndexOf("}");
 
 
-            throw new Error(
-                "تعذر قراءة JSON الصادر من الذكاء الاصطناعي."
-            );
+            if (
+                start === -1 ||
+                end === -1 ||
+                end <= start
+            ) {
+
+                throw new Error(
+                    "تعذر قراءة JSON الصادر من الذكاء الاصطناعي."
+                );
+
+            }
+
+
+            try {
+
+                parsed =
+                    JSON.parse(
+                        cleaned.slice(
+                            start,
+                            end + 1
+                        )
+                    );
+
+            }
+            catch (thirdError) {
+
+                console.error(
+                    "النص الذي تعذر تحليله:",
+                    answer
+                );
+
+                throw new Error(
+                    "تعذر قراءة JSON الصادر من الذكاء الاصطناعي."
+                );
+
+            }
 
         }
 
     }
 
 
-    // =====================================================
-    // 5. التحقق من البنية
-    // =====================================================
+    // ---------------------------------------------
+    // دعم البنية الصحيحة:
+    // { references: [...], stats: {...} }
+    // ---------------------------------------------
 
     if (
         !parsed ||
-        typeof parsed !== "object" ||
-        Array.isArray(parsed)
+        typeof parsed !== "object"
     ) {
 
         throw new Error(
@@ -23038,24 +23010,15 @@ function parseUnifiedReferenceAIResult(
     }
 
 
-    if (
-        !Array.isArray(
+    const references =
+        Array.isArray(
             parsed.references
         )
-    ) {
-
-        throw new Error(
-            "نتيجة الذكاء الاصطناعي لا تحتوي على قائمة references صحيحة."
-        );
-
-    }
+            ? parsed.references
+            : [];
 
 
-    // =====================================================
-    // 6. الإحصاءات
-    // =====================================================
-
-    const sourceStats =
+    const stats =
         parsed.stats &&
         typeof parsed.stats === "object" &&
         !Array.isArray(
@@ -23067,542 +23030,20 @@ function parseUnifiedReferenceAIResult(
             : {};
 
 
-    function toSafeNumber(
-        value,
-        fallback = 0
-    ) {
-
-        const number =
-            Number(
-                value
-            );
-
-
-        return Number.isFinite(
-            number
-        )
-
-            ? number
-
-            : fallback;
-
-    }
-
-
-    const stats = {
-
-        totalMaterials:
-            toSafeNumber(
-                sourceStats.totalMaterials
-            ),
-
-        referenceCount:
-            toSafeNumber(
-                sourceStats.referenceCount
-            ),
-
-        multipleReferenceCount:
-            toSafeNumber(
-                sourceStats.multipleReferenceCount
-            ),
-
-        ibidCount:
-            toSafeNumber(
-                sourceStats.ibidCount
-            ),
-
-        internalReferenceCount:
-            toSafeNumber(
-                sourceStats.internalReferenceCount
-            ),
-
-        hadithCount:
-            toSafeNumber(
-                sourceStats.hadithCount
-            ),
-
-        explanatoryCount:
-            toSafeNumber(
-                sourceStats.explanatoryCount
-            ),
-
-        mixedCount:
-            toSafeNumber(
-                sourceStats.mixedCount
-            ),
-
-        reviewCount:
-            toSafeNumber(
-                sourceStats.reviewCount
-            )
-
-    };
-
-
-    // =====================================================
-    // 7. تحويل المراجع إلى بنية ثابتة
-    // =====================================================
-
-    const references =
-        parsed.references.map(
-            function (
-                reference,
-                index
-            ) {
-
-                const item =
-                    reference &&
-                    typeof reference === "object" &&
-                    !Array.isArray(
-                        reference
-                    )
-
-                        ? reference
-
-                        : {};
-
-
-                // -----------------------------------------
-                // locations
-                // -----------------------------------------
-
-                const rawLocations =
-                    Array.isArray(
-                        item.locations
-                    )
-                        ? item.locations
-                        : [];
-
-
-                const locations = [];
-
-
-                const locationKeys =
-                    new Set();
-
-
-                rawLocations.forEach(
-                    function (
-                        location
-                    ) {
-
-                        if (
-                            !location ||
-                            typeof location !== "object" ||
-                            Array.isArray(
-                                location
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        const normalizedLocation = {
-
-                            volume:
-                                String(
-                                    location.volume ??
-                                    ""
-                                ).trim(),
-
-                            page:
-                                String(
-                                    location.page ??
-                                    ""
-                                ).trim(),
-
-                            pageRange:
-                                String(
-                                    location.pageRange ??
-                                    ""
-                                ).trim()
-
-                        };
-
-
-                        if (
-                            !normalizedLocation.volume &&
-                            !normalizedLocation.page &&
-                            !normalizedLocation.pageRange
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        const key =
-                            [
-                                normalizedLocation.volume,
-                                normalizedLocation.page,
-                                normalizedLocation.pageRange
-                            ]
-                                .join("|");
-
-
-                        if (
-                            locationKeys.has(
-                                key
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        locationKeys.add(
-                            key
-                        );
-
-
-                        locations.push(
-                            normalizedLocation
-                        );
-
-                    }
-                );
-
-
-                // -----------------------------------------
-                // variants
-                // -----------------------------------------
-
-                const rawVariants =
-                    Array.isArray(
-                        item.variants
-                    )
-                        ? item.variants
-                        : [];
-
-
-                const variants = [];
-
-
-                const variantKeys =
-                    new Set();
-
-
-                rawVariants.forEach(
-                    function (
-                        variant
-                    ) {
-
-                        const value =
-                            String(
-                                variant ?? ""
-                            ).trim();
-
-
-                        if (
-                            !value
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        if (
-                            variantKeys.has(
-                                value
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        variantKeys.add(
-                            value
-                        );
-
-
-                        variants.push(
-                            value
-                        );
-
-                    }
-                );
-
-
-                // -----------------------------------------
-                // occurrences
-                // -----------------------------------------
-
-                const rawOccurrences =
-                    Array.isArray(
-                        item.occurrences
-                    )
-                        ? item.occurrences
-                        : [];
-
-
-                const occurrences = [];
-
-
-                rawOccurrences.forEach(
-                    function (
-                        occurrence
-                    ) {
-
-                        if (
-                            !occurrence ||
-                            typeof occurrence !== "object" ||
-                            Array.isArray(
-                                occurrence
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        occurrences.push({
-
-                            materialId:
-                                String(
-                                    occurrence.materialId ??
-                                    ""
-                                ).trim(),
-
-                            source:
-                                String(
-                                    occurrence.source ??
-                                    ""
-                                ).trim(),
-
-                            noteNumber:
-                                occurrence.noteNumber ??
-                                null
-
-                        });
-
-                    }
-                );
-
-
-                // -----------------------------------------
-                // confidence
-                // -----------------------------------------
-
-                let confidence =
-                    toSafeNumber(
-                        item.confidence,
-                        0
-                    );
-
-
-                // النموذج يفترض 0 - 1
-                // لكن إن أعاد 90 بدل 0.90
-                // نتعامل معه أيضًا.
-
-                if (
-                    confidence > 1 &&
-                    confidence <= 100
-                ) {
-
-                    confidence =
-                        confidence /
-                        100;
-
-                }
-
-
-                confidence =
-                    Math.max(
-                        0,
-                        Math.min(
-                            1,
-                            confidence
-                        )
-                    );
-
-
-                // -----------------------------------------
-                // type
-                // -----------------------------------------
-
-                let type =
-                    String(
-                        item.type ||
-                        "book"
-                    )
-                        .trim()
-                        .toLowerCase();
-
-
-                const allowedTypes =
-                    new Set([
-                        "book",
-                        "article",
-                        "journal",
-                        "thesis",
-                        "website",
-                        "hadith",
-                        "other"
-                    ]);
-
-
-                if (
-                    !allowedTypes.has(
-                        type
-                    )
-                ) {
-
-                    type =
-                        "other";
-
-                }
-
-
-                // -----------------------------------------
-                // السجل الموحد
-                // -----------------------------------------
-
-                return {
-
-                    id:
-                        String(
-                            item.id ||
-                            `reference-${index + 1}`
-                        ).trim(),
-
-                    type:
-                        type,
-
-                    author:
-                        String(
-                            item.author ??
-                            ""
-                        ).trim(),
-
-                    title:
-                        String(
-                            item.title ??
-                            ""
-                        ).trim(),
-
-                    edition:
-                        String(
-                            item.edition ??
-                            ""
-                        ).trim(),
-
-                    editor:
-                        String(
-                            item.editor ??
-                            ""
-                        ).trim(),
-
-                    publisher:
-                        String(
-                            item.publisher ??
-                            ""
-                        ).trim(),
-
-                    city:
-                        String(
-                            item.city ??
-                            ""
-                        ).trim(),
-
-                    year:
-                        String(
-                            item.year ??
-                            ""
-                        ).trim(),
-
-                    locations:
-                        locations,
-
-                    variants:
-                        variants,
-
-                    occurrences:
-                        occurrences,
-
-                    notes:
-                        String(
-                            item.notes ??
-                            ""
-                        ).trim(),
-
-                    confidence:
-                        confidence,
-
-                    needsReview:
-                        Boolean(
-                            item.needsReview
-                        )
-
-                };
-
-            }
-        );
-
-
-    // =====================================================
-    // 8. ضمان عدم وجود معرفات مكررة
-    // =====================================================
-
-    const usedIds =
-        new Set();
-
-
-    references.forEach(
-        function (
-            reference,
-            index
-        ) {
-
-            let id =
-                reference.id ||
-                `reference-${index + 1}`;
-
-
-            if (
-                usedIds.has(
-                    id
-                )
-            ) {
-
-                id =
-                    `reference-${index + 1}`;
-
-                while (
-                    usedIds.has(
-                        id
-                    )
-                ) {
-
-                    id =
-                        `reference-${Date.now()}-${index + 1}`;
-
-                }
-
-            }
-
-
-            usedIds.add(
-                id
-            );
-
-
-            reference.id =
-                id;
-
+    console.log(
+        "parseUnifiedReferenceAIResult:",
+        {
+            referencesCount:
+                references.length,
+
+            stats:
+                stats,
+
+            parsed:
+                parsed
         }
     );
 
-
-    // =====================================================
-    // 9. إعادة النتيجة
-    // =====================================================
 
     return {
 
@@ -23610,7 +23051,63 @@ function parseUnifiedReferenceAIResult(
             references,
 
         stats:
-            stats
+            {
+
+                totalMaterials:
+                    Number(
+                        stats.totalMaterials ||
+                        0
+                    ),
+
+                referenceCount:
+                    Number(
+                        stats.referenceCount ||
+                        0
+                    ),
+
+                multipleReferenceCount:
+                    Number(
+                        stats.multipleReferenceCount ||
+                        0
+                    ),
+
+                ibidCount:
+                    Number(
+                        stats.ibidCount ||
+                        0
+                    ),
+
+                internalReferenceCount:
+                    Number(
+                        stats.internalReferenceCount ||
+                        0
+                    ),
+
+                hadithCount:
+                    Number(
+                        stats.hadithCount ||
+                        0
+                    ),
+
+                explanatoryCount:
+                    Number(
+                        stats.explanatoryCount ||
+                        0
+                    ),
+
+                mixedCount:
+                    Number(
+                        stats.mixedCount ||
+                        0
+                    ),
+
+                reviewCount:
+                    Number(
+                        stats.reviewCount ||
+                        0
+                    )
+
+            }
 
     };
 
