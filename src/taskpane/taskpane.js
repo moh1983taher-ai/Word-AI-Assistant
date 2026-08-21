@@ -21692,6 +21692,85 @@ if (referencesContent) {
                                                         referenceSources
                                                     );
 
+                                                const candidateRows =
+                                                    referenceCandidates
+                                                        .map(
+                                                            function (
+                                                                item,
+                                                                index
+                                                            ) {
+
+                                                                const sourceLabel =
+
+                                                                    item.source ===
+                                                                    "main-text"
+
+                                                                        ? "المتن"
+
+                                                                        : item.source ===
+                                                                        "footnote"
+
+                                                                            ? "حاشية سفلية"
+
+                                                                            : "حاشية ختامية";
+
+
+                                                                return `
+                                                                    <div class="reference-candidate">
+
+                                                                        <div class="reference-candidate-head">
+
+                                                                            <span class="reference-candidate-number">
+                                                                                ${index + 1}
+                                                                            </span>
+
+                                                                            <span class="reference-candidate-source">
+                                                                                ${sourceLabel}
+                                                                            </span>
+
+                                                                        </div>
+
+
+                                                                        <div class="reference-candidate-text">
+
+                                                                            ${item.text}
+
+                                                                        </div>
+
+
+                                                                        <div class="reference-candidate-context">
+
+                                                                            ${item.context}
+
+                                                                        </div>
+
+                                                                    </div>
+                                                                `;
+
+                                                            }
+                                                        )
+                                                        .join("");
+
+                                                    referencesSourceWorkspace.insertAdjacentHTML(
+                                                        "beforeend",
+                                                        `
+                                                        <div class="references-candidates">
+
+                                                            <div class="references-candidates-title">
+                                                                الإحالات المرشحة
+                                                                (${referenceCandidates.length})
+                                                            </div>
+
+                                                            ${candidateRows || `
+                                                                <div class="references-empty">
+                                                                    لم يتم العثور على إحالات مرشحة.
+                                                                </div>
+                                                            `}
+
+                                                        </div>
+                                                        `
+                                                    );
+
 
                                                 const mainCandidates =
                                                     referenceCandidates.filter(
