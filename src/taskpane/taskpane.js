@@ -3494,7 +3494,7 @@ function groupDuplicateReferences(
                 !groups.has(
                     key
                 )
-            {
+            ) {
 
                 groups.set(
                     key,
