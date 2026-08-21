@@ -1382,17 +1382,14 @@ async function readReferenceSources() {
 // استخراج الإحالات والمراجع من نص المستند
 // =====================================================
 
-function extractReferenceCandidates(
-    referenceSources
-) {
+function extractReferenceCandidates(referenceSources) {
 
     const candidates = [];
 
 
     if (
         !referenceSources ||
-        typeof referenceSources !==
-            "object"
+        typeof referenceSources !== "object"
     ) {
 
         return candidates;
@@ -1401,7 +1398,7 @@ function extractReferenceCandidates(
 
 
     // =====================================================
-    // أدوات مساعدة
+    // إضافة مرشح
     // =====================================================
 
     function addCandidate(
@@ -1409,19 +1406,16 @@ function extractReferenceCandidates(
         kind,
         text,
         position,
-        context
+        context,
+        extra = {}
     ) {
 
         const value =
-            String(
-                text || ""
-            ).trim();
+            String(text || "").trim();
 
 
         if (!value) {
-
             return;
-
         }
 
 
@@ -1440,19 +1434,21 @@ function extractReferenceCandidates(
                 value,
 
             position:
-                Number(
-                    position || 0
-                ),
+                Number(position || 0),
 
             context:
-                String(
-                    context || value
-                ).trim()
+                String(context || value).trim(),
+
+            ...extra
 
         });
 
     }
 
+
+    // =====================================================
+    // استخراج سياق
+    // =====================================================
 
     function getContext(
         text,
@@ -1461,9 +1457,7 @@ function extractReferenceCandidates(
     ) {
 
         const sourceText =
-            String(
-                text || ""
-            );
+            String(text || "");
 
 
         const contextStart =
@@ -1495,7 +1489,66 @@ function extractReferenceCandidates(
 
 
     // =====================================================
-    // 1. التوثيق داخل المتن
+    // هل النص مرجع خارجي؟
+    // =====================================================
+
+    function isExternalReference(
+        text
+    ) {
+
+        const value =
+            String(text || "").trim();
+
+
+        if (
+            value.length < 3
+        ) {
+
+            return false;
+
+        }
+
+
+        // اسم مصدر + جزء/صفحة
+        if (
+            /\d+\s*[\/:]\s*\d+/
+                .test(value)
+        ) {
+
+            return true;
+
+        }
+
+
+        // ص 33 / ج 2 / جزء 2
+        if (
+            /(?:^|[\s،,])(?:ص|ج|جزء|جلد)\s*\.?\s*\d+/i
+                .test(value)
+        ) {
+
+            return true;
+
+        }
+
+
+        // أسماء كتب ومصادر شائعة
+        if (
+            /(?:الخصائص|الاقتراح|لمع الأدلة|الإغراب|الكليات|الكتاب|الأصول|معاني القرآن وإعرابه|لسان العرب|البحر المحيط|الصحاح|المجموع|الأشباه والنظائر|القاموس|المنثور|البرهان|المحصول|نهاية المطلب|قواطع الأدلة|كتاب العين)/i
+                .test(value)
+        ) {
+
+            return true;
+
+        }
+
+
+        return false;
+
+    }
+
+
+    // =====================================================
+    // 1. المتن
     // =====================================================
 
     const mainText =
@@ -1506,12 +1559,9 @@ function extractReferenceCandidates(
 
     if (mainText) {
 
-        // ---------------------------------------------
-        // أقواس تحتوي على توثيق عربي/رقمي
-        // مثال:
-        // (الصحاح، 2/619)
-        // (ينظر: لسان العرب، مادة ...)
-        // ---------------------------------------------
+        // -------------------------------------------------
+        // أ) التوثيق بين الأقواس
+        // -------------------------------------------------
 
         const parentheticalPattern =
             /(?:\(([^()\n]{2,220})\)|（([^（）\n]{2,220})）)/g;
@@ -1521,10 +1571,12 @@ function extractReferenceCandidates(
 
 
         while (
-            (match =
-                parentheticalPattern.exec(
-                    mainText
-                )) !== null
+            (
+                match =
+                    parentheticalPattern.exec(
+                        mainText
+                    )
+            ) !== null
         ) {
 
             const value =
@@ -1535,10 +1587,10 @@ function extractReferenceCandidates(
                 ).trim();
 
 
+            // تجاهل إحالات الصفحات الداخلية فقط
+            // مثل: ص 65-85
             if (
-                isLikelyReferenceText(
-                    value
-                )
+                isExternalReference(value)
             ) {
 
                 addCandidate(
@@ -1558,42 +1610,63 @@ function extractReferenceCandidates(
         }
 
 
-        // ---------------------------------------------
-        // إحالات لفظية بدون أقواس
-        // ينظر:
-        // انظر:
-        // راجع:
-        // المصدر:
-        // ---------------------------------------------
+        // -------------------------------------------------
+        // ب) إحالات لفظية حقيقية
+        // -------------------------------------------------
 
         const verbalPattern =
-            /(?:ينظر|انظر|راجع|المصدر|المراجع|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,220})/gi;
+            /(?:ينظر|انظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,220})/gi;
 
 
         while (
-            (match =
-                verbalPattern.exec(
-                    mainText
-                )) !== null
+            (
+                match =
+                    verbalPattern.exec(
+                        mainText
+                    )
+            ) !== null
         ) {
 
-            const value =
+            const whole =
                 String(
                     match[0] || ""
                 ).trim();
 
 
-            addCandidate(
-                "main-text",
-                "verbal",
-                value,
-                match.index,
-                getContext(
-                    mainText,
+            // لا نضيف "ينظر مثلا: في هذه الدراسة..."
+            if (
+                /في\s+هذه\s+الدراسة/i
+                    .test(whole)
+            ) {
+
+                continue;
+
+            }
+
+
+            const value =
+                String(
+                    match[1] || ""
+                ).trim();
+
+
+            if (
+                isExternalReference(value)
+            ) {
+
+                addCandidate(
+                    "main-text",
+                    "verbal",
+                    whole,
                     match.index,
-                    verbalPattern.lastIndex
-                )
-            );
+                    getContext(
+                        mainText,
+                        match.index,
+                        verbalPattern.lastIndex
+                    )
+                );
+
+            }
 
         }
 
@@ -1610,55 +1683,117 @@ function extractReferenceCandidates(
         )
     ) {
 
-        referenceSources.footnotes
-            .forEach(
-                function (
-                    note
-                ) {
+        referenceSources.footnotes.forEach(
+            function (
+                note,
+                noteIndex
+            ) {
 
-                    const noteText =
+                const noteText =
+                    String(
+                        note.text || ""
+                    ).trim();
+
+
+                if (!noteText) {
+                    return;
+                }
+
+
+                // -----------------------------------------
+                // النمط:
+                // ([1]) الفصول المفيدة 200.
+                // ([1]) منزلة المعنى في نظرية النحو العربي 19.
+                // -----------------------------------------
+
+                const numbered =
+                    noteText.match(
+                        /^\s*\(\s*\[\s*([0-9٠-٩]+)\s*\]\s*\)\s*(.+?)\s*\.?\s*$/
+                    );
+
+
+                if (numbered) {
+
+                    const value =
                         String(
-                            note.text || ""
+                            numbered[2] || ""
                         ).trim();
 
 
-                    if (!noteText) {
+                    if (
+                        isExternalReference(
+                            value
+                        ) ||
+                        /\d{1,4}\s*$/.test(value)
+                    ) {
 
-                        return;
+                        addCandidate(
+                            "footnote",
+                            "numbered-footnote",
+                            value,
+                            0,
+                            noteText,
+                            {
+                                noteNumber:
+                                    note.number ||
+                                    noteIndex + 1,
+
+                                marker:
+                                    numbered[1]
+
+                            }
+                        );
 
                     }
 
+                    return;
 
-                    const noteCandidates =
-                        extractReferenceTextsFromNote(
-                            noteText
-                        );
+                }
 
 
-                    noteCandidates.forEach(
-                        function (
-                            item
-                        ) {
+                // -----------------------------------------
+                // إحالات لفظية داخل الحاشية
+                // -----------------------------------------
 
-                            addCandidate(
+                const noteVerbalPattern =
+                    /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,250})/gi;
 
-                                "footnote",
 
-                                "footnote",
+                let noteMatch;
 
-                                item.text,
 
-                                item.position,
+                while (
+                    (
+                        noteMatch =
+                            noteVerbalPattern.exec(
+                                noteText
+                            )
+                    ) !== null
+                ) {
 
-                                item.context
+                    const whole =
+                        String(
+                            noteMatch[0] || ""
+                        ).trim();
 
-                            );
 
+                    addCandidate(
+                        "footnote",
+                        "verbal-footnote",
+                        whole,
+                        noteMatch.index,
+                        noteText,
+                        {
+                            noteNumber:
+                                note.number ||
+                                noteIndex + 1
                         }
                     );
 
                 }
-            );
+
+            }
+        );
 
     }
 
@@ -1673,55 +1808,70 @@ function extractReferenceCandidates(
         )
     ) {
 
-        referenceSources.endnotes
-            .forEach(
-                function (
-                    note
+        referenceSources.endnotes.forEach(
+            function (
+                note,
+                noteIndex
+            ) {
+
+                const noteText =
+                    String(
+                        note.text || ""
+                    ).trim();
+
+
+                if (!noteText) {
+                    return;
+                }
+
+
+                // -----------------------------------------
+                // إحالات مثل:
+                // انظر: الفراهيدي، كتاب العين، 2/121
+                // -----------------------------------------
+
+                const noteVerbalPattern =
+                    /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,250})/gi;
+
+
+                let match;
+
+
+                while (
+                    (
+                        match =
+                            noteVerbalPattern.exec(
+                                noteText
+                            )
+                    ) !== null
                 ) {
 
-                    const noteText =
+                    addCandidate(
+                        "endnote",
+                        "verbal-endnote",
                         String(
-                            note.text || ""
-                        ).trim();
-
-
-                    if (!noteText) {
-
-                        return;
-
-                    }
-
-
-                    const noteCandidates =
-                        extractReferenceTextsFromNote(
-                            noteText
-                        );
-
-
-                    noteCandidates.forEach(
-                        function (
-                            item
-                        ) {
-
-                            addCandidate(
-
-                                "endnote",
-
-                                "endnote",
-
-                                item.text,
-
-                                item.position,
-
-                                item.context
-
-                            );
-
+                            match[0] || ""
+                        ).trim(),
+                        match.index,
+                        noteText,
+                        {
+                            noteNumber:
+                                note.number ||
+                                noteIndex + 1
                         }
                     );
 
                 }
-            );
+
+
+                // -----------------------------------------
+                // "المصدر نفسه"
+                // لا نعتبره مرجعًا مستقلاً الآن.
+                // سنعالجه لاحقًا بالاعتماد على السابق.
+                // -----------------------------------------
+
+            }
+        );
 
     }
 
