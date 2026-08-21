@@ -21713,9 +21713,7 @@ if (referencesSourceWorkspace) {
             try {
 
                 const referenceSources =
-                    await readReferenceSources(
-                        referencesSourceDocument
-                    );
+                    await readReferenceSources();
 
 
                 if (
