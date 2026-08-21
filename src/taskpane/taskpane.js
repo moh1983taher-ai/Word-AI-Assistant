@@ -20926,6 +20926,117 @@ if (referencesContent) {
                                     </button>
                                     `;
 
+                                    const analyzeReferencesBtn =
+                                        document.getElementById(
+                                            "analyze-references-btn"
+                                        );
+
+
+                                    if (
+                                        analyzeReferencesBtn
+                                    ) {
+
+                                        analyzeReferencesBtn.onclick =
+                                            async function (
+                                                e
+                                            ) {
+
+                                                e.preventDefault();
+                                                e.stopPropagation();
+
+
+                                                referencesSourceWorkspace.innerHTML =
+                                                    `
+                                                    <div class="references-analysis-status">
+                                                        جارٍ قراءة المستند...
+                                                    </div>
+                                                    `;
+
+
+                                                try {
+
+                                                    let documentRecord =
+                                                        await getDocumentText(
+                                                            currentDocument.id
+                                                        );
+
+
+                                                    if (
+                                                        !documentRecord ||
+                                                        !documentRecord.text
+                                                    ) {
+
+                                                        await readCurrentWordDocument(
+                                                            currentDocument
+                                                        );
+
+
+                                                        documentRecord =
+                                                            await getDocumentText(
+                                                                currentDocument.id
+                                                            );
+
+                                                    }
+
+
+                                                    if (
+                                                        !documentRecord ||
+                                                        !documentRecord.text
+                                                    ) {
+
+                                                        throw new Error(
+                                                            "تعذر الحصول على نص المستند."
+                                                        );
+
+                                                    }
+
+
+                                                    referencesSourceWorkspace.innerHTML =
+                                                        `
+                                                        <div class="references-analysis-status success">
+                                                            ✓ تمت قراءة المستند بنجاح
+                                                        </div>
+
+                                                        <div class="references-analysis-info">
+                                                            تم تجهيز النص لاستخراج المراجع.
+                                                        </div>
+                                                        `;
+
+
+                                                    console.log(
+                                                        "نص المستند جاهز لتحليل المراجع:",
+                                                        documentRecord.text.length,
+                                                        "حرف"
+                                                    );
+
+
+                                                } catch (
+                                                    error
+                                                ) {
+
+                                                    referencesSourceWorkspace.innerHTML =
+                                                        `
+                                                        <div class="references-analysis-status error">
+                                                            ⚠ تعذر قراءة المستند
+                                                        </div>
+
+                                                        <div class="references-analysis-info">
+                                                            ${error.message || "حدث خطأ غير معروف."}
+                                                        </div>
+                                                        `;
+
+
+                                                    console.error(
+                                                        "فشل تحليل المستند للمراجع:",
+                                                        error
+                                                    );
+
+                                                }
+
+                                            };
+
+                                    }
+
                                 return;
 
                             }

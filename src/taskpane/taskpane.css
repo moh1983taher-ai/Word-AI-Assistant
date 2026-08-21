@@ -727,7 +727,58 @@ body {
     font-weight: 600;
 
 }
+/* =========================================================
+   ANALYZE REFERENCES BUTTON
+   زر تحليل المراجع
+   ========================================================= */
 
+.analyze-references-btn {
+
+    width: 100%;
+
+    min-height: 42px;
+
+    margin-top: 10px;
+
+    padding: 8px 14px;
+
+    border: 1px solid #222;
+
+    border-radius: 10px;
+
+    background: #222;
+
+    color: #fff;
+
+    font-size: 13px;
+
+    font-weight: 500;
+
+    cursor: pointer;
+
+    box-sizing: border-box;
+
+    transition:
+        background 0.15s ease,
+        transform 0.12s ease;
+
+}
+
+
+.analyze-references-btn:hover {
+
+    background: #111;
+
+}
+
+
+.analyze-references-btn:active {
+
+    background: #000;
+
+    transform: translateY(1px);
+
+}
 
 /* عدم وجود مستند */
 
