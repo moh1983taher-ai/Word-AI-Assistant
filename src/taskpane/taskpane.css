@@ -270,12 +270,97 @@ body {
 
     display: none;
 
-    width: 100%;
-    height: 100%;
+    position: absolute;
+
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
 
     box-sizing: border-box;
 
     background: #ffffff;
+
+    border: 1px solid #e3e3e3;
+
+    border-radius: 16px;
+
+    box-shadow:
+        0 4px 18px rgba(0, 0, 0, 0.06);
+
+    overflow: auto;
+
+    z-index: 50;
+}
+
+.references-header {
+
+    display: flex;
+
+    align-items: center;
+
+    min-height: 62px;
+
+    padding: 12px 18px;
+
+    border-bottom: 1px solid #eeeeee;
+
+    box-sizing: border-box;
+
+    direction: rtl;
+
+}
+
+.references-header-title {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+.references-header-icon {
+
+    width: 34px;
+    height: 34px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid #e5e5e5;
+
+    border-radius: 9px;
+
+    background: #fafafa;
+
+    color: #333;
+
+    font-size: 17px;
+
+}
+
+.references-title {
+
+    font-size: 15px;
+
+    font-weight: 600;
+
+    color: #222;
+
+}
+
+.references-subtitle {
+
+    margin-top: 3px;
+
+    font-size: 11px;
+
+    color: #777;
+
 }
 
 /* =========================================================
@@ -2676,6 +2761,8 @@ span {
    ========================================================= */
 
 .main {
+    position: relative;
+
     height: 100vh;
     margin-left: 0;
 
