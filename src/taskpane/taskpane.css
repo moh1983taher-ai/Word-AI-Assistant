@@ -260,6 +260,331 @@ body {
     stroke-linejoin: round;
 }
 
+
+/* =========================================================
+   REFERENCES WORKSPACE
+   مساحة عمل المراجع
+   ========================================================= */
+
+.references-workspace {
+
+    display: none;
+
+    width: 100%;
+    height: 100%;
+
+    box-sizing: border-box;
+
+    background: #ffffff;
+}
+
+/* =========================================================
+   REFERENCES SOURCE PANEL
+   مصدر عمل المراجع
+   ========================================================= */
+
+.references-content {
+
+    width: 100%;
+
+    max-width: 720px;
+
+    margin: 0 auto;
+
+    padding: 20px;
+
+    box-sizing: border-box;
+
+}
+
+
+/* =========================================================
+   عنوان مصدر العمل
+   ========================================================= */
+
+.references-source-heading {
+
+    margin-bottom: 12px;
+
+    color: #333;
+
+    font-size: 14px;
+
+    font-weight: 600;
+
+}
+
+
+/* =========================================================
+   خيارات المصدر
+   ========================================================= */
+
+.references-source-options {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+
+}
+
+
+.references-source-option {
+
+    width: 100%;
+
+    min-height: 62px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding: 10px 12px;
+
+    border: 1px solid #e3e3e3;
+
+    border-radius: 12px;
+
+    background: #fff;
+
+    color: #222;
+
+    cursor: pointer;
+
+    direction: rtl;
+
+    text-align: right;
+
+    box-sizing: border-box;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        transform 0.12s ease;
+
+}
+
+
+.references-source-option:hover {
+
+    background: #f7f7f7;
+
+    border-color: #cfcfcf;
+
+    transform: translateY(-1px);
+
+}
+
+
+.references-source-option:active {
+
+    background: #eeeeee;
+
+    transform: translateY(0);
+
+}
+
+
+/* =========================================================
+   أيقونة المصدر
+   ========================================================= */
+
+.references-source-icon {
+
+    width: 34px;
+
+    height: 34px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border: 1px solid #e5e5e5;
+
+    border-radius: 9px;
+
+    background: #fafafa;
+
+    color: #333;
+
+    font-size: 17px;
+
+}
+
+
+/* =========================================================
+   معلومات المصدر
+   ========================================================= */
+
+.references-source-info {
+
+    min-width: 0;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+}
+
+
+.references-source-title {
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+    color: #222;
+
+}
+
+
+.references-source-description {
+
+    font-size: 11px;
+
+    font-weight: 400;
+
+    line-height: 1.45;
+
+    color: #777;
+
+}
+/* =========================================================
+   REFERENCES SELECTED SOURCE
+   المستند المحدد للعمل
+   ========================================================= */
+
+.references-selected-source {
+
+    width: 100%;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    margin-top: 16px;
+
+    padding: 12px 14px;
+
+    border: 1px solid #dedede;
+
+    border-radius: 12px;
+
+    background: #fafafa;
+
+    direction: rtl;
+
+    box-sizing: border-box;
+
+}
+
+
+/* أيقونة المستند */
+
+.references-selected-icon {
+
+    width: 36px;
+
+    height: 36px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border: 1px solid #e2e2e2;
+
+    border-radius: 9px;
+
+    background: #ffffff;
+
+    color: #333333;
+
+    font-size: 17px;
+
+}
+
+
+/* معلومات المستند */
+
+.references-selected-info {
+
+    min-width: 0;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+}
+
+
+.references-selected-title {
+
+    font-size: 11px;
+
+    color: #777777;
+
+    font-weight: 400;
+
+}
+
+
+.references-selected-name {
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-size: 13px;
+
+    color: #222222;
+
+    font-weight: 600;
+
+}
+
+
+/* عدم وجود مستند */
+
+.references-empty {
+
+    margin-top: 16px;
+
+    padding: 14px;
+
+    border: 1px dashed #d8d8d8;
+
+    border-radius: 12px;
+
+    color: #777777;
+
+    background: #fafafa;
+
+    font-size: 12px;
+
+    text-align: center;
+
+    direction: rtl;
+
+}
 /* =========================================================
    الشريط المثبت
 
@@ -1251,6 +1576,7 @@ body {
     margin-right: 4px;
 
 }
+
 
 
 /* =========================================================

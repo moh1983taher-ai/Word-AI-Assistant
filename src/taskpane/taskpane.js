@@ -97,6 +97,15 @@ const referencesBtn =
 const referencesWorkspace =
     document.getElementById("references-workspace");
 
+const referencesContent =
+    document.getElementById("references-content");
+
+const referencesSourceWorkspace =
+    document.getElementById(
+        "references-source-workspace"
+    );
+
+
 const wordDocumentPicker =
     document.getElementById(
         "word-document-picker"
@@ -20769,7 +20778,81 @@ if (referencesBtn && referencesWorkspace) {
         };
 
 }
+// =====================================================
+// References Source
+// المستند الحالي
+// =====================================================
 
+if (referencesContent) {
+
+    referencesContent
+        .querySelectorAll(
+            ".references-source-option"
+        )
+        .forEach(
+            function (button) {
+
+                button.onclick =
+                    function (e) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const source =
+                            button.getAttribute(
+                                "data-reference-source"
+                            );
+
+                        if (
+                            source ===
+                            "current-document"
+                        ) {
+
+                            if (!currentDocument) {
+
+                                referencesSourceWorkspace.innerHTML =
+                                    `
+                                    <div class="references-empty">
+                                        لا يوجد مستند مفتوح حاليًا
+                                    </div>
+                                    `;
+
+                                return;
+
+                            }
+
+
+                            referencesSourceWorkspace.innerHTML =
+                                `
+                                <div class="references-selected-source">
+
+                                    <div class="references-selected-icon">
+                                        ▤
+                                    </div>
+
+                                    <div class="references-selected-info">
+
+                                        <div class="references-selected-title">
+                                            المستند المحدد للعمل
+                                        </div>
+
+                                        <div class="references-selected-name">
+                                            ${currentDocument.name}
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                                `;
+
+                        }
+
+                    };
+
+            }
+        );
+
+}
 // =====================================================
 // Scope Elements
 // =====================================================
