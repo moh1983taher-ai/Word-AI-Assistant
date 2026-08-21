@@ -1205,16 +1205,7 @@ async function getDocumentText(
 // قراءة المتن والحواشي والحواشي الختامية للمراجع
 // =====================================================
 
-async function readReferenceSources(documentItem) {
-
-    if (!documentItem) {
-
-        throw new Error(
-            "لم يتم تحديد المستند."
-        );
-
-    }
-
+async function readReferenceSources() {
 
     if (
         !Office.context.requirements.isSetSupported(
@@ -1230,68 +1221,45 @@ async function readReferenceSources(documentItem) {
     }
 
 
-    const file =
-        await getWorkingWordFile(
-            documentItem.storageId
-        );
-
-
-    if (!file) {
-
-        throw new Error(
-            "لم يتم العثور على نسخة العمل الخاصة بالمستند."
-        );
-
-    }
-
-
-    const base64 =
-        await fileToBase64(
-            file
-        );
-
-
     return await Word.run(
         async function (
             context
         ) {
 
-            const workingDocument =
-                context.application.createDocument(
-                    base64
-                );
+            const document =
+                context.document;
 
 
-            // -----------------------------
+            // =============================================
             // المتن
-            // -----------------------------
+            // =============================================
 
-            const mainBody =
-                workingDocument.body;
+            const body =
+                document.body;
 
-            mainBody.load(
+            body.load(
                 "text"
             );
 
 
-            // -----------------------------
+            // =============================================
             // الحواشي السفلية
-            // -----------------------------
+            // =============================================
 
             const footnotes =
-                mainBody.footnotes;
+                body.footnotes;
 
             footnotes.load(
                 "items"
             );
 
 
-            // -----------------------------
+            // =============================================
             // الحواشي الختامية
-            // -----------------------------
+            // =============================================
 
             const endnotes =
-                mainBody.endnotes;
+                body.endnotes;
 
             endnotes.load(
                 "items"
@@ -1301,18 +1269,14 @@ async function readReferenceSources(documentItem) {
             await context.sync();
 
 
-            // -----------------------------
-            // قراءة تفاصيل الحواشي
-            // -----------------------------
+            // =============================================
+            // تحميل تفاصيل الحواشي
+            // =============================================
 
             footnotes.items.forEach(
                 function (
                     note
                 ) {
-
-                    note.load(
-                        "type"
-                    );
 
                     note.body.load(
                         "text"
@@ -1331,10 +1295,6 @@ async function readReferenceSources(documentItem) {
                     note
                 ) {
 
-                    note.load(
-                        "type"
-                    );
-
                     note.body.load(
                         "text"
                     );
@@ -1350,21 +1310,11 @@ async function readReferenceSources(documentItem) {
             await context.sync();
 
 
-            const result = {
-
-                documentId:
-                    String(
-                        documentItem.id
-                    ),
-
-                documentName:
-                    String(
-                        documentItem.name || ""
-                    ),
+            return {
 
                 mainText:
                     String(
-                        mainBody.text || ""
+                        body.text || ""
                     ),
 
                 footnotes:
@@ -1379,22 +1329,14 @@ async function readReferenceSources(documentItem) {
                                 number:
                                     index + 1,
 
-                                type:
-                                    String(
-                                        note.type ||
-                                        "Footnote"
-                                    ),
-
                                 reference:
                                     String(
-                                        note.reference?.text ||
-                                        ""
+                                        note.reference?.text || ""
                                     ).trim(),
 
                                 text:
                                     String(
-                                        note.body?.text ||
-                                        ""
+                                        note.body?.text || ""
                                     ).trim()
 
                             };
@@ -1414,22 +1356,14 @@ async function readReferenceSources(documentItem) {
                                 number:
                                     index + 1,
 
-                                type:
-                                    String(
-                                        note.type ||
-                                        "Endnote"
-                                    ),
-
                                 reference:
                                     String(
-                                        note.reference?.text ||
-                                        ""
+                                        note.reference?.text || ""
                                     ).trim(),
 
                                 text:
                                     String(
-                                        note.body?.text ||
-                                        ""
+                                        note.body?.text || ""
                                     ).trim()
 
                             };
@@ -1438,9 +1372,6 @@ async function readReferenceSources(documentItem) {
                     )
 
             };
-
-
-            return result;
 
         }
     );
@@ -21659,21 +21590,8 @@ if (referencesContent) {
                             "current-document"
                         ) {
 
-                            if (!currentDocument) {
-
-                                referencesSourceWorkspace.innerHTML =
-                                    `
-                                    <div class="references-empty">
-                                        لا يوجد مستند مفتوح حاليًا
-                                    </div>
-                                    `;
-
-                                return;
-
-                            }
-
                             referencesSourceDocument =
-                                currentDocument;
+                                null;
 
 
                             referencesSourceWorkspace.innerHTML =
@@ -21683,13 +21601,13 @@ if (referencesContent) {
                                     <div class="references-selected-icon">
 
                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                             viewBox="0 0 24 24"
-                                             fill="none"
-                                             stroke="#000000"
-                                             stroke-width="1"
-                                             stroke-linecap="round"
-                                             stroke-linejoin="round"
-                                             aria-hidden="true">
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="#000000"
+                                            stroke-width="1"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            aria-hidden="true">
 
                                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
 
@@ -21708,11 +21626,11 @@ if (referencesContent) {
                                     <div class="references-selected-info">
 
                                         <div class="references-selected-title">
-                                            المستند المحدد للعمل
+                                            المستند المفتوح حاليًا في Word
                                         </div>
 
                                         <div class="references-selected-name">
-                                            ${currentDocument.name}
+                                            سيتم تحليل المستند النشط
                                         </div>
 
                                     </div>
