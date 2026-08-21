@@ -22122,395 +22122,635 @@ function normalizeUnifiedReferenceResult(
         parsedResult &&
         typeof parsedResult === "object" &&
         !Array.isArray(parsedResult)
-
             ? parsedResult
-
             : {};
 
-
     const references =
-        Array.isArray(
-            result.references
-        )
+        Array.isArray(result.references)
             ? result.references
             : [];
-
 
     const statsSource =
         result.stats &&
         typeof result.stats === "object" &&
         !Array.isArray(result.stats)
-
             ? result.stats
-
             : {};
 
+    function text(value) {
+        return String(value ?? "").trim();
+    }
 
-    function safeString(value) {
+    function normalizeTitle(value) {
 
-        return String(
-            value ?? ""
-        ).trim();
+        return text(value)
+            .replace(/^الشيخ\/\s*/i, "")
+            .replace(/^للشيخ\/\s*/i, "")
+            .replace(/\s+/g, " ")
+            .replace(/[.,،:؛]+$/g, "")
+            .trim();
 
     }
 
+    function normalizeAuthor(value) {
 
-    function safeConfidence(value) {
+        return text(value)
+            .replace(/\s+/g, " ")
+            .trim();
 
-        let number =
-            Number(
-                value ?? 0
-            );
+    }
 
+    function titleKey(value) {
 
-        if (
-            !Number.isFinite(number)
-        ) {
+        let t =
+            normalizeTitle(value)
+                .toLowerCase();
 
+        /*
+         * العناوين المختصرة التي نريد اعتبارها
+         * هي والعنوان الكامل كتابًا واحدًا.
+         *
+         * لا نستخدم المؤلف وحده.
+         */
+
+        t = t
+            .replace(
+                /\s+في\s+شرح\s+/g,
+                " "
+            )
+            .replace(
+                /\s+شرح\s+/g,
+                " "
+            )
+            .replace(
+                /\s+أصول\s+الفقه$/g,
+                ""
+            )
+            .trim();
+
+        return t;
+    }
+
+    function sameAuthor(a, b) {
+
+        const x =
+            normalizeAuthor(a);
+
+        const y =
+            normalizeAuthor(b);
+
+        if (!x || !y) {
+            return false;
+        }
+
+        return x === y;
+    }
+
+    function titlesMatch(a, b) {
+
+        const x =
+            titleKey(a);
+
+        const y =
+            titleKey(b);
+
+        if (!x || !y) {
+            return false;
+        }
+
+        if (x === y) {
+            return true;
+        }
+
+        /*
+         * أحد العنوانين قد يكون نسخة مختصرة من الآخر.
+         */
+        return (
+            x.includes(y) ||
+            y.includes(x)
+        );
+
+    }
+
+    function normalizeConfidence(value) {
+
+        let n =
+            Number(value);
+
+        if (!Number.isFinite(n)) {
             return 0;
-
         }
 
-
-        if (
-            number > 1 &&
-            number <= 100
-        ) {
-
-            number =
-                number / 100;
-
+        if (n > 1 && n <= 100) {
+            n /= 100;
         }
-
 
         return Math.max(
             0,
-            Math.min(
-                1,
-                number
-            )
+            Math.min(1, n)
         );
 
     }
 
+    function normalizeLocation(location) {
 
-    function uniqueStrings(values) {
+        if (
+            !location ||
+            typeof location !== "object"
+        ) {
+            return null;
+        }
 
-        const seen =
-            new Set();
+        return {
+            volume:
+                text(location.volume),
 
-        const output =
-            [];
+            page:
+                text(location.page),
 
-        values.forEach(
-            function (value) {
+            pageRange:
+                text(location.pageRange)
+        };
 
-                const text =
-                    safeString(
-                        value
-                    );
+    }
 
+    function normalizeOccurrence(occurrence) {
 
-                if (
-                    !text ||
-                    seen.has(text)
-                ) {
+        if (
+            !occurrence ||
+            typeof occurrence !== "object"
+        ) {
+            return null;
+        }
 
-                    return;
+        return {
+            materialId:
+                text(occurrence.materialId),
 
-                }
+            source:
+                text(occurrence.source),
 
+            noteNumber:
+                occurrence.noteNumber ?? null
+        };
 
-                seen.add(text);
+    }
 
-                output.push(
-                    text
-                );
+    function addUnique(array, value) {
 
+        const v = text(value);
+
+        if (!v) {
+            return;
+        }
+
+        if (!array.includes(v)) {
+            array.push(v);
+        }
+
+    }
+
+    const normalized = [];
+
+    references.forEach(
+        function (reference, index) {
+
+            if (
+                !reference ||
+                typeof reference !== "object"
+            ) {
+                return;
             }
-        );
 
-        return output;
-
-    }
-
-
-    function uniqueLocations(locations) {
-
-        const seen =
-            new Set();
-
-        const output =
-            [];
-
-
-        locations.forEach(
-            function (location) {
-
-                if (
-                    !location ||
-                    typeof location !== "object"
-                ) {
-
-                    return;
-
-                }
-
-
-                const normalizedLocation = {
-
-                    volume:
-                        safeString(
-                            location.volume
-                        ),
-
-                    page:
-                        safeString(
-                            location.page
-                        ),
-
-                    pageRange:
-                        safeString(
-                            location.pageRange
-                        )
-
-                };
-
-
-                if (
-                    !normalizedLocation.volume &&
-                    !normalizedLocation.page &&
-                    !normalizedLocation.pageRange
-                ) {
-
-                    return;
-
-                }
-
-
-                const key =
-                    [
-                        normalizedLocation.volume,
-                        normalizedLocation.page,
-                        normalizedLocation.pageRange
-                    ].join("|");
-
-
-                if (
-                    seen.has(key)
-                ) {
-
-                    return;
-
-                }
-
-
-                seen.add(key);
-
-                output.push(
-                    normalizedLocation
-                );
-
-            }
-        );
-
-
-        return output;
-
-    }
-
-
-    function uniqueOccurrences(occurrences) {
-
-        const seen =
-            new Set();
-
-        const output =
-            [];
-
-
-        occurrences.forEach(
-            function (occurrence) {
-
-                if (
-                    !occurrence ||
-                    typeof occurrence !== "object"
-                ) {
-
-                    return;
-
-                }
-
-
-                const normalizedOccurrence = {
-
-                    materialId:
-                        safeString(
-                            occurrence.materialId
-                        ),
-
-                    source:
-                        safeString(
-                            occurrence.source
-                        ),
-
-                    noteNumber:
-                        occurrence.noteNumber ??
-                        null
-
-                };
-
-
-                const key =
-                    [
-                        normalizedOccurrence.materialId,
-                        normalizedOccurrence.source,
-                        normalizedOccurrence.noteNumber ?? ""
-                    ].join("|");
-
-
-                if (
-                    seen.has(key)
-                ) {
-
-                    return;
-
-                }
-
-
-                seen.add(key);
-
-                output.push(
-                    normalizedOccurrence
-                );
-
-            }
-        );
-
-
-        return output;
-
-    }
-
-
-    const normalized =
-        references.map(
-            function (
-                reference,
-                index
+            const current = {
+
+                id:
+                    text(
+                        reference.id ||
+                        `reference-${index + 1}`
+                    ),
+
+                type:
+                    text(
+                        reference.type ||
+                        "book"
+                    ).toLowerCase(),
+
+                author:
+                    normalizeAuthor(
+                        reference.author
+                    ),
+
+                title:
+                    normalizeTitle(
+                        reference.title
+                    ),
+
+                edition:
+                    text(reference.edition),
+
+                editor:
+                    text(reference.editor),
+
+                publisher:
+                    text(reference.publisher),
+
+                city:
+                    text(reference.city),
+
+                year:
+                    text(reference.year),
+
+                locations:
+                    Array.isArray(reference.locations)
+                        ? reference.locations
+                            .map(normalizeLocation)
+                            .filter(Boolean)
+                        : [],
+
+                variants:
+                    Array.isArray(reference.variants)
+                        ? reference.variants
+                            .map(text)
+                            .filter(Boolean)
+                        : [],
+
+                occurrences:
+                    Array.isArray(reference.occurrences)
+                        ? reference.occurrences
+                            .map(normalizeOccurrence)
+                            .filter(Boolean)
+                        : [],
+
+                notes:
+                    text(reference.notes),
+
+                confidence:
+                    normalizeConfidence(
+                        reference.confidence
+                    ),
+
+                needsReview:
+                    Boolean(
+                        reference.needsReview
+                    )
+            };
+
+            /*
+             * البحث عن مرجع موجود لنفس الكتاب.
+             *
+             * المؤلف + العنوان هما أساس الهوية.
+             * المؤلف وحده لا يكفي.
+             */
+            let existing = null;
+
+            for (
+                let i = 0;
+                i < normalized.length;
+                i++
             ) {
 
-                const item =
-                    reference &&
-                    typeof reference === "object" &&
-                    !Array.isArray(reference)
+                const candidate =
+                    normalized[i];
 
-                        ? reference
-
-                        : {};
-
-
-                return {
-
-                    id:
-                        safeString(
-                            item.id ||
-                            `reference-${index + 1}`
-                        ),
-
-                    type:
-                        safeString(
-                            item.type ||
-                            "book"
+                /*
+                 * إذا كان كلا المرجعين يملكان مؤلفًا:
+                 * يجب تطابق المؤلف.
+                 *
+                 * إذا غاب المؤلف من أحدهما:
+                 * يسمح بالدمج فقط إذا كان العنوان واضحًا جدًا.
+                 */
+                const authorOK =
+                    current.author &&
+                    candidate.author
+                        ? sameAuthor(
+                            current.author,
+                            candidate.author
                         )
-                            .toLowerCase(),
+                        : true;
 
-                    author:
-                        safeString(
-                            item.author
-                        ),
+                if (
+                    !authorOK
+                ) {
+                    continue;
+                }
 
-                    title:
-                        safeString(
-                            item.title
-                        ),
+                if (
+                    titlesMatch(
+                        current.title,
+                        candidate.title
+                    )
+                ) {
 
-                    edition:
-                        safeString(
-                            item.edition
-                        ),
+                    existing =
+                        candidate;
 
-                    editor:
-                        safeString(
-                            item.editor
-                        ),
+                    break;
 
-                    publisher:
-                        safeString(
-                            item.publisher
-                        ),
-
-                    city:
-                        safeString(
-                            item.city
-                        ),
-
-                    year:
-                        safeString(
-                            item.year
-                        ),
-
-                    locations:
-                        uniqueLocations(
-                            Array.isArray(
-                                item.locations
-                            )
-                                ? item.locations
-                                : []
-                        ),
-
-                    variants:
-                        uniqueStrings(
-                            Array.isArray(
-                                item.variants
-                            )
-                                ? item.variants
-                                : []
-                        ),
-
-                    occurrences:
-                        uniqueOccurrences(
-                            Array.isArray(
-                                item.occurrences
-                            )
-                                ? item.occurrences
-                                : []
-                        ),
-
-                    notes:
-                        safeString(
-                            item.notes
-                        ),
-
-                    confidence:
-                        safeConfidence(
-                            item.confidence
-                        ),
-
-                    needsReview:
-                        Boolean(
-                            item.needsReview
-                        )
-
-                };
+                }
 
             }
-        );
 
+            /*
+             * لا يوجد سجل سابق: أضف المرجع.
+             */
+            if (!existing) {
 
-    // =====================================================
-    // الإحصاءات
-    // =====================================================
+                normalized.push(
+                    current
+                );
+
+                return;
+
+            }
+
+            /*
+             * =================================================
+             * دمج آمن
+             * =================================================
+             */
+
+            /*
+             * إذا كان العنوان الموجود أكمل،
+             * نحافظ عليه.
+             */
+            if (
+                current.title.length >
+                existing.title.length
+            ) {
+
+                existing.title =
+                    current.title;
+
+            }
+
+            if (
+                !existing.author &&
+                current.author
+            ) {
+
+                existing.author =
+                    current.author;
+
+            }
+
+            if (
+                !existing.edition &&
+                current.edition
+            ) {
+
+                existing.edition =
+                    current.edition;
+
+            }
+
+            if (
+                !existing.editor &&
+                current.editor
+            ) {
+
+                existing.editor =
+                    current.editor;
+
+            }
+
+            if (
+                !existing.publisher &&
+                current.publisher
+            ) {
+
+                existing.publisher =
+                    current.publisher;
+
+            }
+
+            if (
+                !existing.city &&
+                current.city
+            ) {
+
+                existing.city =
+                    current.city;
+
+            }
+
+            if (
+                !existing.year &&
+                current.year
+            ) {
+
+                existing.year =
+                    current.year;
+
+            }
+
+            /*
+             * جمع المواقع.
+             */
+            current.locations.forEach(
+                function (location) {
+
+                    const exists =
+                        existing.locations.some(
+                            function (oldLocation) {
+
+                                return (
+                                    oldLocation.volume ===
+                                        location.volume &&
+                                    oldLocation.page ===
+                                        location.page &&
+                                    oldLocation.pageRange ===
+                                        location.pageRange
+                                );
+
+                            }
+                        );
+
+                    if (!exists) {
+
+                        existing.locations.push(
+                            location
+                        );
+
+                    }
+
+                }
+            );
+
+            /*
+             * جمع صيغ الظهور.
+             */
+            current.variants.forEach(
+                function (variant) {
+
+                    addUnique(
+                        existing.variants,
+                        variant
+                    );
+
+                }
+            );
+
+            /*
+             * جمع مرات الظهور.
+             */
+            current.occurrences.forEach(
+                function (occurrence) {
+
+                    const exists =
+                        existing.occurrences.some(
+                            function (oldOccurrence) {
+
+                                return (
+                                    oldOccurrence.materialId ===
+                                        occurrence.materialId &&
+                                    oldOccurrence.source ===
+                                        occurrence.source &&
+                                    String(
+                                        oldOccurrence.noteNumber ?? ""
+                                    ) ===
+                                        String(
+                                            occurrence.noteNumber ?? ""
+                                        )
+                                );
+
+                            }
+                        );
+
+                    if (!exists) {
+
+                        existing.occurrences.push(
+                            occurrence
+                        );
+
+                    }
+
+                }
+            );
+
+            /*
+             * جمع الملاحظات.
+             */
+            if (
+                current.notes &&
+                current.notes !== existing.notes
+            ) {
+
+                if (
+                    existing.notes
+                ) {
+
+                    existing.notes +=
+                        " | " +
+                        current.notes;
+
+                }
+                else {
+
+                    existing.notes =
+                        current.notes;
+
+                }
+
+            }
+
+            /*
+             * الاحتفاظ بأعلى ثقة.
+             */
+            existing.confidence =
+                Math.max(
+                    existing.confidence,
+                    current.confidence
+                );
+
+            if (
+                current.needsReview
+            ) {
+
+                existing.needsReview =
+                    true;
+
+            }
+
+        }
+    );
+
+    /*
+     * =====================================================
+     * تنظيف نهائي
+     * =====================================================
+     */
+
+    normalized.forEach(
+        function (reference) {
+
+            reference.locations =
+                reference.locations.filter(
+                    function (location, index, array) {
+
+                        return (
+                            array.findIndex(
+                                function (item) {
+
+                                    return (
+                                        item.volume ===
+                                            location.volume &&
+                                        item.page ===
+                                            location.page &&
+                                        item.pageRange ===
+                                            location.pageRange
+                                    );
+
+                                }
+                            ) === index
+                        );
+
+                    }
+                );
+
+            reference.variants =
+                reference.variants.filter(
+                    function (variant, index, array) {
+
+                        return (
+                            array.indexOf(
+                                variant
+                            ) === index
+                        );
+
+                    }
+                );
+
+            reference.occurrences =
+                reference.occurrences.filter(
+                    function (occurrence, index, array) {
+
+                        return (
+                            array.findIndex(
+                                function (item) {
+
+                                    return (
+                                        item.materialId ===
+                                            occurrence.materialId &&
+                                        item.source ===
+                                            occurrence.source &&
+                                        String(
+                                            item.noteNumber ?? ""
+                                        ) ===
+                                            String(
+                                                occurrence.noteNumber ?? ""
+                                            )
+                                    );
+
+                                }
+                            ) === index
+                        );
+
+                    }
+                );
+
+        }
+    );
 
     normalized.stats = {
 
@@ -22571,12 +22811,9 @@ function normalizeUnifiedReferenceResult(
                 statsSource.reviewCount ??
                 0
             )
-
     };
 
-
     return normalized;
-
 }
 
 function parseUnifiedReferenceAIResult(answer) {
