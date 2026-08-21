@@ -930,29 +930,109 @@ body {
     direction: rtl;
 
 }
+/* =========================================================
+   نتائج تحليل المراجع
+   ========================================================= */
+
+.references-analysis-result {
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #444;
+}
+
 
 /* =========================================================
-   قائمة المراجع الموحدة
+   رسالة النجاح
+   ========================================================= */
+
+.references-analysis-status {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+.references-analysis-status.success {
+    color: #2f6f44;
+}
+
+.references-analysis-status.error {
+    color: #b43a32;
+}
+
+
+/* =========================================================
+   معلومات التحليل
+   ========================================================= */
+
+.references-analysis-info {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 18px;
+    padding: 8px 0 10px;
+    border-bottom: 1px solid #e8e8e8;
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+.references-analysis-info div {
+    margin: 0;
+}
+
+.references-analysis-info strong {
+    font-weight: 600;
+    color: #333;
+}
+
+
+/* =========================================================
+   عنوان المراجع الموحدة
+   ========================================================= */
+
+.references-final-results {
+    margin-top: 12px;
+}
+
+.references-final-results-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e8e8e8;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+
+.references-final-results-title strong {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+}
+
+
+/* =========================================================
+   قائمة المراجع
    ========================================================= */
 
 .references-final-list {
     display: flex;
     flex-direction: column;
-    gap: 0;
-    margin-top: 10px;
 }
 
 
 /* =========================================================
-   صف المرجع
+   المرجع الواحد
    ========================================================= */
 
 .ai-reference-row {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 11px 6px;
-    border-bottom: 1px solid #ececec;
+    gap: 8px;
+    padding: 8px 2px;
+    border-bottom: 1px solid #eeeeee;
 }
 
 .ai-reference-row:last-child {
@@ -961,17 +1041,16 @@ body {
 
 
 /* =========================================================
-   الرقم
+   رقم المرجع
    ========================================================= */
 
 .ai-reference-index {
-    flex: 0 0 28px;
-    width: 28px;
-    color: #8a8f98;
-    font-size: 12px;
-    font-weight: 700;
+    flex: 0 0 22px;
+    width: 22px;
+    padding-top: 1px;
+    color: #888;
+    font-size: 11px;
     text-align: center;
-    padding-top: 2px;
 }
 
 
@@ -980,34 +1059,32 @@ body {
    ========================================================= */
 
 .ai-reference-main {
-    min-width: 0;
     flex: 1;
+    min-width: 0;
+    font-size: 12px;
 }
 
 
 /* =========================================================
-   السطر الأول
+   المؤلف والنوع
    ========================================================= */
 
 .ai-reference-heading {
     display: flex;
-    align-items: center;
-    gap: 7px;
+    align-items: baseline;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
 .ai-reference-type {
     font-size: 10px;
-    color: #777;
-    background: #f3f4f6;
-    padding: 2px 6px;
-    border-radius: 4px;
+    color: #888;
 }
 
 .ai-reference-author {
-    font-size: 14px;
-    font-weight: 700;
-    color: #222;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
 }
 
 
@@ -1016,10 +1093,10 @@ body {
    ========================================================= */
 
 .ai-reference-title {
-    margin-top: 2px;
-    font-size: 14px;
-    color: #444;
+    margin-top: 1px;
+    font-size: 12px;
     line-height: 1.6;
+    color: #555;
 }
 
 
@@ -1030,40 +1107,37 @@ body {
 .ai-reference-locations-line {
     display: flex;
     flex-wrap: wrap;
-    gap: 5px;
-    margin-top: 6px;
+    gap: 4px;
+    margin-top: 3px;
 }
 
 .ai-reference-location-chip {
-    font-size: 11px;
-    color: #555;
-    background: #f7f7f8;
-    border-radius: 4px;
-    padding: 3px 7px;
+    font-size: 10px;
+    color: #666;
 }
 
 
 /* =========================================================
-   المعلومات السفلية
+   البيانات السفلية
    ========================================================= */
 
 .ai-reference-meta {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 6px;
-    font-size: 11px;
-    color: #8a8a8a;
+    gap: 5px;
+    margin-top: 3px;
+    font-size: 10px;
+    color: #888;
 }
 
 .ai-reference-meta strong {
-    color: #444;
-    font-weight: 700;
+    font-weight: 600;
+    color: #666;
 }
 
 .ai-reference-separator {
-    color: #c5c5c5;
+    color: #ccc;
 }
 
 
@@ -1072,11 +1146,8 @@ body {
    ========================================================= */
 
 .ai-reference-review {
+    font-size: 10px;
     color: #a05a00;
-    background: #fff4df;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 600;
 }
 
 
@@ -1085,15 +1156,14 @@ body {
    ========================================================= */
 
 .ai-reference-variants {
-    margin-top: 7px;
+    margin-top: 4px;
 }
 
 .ai-reference-variants summary {
     cursor: pointer;
-    color: #777;
-    font-size: 11px;
     list-style: none;
-    user-select: none;
+    font-size: 10px;
+    color: #888;
 }
 
 .ai-reference-variants summary::-webkit-details-marker {
@@ -1101,41 +1171,67 @@ body {
 }
 
 .ai-reference-variants summary::before {
-    content: "‹";
-    display: inline-block;
-    margin-left: 5px;
-    transform: rotate(-90deg);
-    transition: transform 0.15s ease;
+    content: "▸";
+    margin-left: 4px;
+    font-size: 9px;
 }
 
 .ai-reference-variants[open] summary::before {
-    transform: rotate(90deg);
+    content: "▾";
 }
 
 .ai-reference-variants summary span {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    margin-right: 4px;
-    border-radius: 4px;
-    background: #f1f2f4;
-    font-size: 10px;
+    margin-right: 3px;
+    font-size: 9px;
+    color: #999;
 }
 
 .ai-reference-variants-list {
-    margin-top: 5px;
+    margin-top: 3px;
     padding-right: 8px;
-    border-right: 2px solid #ededed;
+    border-right: 1px solid #e5e5e5;
 }
 
 .ai-reference-variant {
-    padding: 3px 0;
-    color: #777;
-    font-size: 11px;
+    padding: 2px 0;
+    font-size: 10px;
     line-height: 1.5;
+    color: #777;
 }
+
+
+/* =========================================================
+   الملاحظات
+   ========================================================= */
+
+.ai-merged-reference-notes {
+    margin-top: 4px;
+    font-size: 10px;
+    line-height: 1.5;
+    color: #777;
+}
+
+
+/* =========================================================
+   الشاشات الضيقة
+   ========================================================= */
+
+@media (max-width: 600px) {
+
+    .references-analysis-info {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-reference-row {
+        gap: 6px;
+    }
+
+    .ai-reference-main {
+        font-size: 12px;
+    }
+
+}
+
 /* =========================================================
    FINAL REFERENCES
    ========================================================= */
