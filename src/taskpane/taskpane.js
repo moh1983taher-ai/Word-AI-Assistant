@@ -91,6 +91,11 @@ const projectsPopup =
 const projectsList =
     document.getElementById("projects-list");
 
+const referencesBtn =
+    document.getElementById("references-btn");
+
+const referencesWorkspace =
+    document.getElementById("references-workspace");
 
 const wordDocumentPicker =
     document.getElementById(
@@ -20736,6 +20741,34 @@ if (sendBtn) {
 
 }
 
+if (referencesBtn && referencesWorkspace) {
+
+    referencesBtn.onclick =
+        function (e) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            referencesWorkspace.style.display =
+                "block";
+
+            if (chatArea) {
+
+                chatArea.style.display =
+                    "none";
+
+            }
+
+            if (documentTitle) {
+
+                documentTitle.style.display =
+                    "none";
+
+            }
+
+        };
+
+}
 
 // =====================================================
 // Scope Elements
