@@ -22234,11 +22234,7 @@ function normalizeUnifiedReferenceResult(
     materials
 ) {
 
-    // =====================================================
-    // 1. التحقق من النتيجة الواردة
-    // =====================================================
-
-    const source =
+    const result =
         parsedResult &&
         typeof parsedResult === "object" &&
         !Array.isArray(parsedResult)
@@ -22250,27 +22246,23 @@ function normalizeUnifiedReferenceResult(
 
     const references =
         Array.isArray(
-            source.references
+            result.references
         )
-
-            ? source.references
-
-            : Array.isArray(
-                parsedResult
-            )
-
-                ? parsedResult
-
-                : [];
+            ? result.references
+            : [];
 
 
-    // =====================================================
-    // 2. أدوات داخلية بسيطة
-    // =====================================================
+    const statsSource =
+        result.stats &&
+        typeof result.stats === "object" &&
+        !Array.isArray(result.stats)
 
-    function safeString(
-        value
-    ) {
+            ? result.stats
+
+            : {};
+
+
+    function safeString(value) {
 
         return String(
             value ?? ""
@@ -22279,51 +22271,30 @@ function normalizeUnifiedReferenceResult(
     }
 
 
-    function safeNumber(
-        value,
-        fallback = 0
-    ) {
+    function safeConfidence(value) {
 
-        const number =
+        let number =
             Number(
-                value
+                value ?? 0
             );
 
-
-        return Number.isFinite(
-            number
-        )
-
-            ? number
-
-            : fallback;
-
-    }
-
-
-    function normalizeConfidence(
-        value
-    ) {
-
-        let confidence =
-            safeNumber(
-                value,
-                0
-            );
-
-
-        // النموذج قد يعيد:
-        // 0.9
-        // أو 90
 
         if (
-            confidence > 1 &&
-            confidence <= 100
+            !Number.isFinite(number)
         ) {
 
-            confidence =
-                confidence /
-                100;
+            return 0;
+
+        }
+
+
+        if (
+            number > 1 &&
+            number <= 100
+        ) {
+
+            number =
+                number / 100;
 
         }
 
@@ -22332,97 +22303,12 @@ function normalizeUnifiedReferenceResult(
             0,
             Math.min(
                 1,
-                confidence
+                number
             )
         );
 
     }
 
-
-    const allowedTypes =
-        new Set([
-            "book",
-            "article",
-            "journal",
-            "thesis",
-            "website",
-            "hadith",
-            "other"
-        ]);
-
-
-    // =====================================================
-    // 3. الإحصاءات
-    // =====================================================
-
-    const statsSource =
-        source.stats &&
-        typeof source.stats === "object" &&
-        !Array.isArray(
-            source.stats
-        )
-
-            ? source.stats
-
-            : {};
-
-
-    const stats = {
-
-        totalMaterials:
-            safeNumber(
-                statsSource.totalMaterials,
-                Array.isArray(materials)
-                    ? materials.length
-                    : 0
-            ),
-
-        referenceCount:
-            safeNumber(
-                statsSource.referenceCount
-            ),
-
-        multipleReferenceCount:
-            safeNumber(
-                statsSource.multipleReferenceCount
-            ),
-
-        ibidCount:
-            safeNumber(
-                statsSource.ibidCount
-            ),
-
-        internalReferenceCount:
-            safeNumber(
-                statsSource.internalReferenceCount
-            ),
-
-        hadithCount:
-            safeNumber(
-                statsSource.hadithCount
-            ),
-
-        explanatoryCount:
-            safeNumber(
-                statsSource.explanatoryCount
-            ),
-
-        mixedCount:
-            safeNumber(
-                statsSource.mixedCount
-            ),
-
-        reviewCount:
-            safeNumber(
-                statsSource.reviewCount
-            )
-
-    };
-
-
-    // =====================================================
-    // 4. بناء السجلات النهائية
-    // =====================================================
 
     const normalized =
         references.map(
@@ -22434,291 +22320,118 @@ function normalizeUnifiedReferenceResult(
                 const item =
                     reference &&
                     typeof reference === "object" &&
-                    !Array.isArray(
-                        reference
-                    )
+                    !Array.isArray(reference)
 
                         ? reference
 
                         : {};
 
 
-                // -----------------------------------------
-                // type
-                // -----------------------------------------
-
-                let type =
-                    safeString(
-                        item.type ||
-                        "book"
-                    )
-                        .toLowerCase();
-
-
-                if (
-                    !allowedTypes.has(
-                        type
-                    )
-                ) {
-
-                    type =
-                        "other";
-
-                }
-
-
-                // -----------------------------------------
-                // locations
-                // -----------------------------------------
-
-                const rawLocations =
+                const locations =
                     Array.isArray(
                         item.locations
                     )
                         ? item.locations
+                            .filter(
+                                function (location) {
+
+                                    return (
+                                        location &&
+                                        typeof location === "object"
+                                    );
+
+                                }
+                            )
+                            .map(
+                                function (location) {
+
+                                    return {
+
+                                        volume:
+                                            safeString(
+                                                location.volume
+                                            ),
+
+                                        page:
+                                            safeString(
+                                                location.page
+                                            ),
+
+                                        pageRange:
+                                            safeString(
+                                                location.pageRange
+                                            )
+
+                                    };
+
+                                }
+                            )
+
                         : [];
 
 
-                const locations = [];
-
-                const locationKeys =
-                    new Set();
-
-
-                rawLocations.forEach(
-                    function (
-                        location
-                    ) {
-
-                        if (
-                            !location ||
-                            typeof location !== "object" ||
-                            Array.isArray(
-                                location
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        const normalizedLocation = {
-
-                            volume:
-                                safeString(
-                                    location.volume
-                                ),
-
-                            page:
-                                safeString(
-                                    location.page
-                                ),
-
-                            pageRange:
-                                safeString(
-                                    location.pageRange
-                                )
-
-                        };
-
-
-                        if (
-                            !normalizedLocation.volume &&
-                            !normalizedLocation.page &&
-                            !normalizedLocation.pageRange
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        const key =
-                            [
-                                normalizedLocation.volume,
-                                normalizedLocation.page,
-                                normalizedLocation.pageRange
-                            ].join("|");
-
-
-                        if (
-                            locationKeys.has(
-                                key
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        locationKeys.add(
-                            key
-                        );
-
-
-                        locations.push(
-                            normalizedLocation
-                        );
-
-                    }
-                );
-
-
-                // -----------------------------------------
-                // variants
-                // -----------------------------------------
-
-                const rawVariants =
+                const variants =
                     Array.isArray(
                         item.variants
                     )
                         ? item.variants
+                            .map(
+                                function (variant) {
+
+                                    return safeString(
+                                        variant
+                                    );
+
+                                }
+                            )
+                            .filter(
+                                Boolean
+                            )
+
                         : [];
 
 
-                const variants = [];
-
-                const variantKeys =
-                    new Set();
-
-
-                rawVariants.forEach(
-                    function (
-                        variant
-                    ) {
-
-                        const value =
-                            safeString(
-                                variant
-                            );
-
-
-                        if (
-                            !value
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        if (
-                            variantKeys.has(
-                                value
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        variantKeys.add(
-                            value
-                        );
-
-
-                        variants.push(
-                            value
-                        );
-
-                    }
-                );
-
-
-                // -----------------------------------------
-                // occurrences
-                // -----------------------------------------
-
-                const rawOccurrences =
+                const occurrences =
                     Array.isArray(
                         item.occurrences
                     )
                         ? item.occurrences
+                            .filter(
+                                function (occurrence) {
+
+                                    return (
+                                        occurrence &&
+                                        typeof occurrence === "object"
+                                    );
+
+                                }
+                            )
+                            .map(
+                                function (occurrence) {
+
+                                    return {
+
+                                        materialId:
+                                            safeString(
+                                                occurrence.materialId
+                                            ),
+
+                                        source:
+                                            safeString(
+                                                occurrence.source
+                                            ),
+
+                                        noteNumber:
+                                            occurrence.noteNumber ??
+                                            null
+
+                                    };
+
+                                }
+                            )
+
                         : [];
 
-
-                const occurrences = [];
-
-                const occurrenceKeys =
-                    new Set();
-
-
-                rawOccurrences.forEach(
-                    function (
-                        occurrence
-                    ) {
-
-                        if (
-                            !occurrence ||
-                            typeof occurrence !== "object" ||
-                            Array.isArray(
-                                occurrence
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        const normalizedOccurrence = {
-
-                            materialId:
-                                safeString(
-                                    occurrence.materialId
-                                ),
-
-                            source:
-                                safeString(
-                                    occurrence.source
-                                ),
-
-                            noteNumber:
-                                occurrence.noteNumber ??
-                                null
-
-                        };
-
-
-                        const key =
-                            [
-                                normalizedOccurrence.materialId,
-                                normalizedOccurrence.source,
-                                normalizedOccurrence.noteNumber ??
-                                ""
-                            ].join("|");
-
-
-                        if (
-                            occurrenceKeys.has(
-                                key
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        occurrenceKeys.add(
-                            key
-                        );
-
-
-                        occurrences.push(
-                            normalizedOccurrence
-                        );
-
-                    }
-                );
-
-
-                // -----------------------------------------
-                // السجل النهائي
-                // -----------------------------------------
 
                 return {
 
@@ -22729,7 +22442,10 @@ function normalizeUnifiedReferenceResult(
                         ),
 
                     type:
-                        type,
+                        safeString(
+                            item.type ||
+                            "book"
+                        ).toLowerCase(),
 
                     author:
                         safeString(
@@ -22781,7 +22497,7 @@ function normalizeUnifiedReferenceResult(
                         ),
 
                     confidence:
-                        normalizeConfidence(
+                        safeConfidence(
                             item.confidence
                         ),
 
@@ -22797,102 +22513,137 @@ function normalizeUnifiedReferenceResult(
 
 
     // =====================================================
-    // 5. ضمان معرفات فريدة
+    // إزالة التكرار الحرفي داخل البيانات فقط
     // =====================================================
-
-    const usedIds =
-        new Set();
-
-
-    normalized.forEach(
-        function (
-            reference,
-            index
-        ) {
-
-            let id =
-                reference.id ||
-                `reference-${index + 1}`;
-
-
-            if (
-                usedIds.has(
-                    id
-                )
-            ) {
-
-                let counter =
-                    2;
-
-                const baseId =
-                    id;
-
-
-                do {
-
-                    id =
-                        `${baseId}-${counter}`;
-
-                    counter++;
-
-                }
-                while (
-                    usedIds.has(
-                        id
-                    )
-                );
-
-            }
-
-
-            usedIds.add(
-                id
-            );
-
-
-            reference.id =
-                id;
-
-        }
-    );
-
-
-    // =====================================================
-    // 6. إحصائية احتياطية لعدد مرات الاستشهاد
-    //
-    // لا نغير stats التي أرسلها AI،
-    // لكن نوفر قيمة موثوقة مشتقة من السجلات نفسها.
-    // =====================================================
-
-    let totalOccurrences =
-        0;
-
 
     normalized.forEach(
         function (
             reference
         ) {
 
-            totalOccurrences +=
-                reference.occurrences.length;
+            const locationKeys =
+                new Set();
+
+
+            reference.locations =
+                reference.locations.filter(
+                    function (
+                        location
+                    ) {
+
+                        const key =
+                            [
+                                location.volume,
+                                location.page,
+                                location.pageRange
+                            ].join("|");
+
+
+                        if (
+                            locationKeys.has(key)
+                        ) {
+
+                            return false;
+
+                        }
+
+
+                        locationKeys.add(key);
+
+                        return true;
+
+                    }
+                );
+
+
+            const variantKeys =
+                new Set();
+
+
+            reference.variants =
+                reference.variants.filter(
+                    function (
+                        variant
+                    ) {
+
+                        if (
+                            !variant ||
+                            variantKeys.has(variant)
+                        ) {
+
+                            return false;
+
+                        }
+
+
+                        variantKeys.add(variant);
+
+                        return true;
+
+                    }
+                );
 
         }
     );
 
 
-    stats.totalOccurrences =
-        totalOccurrences;
-
-
     // =====================================================
-    // 7. توافق كامل مع مسار الزر الحالي
-    //
-    // الدالة تعيد Array،
-    // وتضع stats كخاصية على الـ Array.
+    // الإحصاءات
     // =====================================================
 
-    normalized.stats =
-        stats;
+    normalized.stats = {
+
+        totalMaterials:
+            Number(
+                statsSource.totalMaterials ??
+                (
+                    Array.isArray(materials)
+                        ? materials.length
+                        : 0
+                )
+            ),
+
+        referenceCount:
+            Number(
+                statsSource.referenceCount ?? 0
+            ),
+
+        multipleReferenceCount:
+            Number(
+                statsSource.multipleReferenceCount ?? 0
+            ),
+
+        ibidCount:
+            Number(
+                statsSource.ibidCount ?? 0
+            ),
+
+        internalReferenceCount:
+            Number(
+                statsSource.internalReferenceCount ?? 0
+            ),
+
+        hadithCount:
+            Number(
+                statsSource.hadithCount ?? 0
+            ),
+
+        explanatoryCount:
+            Number(
+                statsSource.explanatoryCount ?? 0
+            ),
+
+        mixedCount:
+            Number(
+                statsSource.mixedCount ?? 0
+            ),
+
+        reviewCount:
+            Number(
+                statsSource.reviewCount ?? 0
+            )
+
+    };
 
 
     return normalized;
