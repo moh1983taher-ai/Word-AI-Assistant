@@ -932,6 +932,211 @@ body {
 }
 
 /* =========================================================
+   قائمة المراجع الموحدة
+   ========================================================= */
+
+.references-final-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 10px;
+}
+
+
+/* =========================================================
+   صف المرجع
+   ========================================================= */
+
+.ai-reference-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 6px;
+    border-bottom: 1px solid #ececec;
+}
+
+.ai-reference-row:last-child {
+    border-bottom: none;
+}
+
+
+/* =========================================================
+   الرقم
+   ========================================================= */
+
+.ai-reference-index {
+    flex: 0 0 28px;
+    width: 28px;
+    color: #8a8f98;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    padding-top: 2px;
+}
+
+
+/* =========================================================
+   المحتوى
+   ========================================================= */
+
+.ai-reference-main {
+    min-width: 0;
+    flex: 1;
+}
+
+
+/* =========================================================
+   السطر الأول
+   ========================================================= */
+
+.ai-reference-heading {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+.ai-reference-type {
+    font-size: 10px;
+    color: #777;
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.ai-reference-author {
+    font-size: 14px;
+    font-weight: 700;
+    color: #222;
+}
+
+
+/* =========================================================
+   العنوان
+   ========================================================= */
+
+.ai-reference-title {
+    margin-top: 2px;
+    font-size: 14px;
+    color: #444;
+    line-height: 1.6;
+}
+
+
+/* =========================================================
+   المواضع
+   ========================================================= */
+
+.ai-reference-locations-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+}
+
+.ai-reference-location-chip {
+    font-size: 11px;
+    color: #555;
+    background: #f7f7f8;
+    border-radius: 4px;
+    padding: 3px 7px;
+}
+
+
+/* =========================================================
+   المعلومات السفلية
+   ========================================================= */
+
+.ai-reference-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: #8a8a8a;
+}
+
+.ai-reference-meta strong {
+    color: #444;
+    font-weight: 700;
+}
+
+.ai-reference-separator {
+    color: #c5c5c5;
+}
+
+
+/* =========================================================
+   يحتاج مراجعة
+   ========================================================= */
+
+.ai-reference-review {
+    color: #a05a00;
+    background: #fff4df;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+
+/* =========================================================
+   صيغ الظهور
+   ========================================================= */
+
+.ai-reference-variants {
+    margin-top: 7px;
+}
+
+.ai-reference-variants summary {
+    cursor: pointer;
+    color: #777;
+    font-size: 11px;
+    list-style: none;
+    user-select: none;
+}
+
+.ai-reference-variants summary::-webkit-details-marker {
+    display: none;
+}
+
+.ai-reference-variants summary::before {
+    content: "‹";
+    display: inline-block;
+    margin-left: 5px;
+    transform: rotate(-90deg);
+    transition: transform 0.15s ease;
+}
+
+.ai-reference-variants[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.ai-reference-variants summary span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    margin-right: 4px;
+    border-radius: 4px;
+    background: #f1f2f4;
+    font-size: 10px;
+}
+
+.ai-reference-variants-list {
+    margin-top: 5px;
+    padding-right: 8px;
+    border-right: 2px solid #ededed;
+}
+
+.ai-reference-variant {
+    padding: 3px 0;
+    color: #777;
+    font-size: 11px;
+    line-height: 1.5;
+}
+/* =========================================================
    FINAL REFERENCES
    ========================================================= */
 
