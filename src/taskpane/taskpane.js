@@ -21648,6 +21648,136 @@ if (referencesContent) {
                                 </button>
                                 `;
 
+                                const analyzeReferencesBtn =
+                                    document.getElementById(
+                                        "analyze-references-btn"
+                                    );
+
+
+                                if (analyzeReferencesBtn) {
+
+                                    analyzeReferencesBtn.onclick =
+                                        async function (e) {
+
+                                            e.preventDefault();
+                                            e.stopPropagation();
+
+
+                                            analyzeReferencesBtn.disabled =
+                                                true;
+
+                                            analyzeReferencesBtn.textContent =
+                                                "جارٍ تحليل المستند...";
+
+
+                                            try {
+
+                                                const referenceSources =
+                                                    await readReferenceSources();
+
+
+                                                if (
+                                                    !referenceSources ||
+                                                    !referenceSources.mainText
+                                                ) {
+
+                                                    throw new Error(
+                                                        "تعذر الحصول على نص المستند المفتوح."
+                                                    );
+
+                                                }
+
+
+                                                analyzeReferencesBtn.textContent =
+                                                    "✓ تم التحليل";
+
+
+                                                referencesSourceWorkspace.insertAdjacentHTML(
+                                                    "beforeend",
+                                                    `
+                                                    <div class="references-analysis-status success">
+                                                        ✓ تم تحليل بنية المستند
+                                                    </div>
+
+                                                    <div class="references-analysis-info">
+
+                                                        <div>
+                                                            المتن:
+                                                            <strong>
+                                                                ${referenceSources.mainText.length}
+                                                            </strong>
+                                                            حرف
+                                                        </div>
+
+                                                        <div>
+                                                            الحواشي السفلية:
+                                                            <strong>
+                                                                ${referenceSources.footnotes.length}
+                                                            </strong>
+                                                        </div>
+
+                                                        <div>
+                                                            الحواشي الختامية:
+                                                            <strong>
+                                                                ${referenceSources.endnotes.length}
+                                                            </strong>
+                                                        </div>
+
+                                                    </div>
+                                                    `
+                                                );
+
+
+                                                console.log(
+                                                    "تم تحليل المستند المفتوح في Word:",
+                                                    {
+                                                        mainTextLength:
+                                                            referenceSources.mainText.length,
+
+                                                        footnotes:
+                                                            referenceSources.footnotes.length,
+
+                                                        endnotes:
+                                                            referenceSources.endnotes.length
+                                                    }
+                                                );
+
+
+                                            } catch (error) {
+
+                                                analyzeReferencesBtn.disabled =
+                                                    false;
+
+                                                analyzeReferencesBtn.textContent =
+                                                    "تحليل المراجع";
+
+
+                                                referencesSourceWorkspace.insertAdjacentHTML(
+                                                    "beforeend",
+                                                    `
+                                                    <div class="references-analysis-status error">
+                                                        ⚠ تعذر تحليل المستند
+                                                    </div>
+
+                                                    <div class="references-analysis-info">
+                                                        ${error.message ||
+                                                        "حدث خطأ غير معروف."}
+                                                    </div>
+                                                    `
+                                                );
+
+
+                                                console.error(
+                                                    "فشل تحليل المستند المفتوح:",
+                                                    error
+                                                );
+
+                                            }
+
+                                        };
+
+                                }
+
 
                             return;
 
@@ -21661,287 +21791,7 @@ if (referencesContent) {
 }
 
 
-// =====================================================
-// زر تحليل المراجع
-// Event Delegation
-// =====================================================
 
-if (referencesSourceWorkspace) {
-
-    referencesSourceWorkspace.addEventListener(
-        "click",
-        async function (e) {
-
-            const analyzeButton =
-                e.target.closest(
-                    "#analyze-references-btn"
-                );
-
-
-            if (!analyzeButton) {
-
-                return;
-
-            }
-
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            if (!referencesSourceDocument) {
-
-                referencesSourceWorkspace.innerHTML =
-                    `
-                    <div class="references-empty">
-                        لا يوجد مستند محدد للعمل عليه
-                    </div>
-                    `;
-
-                return;
-
-            }
-
-
-            analyzeButton.disabled =
-                true;
-
-            analyzeButton.textContent =
-                "جارٍ تحليل المستند...";
-
-
-            try {
-
-                const referenceSources =
-                    await readReferenceSources();
-
-
-                if (
-                    !referenceSources ||
-                    !referenceSources.mainText
-                ) {
-
-                    throw new Error(
-                        "تعذر الحصول على نص المستند."
-                    );
-
-                }
-
-                const referenceCandidates =
-                    extractReferenceCandidates(
-                        referenceSources
-                    );
-
-
-                console.log(
-                    "المرشحون للمراجع:",
-                    referenceCandidates
-                );
-
-
-                analyzeButton.textContent =
-                    "✓ تم التحليل";
-
-
-                const mainCount =
-                    referenceCandidates.filter(
-                        item =>
-                            item.source ===
-                            "main-text"
-                    ).length;
-
-
-                const footnoteCount =
-                    referenceCandidates.filter(
-                        item =>
-                            item.source ===
-                            "footnote"
-                    ).length;
-
-
-                const endnoteCount =
-                    referenceCandidates.filter(
-                        item =>
-                            item.source ===
-                            "endnote"
-                    ).length;
-
-
-                const candidateRows =
-                    referenceCandidates
-                        .map(
-                            function (
-                                item,
-                                index
-                            ) {
-
-                                const sourceLabel =
-
-                                    item.source ===
-                                    "main-text"
-
-                                        ? "المتن"
-
-                                        : item.source ===
-                                        "footnote"
-
-                                            ? "حاشية سفلية"
-
-                                            : "حاشية ختامية";
-
-
-                                return `
-                                    <div class="reference-candidate">
-
-                                        <div class="reference-candidate-head">
-
-                                            <span class="reference-candidate-number">
-                                                ${index + 1}
-                                            </span>
-
-                                            <span class="reference-candidate-source">
-                                                ${sourceLabel}
-                                            </span>
-
-                                        </div>
-
-
-                                        <div class="reference-candidate-text">
-
-                                            ${item.text}
-
-                                        </div>
-
-
-                                        <div class="reference-candidate-context">
-
-                                            ${item.context}
-
-                                        </div>
-
-                                    </div>
-                                `;
-
-                            }
-                        )
-                        .join("");
-
-
-                referencesSourceWorkspace.insertAdjacentHTML(
-                    "beforeend",
-                    `
-                    <div class="references-analysis-status success">
-                        ✓ اكتمل التحليل الأولي
-                    </div>
-
-
-                    <div class="references-analysis-info">
-
-                        <div>
-                            مرشحو التوثيق في المتن:
-                            <strong>
-                                ${mainCount}
-                            </strong>
-                        </div>
-
-                        <div>
-                            مرشحو المراجع في الحواشي:
-                            <strong>
-                                ${footnoteCount}
-                            </strong>
-                        </div>
-
-                        <div>
-                            مرشحو المراجع في الحواشي الختامية:
-                            <strong>
-                                ${endnoteCount}
-                            </strong>
-                        </div>
-
-                        <div>
-                            إجمالي المرشحين:
-                            <strong>
-                                ${referenceCandidates.length}
-                            </strong>
-                        </div>
-
-                    </div>
-
-
-                    <div class="references-candidates">
-
-                        ${candidateRows || `
-                            <div class="references-empty">
-                                لم يتم العثور على إحالات مرشحة للمراجع.
-                            </div>
-                        `}
-
-                    </div>
-                    `
-                );
-
-
-                console.log(
-                    "مصادر المراجع:",
-                    {
-                        documentId:
-                            referenceSources.documentId,
-
-                        documentName:
-                            referenceSources.documentName,
-
-                        mainTextLength:
-                            referenceSources.mainText.length,
-
-                        footnotes:
-                            referenceSources.footnotes.length,
-
-                        endnotes:
-                            referenceSources.endnotes.length
-                    }
-                );
-
-
-            } catch (error) {
-
-                analyzeButton.disabled =
-                    false;
-
-                analyzeButton.textContent =
-                    "تحليل المراجع";
-
-
-                referencesSourceWorkspace.insertAdjacentHTML(
-                    "beforeend",
-                    `
-                    <div class="references-analysis-status error">
-
-                        ⚠ تعذر تحليل المستند
-
-                    </div>
-
-
-                    <div class="references-analysis-info">
-
-                        ${error.message ||
-                        "حدث خطأ غير معروف."}
-
-                    </div>
-                    `
-                );
-
-
-                console.error(
-                    "فشل تحليل مستند المراجع:",
-                    error
-                );
-
-            }
-
-        }
-    );
-
-}
 // =====================================================
 // Scope Elements
 // =====================================================
