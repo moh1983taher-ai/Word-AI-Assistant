@@ -20865,6 +20865,11 @@ if (referencesContent) {
                                 "data-reference-source"
                             );
 
+
+                        // =====================================================
+                        // المستند الحالي
+                        // =====================================================
+
                         if (
                             source ===
                             "current-document"
@@ -20874,168 +20879,10 @@ if (referencesContent) {
 
                                 referencesSourceWorkspace.innerHTML =
                                     `
-                                    <div class="references-selected-source">
-
-                                        <div class="references-selected-icon">
-
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="#000000"
-                                                stroke-width="1"
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                aria-hidden="true">
-
-                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-
-                                                <polyline points="14 2 14 8 20 8"/>
-
-                                                <line x1="8" y1="13" x2="16" y2="13"/>
-
-                                                <line x1="8" y1="17" x2="16" y2="17"/>
-
-                                                <line x1="8" y1="9" x2="10" y2="9"/>
-
-                                            </svg>
-
-                                        </div>
-
-                                        <div class="references-selected-info">
-
-                                            <div class="references-selected-title">
-                                                المستند المحدد للعمل
-                                            </div>
-
-                                            <div class="references-selected-name">
-                                                ${currentDocument.name}
-                                            </div>
-
-                                        </div>
-
+                                    <div class="references-empty">
+                                        لا يوجد مستند مفتوح حاليًا
                                     </div>
-
-
-                                    <button
-                                        type="button"
-                                        id="analyze-references-btn"
-                                        class="analyze-references-btn">
-
-                                        تحليل المراجع
-
-                                    </button>
                                     `;
-
-                                    const analyzeReferencesBtn =
-                                        document.getElementById(
-                                            "analyze-references-btn"
-                                        );
-
-
-                                    if (
-                                        analyzeReferencesBtn
-                                    ) {
-
-                                        analyzeReferencesBtn.onclick =
-                                            async function (
-                                                e
-                                            ) {
-
-                                                e.preventDefault();
-                                                e.stopPropagation();
-
-
-                                                referencesSourceWorkspace.innerHTML =
-                                                    `
-                                                    <div class="references-analysis-status">
-                                                        جارٍ قراءة المستند...
-                                                    </div>
-                                                    `;
-
-
-                                                try {
-
-                                                    let documentRecord =
-                                                        await getDocumentText(
-                                                            currentDocument.id
-                                                        );
-
-
-                                                    if (
-                                                        !documentRecord ||
-                                                        !documentRecord.text
-                                                    ) {
-
-                                                        await readCurrentWordDocument(
-                                                            currentDocument
-                                                        );
-
-
-                                                        documentRecord =
-                                                            await getDocumentText(
-                                                                currentDocument.id
-                                                            );
-
-                                                    }
-
-
-                                                    if (
-                                                        !documentRecord ||
-                                                        !documentRecord.text
-                                                    ) {
-
-                                                        throw new Error(
-                                                            "تعذر الحصول على نص المستند."
-                                                        );
-
-                                                    }
-
-
-                                                    referencesSourceWorkspace.innerHTML =
-                                                        `
-                                                        <div class="references-analysis-status success">
-                                                            ✓ تمت قراءة المستند بنجاح
-                                                        </div>
-
-                                                        <div class="references-analysis-info">
-                                                            تم تجهيز النص لاستخراج المراجع.
-                                                        </div>
-                                                        `;
-
-
-                                                    console.log(
-                                                        "نص المستند جاهز لتحليل المراجع:",
-                                                        documentRecord.text.length,
-                                                        "حرف"
-                                                    );
-
-
-                                                } catch (
-                                                    error
-                                                ) {
-
-                                                    referencesSourceWorkspace.innerHTML =
-                                                        `
-                                                        <div class="references-analysis-status error">
-                                                            ⚠ تعذر قراءة المستند
-                                                        </div>
-
-                                                        <div class="references-analysis-info">
-                                                            ${error.message || "حدث خطأ غير معروف."}
-                                                        </div>
-                                                        `;
-
-
-                                                    console.error(
-                                                        "فشل تحليل المستند للمراجع:",
-                                                        error
-                                                    );
-
-                                                }
-
-                                            };
-
-                                    }
 
                                 return;
 
@@ -21047,7 +20894,28 @@ if (referencesContent) {
                                 <div class="references-selected-source">
 
                                     <div class="references-selected-icon">
-                                        ▤
+
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                             viewBox="0 0 24 24"
+                                             fill="none"
+                                             stroke="#000000"
+                                             stroke-width="1"
+                                             stroke-linecap="round"
+                                             stroke-linejoin="round"
+                                             aria-hidden="true">
+
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+
+                                            <polyline points="14 2 14 8 20 8"/>
+
+                                            <line x1="8" y1="13" x2="16" y2="13"/>
+
+                                            <line x1="8" y1="17" x2="16" y2="17"/>
+
+                                            <line x1="8" y1="9" x2="10" y2="9"/>
+
+                                        </svg>
+
                                     </div>
 
                                     <div class="references-selected-info">
@@ -21063,7 +20931,20 @@ if (referencesContent) {
                                     </div>
 
                                 </div>
+
+
+                                <button
+                                    type="button"
+                                    id="analyze-references-btn"
+                                    class="analyze-references-btn">
+
+                                    تحليل المراجع
+
+                                </button>
                                 `;
+
+
+                            return;
 
                         }
 
@@ -21071,6 +20952,154 @@ if (referencesContent) {
 
             }
         );
+
+}
+
+
+// =====================================================
+// زر تحليل المراجع
+// Event Delegation
+// =====================================================
+
+if (referencesSourceWorkspace) {
+
+    referencesSourceWorkspace.addEventListener(
+        "click",
+        async function (e) {
+
+            const analyzeButton =
+                e.target.closest(
+                    "#analyze-references-btn"
+                );
+
+
+            if (!analyzeButton) {
+
+                return;
+
+            }
+
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            if (!currentDocument) {
+
+                referencesSourceWorkspace.innerHTML =
+                    `
+                    <div class="references-empty">
+                        لا يوجد مستند مفتوح حاليًا
+                    </div>
+                    `;
+
+                return;
+
+            }
+
+
+            analyzeButton.disabled =
+                true;
+
+            analyzeButton.textContent =
+                "جارٍ قراءة المستند...";
+
+
+            try {
+
+                let documentRecord =
+                    await getDocumentText(
+                        currentDocument.id
+                    );
+
+
+                if (
+                    !documentRecord ||
+                    !documentRecord.text
+                ) {
+
+                    await readCurrentWordDocument(
+                        currentDocument
+                    );
+
+
+                    documentRecord =
+                        await getDocumentText(
+                            currentDocument.id
+                        );
+
+                }
+
+
+                if (
+                    !documentRecord ||
+                    !documentRecord.text
+                ) {
+
+                    throw new Error(
+                        "تعذر الحصول على نص المستند."
+                    );
+
+                }
+
+
+                analyzeButton.textContent =
+                    "✓ تم تجهيز المستند";
+
+
+                referencesSourceWorkspace.insertAdjacentHTML(
+                    "beforeend",
+                    `
+                    <div class="references-analysis-status success">
+                        ✓ تمت قراءة المستند بنجاح
+                    </div>
+
+                    <div class="references-analysis-info">
+                        تم تجهيز النص لاستخراج المراجع.
+                    </div>
+                    `
+                );
+
+
+                console.log(
+                    "نص المستند جاهز لاستخراج المراجع:",
+                    documentRecord.text.length,
+                    "حرف"
+                );
+
+
+            } catch (error) {
+
+                analyzeButton.disabled =
+                    false;
+
+                analyzeButton.textContent =
+                    "تحليل المراجع";
+
+
+                referencesSourceWorkspace.insertAdjacentHTML(
+                    "beforeend",
+                    `
+                    <div class="references-analysis-status error">
+                        ⚠ تعذر قراءة المستند
+                    </div>
+
+                    <div class="references-analysis-info">
+                        ${error.message || "حدث خطأ غير معروف."}
+                    </div>
+                    `
+                );
+
+
+                console.error(
+                    "فشل تجهيز المستند للمراجع:",
+                    error
+                );
+
+            }
+
+        }
+    );
 
 }
 // =====================================================
