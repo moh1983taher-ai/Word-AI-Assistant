@@ -2933,6 +2933,1245 @@ function parseAllReferenceRecords(
         );
 
 }
+
+// =====================================================
+// NORMALIZE REFERENCE
+// توحيد صيغة المرجع للمقارنة
+// =====================================================
+
+function normalizeParsedReference(
+    record
+) {
+
+    if (
+        !record ||
+        typeof record !== "object"
+    ) {
+        return null;
+    }
+
+
+    function clean(value) {
+
+        return String(
+            value || ""
+        )
+        .toLowerCase()
+        .replace(
+            /[\u064B-\u065F\u0670]/g,
+            ""
+        )
+        .replace(
+            /[أإآ]/g,
+            "ا"
+        )
+        .replace(
+            /ة/g,
+            "ه"
+        )
+        .replace(
+            /ى/g,
+            "ي"
+        )
+        .replace(
+            /ـ/g,
+            ""
+        )
+        .replace(
+            /[^a-z0-9\u0600-\u06FF]+/gi,
+            " "
+        )
+        .replace(
+            /\s+/g,
+            " "
+        )
+        .trim();
+
+    }
+
+
+    const author =
+        clean(
+            record.author
+        );
+
+    const title =
+        clean(
+            record.title
+        );
+
+    const volume =
+        clean(
+            record.volume
+        );
+
+    const page =
+        clean(
+            record.page
+        );
+
+    const pageRange =
+        clean(
+            record.pageRange
+        );
+
+
+    const referenceKey =
+        [
+            author,
+            title,
+            volume,
+            page,
+            pageRange
+        ]
+        .filter(
+            Boolean
+        )
+        .join("|");
+
+
+    return {
+
+        ...record,
+
+        normalized: {
+
+            author:
+                author,
+
+            title:
+                title,
+
+            volume:
+                volume,
+
+            page:
+                page,
+
+            pageRange:
+                pageRange
+
+        },
+
+        matchKey:
+            referenceKey
+
+    };
+
+}
+// =====================================================
+// NORMALIZE ALL REFERENCES
+// =====================================================
+
+function normalizeAllParsedReferences(
+    references
+) {
+
+    if (
+        !Array.isArray(
+            references
+        )
+    ) {
+        return [];
+    }
+
+
+    return references
+        .map(
+            function (
+                reference
+            ) {
+
+                return normalizeParsedReference(
+                    reference
+                );
+
+            }
+        )
+        .filter(
+            Boolean
+        );
+
+}
+// =====================================================
+// RESOLVE IBID REFERENCES
+// حل «المصدر نفسه» بالرجوع إلى المرجع السابق
+// =====================================================
+
+function resolveIbidReferences(
+    references
+) {
+
+    if (
+        !Array.isArray(
+            references
+        )
+    ) {
+
+        return [];
+
+    }
+
+
+    const resolved = [];
+
+    // آخر مرجع معروف لكل مصدر
+    const lastReferenceBySource =
+        new Map();
+
+
+    references.forEach(
+        function (
+            record
+        ) {
+
+            if (!record) {
+                return;
+            }
+
+
+            // -----------------------------------------
+            // مرجع حقيقي
+            // -----------------------------------------
+
+            if (
+                record.kind ===
+                "reference"
+            ) {
+
+                lastReferenceBySource.set(
+                    record.source,
+                    record
+                );
+
+                resolved.push({
+                    ...record,
+                    resolvedFromIbid: false
+                });
+
+                return;
+
+            }
+
+
+            // -----------------------------------------
+            // «المصدر نفسه»
+            // -----------------------------------------
+
+            if (
+                record.kind ===
+                "ibid"
+            ) {
+
+                const previous =
+                    lastReferenceBySource.get(
+                        record.source
+                    );
+
+
+                if (previous) {
+
+                    resolved.push({
+
+                        ...record,
+
+                        resolvedFromIbid:
+                            true,
+
+                        resolvedReferenceId:
+                            previous.id,
+
+                        resolvedAuthor:
+                            previous.author ||
+                            "",
+
+                        resolvedTitle:
+                            previous.title ||
+                            "",
+
+                        resolvedVolume:
+                            record.volume ||
+                            previous.volume ||
+                            "",
+
+                        resolvedPage:
+                            record.page ||
+                            previous.page ||
+                            "",
+
+                        resolvedPageRange:
+                            record.pageRange ||
+                            previous.pageRange ||
+                            "",
+
+                        matchKey:
+                            previous.matchKey ||
+                            ""
+
+                    });
+
+                }
+                else {
+
+                    resolved.push({
+
+                        ...record,
+
+                        resolvedFromIbid:
+                            false,
+
+                        unresolvedReason:
+                            "لا يوجد مرجع سابق واضح"
+
+                    });
+
+                }
+
+                return;
+
+            }
+
+
+            // -----------------------------------------
+            // أنواع أخرى
+            // -----------------------------------------
+
+            resolved.push(record);
+
+        }
+    );
+
+
+    return resolved;
+
+}
+// =====================================================
+// APPLY IBID RESOLUTION
+// =====================================================
+
+function applyIbidResolution(
+    references
+) {
+
+    return resolveIbidReferences(
+        references
+    );
+
+}
+// =====================================================
+// GROUP DUPLICATE REFERENCES
+// تجميع الإحالات التي تشير إلى المرجع نفسه
+// =====================================================
+
+function groupDuplicateReferences(
+    references
+) {
+
+    if (
+        !Array.isArray(
+            references
+        )
+    ) {
+
+        return [];
+
+    }
+
+
+    const groups =
+        new Map();
+
+
+    function cleanIdentityPart(
+        value
+    ) {
+
+        return String(
+            value || ""
+        )
+        .toLowerCase()
+        .replace(
+            /[\u064B-\u065F\u0670]/g,
+            ""
+        )
+        .replace(
+            /[أإآ]/g,
+            "ا"
+        )
+        .replace(
+            /ة/g,
+            "ه"
+        )
+        .replace(
+            /ى/g,
+            "ي"
+        )
+        .replace(
+            /ـ/g,
+            ""
+        )
+        .replace(
+            /\s+/g,
+            " "
+        )
+        .trim();
+
+    }
+
+
+    function getIdentityKey(
+        record
+    ) {
+
+        // ---------------------------------------------
+        // إذا كان «المصدر نفسه» قد حُلّ
+        // ---------------------------------------------
+
+        if (
+            record.resolvedFromIbid &&
+            record.resolvedReferenceId
+        ) {
+
+            return (
+                "resolved:" +
+                record.resolvedReferenceId
+            );
+
+        }
+
+
+        const author =
+            cleanIdentityPart(
+                record.author
+            );
+
+
+        const title =
+            cleanIdentityPart(
+                record.title
+            );
+
+
+        // ---------------------------------------------
+        // الهوية الأساسية:
+        // المؤلف + العنوان
+        // ولا ندخل الجزء والصفحة في الهوية
+        // لأن المرجع الواحد قد يُحال إليه في صفحات مختلفة.
+        // ---------------------------------------------
+
+        if (
+            author ||
+            title
+        ) {
+
+            return [
+                "book",
+                author,
+                title
+            ].join("|");
+
+        }
+
+
+        // ---------------------------------------------
+        // لا توجد مكونات كافية:
+        // نستخدم النص المنظف كحل احتياطي.
+        // ---------------------------------------------
+
+        const text =
+            cleanIdentityPart(
+                record.cleanedText
+            );
+
+
+        return [
+            "text",
+            text
+        ].join("|");
+
+    }
+
+
+    references.forEach(
+        function (
+            record
+        ) {
+
+            if (!record) {
+                return;
+            }
+
+
+            // لا نضع الإحالات الداخلية
+            // في قائمة المراجع.
+            if (
+                record.kind ===
+                "internal"
+            ) {
+
+                return;
+
+            }
+
+
+            // مواد المراجعة تبقى منفصلة
+            if (
+                record.kind ===
+                "review"
+            ) {
+
+                const reviewKey =
+                    "review:" +
+                    cleanIdentityPart(
+                        record.cleanedText
+                    );
+
+
+                if (
+                    !groups.has(
+                        reviewKey
+                    )
+                ) {
+
+                    groups.set(
+                        reviewKey,
+                        {
+
+                            id:
+                                `reference-group-${groups.size + 1}`,
+
+                            status:
+                                "review",
+
+                            representative:
+                                record,
+
+                            variants:
+                                [record],
+
+                            occurrences:
+                                [record],
+
+                            pages:
+                                [],
+
+                            sources:
+                                new Set()
+
+                        }
+                    );
+
+                }
+                else {
+
+                    const group =
+                        groups.get(
+                            reviewKey
+                        );
+
+                    group.variants.push(
+                        record
+                    );
+
+                    group.occurrences.push(
+                        record
+                    );
+
+                }
+
+                return;
+
+            }
+
+
+            const key =
+                getIdentityKey(
+                    record
+                );
+
+
+            if (
+                !groups.has(
+                    key
+                )
+            {
+
+                groups.set(
+                    key,
+                    {
+
+                        id:
+                            `reference-group-${groups.size + 1}`,
+
+                        status:
+                            "reference",
+
+                        representative:
+                            record,
+
+                        variants:
+                            [],
+
+                        occurrences:
+                            [],
+
+                        pages:
+                            [],
+
+                        sources:
+                            new Set()
+
+                    }
+                );
+
+            }
+
+
+            const group =
+                groups.get(
+                    key
+                );
+
+
+            group.variants.push(
+                record
+            );
+
+
+            group.occurrences.push(
+                record
+            );
+
+
+            if (
+                record.source
+            ) {
+
+                group.sources.add(
+                    record.source
+                );
+
+            }
+
+
+            // -----------------------------------------
+            // حفظ مواضع الإحالة
+            // -----------------------------------------
+
+            const page =
+                record.page ||
+                record.resolvedPage ||
+                "";
+
+
+            const pageRange =
+                record.pageRange ||
+                record.resolvedPageRange ||
+                "";
+
+
+            const volume =
+                record.volume ||
+                record.resolvedVolume ||
+                "";
+
+
+            if (
+                page ||
+                pageRange ||
+                volume
+            ) {
+
+                const locationKey =
+                    [
+                        volume,
+                        page,
+                        pageRange
+                    ].join("|");
+
+
+                const alreadyExists =
+                    group.pages.some(
+                        function (
+                            item
+                        ) {
+
+                            return (
+                                item.key ===
+                                locationKey
+                            );
+
+                        }
+                    );
+
+
+                if (
+                    !alreadyExists
+                ) {
+
+                    group.pages.push({
+
+                        key:
+                            locationKey,
+
+                        volume:
+                            volume,
+
+                        page:
+                            page,
+
+                        pageRange:
+                            pageRange,
+
+                        source:
+                            record.source,
+
+                        noteNumber:
+                            record.noteNumber ||
+                            null
+
+                    });
+
+                }
+
+            }
+
+        }
+    );
+
+
+    // =================================================
+    // تحويل Set إلى Array
+    // =================================================
+
+    return Array.from(
+        groups.values()
+    )
+    .map(
+        function (
+            group
+        ) {
+
+            return {
+
+                ...group,
+
+                sources:
+                    Array.from(
+                        group.sources
+                    ),
+
+                occurrenceCount:
+                    group.occurrences.length,
+
+                variantCount:
+                    group.variants.length,
+
+                locationCount:
+                    group.pages.length
+
+            };
+
+        }
+    );
+
+}
+// =====================================================
+// BUILD FINAL REFERENCE RECORD
+// بناء السجل النهائي للمرجع
+// =====================================================
+
+function buildFinalReferenceRecords(
+    groupedReferences
+) {
+
+    if (
+        !Array.isArray(
+            groupedReferences
+        )
+    ) {
+
+        return [];
+    }
+
+
+    function clean(value) {
+
+        return String(
+            value || ""
+        ).trim();
+
+    }
+
+
+    return groupedReferences.map(
+        function (
+            group,
+            index
+        ) {
+
+            const representative =
+                group.representative ||
+                {};
+
+
+            const finalRecord = {
+
+                // -----------------------------------------
+                // هوية السجل
+                // -----------------------------------------
+
+                id:
+                    `final-reference-${index + 1}`,
+
+                groupId:
+                    group.id || "",
+
+
+                // -----------------------------------------
+                // حالة المرجع
+                // -----------------------------------------
+
+                status:
+                    group.status ||
+                    "reference",
+
+
+                // -----------------------------------------
+                // البيانات الببليوغرافية
+                // -----------------------------------------
+
+                author:
+                    clean(
+                        representative.author
+                    ),
+
+                title:
+                    clean(
+                        representative.title
+                    ),
+
+                volume:
+                    clean(
+                        representative.volume
+                        ||
+                        representative.resolvedVolume
+                    ),
+
+                page:
+                    clean(
+                        representative.page
+                        ||
+                        representative.resolvedPage
+                    ),
+
+                pageRange:
+                    clean(
+                        representative.pageRange
+                        ||
+                        representative.resolvedPageRange
+                    ),
+
+                edition:
+                    clean(
+                        representative.edition
+                    ),
+
+                editor:
+                    clean(
+                        representative.editor
+                    ),
+
+                publisher:
+                    clean(
+                        representative.publisher
+                    ),
+
+                city:
+                    clean(
+                        representative.city
+                    ),
+
+                year:
+                    clean(
+                        representative.year
+                    ),
+
+
+                // -----------------------------------------
+                // نوع المصدر
+                // -----------------------------------------
+
+                referenceType:
+                    representative.referenceType
+                    ||
+                    (
+                        representative.kind === "hadith"
+                            ? "hadith"
+                            : "book"
+                    ),
+
+
+                // -----------------------------------------
+                // النصوص الأصلية
+                // -----------------------------------------
+
+                originalText:
+                    clean(
+                        representative.originalText
+                    ),
+
+                cleanedText:
+                    clean(
+                        representative.cleanedText
+                    ),
+
+
+                // -----------------------------------------
+                // الثقة
+                // -----------------------------------------
+
+                confidence:
+                    Number(
+                        representative.confidence || 0
+                    ),
+
+
+                // -----------------------------------------
+                // جميع الصيغ التي ظهرت في المستند
+                // -----------------------------------------
+
+                variants:
+                    Array.isArray(
+                        group.variants
+                    )
+                        ? group.variants.map(
+                            function (
+                                item
+                            ) {
+
+                                return {
+
+                                    text:
+                                        clean(
+                                            item.originalText ||
+                                            item.cleanedText
+                                        ),
+
+                                    source:
+                                        item.source ||
+                                        "",
+
+                                    kind:
+                                        item.kind ||
+                                        "",
+
+                                    noteNumber:
+                                        item.noteNumber ||
+                                        null
+
+                                };
+
+                            }
+                        )
+                        : [],
+
+
+                // -----------------------------------------
+                // جميع مواضع الإحالة
+                // -----------------------------------------
+
+                occurrences:
+                    Array.isArray(
+                        group.occurrences
+                    )
+                        ? group.occurrences.map(
+                            function (
+                                item
+                            ) {
+
+                                return {
+
+                                    source:
+                                        item.source ||
+                                        "",
+
+                                    kind:
+                                        item.kind ||
+                                        "",
+
+                                    noteNumber:
+                                        item.noteNumber ||
+                                        null,
+
+                                    position:
+                                        Number(
+                                            item.position || 0
+                                        ),
+
+                                    text:
+                                        clean(
+                                            item.originalText ||
+                                            item.cleanedText
+                                        )
+
+                                };
+
+                            }
+                        )
+                        : [],
+
+
+                // -----------------------------------------
+                // مواضع الجزء/الصفحة
+                // -----------------------------------------
+
+                locations:
+                    Array.isArray(
+                        group.pages
+                    )
+                        ? group.pages.map(
+                            function (
+                                item
+                            ) {
+
+                                return {
+
+                                    volume:
+                                        clean(
+                                            item.volume
+                                        ),
+
+                                    page:
+                                        clean(
+                                            item.page
+                                        ),
+
+                                    pageRange:
+                                        clean(
+                                            item.pageRange
+                                        ),
+
+                                    source:
+                                        item.source ||
+                                        "",
+
+                                    noteNumber:
+                                        item.noteNumber ||
+                                        null
+
+                                };
+
+                            }
+                        )
+                        : [],
+
+
+                // -----------------------------------------
+                // مصادر ظهور المرجع
+                // -----------------------------------------
+
+                sources:
+                    Array.isArray(
+                        group.sources
+                    )
+                        ? [...group.sources]
+                        : [],
+
+
+                // -----------------------------------------
+                // إحصاءات
+                // -----------------------------------------
+
+                occurrenceCount:
+                    Number(
+                        group.occurrenceCount || 0
+                    ),
+
+                variantCount:
+                    Number(
+                        group.variantCount || 0
+                    ),
+
+                locationCount:
+                    Number(
+                        group.locationCount || 0
+                    ),
+
+
+                // -----------------------------------------
+                // معلومات المراجعة
+                // -----------------------------------------
+
+                unresolved:
+                    Array.isArray(
+                        representative.unresolved
+                    )
+                        ? [
+                            ...representative.unresolved
+                        ]
+                        : [],
+
+                needsReview:
+                    group.status === "review"
+                    ||
+                    (
+                        Array.isArray(
+                            representative.unresolved
+                        )
+                        &&
+                        representative.unresolved.length > 0
+                    )
+
+            };
+
+
+            return finalRecord;
+
+        }
+    );
+
+}
+// =====================================================
+// RENDER FINAL REFERENCE RECORDS
+// عرض السجلات النهائية للمراجع
+// =====================================================
+
+function renderFinalReferenceRecords(
+    finalReferences
+) {
+
+    if (
+        !Array.isArray(finalReferences)
+        ||
+        finalReferences.length === 0
+    ) {
+
+        return `
+            <div class="references-empty">
+                لم يتم العثور على مراجع نهائية.
+            </div>
+        `;
+
+    }
+
+
+    return finalReferences
+        .map(
+            function (
+                record,
+                index
+            ) {
+
+                const author =
+                    record.author ||
+                    "مؤلف غير محدد";
+
+                const title =
+                    record.title ||
+                    record.cleanedText ||
+                    "مرجع غير محدد";
+
+
+                const location =
+                    record.volume
+                    &&
+                    record.page
+
+                        ? `ج ${record.volume} / ص ${record.page}`
+
+                        : record.pageRange
+
+                            ? `ص ${record.pageRange}`
+
+                            : record.page
+
+                                ? `ص ${record.page}`
+
+                                : "";
+
+
+                const reviewClass =
+                    record.needsReview
+                        ? " reference-needs-review"
+                        : "";
+
+
+                return `
+                    <div
+                        class="final-reference-card${reviewClass}"
+                        data-reference-id="${record.id}"
+                    >
+
+                        <div class="final-reference-head">
+
+                            <span class="final-reference-number">
+                                ${index + 1}
+                            </span>
+
+                            <span class="final-reference-type">
+                                ${
+                                    record.referenceType === "hadith"
+                                        ? "حديث"
+                                        : "كتاب"
+                                }
+                            </span>
+
+                        </div>
+
+
+                        <div class="final-reference-author">
+                            ${author}
+                        </div>
+
+
+                        <div class="final-reference-title">
+                            ${title}
+                        </div>
+
+
+                        ${
+                            location
+                                ? `
+                                <div class="final-reference-location">
+                                    ${location}
+                                </div>
+                                `
+                                : ""
+                        }
+
+
+                        <div class="final-reference-meta">
+
+                            تكرار:
+                            ${record.occurrenceCount}
+
+                            &nbsp;·&nbsp;
+
+                            صيغ:
+                            ${record.variantCount}
+
+                            ${
+                                record.needsReview
+                                    ? `
+                                        &nbsp;·&nbsp;
+                                        <span class="reference-review-label">
+                                            يحتاج مراجعة
+                                        </span>
+                                    `
+                                    : ""
+                            }
+
+                        </div>
+
+                    </div>
+                `;
+
+            }
+        )
+        .join("");
+
+}
 // ======================================
 // Normalize Search Text
 // العربية
@@ -22712,6 +23951,72 @@ if (referencesContent) {
                                                 console.log(
                                                     "المراجع بعد تحليل المكونات:",
                                                     parsedReferences
+                                                );
+
+                                                const normalizedReferences =
+                                                    normalizeAllParsedReferences(
+                                                        parsedReferences
+                                                    );
+
+                                                console.log(
+                                                    "المراجع بعد التوحيد:",
+                                                    normalizedReferences
+                                                );
+
+                                                const resolvedReferences =
+                                                    applyIbidResolution(
+                                                        normalizedReferences
+                                                    );
+
+                                                console.log(
+                                                    "المراجع بعد حل المصدر نفسه:",
+                                                    resolvedReferences
+                                                );
+
+                                                const groupedReferences =
+                                                    groupDuplicateReferences(
+                                                        resolvedReferences
+                                                    );
+
+                                                console.log(
+                                                    "المراجع بعد كشف التكرار:",
+                                                    groupedReferences
+                                                );
+
+                                                const finalReferenceRecords =
+                                                    buildFinalReferenceRecords(
+                                                        groupedReferences
+                                                    );
+
+                                                console.log(
+                                                    "السجلات النهائية للمراجع:",
+                                                    finalReferenceRecords
+                                                );
+
+                                                const finalReferenceHTML =
+                                                    renderFinalReferenceRecords(
+                                                        finalReferenceRecords
+                                                    );
+
+
+                                                referencesSourceWorkspace.insertAdjacentHTML(
+                                                    "beforeend",
+                                                    `
+                                                    <div class="references-final-results">
+
+                                                        <div class="references-final-results-title">
+                                                            المراجع المكتشفة
+                                                            <strong>
+                                                                ${finalReferenceRecords.length}
+                                                            </strong>
+                                                        </div>
+
+                                                        <div class="references-final-list">
+                                                            ${finalReferenceHTML}
+                                                        </div>
+
+                                                    </div>
+                                                    `
                                                 );
 
                                                 const referenceRecords =

@@ -930,6 +930,169 @@ body {
     direction: rtl;
 
 }
+
+/* =========================================================
+   FINAL REFERENCES
+   ========================================================= */
+
+.references-final-results {
+
+    margin-top: 18px;
+
+    direction: rtl;
+
+}
+
+
+.references-final-results-title {
+
+    margin-bottom: 10px;
+
+    color: #333;
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+}
+
+
+.references-final-list {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+
+}
+
+
+.final-reference-card {
+
+    padding: 12px 14px;
+
+    border: 1px solid #e3e3e3;
+
+    border-radius: 11px;
+
+    background: #fff;
+
+    box-sizing: border-box;
+
+}
+
+
+.final-reference-card:hover {
+
+    background: #fafafa;
+
+}
+
+
+.final-reference-head {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    margin-bottom: 7px;
+
+}
+
+
+.final-reference-number {
+
+    width: 22px;
+
+    height: 22px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border-radius: 6px;
+
+    background: #f1f1f1;
+
+    color: #666;
+
+    font-size: 10px;
+
+}
+
+
+.final-reference-type {
+
+    color: #888;
+
+    font-size: 10px;
+
+}
+
+
+.final-reference-author {
+
+    color: #222;
+
+    font-size: 12px;
+
+    font-weight: 600;
+
+}
+
+
+.final-reference-title {
+
+    margin-top: 3px;
+
+    color: #333;
+
+    font-size: 12px;
+
+    line-height: 1.6;
+
+}
+
+
+.final-reference-location {
+
+    margin-top: 5px;
+
+    color: #666;
+
+    font-size: 11px;
+
+}
+
+
+.final-reference-meta {
+
+    margin-top: 8px;
+
+    color: #999;
+
+    font-size: 10px;
+
+}
+
+
+.final-reference-card.reference-needs-review {
+
+    border-style: dashed;
+
+}
+
+
+.reference-review-label {
+
+    color: #a66;
+
+}
 /* =========================================================
    الشريط المثبت
 
