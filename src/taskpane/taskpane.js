@@ -2414,6 +2414,587 @@ function processReferenceSources(referenceSources) {
 }
 
 // =====================================================
+// AI UNIFIED REFERENCE ANALYZER
+// تحليل المواد وبناء المراجع الموحدة في طلب واحد
+// =====================================================
+
+async function analyzeAndBuildFinalReferencesWithAI(
+    processedReferences
+) {
+
+    if (
+        !Array.isArray(processedReferences) ||
+        processedReferences.length === 0
+    ) {
+
+        return [];
+
+    }
+
+
+    const settings =
+        getSavedSettings();
+
+
+    const provider =
+        String(
+            settings.provider || "openrouter"
+        ).toLowerCase();
+
+
+    const key =
+        String(
+            settings.key || ""
+        ).trim();
+
+
+    const model =
+        String(
+            settings.model || ""
+        ).trim();
+
+
+    if (!key) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
+        );
+
+    }
+
+
+    if (!model) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
+        );
+
+    }
+
+
+    // =================================================
+    // إعداد المواد التي سترسل إلى الذكاء الاصطناعي
+    // =================================================
+
+    const materials =
+        processedReferences.map(
+            function (
+                material,
+                index
+            ) {
+
+                return {
+
+                    materialId:
+                        String(
+                            material.id ||
+                            `material-${index + 1}`
+                        ),
+
+                    source:
+                        String(
+                            material.source || ""
+                        ),
+
+                    kind:
+                        String(
+                            material.kind || ""
+                        ),
+
+                    noteNumber:
+                        material.noteNumber ??
+                        null,
+
+                    marker:
+                        String(
+                            material.marker || ""
+                        ),
+
+                    text:
+                        String(
+                            material.originalText ||
+                            material.cleanedText ||
+                            material.text ||
+                            ""
+                        ),
+
+                    context:
+                        String(
+                            material.context ||
+                            ""
+                        )
+
+                };
+
+            }
+        );
+
+
+    // =================================================
+    // التعليمات الرئيسية
+    // =================================================
+
+    const systemPrompt = `
+
+أنت محلل مراجع أكاديمي متخصص في الدراسات العربية
+والدراسات الإسلامية والفقه وأصول الفقه.
+
+ستتلقى مواد خام مأخوذة من:
+- متن مستند Word
+- حواشي سفلية
+- حواشي ختامية
+
+مهمتك أن تنتج مباشرة قائمة المراجع الموحدة النهائية.
+
+لا أريد منك قائمة بالمواد الخام.
+لا أريد منك نتيجة تحليل أولي لكل مادة.
+أريد فقط السجلات المرجعية الموحدة النهائية.
+
+القواعد:
+
+1. استخرج المراجع الببليوغرافية الحقيقية فقط.
+
+2. وحّد الصيغ المختلفة التي تشير إلى الكتاب نفسه.
+مثال:
+"الزركشي، البحر المحيط 8/85"
+و
+"الزركشي، البحر المحيط في أصول الفقه، ط1، 8/85"
+هما مرجع واحد إذا كان السياق يسمح بذلك.
+
+3. اختلاف الصفحة أو الجزء لا يجعل الكتاب مرجعًا جديدًا.
+يجب وضع جميع مواضع الاستشهاد داخل locations.
+
+4. اختلاف طريقة كتابة المرجع لا يجعله مرجعًا جديدًا.
+ضع الصيغ الأصلية في variants.
+
+5. احتفظ بكل materialId التي استُخدمت في المرجع داخل occurrences.
+
+6. "المصدر نفسه" و"المرجع نفسه" ليست مراجع جديدة.
+اربطها بالمرجع السابق المناسب عند الإمكان.
+
+7. لا تربط "المصدر نفسه" بمرجع سابق إذا كان الربط غير موثوق.
+عند الشك اجعل needsReview = true.
+
+8. إذا احتوت مادة واحدة على عدة مراجع:
+أنشئ سجلات مستقلة لكل مرجع.
+
+9. لا تعتبر إحالات صفحات الدراسة مثل:
+"ص 413"
+"ص 25-26"
+"في هذه الدراسة ص 67"
+مراجع ببليوغرافية.
+
+10. لا تعتبر المصطلحات أو التواريخ أو الجمل الشارحة مراجع.
+
+11. تخريج الحديث يجب أن يبقى من النوع hadith وليس book.
+
+12. المجلات والدوريات تكون من النوع journal.
+
+13. لا تخترع:
+- اسم مؤلف
+- عنوان كتاب
+- دار نشر
+- مدينة
+- سنة
+- رقم مجلد
+- رقم صفحة
+
+إذا لم تكن المعلومة موجودة فلا تخترعها.
+
+14. إذا كان رقم أو معلومة تبدو خطأ مطبعيًا في المصدر الأصلي:
+احتفظ بها كما هي، وضع ملاحظة في notes.
+
+15. لا تدمج مرجعين لمجرد تشابه العنوان.
+يجب أن تتوفر قرائن كافية على أنهما الكتاب نفسه.
+
+16. عند وجود اسم مختصر للكتاب واسم كامل لنفس الكتاب، يجوز توحيدهما إذا كان السياق واضحًا.
+
+17. أعد جميع المراجع الموحدة، حتى المرجع الذي ظهر مرة واحدة.
+
+18. confidence بين 0 و1.
+
+19. needsReview = true عندما يكون التعرف أو الدمج غير مؤكد.
+
+20. أعد JSON فقط.
+لا تستخدم Markdown.
+لا تضف أي شرح قبل JSON أو بعده.
+
+الصيغة:
+
+{
+  "references": [
+    {
+      "id": "ref-1",
+      "type": "book",
+      "author": "",
+      "title": "",
+      "edition": "",
+      "editor": "",
+      "publisher": "",
+      "city": "",
+      "year": "",
+      "locations": [
+        {
+          "volume": "",
+          "page": "",
+          "pageRange": ""
+        }
+      ],
+      "variants": [],
+      "occurrences": [],
+      "notes": "",
+      "confidence": 0.0,
+      "needsReview": false
+    }
+  ]
+}
+
+أنواع type المسموح بها:
+book
+journal
+hadith
+
+لا تضع explanatory أو internal-reference أو review داخل references.
+هذه مواد لا تدخل قائمة المراجع النهائية.
+
+في occurrences استخدم materialId فقط.
+`;
+
+
+    const userPrompt =
+        [
+            "حلل مواد المستند التالية وابنِ قائمة المراجع الموحدة مباشرة.",
+            "",
+            JSON.stringify(
+                materials,
+                null,
+                2
+            )
+        ].join("\n");
+
+
+    let result;
+
+
+    // =================================================
+    // Gemini
+    // =================================================
+
+    if (
+        provider ===
+        "gemini"
+    ) {
+
+        const response =
+            await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizeGeminiModel(model))}:generateContent?key=${encodeURIComponent(key)}`,
+                {
+
+                    method:
+                        "POST",
+
+                    headers:
+                        {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                    body:
+                        JSON.stringify({
+
+                            systemInstruction:
+                                {
+                                    parts:
+                                        [
+                                            {
+                                                text:
+                                                    systemPrompt
+                                            }
+                                        ]
+                                },
+
+                            contents:
+                                [
+                                    {
+                                        role:
+                                            "user",
+
+                                        parts:
+                                            [
+                                                {
+                                                    text:
+                                                        userPrompt
+                                                }
+                                            ]
+                                    }
+                                ],
+
+                            generationConfig:
+                                {
+                                    temperature:
+                                        0.1,
+
+                                    maxOutputTokens:
+                                        12000
+                                }
+
+                        })
+
+                }
+            );
+
+
+        result =
+            await readJSON(
+                response
+            );
+
+
+        if (
+            !response.ok
+        ) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل تحليل المراجع باستخدام Gemini."
+                )
+            );
+
+        }
+
+
+        const answer =
+            extractGeminiAnswer(
+                result
+            );
+
+
+        return parseUnifiedReferenceJSON(
+            answer
+        );
+
+    }
+
+
+    // =================================================
+    // OpenAI / OpenRouter / Groq
+    // =================================================
+
+    const endpoint =
+        provider === "openai"
+
+            ? "https://api.openai.com/v1/chat/completions"
+
+            : provider === "groq"
+
+                ? "https://api.groq.com/openai/v1/chat/completions"
+
+                : "https://openrouter.ai/api/v1/chat/completions";
+
+
+    const headers = {
+
+        "Content-Type":
+            "application/json",
+
+        "Authorization":
+            "Bearer " + key
+
+    };
+
+
+    if (
+        provider ===
+        "openrouter"
+    ) {
+
+        headers[
+            "HTTP-Referer"
+        ] =
+            window.location.href;
+
+        headers[
+            "X-Title"
+        ] =
+            "Research Tools";
+
+    }
+
+
+    const response =
+        await fetch(
+            endpoint,
+            {
+
+                method:
+                    "POST",
+
+                headers:
+                    headers,
+
+                body:
+                    JSON.stringify({
+
+                        model:
+                            model,
+
+                        messages:
+                            [
+                                {
+                                    role:
+                                        "system",
+
+                                    content:
+                                        systemPrompt
+                                },
+
+                                {
+                                    role:
+                                        "user",
+
+                                    content:
+                                        userPrompt
+                                }
+                            ],
+
+                        temperature:
+                            0.1,
+
+                        max_tokens:
+                            provider ===
+                            "groq"
+                                ? 12000
+                                : 14000
+
+                    })
+
+            }
+        );
+
+
+    result =
+        await readJSON(
+            response
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        throw new Error(
+            getAPIError(
+                result,
+                `فشل تحليل المراجع باستخدام ${provider}.`
+            )
+        );
+
+    }
+
+
+    const answer =
+        extractOpenAIStyleAnswer(
+            result,
+            provider
+        );
+
+
+    return parseUnifiedReferenceJSON(
+        answer
+    );
+
+}
+// =====================================================
+// PARSE UNIFIED REFERENCE JSON
+// =====================================================
+
+function parseUnifiedReferenceJSON(
+    text
+) {
+
+    let raw =
+        String(
+            text || ""
+        ).trim();
+
+
+    if (!raw) {
+
+        throw new Error(
+            "لم يُعد الذكاء الاصطناعي أي بيانات للمراجع."
+        );
+
+    }
+
+
+    raw =
+        raw.replace(
+            /^```json\s*/i,
+            ""
+        );
+
+
+    raw =
+        raw.replace(
+            /^```\s*/i,
+            ""
+        );
+
+
+    raw =
+        raw.replace(
+            /\s*```$/i,
+            ""
+        );
+
+
+    let parsed;
+
+
+    try {
+
+        parsed =
+            JSON.parse(
+                raw
+            );
+
+    }
+    catch (
+        error
+    ) {
+
+        console.error(
+            "النص الذي أعاده الذكاء الاصطناعي:",
+            raw
+        );
+
+
+        throw new Error(
+            "تعذر قراءة نتيجة المراجع الموحدة التي أعادها الذكاء الاصطناعي."
+        );
+
+    }
+
+
+    if (
+        !parsed ||
+        !Array.isArray(
+            parsed.references
+        )
+    ) {
+
+        throw new Error(
+            "نتيجة الذكاء الاصطناعي لا تحتوي على قائمة مراجع صحيحة."
+        );
+
+    }
+
+
+    return parsed.references;
+
+}
+// =====================================================
 // PARSE REFERENCE RECORD
 // تحليل مكونات المرجع الواحد
 // =====================================================
@@ -24890,550 +25471,663 @@ if (referencesContent) {
                         // =====================================================
 
                         if (
-                            source ===
+                            source !==
                             "current-document"
                         ) {
 
-                            referencesSourceDocument =
-                                null;
+                            return;
+
+                        }
 
 
-                            referencesSourceWorkspace.innerHTML =
-                                `
-                                <div class="references-selected-source">
-
-                                    <div class="references-selected-icon">
-
-                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                             viewBox="0 0 24 24"
-                                             fill="none"
-                                             stroke="#000000"
-                                             stroke-width="1"
-                                             stroke-linecap="round"
-                                             stroke-linejoin="round"
-                                             aria-hidden="true">
-
-                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-
-                                            <polyline points="14 2 14 8 20 8"/>
-
-                                            <line x1="8" y1="13" x2="16" y2="13"/>
-
-                                            <line x1="8" y1="17" x2="16" y2="17"/>
-
-                                            <line x1="8" y1="9" x2="10" y2="9"/>
-
-                                        </svg>
-
-                                    </div>
+                        referencesSourceDocument =
+                            null;
 
 
-                                    <div class="references-selected-info">
+                        referencesSourceWorkspace.innerHTML =
+                            `
+                            <div class="references-selected-source">
 
-                                        <div class="references-selected-title">
-                                            المستند المفتوح حاليًا في Word
-                                        </div>
+                                <div class="references-selected-icon">
 
-                                        <div class="references-selected-name">
-                                            سيتم تحليل المستند النشط
-                                        </div>
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                         viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="#000000"
+                                         stroke-width="1"
+                                         stroke-linecap="round"
+                                         stroke-linejoin="round"
+                                         aria-hidden="true">
 
-                                    </div>
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+
+                                        <polyline points="14 2 14 8 20 8"/>
+
+                                        <line x1="8" y1="13" x2="16" y2="13"/>
+
+                                        <line x1="8" y1="17" x2="16" y2="17"/>
+
+                                        <line x1="8" y1="9" x2="10" y2="9"/>
+
+                                    </svg>
 
                                 </div>
 
 
-                                <button
-                                    type="button"
-                                    id="analyze-references-btn"
-                                    class="analyze-references-btn">
+                                <div class="references-selected-info">
 
-                                    تحليل المراجع
+                                    <div class="references-selected-title">
+                                        المستند المفتوح حاليًا في Word
+                                    </div>
 
-                                </button>
-                                `;
+                                    <div class="references-selected-name">
+                                        سيتم تحليل المستند النشط
+                                    </div>
 
+                                </div>
 
-                            const analyzeReferencesBtn =
-                                document.getElementById(
-                                    "analyze-references-btn"
-                                );
+                            </div>
 
 
-                            if (
-                                !analyzeReferencesBtn
-                            ) {
+                            <button
+                                type="button"
+                                id="analyze-references-btn"
+                                class="analyze-references-btn">
 
-                                return;
+                                تحليل المراجع
 
-                            }
-
-
-                            analyzeReferencesBtn.onclick =
-                                async function (e) {
-
-                                    e.preventDefault();
-                                    e.stopPropagation();
+                            </button>
+                            `;
 
 
-                                    analyzeReferencesBtn.disabled =
-                                        true;
+                        const analyzeReferencesBtn =
+                            document.getElementById(
+                                "analyze-references-btn"
+                            );
+
+
+                        if (
+                            !analyzeReferencesBtn
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        analyzeReferencesBtn.onclick =
+                            async function (e) {
+
+                                e.preventDefault();
+                                e.stopPropagation();
+
+
+                                analyzeReferencesBtn.disabled =
+                                    true;
+
+                                analyzeReferencesBtn.textContent =
+                                    "جارٍ قراءة المستند...";
+
+
+                                try {
+
+                                    // =================================================
+                                    // 1. قراءة المستند المفتوح فعليًا في Word
+                                    // =================================================
+
+                                    const referenceSources =
+                                        await readReferenceSources();
+
+
+                                    if (
+                                        !referenceSources ||
+                                        !referenceSources.mainText
+                                    ) {
+
+                                        throw new Error(
+                                            "تعذر الحصول على نص المستند المفتوح."
+                                        );
+
+                                    }
+
+
+                                    // =================================================
+                                    // 2. تجهيز المواد الخام
+                                    //
+                                    // لا نحاول هنا تحديد هل المادة مرجع أم شرح.
+                                    // نكتفي بجمع المواد التي يمكن أن تكون ذات صلة.
+                                    // =================================================
 
                                     analyzeReferencesBtn.textContent =
-                                        "جارٍ تحليل المراجع بالذكاء الاصطناعي...";
+                                        "جارٍ تجهيز مواد المراجع...";
 
 
-                                    try {
-
-                                        // =================================================
-                                        // 1. قراءة المستند المفتوح فعليًا في Word
-                                        // =================================================
-
-                                        const referenceSources =
-                                            await readReferenceSources();
+                                    const processedReferences =
+                                        processReferenceSources(
+                                            referenceSources
+                                        );
 
 
-                                        if (
-                                            !referenceSources ||
-                                            !referenceSources.mainText
-                                        ) {
+                                    if (
+                                        !Array.isArray(
+                                            processedReferences
+                                        ) ||
+                                        processedReferences.length === 0
+                                    ) {
 
-                                            throw new Error(
-                                                "تعذر الحصول على نص المستند المفتوح."
-                                            );
+                                        throw new Error(
+                                            "لم يتم العثور على مواد قابلة لتحليل المراجع."
+                                        );
 
-                                        }
-
-
-                                        // =================================================
-                                        // 2. تجهيز المواد الخام
-                                        // =================================================
-
-                                        const processedReferences =
-                                            processReferenceSources(
-                                                referenceSources
-                                            );
+                                    }
 
 
-                                        if (
-                                            !Array.isArray(
-                                                processedReferences
-                                            ) ||
-                                            processedReferences.length === 0
-                                        ) {
-
-                                            throw new Error(
-                                                "لم يتم العثور على مواد قابلة للتحليل."
-                                            );
-
-                                        }
+                                    console.log(
+                                        "مواد المراجع المجهزة:",
+                                        processedReferences
+                                    );
 
 
-                                        console.log(
-                                            "المواد الخام المجهزة:",
+                                    // =================================================
+                                    // 3. تحليل وبناء المراجع الموحدة
+                                    //
+                                    // طلب ذكاء اصطناعي واحد
+                                    // =================================================
+
+                                    analyzeReferencesBtn.textContent =
+                                        "جارٍ تحليل وبناء المراجع الموحدة...";
+
+
+                                    const finalReferenceRecords =
+                                        await analyzeAndBuildFinalReferencesWithAI(
                                             processedReferences
                                         );
 
 
-                                        // =================================================
-                                        // 3. المرحلة الأولى:
-                                        // فهم كل مادة بالذكاء الاصطناعي
-                                        // =================================================
+                                    if (
+                                        !Array.isArray(
+                                            finalReferenceRecords
+                                        )
+                                    ) {
 
-                                        const aiReferenceResults =
-                                            await analyzeReferencesWithAI(
-                                                processedReferences
-                                            );
-
-
-                                        if (
-                                            !Array.isArray(
-                                                aiReferenceResults
-                                            )
-                                        ) {
-
-                                            throw new Error(
-                                                "لم تصل نتيجة منظمة من محلل المراجع."
-                                            );
-
-                                        }
-
-
-                                        console.log(
-                                            "نتائج التحليل الأولي:",
-                                            aiReferenceResults
+                                        throw new Error(
+                                            "لم تصل قائمة منظمة من المراجع الموحدة."
                                         );
 
-
-                                        // =================================================
-                                        // 4. إحصاءات التحليل الأولي
-                                        // =================================================
-
-                                        let referenceCount =
-                                            0;
-
-                                        let multipleReferenceCount =
-                                            0;
-
-                                        let ibidCount =
-                                            0;
-
-                                        let internalReferenceCount =
-                                            0;
-
-                                        let hadithCount =
-                                            0;
-
-                                        let explanatoryCount =
-                                            0;
-
-                                        let mixedCount =
-                                            0;
-
-                                        let reviewCount =
-                                            0;
+                                    }
 
 
-                                        aiReferenceResults.forEach(
-                                            function (
-                                                item
+                                    console.log(
+                                        "المراجع الموحدة النهائية:",
+                                        finalReferenceRecords
+                                    );
+
+
+                                    // =================================================
+                                    // 4. تنظيف HTML
+                                    // =================================================
+
+                                    function escapeHTML(
+                                        value
+                                    ) {
+
+                                        return String(
+                                            value ?? ""
+                                        )
+                                            .replace(
+                                                /&/g,
+                                                "&amp;"
+                                            )
+                                            .replace(
+                                                /</g,
+                                                "&lt;"
+                                            )
+                                            .replace(
+                                                />/g,
+                                                "&gt;"
+                                            )
+                                            .replace(
+                                                /"/g,
+                                                "&quot;"
+                                            )
+                                            .replace(
+                                                /'/g,
+                                                "&#039;"
+                                            );
+
+                                    }
+
+
+                                    // =================================================
+                                    // 5. إحصاءات المراجع الموحدة
+                                    // =================================================
+
+                                    let bookCount =
+                                        0;
+
+                                    let journalCount =
+                                        0;
+
+                                    let hadithCount =
+                                        0;
+
+                                    let reviewCount =
+                                        0;
+
+                                    let totalOccurrences =
+                                        0;
+
+
+                                    finalReferenceRecords.forEach(
+                                        function (
+                                            reference
+                                        ) {
+
+                                            const type =
+                                                String(
+                                                    reference?.type ||
+                                                    "book"
+                                                )
+                                                    .trim()
+                                                    .toLowerCase();
+
+
+                                            if (
+                                                type ===
+                                                "book"
                                             ) {
 
-                                                const itemClass =
-                                                    String(
-                                                        item?.class ||
-                                                        ""
-                                                    ).trim();
-
-
-                                                if (
-                                                    itemClass ===
-                                                    "reference"
-                                                ) {
-
-                                                    referenceCount++;
-
-                                                }
-                                                else if (
-                                                    itemClass ===
-                                                    "multiple-reference"
-                                                ) {
-
-                                                    multipleReferenceCount++;
-
-                                                }
-                                                else if (
-                                                    itemClass ===
-                                                    "ibid"
-                                                ) {
-
-                                                    ibidCount++;
-
-                                                }
-                                                else if (
-                                                    itemClass ===
-                                                    "internal-reference"
-                                                ) {
-
-                                                    internalReferenceCount++;
-
-                                                }
-                                                else if (
-                                                    itemClass ===
-                                                    "hadith"
-                                                ) {
-
-                                                    hadithCount++;
-
-                                                }
-                                                else if (
-                                                    itemClass ===
-                                                    "explanatory"
-                                                ) {
-
-                                                    explanatoryCount++;
-
-                                                }
-                                                else if (
-                                                    itemClass ===
-                                                    "mixed"
-                                                ) {
-
-                                                    mixedCount++;
-
-                                                }
-                                                else {
-
-                                                    reviewCount++;
-
-                                                }
+                                                bookCount++;
 
                                             }
-                                        );
+                                            else if (
+                                                type ===
+                                                "journal"
+                                            ) {
+
+                                                journalCount++;
+
+                                            }
+                                            else if (
+                                                type ===
+                                                "hadith"
+                                            ) {
+
+                                                hadithCount++;
+
+                                            }
 
 
-                                        // =================================================
-                                        // 5. المرحلة الثانية:
-                                        // توحيد وتجميع المراجع بالذكاء الاصطناعي
-                                        // =================================================
+                                            if (
+                                                reference?.needsReview
+                                            ) {
 
-                                        analyzeReferencesBtn.textContent =
-                                            "جارٍ توحيد المراجع...";
+                                                reviewCount++;
 
-
-                                        const mergedReferenceResults =
-                                            await mergeReferencesWithAI(
-                                                aiReferenceResults
-                                            );
+                                            }
 
 
-                                        if (
-                                            !Array.isArray(
-                                                mergedReferenceResults
-                                            )
-                                        ) {
+                                            if (
+                                                Array.isArray(
+                                                    reference?.occurrences
+                                                )
+                                            ) {
 
-                                            throw new Error(
-                                                "لم تصل نتيجة منظمة من مرحلة توحيد المراجع."
-                                            );
+                                                totalOccurrences +=
+                                                    reference.occurrences.length;
+
+                                            }
 
                                         }
+                                    );
 
 
-                                        console.log(
-                                            "المراجع الموحدة:",
-                                            mergedReferenceResults
-                                        );
+                                    // =================================================
+                                    // 6. بناء بطاقات المراجع النهائية
+                                    // =================================================
+
+                                    const finalReferenceHTML =
+                                        finalReferenceRecords
+                                            .map(
+                                                function (
+                                                    reference,
+                                                    index
+                                                ) {
+
+                                                    const type =
+                                                        String(
+                                                            reference?.type ||
+                                                            "book"
+                                                        )
+                                                            .trim()
+                                                            .toLowerCase();
 
 
-                                        // =================================================
-                                        // 6. تنظيف HTML
-                                        // =================================================
+                                                    const typeLabel =
+                                                        type ===
+                                                        "book"
 
-                                        function escapeHTML(
-                                            value
-                                        ) {
+                                                            ? "كتاب"
 
-                                            return String(
-                                                value ?? ""
-                                            )
-                                                .replace(
-                                                    /&/g,
-                                                    "&amp;"
-                                                )
-                                                .replace(
-                                                    /</g,
-                                                    "&lt;"
-                                                )
-                                                .replace(
-                                                    />/g,
-                                                    "&gt;"
-                                                )
-                                                .replace(
-                                                    /"/g,
-                                                    "&quot;"
-                                                )
-                                                .replace(
-                                                    /'/g,
-                                                    "&#039;"
-                                                );
+                                                            : type ===
+                                                              "journal"
 
-                                        }
+                                                                ? "دورية"
+
+                                                                : type ===
+                                                                  "hadith"
+
+                                                                    ? "حديث"
+
+                                                                    : escapeHTML(
+                                                                        type
+                                                                    );
 
 
-                                        // =================================================
-                                        // 7. بناء بطاقات المراجع الموحدة
-                                        // =================================================
-
-                                        const mergedReferenceHTML =
-                                            mergedReferenceResults
-                                                .map(
-                                                    function (
-                                                        reference,
-                                                        index
-                                                    ) {
-
-                                                        const author =
-                                                            escapeHTML(
-                                                                reference?.author ||
-                                                                ""
-                                                            );
+                                                    const author =
+                                                        escapeHTML(
+                                                            reference?.author ||
+                                                            ""
+                                                        );
 
 
-                                                        const title =
-                                                            escapeHTML(
-                                                                reference?.title ||
-                                                                ""
-                                                            );
+                                                    const title =
+                                                        escapeHTML(
+                                                            reference?.title ||
+                                                            ""
+                                                        );
 
 
-                                                        const type =
-                                                            escapeHTML(
-                                                                reference?.type ||
-                                                                "book"
-                                                            );
+                                                    const edition =
+                                                        escapeHTML(
+                                                            reference?.edition ||
+                                                            ""
+                                                        );
 
 
-                                                        const locations =
-                                                            Array.isArray(
-                                                                reference?.locations
+                                                    const editor =
+                                                        escapeHTML(
+                                                            reference?.editor ||
+                                                            ""
+                                                        );
+
+
+                                                    const publisher =
+                                                        escapeHTML(
+                                                            reference?.publisher ||
+                                                            ""
+                                                        );
+
+
+                                                    const city =
+                                                        escapeHTML(
+                                                            reference?.city ||
+                                                            ""
+                                                        );
+
+
+                                                    const year =
+                                                        escapeHTML(
+                                                            reference?.year ||
+                                                            ""
+                                                        );
+
+
+                                                    const notes =
+                                                        escapeHTML(
+                                                            reference?.notes ||
+                                                            ""
+                                                        );
+
+
+                                                    const locations =
+                                                        Array.isArray(
+                                                            reference?.locations
+                                                        )
+                                                            ? reference.locations
+                                                            : [];
+
+
+                                                    const variants =
+                                                        Array.isArray(
+                                                            reference?.variants
+                                                        )
+                                                            ? reference.variants
+                                                            : [];
+
+
+                                                    const occurrences =
+                                                        Array.isArray(
+                                                            reference?.occurrences
+                                                        )
+                                                            ? reference.occurrences
+                                                            : [];
+
+
+                                                    const confidence =
+                                                        Math.max(
+                                                            0,
+                                                            Math.min(
+                                                                100,
+                                                                Math.round(
+                                                                    Number(
+                                                                        reference?.confidence ||
+                                                                        0
+                                                                    ) *
+                                                                    100
+                                                                )
                                                             )
-                                                                ? reference.locations
-                                                                : [];
+                                                        );
 
 
-                                                        const occurrences =
-                                                            Array.isArray(
-                                                                reference?.occurrences
-                                                            )
-                                                                ? reference.occurrences
-                                                                : [];
+                                                    const locationHTML =
+                                                        locations
+                                                            .map(
+                                                                function (
+                                                                    location
+                                                                ) {
+
+                                                                    const volume =
+                                                                        escapeHTML(
+                                                                            location?.volume ||
+                                                                            ""
+                                                                        );
 
 
-                                                        const variants =
-                                                            Array.isArray(
-                                                                reference?.variants
-                                                            )
-                                                                ? reference.variants
-                                                                : [];
+                                                                    const page =
+                                                                        escapeHTML(
+                                                                            location?.page ||
+                                                                            ""
+                                                                        );
 
 
-                                                        const locationHTML =
-                                                            locations
-                                                                .map(
-                                                                    function (
-                                                                        location
+                                                                    const pageRange =
+                                                                        escapeHTML(
+                                                                            location?.pageRange ||
+                                                                            ""
+                                                                        );
+
+
+                                                                    if (
+                                                                        volume &&
+                                                                        page
                                                                     ) {
 
-                                                                        const volume =
-                                                                            escapeHTML(
-                                                                                location?.volume ||
-                                                                                ""
-                                                                            );
-
-
-                                                                        const page =
-                                                                            escapeHTML(
-                                                                                location?.page ||
-                                                                                ""
-                                                                            );
-
-
-                                                                        const pageRange =
-                                                                            escapeHTML(
-                                                                                location?.pageRange ||
-                                                                                ""
-                                                                            );
-
-
-                                                                        if (
-                                                                            volume &&
-                                                                            page
-                                                                        ) {
-
-                                                                            return `
+                                                                        return `
                                                                             <div class="ai-merged-location">
                                                                                 ج ${volume} / ص ${page}
                                                                             </div>
-                                                                            `;
+                                                                        `;
 
-                                                                        }
+                                                                    }
 
 
-                                                                        if (
-                                                                            pageRange
-                                                                        ) {
+                                                                    if (
+                                                                        pageRange
+                                                                    ) {
 
-                                                                            return `
+                                                                        return `
                                                                             <div class="ai-merged-location">
                                                                                 ص ${pageRange}
                                                                             </div>
-                                                                            `;
+                                                                        `;
 
-                                                                        }
+                                                                    }
 
 
-                                                                        if (
-                                                                            page
-                                                                        ) {
+                                                                    if (
+                                                                        page
+                                                                    ) {
 
-                                                                            return `
+                                                                        return `
                                                                             <div class="ai-merged-location">
                                                                                 ص ${page}
                                                                             </div>
-                                                                            `;
-
-                                                                        }
-
-
-                                                                        return "";
+                                                                        `;
 
                                                                     }
-                                                                )
-                                                                .join("");
 
 
-                                                        const variantsHTML =
-                                                            variants.length
+                                                                    return "";
 
-                                                                ? `
-                                                                    <div class="ai-merged-reference-variants">
+                                                                }
+                                                            )
+                                                            .join("");
 
-                                                                        <div class="ai-merged-reference-section-title">
-                                                                            صيغ الظهور
-                                                                        </div>
 
-                                                                        ${variants
-                                                                            .map(
-                                                                                function (
-                                                                                    variant
-                                                                                ) {
+                                                    const variantsHTML =
+                                                        variants.length > 0
 
-                                                                                    return `
+                                                            ? `
+                                                                <div class="ai-merged-reference-variants">
+
+                                                                    <div class="ai-merged-reference-section-title">
+                                                                        صيغ الظهور
+                                                                    </div>
+
+                                                                    ${variants
+                                                                        .map(
+                                                                            function (
+                                                                                variant
+                                                                            ) {
+
+                                                                                return `
                                                                                     <div class="ai-merged-reference-variant">
                                                                                         ${escapeHTML(
                                                                                             variant
                                                                                         )}
                                                                                     </div>
-                                                                                    `;
+                                                                                `;
 
-                                                                                }
-                                                                            )
-                                                                            .join("")}
+                                                                            }
+                                                                        )
+                                                                        .join("")}
 
-                                                                    </div>
-                                                                  `
+                                                                </div>
+                                                            `
 
-                                                                : "";
-
-
-                                                        const needsReview =
-                                                            reference?.needsReview
-                                                                ? `
-                                                                    <span class="ai-merged-review">
-                                                                        يحتاج مراجعة
-                                                                    </span>
-                                                                  `
-                                                                : "";
+                                                            : "";
 
 
-                                                        const confidence =
-                                                            Math.max(
-                                                                0,
-                                                                Math.min(
-                                                                    100,
-                                                                    Math.round(
-                                                                        Number(
-                                                                            reference?.confidence ||
-                                                                            0
-                                                                        ) *
-                                                                        100
-                                                                    )
-                                                                )
-                                                            );
+                                                    const reviewHTML =
+                                                        reference?.needsReview
+
+                                                            ? `
+                                                                <span class="ai-merged-review">
+                                                                    يحتاج مراجعة
+                                                                </span>
+                                                            `
+
+                                                            : "";
 
 
-                                                        return `
+                                                    const metadataParts = [];
+
+
+                                                    if (
+                                                        edition
+                                                    ) {
+
+                                                        metadataParts.push(
+                                                            `الطبعة: ${edition}`
+                                                        );
+
+                                                    }
+
+
+                                                    if (
+                                                        editor
+                                                    ) {
+
+                                                        metadataParts.push(
+                                                            `تحقيق: ${editor}`
+                                                        );
+
+                                                    }
+
+
+                                                    if (
+                                                        publisher
+                                                    ) {
+
+                                                        metadataParts.push(
+                                                            `الناشر: ${publisher}`
+                                                        );
+
+                                                    }
+
+
+                                                    if (
+                                                        city
+                                                    ) {
+
+                                                        metadataParts.push(
+                                                            `المكان: ${city}`
+                                                        );
+
+                                                    }
+
+
+                                                    if (
+                                                        year
+                                                    ) {
+
+                                                        metadataParts.push(
+                                                            `السنة: ${year}`
+                                                        );
+
+                                                    }
+
+
+                                                    const metadataHTML =
+                                                        metadataParts.length > 0
+
+                                                            ? `
+                                                                <div class="ai-merged-reference-metadata">
+                                                                    ${metadataParts
+                                                                        .map(
+                                                                            function (
+                                                                                item
+                                                                            ) {
+
+                                                                                return `
+                                                                                    <div>
+                                                                                        ${escapeHTML(
+                                                                                            item
+                                                                                        )}
+                                                                                    </div>
+                                                                                `;
+
+                                                                            }
+                                                                        )
+                                                                        .join("")}
+                                                                </div>
+                                                            `
+
+                                                            : "";
+
+
+                                                    return `
                                                         <div
                                                             class="ai-merged-reference"
                                                             data-reference-id="${escapeHTML(
@@ -25449,7 +26143,7 @@ if (referencesContent) {
                                                             <div class="ai-merged-reference-content">
 
                                                                 <div class="ai-merged-reference-type">
-                                                                    ${type === "book" ? "كتاب" : escapeHTML(type)}
+                                                                    ${typeLabel}
                                                                 </div>
 
 
@@ -25470,17 +26164,22 @@ if (referencesContent) {
 
 
                                                                 ${
+                                                                    metadataHTML
+                                                                }
+
+
+                                                                ${
                                                                     locationHTML
                                                                         ? `
-                                                                        <div class="ai-merged-reference-locations">
+                                                                            <div class="ai-merged-reference-locations">
 
-                                                                            <div class="ai-merged-reference-section-title">
-                                                                                مواضع الاستشهاد
+                                                                                <div class="ai-merged-reference-section-title">
+                                                                                    مواضع الاستشهاد
+                                                                                </div>
+
+                                                                                ${locationHTML}
+
                                                                             </div>
-
-                                                                            ${locationHTML}
-
-                                                                        </div>
                                                                         `
                                                                         : ""
                                                                 }
@@ -25505,282 +26204,315 @@ if (referencesContent) {
                                                                         ${confidence}%
                                                                     </strong>
 
-                                                                    ${needsReview}
+                                                                    ${reviewHTML}
 
                                                                 </div>
+
+
+                                                                ${
+                                                                    notes
+                                                                        ? `
+                                                                            <div class="ai-merged-reference-notes">
+
+                                                                                ${notes}
+
+                                                                            </div>
+                                                                        `
+                                                                        : ""
+                                                                }
 
                                                             </div>
 
                                                         </div>
-                                                        `;
-
-                                                    }
-                                                )
-                                                .join("");
-
-
-                                        // =================================================
-                                        // 8. إزالة النتيجة السابقة
-                                        // =================================================
-
-                                        referencesSourceWorkspace
-                                            .querySelectorAll(
-                                                ".references-analysis-result"
-                                            )
-                                            .forEach(
-                                                function (
-                                                    element
-                                                ) {
-
-                                                    element.remove();
+                                                    `;
 
                                                 }
-                                            );
+                                            )
+                                            .join("");
 
 
-                                        // =================================================
-                                        // 9. عرض النتيجة النهائية الحالية
-                                        // =================================================
+                                    // =================================================
+                                    // 7. إزالة النتائج السابقة
+                                    // =================================================
 
-                                        referencesSourceWorkspace.insertAdjacentHTML(
-                                            "beforeend",
-                                            `
-                                            <div class="references-analysis-result">
+                                    referencesSourceWorkspace
+                                        .querySelectorAll(
+                                            ".references-analysis-result"
+                                        )
+                                        .forEach(
+                                            function (
+                                                element
+                                            ) {
 
-                                                <div class="references-analysis-status success">
-
-                                                    ✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي
-
-                                                </div>
-
-
-                                                <div class="references-analysis-info">
-
-                                                    <div>
-                                                        المتن:
-                                                        <strong>
-                                                            ${referenceSources.mainText.length}
-                                                        </strong>
-                                                        حرف
-                                                    </div>
-
-
-                                                    <div>
-                                                        الحواشي السفلية:
-                                                        <strong>
-                                                            ${referenceSources.footnotes.length}
-                                                        </strong>
-                                                    </div>
-
-
-                                                    <div>
-                                                        الحواشي الختامية:
-                                                        <strong>
-                                                            ${referenceSources.endnotes.length}
-                                                        </strong>
-                                                    </div>
-
-
-                                                    <div>
-                                                        المواد الأصلية:
-                                                        <strong>
-                                                            ${processedReferences.length}
-                                                        </strong>
-                                                    </div>
-
-
-                                                    <div>
-                                                        مواد صنفها AI كمراجع:
-                                                        <strong>
-                                                            ${referenceCount}
-                                                        </strong>
-                                                    </div>
-
-
-                                                    <div>
-                                                        المصدر نفسه:
-                                                        <strong>
-                                                            ${ibidCount}
-                                                        </strong>
-                                                    </div>
-
-
-                                                    <div>
-                                                        تخريج الأحاديث:
-                                                        <strong>
-                                                            ${hadithCount}
-                                                        </strong>
-                                                    </div>
-
-
-                                                    <div>
-                                                        مواد تحتاج مراجعة:
-                                                        <strong>
-                                                            ${reviewCount}
-                                                        </strong>
-                                                    </div>
-
-
-                                                    <div>
-                                                        المراجع الموحدة:
-                                                        <strong>
-                                                            ${mergedReferenceResults.length}
-                                                        </strong>
-                                                    </div>
-
-                                                </div>
-
-
-                                                <div class="references-final-results">
-
-                                                    <div class="references-final-results-title">
-
-                                                        المراجع الموحدة
-                                                        <strong>
-                                                            ${mergedReferenceResults.length}
-                                                        </strong>
-
-                                                    </div>
-
-
-                                                    <div class="references-final-list">
-
-                                                        ${mergedReferenceHTML}
-
-                                                    </div>
-
-                                                </div>
-
-                                            </div>
-                                            `
-                                        );
-
-
-                                        analyzeReferencesBtn.textContent =
-                                            "✓ تم التحليل والتوحيد";
-
-
-                                        console.log(
-                                            "اكتمل تحليل وتوحيد المراجع:",
-                                            {
-                                                mainTextLength:
-                                                    referenceSources.mainText.length,
-
-                                                footnotes:
-                                                    referenceSources.footnotes.length,
-
-                                                endnotes:
-                                                    referenceSources.endnotes.length,
-
-                                                processedMaterials:
-                                                    processedReferences.length,
-
-                                                aiResults:
-                                                    aiReferenceResults.length,
-
-                                                references:
-                                                    referenceCount,
-
-                                                multipleReferences:
-                                                    multipleReferenceCount,
-
-                                                ibid:
-                                                    ibidCount,
-
-                                                internalReferences:
-                                                    internalReferenceCount,
-
-                                                hadith:
-                                                    hadithCount,
-
-                                                explanatory:
-                                                    explanatoryCount,
-
-                                                mixed:
-                                                    mixedCount,
-
-                                                review:
-                                                    reviewCount,
-
-                                                mergedReferences:
-                                                    mergedReferenceResults.length
+                                                element.remove();
 
                                             }
                                         );
 
-                                    }
-                                    catch (
-                                        error
-                                    ) {
 
-                                        analyzeReferencesBtn.disabled =
-                                            false;
+                                    // =================================================
+                                    // 8. عرض النتيجة النهائية
+                                    // =================================================
 
-                                        analyzeReferencesBtn.textContent =
-                                            "تحليل المراجع";
+                                    referencesSourceWorkspace.insertAdjacentHTML(
+                                        "beforeend",
+                                        `
+                                        <div class="references-analysis-result">
 
+                                            <div class="references-analysis-status success">
 
-                                        referencesSourceWorkspace
-                                            .querySelectorAll(
-                                                ".references-analysis-result"
-                                            )
-                                            .forEach(
-                                                function (
-                                                    element
-                                                ) {
+                                                ✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي
 
-                                                    element.remove();
-
-                                                }
-                                            );
+                                            </div>
 
 
-                                        referencesSourceWorkspace.insertAdjacentHTML(
-                                            "beforeend",
-                                            `
-                                            <div class="references-analysis-result">
+                                            <div class="references-analysis-info">
 
-                                                <div class="references-analysis-status error">
+                                                <div>
+                                                    المتن:
+                                                    <strong>
+                                                        ${referenceSources.mainText.length}
+                                                    </strong>
+                                                    حرف
+                                                </div>
 
-                                                    ⚠ تعذر تحليل المستند
+
+                                                <div>
+                                                    الحواشي السفلية:
+                                                    <strong>
+                                                        ${referenceSources.footnotes.length}
+                                                    </strong>
+                                                </div>
+
+
+                                                <div>
+                                                    الحواشي الختامية:
+                                                    <strong>
+                                                        ${referenceSources.endnotes.length}
+                                                    </strong>
+                                                </div>
+
+
+                                                <div>
+                                                    المواد المحللة:
+                                                    <strong>
+                                                        ${processedReferences.length}
+                                                    </strong>
+                                                </div>
+
+
+                                                <div>
+                                                    المراجع:
+                                                    <strong>
+                                                        ${finalReferenceRecords.length}
+                                                    </strong>
+                                                </div>
+
+
+                                                <div>
+                                                    الكتب:
+                                                    <strong>
+                                                        ${bookCount}
+                                                    </strong>
+                                                </div>
+
+
+                                                <div>
+                                                    الدوريات:
+                                                    <strong>
+                                                        ${journalCount}
+                                                    </strong>
+                                                </div>
+
+
+                                                <div>
+                                                    تخريجات الأحاديث:
+                                                    <strong>
+                                                        ${hadithCount}
+                                                    </strong>
+                                                </div>
+
+
+                                                <div>
+                                                    إجمالي الظهورات:
+                                                    <strong>
+                                                        ${totalOccurrences}
+                                                    </strong>
+                                                </div>
+
+
+                                                <div>
+                                                    تحتاج مراجعة:
+                                                    <strong>
+                                                        ${reviewCount}
+                                                    </strong>
+                                                </div>
+
+                                            </div>
+
+
+                                            <div class="references-final-results">
+
+                                                <div class="references-final-results-title">
+
+                                                    المراجع الموحدة
+                                                    <strong>
+                                                        ${finalReferenceRecords.length}
+                                                    </strong>
 
                                                 </div>
 
 
-                                                <div class="references-analysis-info">
+                                                <div class="references-final-list">
 
-                                                    ${escapeHTML(
-                                                        error?.message ||
-                                                        "حدث خطأ غير معروف."
-                                                    )}
+                                                    ${finalReferenceHTML}
 
                                                 </div>
 
                                             </div>
-                                            `
+
+                                        </div>
+                                        `
+                                    );
+
+
+                                    analyzeReferencesBtn.textContent =
+                                        "✓ تم التحليل والتوحيد";
+
+
+                                    console.log(
+                                        "اكتمل تحليل المراجع الموحدة:",
+                                        {
+                                            mainTextLength:
+                                                referenceSources.mainText.length,
+
+                                            footnotes:
+                                                referenceSources.footnotes.length,
+
+                                            endnotes:
+                                                referenceSources.endnotes.length,
+
+                                            processedMaterials:
+                                                processedReferences.length,
+
+                                            finalReferences:
+                                                finalReferenceRecords.length,
+
+                                            books:
+                                                bookCount,
+
+                                            journals:
+                                                journalCount,
+
+                                            hadith:
+                                                hadithCount,
+
+                                            totalOccurrences:
+                                                totalOccurrences,
+
+                                            review:
+                                                reviewCount
+
+                                        }
+                                    );
+
+                                }
+                                catch (
+                                    error
+                                ) {
+
+                                    analyzeReferencesBtn.disabled =
+                                        false;
+
+                                    analyzeReferencesBtn.textContent =
+                                        "تحليل المراجع";
+
+
+                                    referencesSourceWorkspace
+                                        .querySelectorAll(
+                                            ".references-analysis-result"
+                                        )
+                                        .forEach(
+                                            function (
+                                                element
+                                            ) {
+
+                                                element.remove();
+
+                                            }
                                         );
 
 
-                                        console.error(
-                                            "فشل تحليل وتوحيد المراجع:",
-                                            error
-                                        );
+                                    function escapeErrorHTML(
+                                        value
+                                    ) {
+
+                                        return String(
+                                            value ?? ""
+                                        )
+                                            .replace(
+                                                /&/g,
+                                                "&amp;"
+                                            )
+                                            .replace(
+                                                /</g,
+                                                "&lt;"
+                                            )
+                                            .replace(
+                                                />/g,
+                                                "&gt;"
+                                            )
+                                            .replace(
+                                                /"/g,
+                                                "&quot;"
+                                            )
+                                            .replace(
+                                                /'/g,
+                                                "&#039;"
+                                            );
 
                                     }
 
-                                };
 
-                            return;
+                                    referencesSourceWorkspace.insertAdjacentHTML(
+                                        "beforeend",
+                                        `
+                                        <div class="references-analysis-result">
 
-                        }
+                                            <div class="references-analysis-status error">
 
-                    };
+                                                ⚠ تعذر تحليل المستند
 
-            }
+                                            </div>
+
+
+                                            <div class="references-analysis-info">
+
+                                                ${escapeErrorHTML(
+                                                    error?.message ||
+                                                    "حدث خطأ غير معروف."
+                                                )}
+
+                                            </div>
+
+                                        </div>
+                                        `
+                                    );
+
+
+                                    console.error(
+                                        "فشل تحليل وتوحيد المراجع:",
+                                        error
+                                    );
+
+                                }
+
+                            };
+
+                    }
         );
 
 }
-
 
 
 // =====================================================
