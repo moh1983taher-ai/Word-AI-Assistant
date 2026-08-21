@@ -58,6 +58,7 @@ const AppState = {
 let currentProject = null;
 let currentDocument = null;
 let currentChat = null;
+let referencesSourceDocument = null;
 
 let researchScope = {
 
@@ -1199,8 +1200,791 @@ async function getDocumentText(
     );
 
 }
+// =====================================================
+// READ DOCUMENT SOURCES FOR REFERENCES
+// قراءة المتن والحواشي والحواشي الختامية للمراجع
+// =====================================================
+
+async function readReferenceSources(documentItem) {
+
+    if (!documentItem) {
+
+        throw new Error(
+            "لم يتم تحديد المستند."
+        );
+
+    }
 
 
+    if (
+        !Office.context.requirements.isSetSupported(
+            "WordApi",
+            "1.5"
+        )
+    ) {
+
+        throw new Error(
+            "قراءة الحواشي تحتاج إلى Word API 1.5 أو أحدث."
+        );
+
+    }
+
+
+    const file =
+        await getWorkingWordFile(
+            documentItem.storageId
+        );
+
+
+    if (!file) {
+
+        throw new Error(
+            "لم يتم العثور على نسخة العمل الخاصة بالمستند."
+        );
+
+    }
+
+
+    const base64 =
+        await fileToBase64(
+            file
+        );
+
+
+    return await Word.run(
+        async function (
+            context
+        ) {
+
+            const workingDocument =
+                context.application.createDocument(
+                    base64
+                );
+
+
+            // -----------------------------
+            // المتن
+            // -----------------------------
+
+            const mainBody =
+                workingDocument.body;
+
+            mainBody.load(
+                "text"
+            );
+
+
+            // -----------------------------
+            // الحواشي السفلية
+            // -----------------------------
+
+            const footnotes =
+                mainBody.footnotes;
+
+            footnotes.load(
+                "items"
+            );
+
+
+            // -----------------------------
+            // الحواشي الختامية
+            // -----------------------------
+
+            const endnotes =
+                mainBody.endnotes;
+
+            endnotes.load(
+                "items"
+            );
+
+
+            await context.sync();
+
+
+            // -----------------------------
+            // قراءة تفاصيل الحواشي
+            // -----------------------------
+
+            footnotes.items.forEach(
+                function (
+                    note
+                ) {
+
+                    note.load(
+                        "type"
+                    );
+
+                    note.body.load(
+                        "text"
+                    );
+
+                    note.reference.load(
+                        "text"
+                    );
+
+                }
+            );
+
+
+            endnotes.items.forEach(
+                function (
+                    note
+                ) {
+
+                    note.load(
+                        "type"
+                    );
+
+                    note.body.load(
+                        "text"
+                    );
+
+                    note.reference.load(
+                        "text"
+                    );
+
+                }
+            );
+
+
+            await context.sync();
+
+
+            const result = {
+
+                documentId:
+                    String(
+                        documentItem.id
+                    ),
+
+                documentName:
+                    String(
+                        documentItem.name || ""
+                    ),
+
+                mainText:
+                    String(
+                        mainBody.text || ""
+                    ),
+
+                footnotes:
+                    footnotes.items.map(
+                        function (
+                            note,
+                            index
+                        ) {
+
+                            return {
+
+                                number:
+                                    index + 1,
+
+                                type:
+                                    String(
+                                        note.type ||
+                                        "Footnote"
+                                    ),
+
+                                reference:
+                                    String(
+                                        note.reference?.text ||
+                                        ""
+                                    ).trim(),
+
+                                text:
+                                    String(
+                                        note.body?.text ||
+                                        ""
+                                    ).trim()
+
+                            };
+
+                        }
+                    ),
+
+                endnotes:
+                    endnotes.items.map(
+                        function (
+                            note,
+                            index
+                        ) {
+
+                            return {
+
+                                number:
+                                    index + 1,
+
+                                type:
+                                    String(
+                                        note.type ||
+                                        "Endnote"
+                                    ),
+
+                                reference:
+                                    String(
+                                        note.reference?.text ||
+                                        ""
+                                    ).trim(),
+
+                                text:
+                                    String(
+                                        note.body?.text ||
+                                        ""
+                                    ).trim()
+
+                            };
+
+                        }
+                    )
+
+            };
+
+
+            return result;
+
+        }
+    );
+
+}
+// =====================================================
+// REFERENCES EXTRACTION
+// استخراج الإحالات والمراجع من نص المستند
+// =====================================================
+
+function extractReferenceCandidates(
+    referenceSources
+) {
+
+    const candidates = [];
+
+
+    if (
+        !referenceSources ||
+        typeof referenceSources !==
+            "object"
+    ) {
+
+        return candidates;
+
+    }
+
+
+    // =====================================================
+    // أدوات مساعدة
+    // =====================================================
+
+    function addCandidate(
+        source,
+        kind,
+        text,
+        position,
+        context
+    ) {
+
+        const value =
+            String(
+                text || ""
+            ).trim();
+
+
+        if (!value) {
+
+            return;
+
+        }
+
+
+        candidates.push({
+
+            id:
+                `reference-${candidates.length + 1}`,
+
+            source:
+                source,
+
+            kind:
+                kind,
+
+            text:
+                value,
+
+            position:
+                Number(
+                    position || 0
+                ),
+
+            context:
+                String(
+                    context || value
+                ).trim()
+
+        });
+
+    }
+
+
+    function getContext(
+        text,
+        start,
+        end
+    ) {
+
+        const sourceText =
+            String(
+                text || ""
+            );
+
+
+        const contextStart =
+            Math.max(
+                0,
+                start - 100
+            );
+
+
+        const contextEnd =
+            Math.min(
+                sourceText.length,
+                end + 180
+            );
+
+
+        return sourceText
+            .slice(
+                contextStart,
+                contextEnd
+            )
+            .replace(
+                /\s+/g,
+                " "
+            )
+            .trim();
+
+    }
+
+
+    // =====================================================
+    // 1. التوثيق داخل المتن
+    // =====================================================
+
+    const mainText =
+        String(
+            referenceSources.mainText || ""
+        );
+
+
+    if (mainText) {
+
+        // ---------------------------------------------
+        // أقواس تحتوي على توثيق عربي/رقمي
+        // مثال:
+        // (الصحاح، 2/619)
+        // (ينظر: لسان العرب، مادة ...)
+        // ---------------------------------------------
+
+        const parentheticalPattern =
+            /(?:\(([^()\n]{2,220})\)|（([^（）\n]{2,220})）)/g;
+
+
+        let match;
+
+
+        while (
+            (match =
+                parentheticalPattern.exec(
+                    mainText
+                )) !== null
+        ) {
+
+            const value =
+                (
+                    match[1] ||
+                    match[2] ||
+                    ""
+                ).trim();
+
+
+            if (
+                isLikelyReferenceText(
+                    value
+                )
+            ) {
+
+                addCandidate(
+                    "main-text",
+                    "parenthetical",
+                    value,
+                    match.index,
+                    getContext(
+                        mainText,
+                        match.index,
+                        parentheticalPattern.lastIndex
+                    )
+                );
+
+            }
+
+        }
+
+
+        // ---------------------------------------------
+        // إحالات لفظية بدون أقواس
+        // ينظر:
+        // انظر:
+        // راجع:
+        // المصدر:
+        // ---------------------------------------------
+
+        const verbalPattern =
+            /(?:ينظر|انظر|راجع|المصدر|المراجع|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,220})/gi;
+
+
+        while (
+            (match =
+                verbalPattern.exec(
+                    mainText
+                )) !== null
+        ) {
+
+            const value =
+                String(
+                    match[0] || ""
+                ).trim();
+
+
+            addCandidate(
+                "main-text",
+                "verbal",
+                value,
+                match.index,
+                getContext(
+                    mainText,
+                    match.index,
+                    verbalPattern.lastIndex
+                )
+            );
+
+        }
+
+    }
+
+
+    // =====================================================
+    // 2. الحواشي السفلية
+    // =====================================================
+
+    if (
+        Array.isArray(
+            referenceSources.footnotes
+        )
+    ) {
+
+        referenceSources.footnotes
+            .forEach(
+                function (
+                    note
+                ) {
+
+                    const noteText =
+                        String(
+                            note.text || ""
+                        ).trim();
+
+
+                    if (!noteText) {
+
+                        return;
+
+                    }
+
+
+                    const noteCandidates =
+                        extractReferenceTextsFromNote(
+                            noteText
+                        );
+
+
+                    noteCandidates.forEach(
+                        function (
+                            item
+                        ) {
+
+                            addCandidate(
+
+                                "footnote",
+
+                                "footnote",
+
+                                item.text,
+
+                                item.position,
+
+                                item.context
+
+                            );
+
+                        }
+                    );
+
+                }
+            );
+
+    }
+
+
+    // =====================================================
+    // 3. الحواشي الختامية
+    // =====================================================
+
+    if (
+        Array.isArray(
+            referenceSources.endnotes
+        )
+    ) {
+
+        referenceSources.endnotes
+            .forEach(
+                function (
+                    note
+                ) {
+
+                    const noteText =
+                        String(
+                            note.text || ""
+                        ).trim();
+
+
+                    if (!noteText) {
+
+                        return;
+
+                    }
+
+
+                    const noteCandidates =
+                        extractReferenceTextsFromNote(
+                            noteText
+                        );
+
+
+                    noteCandidates.forEach(
+                        function (
+                            item
+                        ) {
+
+                            addCandidate(
+
+                                "endnote",
+
+                                "endnote",
+
+                                item.text,
+
+                                item.position,
+
+                                item.context
+
+                            );
+
+                        }
+                    );
+
+                }
+            );
+
+    }
+
+
+    return candidates;
+
+}
+
+function isLikelyReferenceText(
+    text
+) {
+
+    const value =
+        String(
+            text || ""
+        ).trim();
+
+
+    if (
+        value.length <
+        2
+    ) {
+
+        return false;
+
+    }
+
+
+    // كلمات تدل غالبًا على توثيق
+    if (
+        /(?:ينظر|انظر|راجع|المصدر|المراجع|الصحاح|اللسان|القاموس|التاج|صحيح|سنن|مسند|تفسير|شرح|تحقيق)/i
+            .test(
+                value
+            )
+    ) {
+
+        return true;
+
+    }
+
+
+    // وجود جزء/صفحة
+    if (
+        /\b\d+\s*[\/:]\s*\d+\b/
+            .test(
+                value
+            )
+    ) {
+
+        return true;
+
+    }
+
+
+    // وجود "ص" أو "ج" مع رقم
+    if (
+        /(?:^|[\s،,])(?:ص|ج|جلد|جزء)\s*\.?\s*\d+/i
+            .test(
+                value
+            )
+    ) {
+
+        return true;
+
+    }
+
+
+    return false;
+
+}
+
+function extractReferenceTextsFromNote(
+    noteText
+) {
+
+    const results = [];
+
+
+    const sourceText =
+        String(
+            noteText || ""
+        );
+
+
+    // التوثيق بين الأقواس داخل الحاشية
+    const parentheticalPattern =
+        /(?:\(([^()\n]{2,220})\)|（([^（）\n]{2,220})）)/g;
+
+
+    let match;
+
+
+    while (
+        (match =
+            parentheticalPattern.exec(
+                sourceText
+            )) !== null
+    ) {
+
+        const value =
+            (
+                match[1] ||
+                match[2] ||
+                ""
+            ).trim();
+
+
+        if (
+            isLikelyReferenceText(
+                value
+            )
+        ) {
+
+            results.push({
+
+                text:
+                    value,
+
+                position:
+                    match.index,
+
+                context:
+                    sourceText
+                        .slice(
+                            Math.max(
+                                0,
+                                match.index - 80
+                            ),
+                            Math.min(
+                                sourceText.length,
+                                parentheticalPattern.lastIndex + 150
+                            )
+                        )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim()
+
+            });
+
+        }
+
+    }
+
+
+    // الحواشي التي تبدأ مباشرة بـ "ينظر" أو "انظر"
+    const verbalPattern =
+        /(?:ينظر|انظر|راجع|المصدر)\s*[:：]?\s*([^.\n؛]{3,220})/gi;
+
+
+    while (
+        (match =
+            verbalPattern.exec(
+                sourceText
+            )) !== null
+    ) {
+
+        results.push({
+
+            text:
+                String(
+                    match[0] || ""
+                ).trim(),
+
+            position:
+                match.index,
+
+            context:
+                sourceText
+                    .slice(
+                        Math.max(
+                            0,
+                            match.index - 80
+                        ),
+                        Math.min(
+                            sourceText.length,
+                            verbalPattern.lastIndex + 150
+                        )
+                    )
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim()
+
+        });
+
+    }
+
+
+    return results;
+
+}
 // ======================================
 // Normalize Search Text
 // العربية
@@ -20888,6 +21672,9 @@ if (referencesContent) {
 
                             }
 
+                            referencesSourceDocument =
+                                currentDocument;
+
 
                             referencesSourceWorkspace.innerHTML =
                                 `
@@ -20984,12 +21771,12 @@ if (referencesSourceWorkspace) {
             e.stopPropagation();
 
 
-            if (!currentDocument) {
+            if (!referencesSourceDocument) {
 
                 referencesSourceWorkspace.innerHTML =
                     `
                     <div class="references-empty">
-                        لا يوجد مستند مفتوح حاليًا
+                        لا يوجد مستند محدد للعمل عليه
                     </div>
                     `;
 
@@ -21002,38 +21789,20 @@ if (referencesSourceWorkspace) {
                 true;
 
             analyzeButton.textContent =
-                "جارٍ قراءة المستند...";
+                "جارٍ تحليل المستند...";
 
 
             try {
 
-                let documentRecord =
-                    await getDocumentText(
-                        currentDocument.id
+                const referenceSources =
+                    await readReferenceSources(
+                        referencesSourceDocument
                     );
 
 
                 if (
-                    !documentRecord ||
-                    !documentRecord.text
-                ) {
-
-                    await readCurrentWordDocument(
-                        currentDocument
-                    );
-
-
-                    documentRecord =
-                        await getDocumentText(
-                            currentDocument.id
-                        );
-
-                }
-
-
-                if (
-                    !documentRecord ||
-                    !documentRecord.text
+                    !referenceSources ||
+                    !referenceSources.mainText
                 ) {
 
                     throw new Error(
@@ -21042,29 +21811,178 @@ if (referencesSourceWorkspace) {
 
                 }
 
+                const referenceCandidates =
+                    extractReferenceCandidates(
+                        referenceSources
+                    );
+
+
+                console.log(
+                    "المرشحون للمراجع:",
+                    referenceCandidates
+                );
+
 
                 analyzeButton.textContent =
-                    "✓ تم تجهيز المستند";
+                    "✓ تم التحليل";
+
+
+                const mainCount =
+                    referenceCandidates.filter(
+                        item =>
+                            item.source ===
+                            "main-text"
+                    ).length;
+
+
+                const footnoteCount =
+                    referenceCandidates.filter(
+                        item =>
+                            item.source ===
+                            "footnote"
+                    ).length;
+
+
+                const endnoteCount =
+                    referenceCandidates.filter(
+                        item =>
+                            item.source ===
+                            "endnote"
+                    ).length;
+
+
+                const candidateRows =
+                    referenceCandidates
+                        .map(
+                            function (
+                                item,
+                                index
+                            ) {
+
+                                const sourceLabel =
+
+                                    item.source ===
+                                    "main-text"
+
+                                        ? "المتن"
+
+                                        : item.source ===
+                                        "footnote"
+
+                                            ? "حاشية سفلية"
+
+                                            : "حاشية ختامية";
+
+
+                                return `
+                                    <div class="reference-candidate">
+
+                                        <div class="reference-candidate-head">
+
+                                            <span class="reference-candidate-number">
+                                                ${index + 1}
+                                            </span>
+
+                                            <span class="reference-candidate-source">
+                                                ${sourceLabel}
+                                            </span>
+
+                                        </div>
+
+
+                                        <div class="reference-candidate-text">
+
+                                            ${item.text}
+
+                                        </div>
+
+
+                                        <div class="reference-candidate-context">
+
+                                            ${item.context}
+
+                                        </div>
+
+                                    </div>
+                                `;
+
+                            }
+                        )
+                        .join("");
 
 
                 referencesSourceWorkspace.insertAdjacentHTML(
                     "beforeend",
                     `
                     <div class="references-analysis-status success">
-                        ✓ تمت قراءة المستند بنجاح
+                        ✓ اكتمل التحليل الأولي
                     </div>
 
+
                     <div class="references-analysis-info">
-                        تم تجهيز النص لاستخراج المراجع.
+
+                        <div>
+                            مرشحو التوثيق في المتن:
+                            <strong>
+                                ${mainCount}
+                            </strong>
+                        </div>
+
+                        <div>
+                            مرشحو المراجع في الحواشي:
+                            <strong>
+                                ${footnoteCount}
+                            </strong>
+                        </div>
+
+                        <div>
+                            مرشحو المراجع في الحواشي الختامية:
+                            <strong>
+                                ${endnoteCount}
+                            </strong>
+                        </div>
+
+                        <div>
+                            إجمالي المرشحين:
+                            <strong>
+                                ${referenceCandidates.length}
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="references-candidates">
+
+                        ${candidateRows || `
+                            <div class="references-empty">
+                                لم يتم العثور على إحالات مرشحة للمراجع.
+                            </div>
+                        `}
+
                     </div>
                     `
                 );
 
 
                 console.log(
-                    "نص المستند جاهز لاستخراج المراجع:",
-                    documentRecord.text.length,
-                    "حرف"
+                    "مصادر المراجع:",
+                    {
+                        documentId:
+                            referenceSources.documentId,
+
+                        documentName:
+                            referenceSources.documentName,
+
+                        mainTextLength:
+                            referenceSources.mainText.length,
+
+                        footnotes:
+                            referenceSources.footnotes.length,
+
+                        endnotes:
+                            referenceSources.endnotes.length
+                    }
                 );
 
 
@@ -21081,18 +21999,24 @@ if (referencesSourceWorkspace) {
                     "beforeend",
                     `
                     <div class="references-analysis-status error">
-                        ⚠ تعذر قراءة المستند
+
+                        ⚠ تعذر تحليل المستند
+
                     </div>
 
+
                     <div class="references-analysis-info">
-                        ${error.message || "حدث خطأ غير معروف."}
+
+                        ${error.message ||
+                        "حدث خطأ غير معروف."}
+
                     </div>
                     `
                 );
 
 
                 console.error(
-                    "فشل تجهيز المستند للمراجع:",
+                    "فشل تحليل مستند المراجع:",
                     error
                 );
 
