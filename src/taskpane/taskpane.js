@@ -1332,12 +1332,17 @@ async function readReferenceSources() {
                                 reference:
                                     String(
                                         note.reference?.text || ""
-                                    ).trim(),
+                                    ),
 
                                 text:
                                     String(
                                         note.body?.text || ""
-                                    ).trim()
+                                    ),
+
+                                rawText:
+                                    String(
+                                        note.body?.text || ""
+                                    )
 
                             };
 
@@ -1359,12 +1364,17 @@ async function readReferenceSources() {
                                 reference:
                                     String(
                                         note.reference?.text || ""
-                                    ).trim(),
+                                    ),
 
                                 text:
                                     String(
                                         note.body?.text || ""
-                                    ).trim()
+                                    ),
+
+                                rawText:
+                                    String(
+                                        note.body?.text || ""
+                                    )
 
                             };
 
@@ -1674,8 +1684,10 @@ function extractReferenceCandidates(referenceSources) {
 
 
 
+
     // =====================================================
-    // 2. الحواشي السفلية
+    // الحواشي السفلية
+    // كل حاشية وحدة مستقلة بصرف النظر عن شكل علامتها
     // =====================================================
 
     if (
@@ -1692,7 +1704,9 @@ function extractReferenceCandidates(referenceSources) {
 
                 const noteText =
                     String(
-                        note.text || ""
+                        note.rawText ||
+                        note.text ||
+                        ""
                     ).trim();
 
 
@@ -1703,104 +1717,33 @@ function extractReferenceCandidates(referenceSources) {
                 }
 
 
-                const noteNumber =
-                    note.number ||
-                    noteIndex + 1;
+                addCandidate(
 
+                    "footnote",
 
-                const noteReference =
-                    String(
-                        note.reference || ""
-                    ).trim();
+                    "footnote",
 
+                    noteText,
 
-                // -----------------------------------------
-                // أولوية أولى:
-                // التعامل مع نص الحاشية نفسه
-                // حتى لو كان رقم الحاشية منفصلًا
-                // -----------------------------------------
+                    0,
 
-                if (
-                    isExternalReference(
-                        noteText
-                    ) ||
-                    /\d{1,4}\s*$/.test(
-                        noteText
-                    )
-                ) {
+                    noteText,
 
-                    addCandidate(
+                    {
 
-                        "footnote",
+                        noteNumber:
+                            note.number ||
+                            noteIndex + 1,
 
-                        "footnote",
+                        marker:
+                            String(
+                                note.reference ||
+                                ""
+                            ).trim()
 
-                        noteText,
+                    }
 
-                        0,
-
-                        noteText,
-
-                        {
-                            noteNumber:
-                                noteNumber,
-
-                            marker:
-                                noteReference
-
-                        }
-
-                    );
-
-                }
-
-
-                // -----------------------------------------
-                // أنماط لفظية داخل الحاشية
-                // -----------------------------------------
-
-                const noteVerbalPattern =
-                    /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,250})/gi;
-
-
-                let match;
-
-
-                while (
-                    (
-                        match =
-                            noteVerbalPattern.exec(
-                                noteText
-                            )
-                    ) !== null
-                ) {
-
-                    addCandidate(
-
-                        "footnote",
-
-                        "verbal-footnote",
-
-                        String(
-                            match[0] || ""
-                        ).trim(),
-
-                        match.index,
-
-                        noteText,
-
-                        {
-                            noteNumber:
-                                noteNumber,
-
-                            marker:
-                                noteReference
-
-                        }
-
-                    );
-
-                }
+                );
 
             }
         );
@@ -1811,6 +1754,7 @@ function extractReferenceCandidates(referenceSources) {
     // =====================================================
     // 3. الحواشي الختامية
     // =====================================================
+
 
     if (
         Array.isArray(
@@ -1826,59 +1770,46 @@ function extractReferenceCandidates(referenceSources) {
 
                 const noteText =
                     String(
-                        note.text || ""
+                        note.rawText ||
+                        note.text ||
+                        ""
                     ).trim();
 
 
                 if (!noteText) {
+
                     return;
-                }
-
-
-                // -----------------------------------------
-                // إحالات مثل:
-                // انظر: الفراهيدي، كتاب العين، 2/121
-                // -----------------------------------------
-
-                const noteVerbalPattern =
-                    /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,250})/gi;
-
-
-                let match;
-
-
-                while (
-                    (
-                        match =
-                            noteVerbalPattern.exec(
-                                noteText
-                            )
-                    ) !== null
-                ) {
-
-                    addCandidate(
-                        "endnote",
-                        "verbal-endnote",
-                        String(
-                            match[0] || ""
-                        ).trim(),
-                        match.index,
-                        noteText,
-                        {
-                            noteNumber:
-                                note.number ||
-                                noteIndex + 1
-                        }
-                    );
 
                 }
 
 
-                // -----------------------------------------
-                // "المصدر نفسه"
-                // لا نعتبره مرجعًا مستقلاً الآن.
-                // سنعالجه لاحقًا بالاعتماد على السابق.
-                // -----------------------------------------
+                addCandidate(
+
+                    "endnote",
+
+                    "endnote",
+
+                    noteText,
+
+                    0,
+
+                    noteText,
+
+                    {
+
+                        noteNumber:
+                            note.number ||
+                            noteIndex + 1,
+
+                        marker:
+                            String(
+                                note.reference ||
+                                ""
+                            ).trim()
+
+                    }
+
+                );
 
             }
         );
