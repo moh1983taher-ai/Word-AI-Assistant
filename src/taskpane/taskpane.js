@@ -1495,37 +1495,7 @@ if (referencesContent) {
 
                         }
 
-                        // =====================================================
-                        // أداة حماية النص قبل إدخاله في HTML
-                        // =====================================================
-
-                        function escapeHTML(value) {
-
-                            return String(
-                                value ?? ""
-                            )
-                                .replace(
-                                    /&/g,
-                                    "&amp;"
-                                )
-                                .replace(
-                                    /</g,
-                                    "&lt;"
-                                )
-                                .replace(
-                                    />/g,
-                                    "&gt;"
-                                )
-                                .replace(
-                                    /"/g,
-                                    "&quot;"
-                                )
-                                .replace(
-                                    /'/g,
-                                    "&#039;"
-                                );
-
-                        }
+                        
 
                         // =====================================================
                         // زر تحليل المستند
@@ -25346,6 +25316,17 @@ if (closeReferences) {
             }
 
         };
+
+}
+
+function escapeHTML(value) {
+
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 
 }
 // =====================================================
