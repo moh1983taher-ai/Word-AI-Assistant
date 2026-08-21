@@ -22175,11 +22175,7 @@ needsReview = true
     );
 
 }
-```
 
-وأضف **هذه الدالة الجديدة مرة واحدة خارج دالة الزر**، حتى لا نكرر خطأ `escapeHTML` أو نضع دوال مساعدة داخل نطاق زر التحليل:
-
-````javascript
 function parseUnifiedReferenceAIResult(
     answer
 ) {
