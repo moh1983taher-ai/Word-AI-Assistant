@@ -1387,168 +1387,255 @@ async function readReferenceSources() {
     );
 
 }
+
 // =====================================================
-// REFERENCES EXTRACTION
-// استخراج الإحالات والمراجع من نص المستند
+// REFERENCE PROCESSOR
+// المحرك الموحد لتنظيف وتحليل مواد المراجع
 // =====================================================
 
-function extractReferenceCandidates(referenceSources) {
+function processReferenceSources(referenceSources) {
 
-    const candidates = [];
-
+    const records = [];
 
     if (
         !referenceSources ||
         typeof referenceSources !== "object"
     ) {
+        return records;
+    }
 
-        return candidates;
+
+    // =====================================================
+    // 1. تنظيف النص الخام
+    // =====================================================
+
+    function cleanRawText(value) {
+
+        let text =
+            String(value || "");
+
+
+        // رموز التحكم غير المفيدة،
+        // مع الإبقاء على النص العربي والأرقام
+        text =
+            text.replace(
+                /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,
+                " "
+            );
+
+
+        // رمز الاستبدال الذي قد يظهر من Word
+        text =
+            text.replace(
+                /\uFFFD/g,
+                " "
+            );
+
+
+        // الرمز الغريب الذي ظهر في نتائج الحواشي
+        text =
+            text.replace(
+                //g,
+                " "
+            );
+
+
+        // مسافات زائدة
+        text =
+            text.replace(
+                /\s+/g,
+                " "
+            );
+
+
+        return text.trim();
 
     }
 
 
     // =====================================================
-    // إضافة مرشح
+    // 2. تحويل الأرقام العربية إلى أرقام قياسية
     // =====================================================
 
-    function addCandidate(
-        source,
-        kind,
-        text,
-        position,
-        context,
-        extra = {}
-    ) {
+    function normalizeArabicDigits(value) {
+
+        return String(value || "")
+            .replace(
+                /[٠-٩]/g,
+                function (digit) {
+
+                    return String(
+                        "٠١٢٣٤٥٦٧٨٩".indexOf(
+                            digit
+                        )
+                    );
+
+                }
+            );
+
+    }
+
+
+    // =====================================================
+    // 3. توحيد المسافات والعلامات
+    // =====================================================
+
+    function normalizeSpacing(value) {
+
+        let text =
+            String(value || "");
+
+
+        text =
+            text.replace(
+                /\s*([،,:؛])\s*/g,
+                "$1 "
+            );
+
+
+        text =
+            text.replace(
+                /\s*\/\s*/g,
+                "/"
+            );
+
+
+        text =
+            text.replace(
+                /\s*([–—-])\s*/g,
+                "$1"
+            );
+
+
+        text =
+            text.replace(
+                /\(\s+/g,
+                "("
+            );
+
+
+        text =
+            text.replace(
+                /\s+\)/g,
+                ")"
+            );
+
+
+        text =
+            text.replace(
+                /\[\s+/g,
+                "["
+            );
+
+
+        text =
+            text.replace(
+                /\s+\]/g,
+                "]"
+            );
+
+
+        text =
+            text.replace(
+                /\s+/g,
+                " "
+            );
+
+
+        return text.trim();
+
+    }
+
+
+    // =====================================================
+    // 4. التنظيف النهائي لنص المرجع
+    // =====================================================
+
+    function normalizeReferenceText(value) {
+
+        let text =
+            cleanRawText(value);
+
+
+        text =
+            normalizeArabicDigits(
+                text
+            );
+
+
+        text =
+            normalizeSpacing(
+                text
+            );
+
+
+        // إزالة علامات البداية الزائدة
+        text =
+            text.replace(
+                /^[\s,،;؛:.\-–—]+/,
+                ""
+            );
+
+
+        // إزالة علامات النهاية الزائدة
+        text =
+            text.replace(
+                /[\s,،;؛:.\-–—]+$/,
+                ""
+            );
+
+
+        return text.trim();
+
+    }
+
+
+    // =====================================================
+    // 5. الإحالة الداخلية إلى صفحات الدراسة
+    // =====================================================
+
+    function isInternalReference(text) {
 
         const value =
-            String(text || "").trim();
+            normalizeReferenceText(
+                text
+            );
 
 
         if (!value) {
-            return;
-        }
-
-
-        candidates.push({
-
-            id:
-                `reference-${candidates.length + 1}`,
-
-            source:
-                source,
-
-            kind:
-                kind,
-
-            text:
-                value,
-
-            position:
-                Number(position || 0),
-
-            context:
-                String(context || value).trim(),
-
-            ...extra
-
-        });
-
-    }
-
-
-    // =====================================================
-    // استخراج سياق
-    // =====================================================
-
-    function getContext(
-        text,
-        start,
-        end
-    ) {
-
-        const sourceText =
-            String(text || "");
-
-
-        const contextStart =
-            Math.max(
-                0,
-                start - 100
-            );
-
-
-        const contextEnd =
-            Math.min(
-                sourceText.length,
-                end + 180
-            );
-
-
-        return sourceText
-            .slice(
-                contextStart,
-                contextEnd
-            )
-            .replace(
-                /\s+/g,
-                " "
-            )
-            .trim();
-
-    }
-
-
-    // =====================================================
-    // هل النص مرجع خارجي؟
-    // =====================================================
-
-    function isExternalReference(
-        text
-    ) {
-
-        const value =
-            String(text || "").trim();
-
-
-        if (
-            value.length < 3
-        ) {
-
             return false;
-
         }
 
 
-        // اسم مصدر + جزء/صفحة
+        // في هذه الدراسة ص 67
         if (
-            /\d+\s*[\/:]\s*\d+/
-                .test(value)
+            /في\s+هذه\s+الدراسة/i.test(
+                value
+            )
         ) {
-
             return true;
-
         }
 
 
-        // ص 33 / ج 2 / جزء 2
+        // ص 65
+        // ص 65-85
+        // ص 448-449
         if (
-            /(?:^|[\s،,])(?:ص|ج|جزء|جلد)\s*\.?\s*\d+/i
-                .test(value)
+            /^ص\.?\s*\d+(?:\s*[-–—]\s*\d+)?$/i.test(
+                value
+            )
         ) {
-
             return true;
-
         }
 
 
-        // أسماء كتب ومصادر شائعة
+        // ص 25-26، ص 45-46
         if (
-            /(?:الخصائص|الاقتراح|لمع الأدلة|الإغراب|الكليات|الكتاب|الأصول|معاني القرآن وإعرابه|لسان العرب|البحر المحيط|الصحاح|المجموع|الأشباه والنظائر|القاموس|المنثور|البرهان|المحصول|نهاية المطلب|قواطع الأدلة|كتاب العين)/i
-                .test(value)
+            /^ص\.?\s*\d+(?:\s*[-–—]\s*\d+)?(?:\s*[,،]\s*ص?\.?\s*\d+(?:\s*[-–—]\s*\d+)?)*$/i.test(
+                value
+            )
         ) {
-
             return true;
-
         }
 
 
@@ -1558,7 +1645,546 @@ function extractReferenceCandidates(referenceSources) {
 
 
     // =====================================================
-    // 1. المتن
+    // 6. المصدر نفسه
+    // =====================================================
+
+    function isIbid(text) {
+
+        const value =
+            normalizeReferenceText(
+                text
+            );
+
+
+        return (
+            /^(?:المصدر\s+نفسه|المرجع\s+نفسه)$/i.test(
+                value
+            )
+        );
+
+    }
+
+
+    // =====================================================
+    // 7. المصدر نفسه مع رقم جزء/صفحة
+    // =====================================================
+
+    function isIbidWithLocation(text) {
+
+        const value =
+            normalizeReferenceText(
+                text
+            );
+
+
+        return (
+            /^(?:المصدر\s+نفسه|المرجع\s+نفسه)(?:\s*[,،:]?\s*(?:ج|جزء|جلد)?\.?\s*\d+(?:\s*\/\s*\d+)?|\s*[,،:]?\s*\d+\s*\/\s*\d+)$/i
+                .test(
+                    value
+                )
+        );
+
+    }
+
+
+    // =====================================================
+    // 8. تخريج الحديث
+    // =====================================================
+
+    function isHadithReference(text) {
+
+        const value =
+            normalizeReferenceText(
+                text
+            );
+
+
+        return (
+            /^(?:رواه|أخرجه)\s+/i.test(
+                value
+            )
+            ||
+            /(?:حديث\s+رقم|الحديث\s+رقم)/i.test(
+                value
+            )
+        );
+
+    }
+
+
+    // =====================================================
+    // 9. وجود بيانات مرجعية
+    // =====================================================
+
+    function hasLocationData(text) {
+
+        const value =
+            normalizeReferenceText(
+                text
+            );
+
+
+        return (
+            /\d+\s*\/\s*\d+/.test(
+                value
+            )
+            ||
+            /(?:ص|ج|جزء|جلد)\.?\s*\d+/i.test(
+                value
+            )
+            ||
+            /\b\d{1,4}\s*$/.test(
+                value
+            )
+        );
+
+    }
+
+
+    // =====================================================
+    // 10. هل المادة تبدو مرجعًا خارجيًا؟
+    // =====================================================
+
+    function looksLikeReference(text) {
+
+        const value =
+            normalizeReferenceText(
+                text
+            );
+
+
+        if (!value) {
+            return false;
+        }
+
+
+        if (
+            isInternalReference(
+                value
+            )
+        ) {
+            return false;
+        }
+
+
+        if (
+            isIbid(value)
+            ||
+            isIbidWithLocation(value)
+            ||
+            isHadithReference(value)
+        ) {
+            return true;
+        }
+
+
+        if (
+            hasLocationData(value)
+        ) {
+            return true;
+        }
+
+
+        // مؤشرات توثيق واضحة
+        if (
+            /^(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]/i.test(
+                value
+            )
+        ) {
+            return true;
+        }
+
+
+        // أسماء كتب/مصادر شائعة في العربية
+        if (
+            /(?:الخصائص|الاقتراح|لمع الأدلة|الإغراب|الكليات|الكتاب|الأصول|معاني القرآن وإعرابه|لسان العرب|كتاب العين|البحر المحيط|المجموع|الأشباه والنظائر|المنثور|البرهان|المحصول|نهاية المطلب|قواطع الأدلة|الصحاح|مختار الصحاح|الإبهاج|اللمع|الحاوي الكبير|أساس القياس|ضوابط المصلحة|أثر الأدلة|فتح الباري)/i.test(
+                value
+            )
+        ) {
+            return true;
+        }
+
+
+        return false;
+
+    }
+
+
+    // =====================================================
+    // 11. إضافة سجل موحد
+    // =====================================================
+
+    function addRecord(
+        source,
+        kind,
+        originalText,
+        context,
+        metadata = {}
+    ) {
+
+        const original =
+            String(
+                originalText || ""
+            ).trim();
+
+
+        const cleaned =
+            normalizeReferenceText(
+                original
+            );
+
+
+        if (!cleaned) {
+            return;
+        }
+
+
+        records.push({
+
+            id:
+                `reference-${records.length + 1}`,
+
+            source:
+                source,
+
+            kind:
+                kind,
+
+            originalText:
+                original,
+
+            cleanedText:
+                cleaned,
+
+            context:
+                normalizeReferenceText(
+                    context || original
+                ),
+
+            ...metadata
+
+        });
+
+    }
+
+
+    // =====================================================
+    // 12. تحليل مادة واحدة
+    //
+    // هنا لا نهتم هل جاءت من المتن أو الحاشية.
+    // =====================================================
+
+    function processMaterial(
+        source,
+        text,
+        metadata = {}
+    ) {
+
+        const raw =
+            cleanRawText(
+                text
+            );
+
+
+        if (!raw) {
+            return;
+        }
+
+
+        // -----------------------------------------------
+        // إحالة داخلية
+        // -----------------------------------------------
+
+        if (
+            isInternalReference(
+                raw
+            )
+        ) {
+
+            addRecord(
+                source,
+                "internal",
+                raw,
+                raw,
+                metadata
+            );
+
+            return;
+
+        }
+
+
+        // -----------------------------------------------
+        // المصدر نفسه
+        // -----------------------------------------------
+
+        if (
+            isIbid(raw)
+            ||
+            isIbidWithLocation(raw)
+        ) {
+
+            addRecord(
+                source,
+                "ibid",
+                raw,
+                raw,
+                metadata
+            );
+
+            return;
+
+        }
+
+
+        // -----------------------------------------------
+        // تخريج حديث
+        // -----------------------------------------------
+
+        if (
+            isHadithReference(
+                raw
+            )
+        ) {
+
+            addRecord(
+                source,
+                "hadith",
+                raw,
+                raw,
+                metadata
+            );
+
+            // نكمل لأن الحاشية قد تحتوي معلومات إضافية
+        }
+
+
+        let foundReference =
+            false;
+
+
+        // -----------------------------------------------
+        // استخراج إحالات تبدأ بـ:
+        // انظر / ينظر / نقلًا عن
+        // -----------------------------------------------
+
+        const verbalMatches =
+            raw.match(
+                /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*[^.؛]+/gi
+            );
+
+
+        if (
+            verbalMatches
+            &&
+            verbalMatches.length
+        ) {
+
+            verbalMatches.forEach(
+                function (
+                    item
+                ) {
+
+                    const value =
+                        normalizeReferenceText(
+                            item
+                        );
+
+
+                    if (
+                        isInternalReference(
+                            value
+                        )
+                    ) {
+
+                        addRecord(
+                            source,
+                            "internal",
+                            value,
+                            raw,
+                            metadata
+                        );
+
+                        return;
+
+                    }
+
+
+                    if (
+                        looksLikeReference(
+                            value
+                        )
+                    ) {
+
+                        addRecord(
+                            source,
+                            "reference",
+                            value,
+                            raw,
+                            metadata
+                        );
+
+                        foundReference = true;
+
+                    }
+
+                }
+            );
+
+        }
+
+
+        // -----------------------------------------------
+        // فصل المراجع المتعددة داخل المادة
+        // مثال:
+        // المحصول، 1/229، السبكي، الإبهاج، 1/275
+        // -----------------------------------------------
+
+        const parts =
+            raw.split(
+                /\s*[؛;]\s*|\s+(?=(?:ابن|أبو|السبكي|السيوطي|الزركشي|الجويني|الرازي|النووي|الغزالي|السمعاني|الشافعي|البوطي|العز|الماوردي|البخاري|الترمذي|البيهقي|الآمدي|الإسنوي)\s*[,،:])/
+            );
+
+
+        if (
+            parts.length > 1
+        ) {
+
+            parts.forEach(
+                function (
+                    part
+                ) {
+
+                    const value =
+                        normalizeReferenceText(
+                            part
+                        );
+
+
+                    if (!value) {
+                        return;
+                    }
+
+
+                    if (
+                        isInternalReference(
+                            value
+                        )
+                    ) {
+
+                        addRecord(
+                            source,
+                            "internal",
+                            value,
+                            raw,
+                            metadata
+                        );
+
+                        return;
+
+                    }
+
+
+                    if (
+                        isIbid(value)
+                        ||
+                        isIbidWithLocation(value)
+                    ) {
+
+                        addRecord(
+                            source,
+                            "ibid",
+                            value,
+                            raw,
+                            metadata
+                        );
+
+                        return;
+
+                    }
+
+
+                    if (
+                        looksLikeReference(
+                            value
+                        )
+                    ) {
+
+                        addRecord(
+                            source,
+                            "reference",
+                            value,
+                            raw,
+                            metadata
+                        );
+
+                        foundReference = true;
+
+                    }
+
+                }
+            );
+
+        }
+
+
+        // -----------------------------------------------
+        // النص الذي يحتوي مرجعًا واضحًا بدون كلمة انظر
+        // -----------------------------------------------
+
+        if (
+            !foundReference
+            &&
+            looksLikeReference(
+                raw
+            )
+        ) {
+
+            addRecord(
+                source,
+                "reference",
+                raw,
+                raw,
+                metadata
+            );
+
+            foundReference = true;
+
+        }
+
+
+        // -----------------------------------------------
+        // لم نستطع حسم المادة
+        // نحتفظ بها للمراجعة
+        // -----------------------------------------------
+
+        if (
+            !foundReference
+            &&
+            !isHadithReference(raw)
+            &&
+            !isInternalReference(raw)
+            &&
+            !isIbid(raw)
+            &&
+            !isIbidWithLocation(raw)
+        ) {
+
+            addRecord(
+                source,
+                "review",
+                raw,
+                raw,
+                metadata
+            );
+
+        }
+
+    }
+
+
+    // =====================================================
+    // 13. المتن
     // =====================================================
 
     const mainText =
@@ -1569,12 +2195,12 @@ function extractReferenceCandidates(referenceSources) {
 
     if (mainText) {
 
-        // -------------------------------------------------
-        // أ) التوثيق بين الأقواس
-        // -------------------------------------------------
+        // -----------------------------------------------
+        // التوثيق بين الأقواس
+        // -----------------------------------------------
 
         const parentheticalPattern =
-            /(?:\(([^()\n]{2,220})\)|（([^（）\n]{2,220})）)/g;
+            /(?:\(([^()\n]{2,300})\)|（([^（）\n]{2,300})）)/g;
 
 
         let match;
@@ -1591,41 +2217,32 @@ function extractReferenceCandidates(referenceSources) {
 
             const value =
                 (
-                    match[1] ||
-                    match[2] ||
+                    match[1]
+                    ||
+                    match[2]
+                    ||
                     ""
                 ).trim();
 
 
-            // تجاهل إحالات الصفحات الداخلية فقط
-            // مثل: ص 65-85
-            if (
-                isExternalReference(value)
-            ) {
-
-                addCandidate(
-                    "main-text",
-                    "parenthetical",
-                    value,
-                    match.index,
-                    getContext(
-                        mainText,
-                        match.index,
-                        parentheticalPattern.lastIndex
-                    )
-                );
-
-            }
+            processMaterial(
+                "main-text",
+                value,
+                {
+                    position:
+                        match.index
+                }
+            );
 
         }
 
 
-        // -------------------------------------------------
-        // ب) إحالات لفظية حقيقية
-        // -------------------------------------------------
+        // -----------------------------------------------
+        // الإحالات اللفظية في المتن
+        // -----------------------------------------------
 
         const verbalPattern =
-            /(?:ينظر|انظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,220})/gi;
+            /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*[^.؛\n]+/gi;
 
 
         while (
@@ -1637,57 +2254,31 @@ function extractReferenceCandidates(referenceSources) {
             ) !== null
         ) {
 
-            const whole =
+            const value =
                 String(
                     match[0] || ""
                 ).trim();
 
 
-            // لا نضيف "ينظر مثلا: في هذه الدراسة..."
-            if (
-                /في\s+هذه\s+الدراسة/i
-                    .test(whole)
-            ) {
-
-                continue;
-
-            }
-
-
-            const value =
-                String(
-                    match[1] || ""
-                ).trim();
-
-
-            if (
-                isExternalReference(value)
-            ) {
-
-                addCandidate(
-                    "main-text",
-                    "verbal",
-                    whole,
-                    match.index,
-                    getContext(
-                        mainText,
-                        match.index,
-                        verbalPattern.lastIndex
-                    )
-                );
-
-            }
+            processMaterial(
+                "main-text",
+                value,
+                {
+                    position:
+                        match.index
+                }
+            );
 
         }
 
     }
 
 
-
-
     // =====================================================
-    // الحواشي السفلية
-    // كل حاشية وحدة مستقلة بصرف النظر عن شكل علامتها
+    // 14. الحواشي السفلية
+    //
+    // نعالج نص الحاشية كما هو،
+    // ولا نهتم بشكل رقم الحاشية.
     // =====================================================
 
     if (
@@ -1699,50 +2290,29 @@ function extractReferenceCandidates(referenceSources) {
         referenceSources.footnotes.forEach(
             function (
                 note,
-                noteIndex
+                index
             ) {
 
-                const noteText =
-                    String(
-                        note.rawText ||
-                        note.text ||
-                        ""
-                    ).trim();
-
-
-                if (!noteText) {
-
-                    return;
-
-                }
-
-
-                addCandidate(
-
+                processMaterial(
                     "footnote",
-
-                    "footnote",
-
-                    noteText,
-
-                    0,
-
-                    noteText,
-
+                    note.rawText
+                    ||
+                    note.text
+                    ||
+                    "",
                     {
 
                         noteNumber:
-                            note.number ||
-                            noteIndex + 1,
+                            note.number
+                            ||
+                            index + 1,
 
                         marker:
-                            String(
-                                note.reference ||
-                                ""
-                            ).trim()
+                            note.reference
+                            ||
+                            ""
 
                     }
-
                 );
 
             }
@@ -1752,9 +2322,8 @@ function extractReferenceCandidates(referenceSources) {
 
 
     // =====================================================
-    // 3. الحواشي الختامية
+    // 15. الحواشي الختامية
     // =====================================================
-
 
     if (
         Array.isArray(
@@ -1765,50 +2334,29 @@ function extractReferenceCandidates(referenceSources) {
         referenceSources.endnotes.forEach(
             function (
                 note,
-                noteIndex
+                index
             ) {
 
-                const noteText =
-                    String(
-                        note.rawText ||
-                        note.text ||
-                        ""
-                    ).trim();
-
-
-                if (!noteText) {
-
-                    return;
-
-                }
-
-
-                addCandidate(
-
+                processMaterial(
                     "endnote",
-
-                    "endnote",
-
-                    noteText,
-
-                    0,
-
-                    noteText,
-
+                    note.rawText
+                    ||
+                    note.text
+                    ||
+                    "",
                     {
 
                         noteNumber:
-                            note.number ||
-                            noteIndex + 1,
+                            note.number
+                            ||
+                            index + 1,
 
                         marker:
-                            String(
-                                note.reference ||
-                                ""
-                            ).trim()
+                            note.reference
+                            ||
+                            ""
 
                     }
-
                 );
 
             }
@@ -1817,260 +2365,574 @@ function extractReferenceCandidates(referenceSources) {
     }
 
 
-    return candidates;
+    // =====================================================
+    // 16. إزالة التكرار الحرفي فقط
+    //
+    // لا نحذف التكرارات الحقيقية هنا؛
+    // التوحيد وكشف التكرار مرحلة لاحقة.
+    // =====================================================
 
-}
-
-function isLikelyReferenceText(
-    text
-) {
-
-    const value =
-        String(
-            text || ""
-        ).trim();
+    const seen =
+        new Set();
 
 
-    if (
-        value.length <
-        2
-    ) {
+    return records.filter(
+        function (
+            record
+        ) {
 
-        return false;
-
-    }
-
-
-    // كلمات تدل غالبًا على توثيق
-    if (
-        /(?:ينظر|انظر|راجع|المصدر|المراجع|الصحاح|اللسان|القاموس|التاج|صحيح|سنن|مسند|تفسير|شرح|تحقيق)/i
-            .test(
-                value
-            )
-    ) {
-
-        return true;
-
-    }
+            const key =
+                [
+                    record.source,
+                    record.kind,
+                    record.cleanedText,
+                    record.noteNumber
+                    ||
+                    ""
+                ].join("|");
 
 
-    // وجود جزء/صفحة
-    if (
-        /\b\d+\s*[\/:]\s*\d+\b/
-            .test(
-                value
-            )
-    ) {
+            if (
+                seen.has(key)
+            ) {
 
-        return true;
+                return false;
 
-    }
+            }
 
 
-    // وجود "ص" أو "ج" مع رقم
-    if (
-        /(?:^|[\s،,])(?:ص|ج|جلد|جزء)\s*\.?\s*\d+/i
-            .test(
-                value
-            )
-    ) {
-
-        return true;
-
-    }
+            seen.add(
+                key
+            );
 
 
-    return false;
+            return true;
+
+        }
+    );
 
 }
 
 // =====================================================
-// استخراج الحواشي السفلية 
+// PARSE REFERENCE RECORD
+// تحليل مكونات المرجع الواحد
 // =====================================================
 
-function extractReferenceTextsFromNote(
-    noteText
-) {
+function parseReferenceRecord(record) {
 
-    const results = [];
+    if (
+        !record ||
+        typeof record !== "object"
+    ) {
+        return null;
+    }
 
-    const sourceText =
+
+    const originalText =
         String(
-            noteText || ""
+            record.cleanedText ||
+            record.originalText ||
+            ""
         ).trim();
 
 
-    if (!sourceText) {
+    if (!originalText) {
+        return null;
+    }
 
-        return results;
+
+    // =================================================
+    // السجل الأساسي
+    // =================================================
+
+    const parsed = {
+
+        id:
+            record.id || "",
+
+        source:
+            record.source || "",
+
+        kind:
+            record.kind || "",
+
+        noteNumber:
+            record.noteNumber ||
+            null,
+
+        originalText:
+            originalText,
+
+        author:
+            "",
+
+        title:
+            "",
+
+        volume:
+            "",
+
+        page:
+            "",
+
+        pageRange:
+            "",
+
+        edition:
+            "",
+
+        editor:
+            "",
+
+        publisher:
+            "",
+
+        city:
+            "",
+
+        year:
+            "",
+
+        referenceType:
+            "unknown",
+
+        confidence:
+            0,
+
+        unresolved:
+            []
+
+    };
+
+
+    // =================================================
+    // الإحالات التي لا تحتاج تفكيكًا الآن
+    // =================================================
+
+    if (
+        record.kind === "internal"
+    ) {
+
+        parsed.referenceType =
+            "internal";
+
+        parsed.confidence =
+            1;
+
+        return parsed;
 
     }
 
 
-    // =====================================================
-    // 1. توثيق مرقّم داخل الحاشية
-    // أمثلة:
-    // ([1]) الفصول المفيدة 200
-    // ([1]) منزلة المعنى في نظرية النحو العربي 19
-    // =====================================================
+    if (
+        record.kind === "ibid"
+    ) {
 
-    const numberedPattern =
-        /^\s*\(\s*\[\s*([0-9٠-٩]+)\s*\]\s*\)\s*(.+?)\s*\.?\s*$/;
+        parsed.referenceType =
+            "ibid";
+
+        parsed.confidence =
+            1;
+
+        return parsed;
+
+    }
 
 
-    const numberedMatch =
-        sourceText.match(
-            numberedPattern
+    if (
+        record.kind === "hadith"
+    ) {
+
+        parsed.referenceType =
+            "hadith";
+
+    }
+
+
+    // =================================================
+    // نسخة للعمل
+    // =================================================
+
+    let text =
+        originalText;
+
+
+    // إزالة "انظر:" وما شابهها
+    text =
+        text.replace(
+            /^(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*/i,
+            ""
+        ).trim();
+
+
+    // =================================================
+    // استخراج الطبعة
+    // =================================================
+
+    const editionMatch =
+        text.match(
+            /(?:ط|الطبعة)\s*\.?\s*([0-9٠-٩]+)/i
         );
 
 
-    if (numberedMatch) {
+    if (editionMatch) {
 
-        const referenceText =
-            String(
-                numberedMatch[2] || ""
-            ).trim();
+        parsed.edition =
+            editionMatch[1];
+
+    }
+
+
+    // =================================================
+    // استخراج الجزء/الصفحة
+    //
+    // 8/85
+    // 2/161
+    // =================================================
+
+    const volumePageMatch =
+        text.match(
+            /(?:ج\s*)?([0-9٠-٩]+)\s*\/\s*([0-9٠-٩]+)/
+        );
+
+
+    if (volumePageMatch) {
+
+        parsed.volume =
+            volumePageMatch[1];
+
+        parsed.page =
+            volumePageMatch[2];
+
+    }
+
+
+    // =================================================
+    // استخراج ص 115
+    // =================================================
+
+    const pageMatch =
+        text.match(
+            /(?:ص|صفحة)\s*\.?\s*([0-9٠-٩]+)(?:\s*[-–—]\s*([0-9٠-٩]+))?/i
+        );
+
+
+    if (pageMatch) {
+
+        if (
+            !parsed.page
+        ) {
+
+            parsed.page =
+                pageMatch[1];
+
+        }
 
 
         if (
-            isLikelyFootnoteReference(
-                referenceText
-            )
+            pageMatch[2]
         ) {
 
-            results.push({
-
-                text:
-                    referenceText,
-
-                position:
-                    0,
-
-                context:
-                    sourceText,
-
-                noteMarker:
-                    numberedMatch[1]
-
-            });
+            parsed.pageRange =
+                `${pageMatch[1]}-${pageMatch[2]}`;
 
         }
 
     }
 
 
-    // =====================================================
-    // 2. توثيق داخل الحاشية دون ترقيم
-    // مثل:
-    // انظر: الفراهيدي، كتاب العين، 2/121
-    // المصدر نفسه
-    // =====================================================
+    // =================================================
+    // استخراج السنة
+    // =================================================
 
-    const verbalPattern =
-        /(?:انظر|ينظر|راجع|المصدر نفسه|المصدر)\s*[:：]?\s*([^.\n؛]{3,250})/gi;
-
-
-    let match;
+    const yearMatch =
+        text.match(
+            /\b([0-9٠-٩]{4})\s*(?:هـ|ه|م)\b/
+        );
 
 
-    while (
-        (match =
-            verbalPattern.exec(
-                sourceText
-            )) !== null
-    ) {
+    if (yearMatch) {
 
-        const wholeText =
-            String(
-                match[0] || ""
-            ).trim();
-
-
-        results.push({
-
-            text:
-                wholeText,
-
-            position:
-                match.index,
-
-            context:
-                sourceText,
-
-            noteMarker:
-                ""
-
-        });
+        parsed.year =
+            yearMatch[1];
 
     }
 
 
-    return results;
+    // =================================================
+    // المحقق
+    // =================================================
+
+    const editorMatch =
+        text.match(
+            /تحقيق\s*[:：]?\s*([^،؛.]+)/
+        );
+
+
+    if (editorMatch) {
+
+        parsed.editor =
+            editorMatch[1].trim();
+
+    }
+
+
+    // =================================================
+    // الناشر
+    // =================================================
+
+    const publisherMatch =
+        text.match(
+            /(?:دار|مؤسسة)\s+([^،؛.]+)/
+        );
+
+
+    if (publisherMatch) {
+
+        parsed.publisher =
+            `${publisherMatch[0]}`.trim();
+
+    }
+
+
+    // =================================================
+    // مدينة النشر
+    // =================================================
+
+    const cityMatch =
+        text.match(
+            /(?:بيروت|القاهرة|دمشق|الرياض|بغداد|مكة|المدينة|عمان|جدة|الكويت|الدوحة|دبي)/
+        );
+
+
+    if (cityMatch) {
+
+        parsed.city =
+            cityMatch[0];
+
+    }
+
+
+    // =================================================
+    // تحديد عنوان الكتاب والمؤلف
+    //
+    // القاعدة الأولية:
+    // "المؤلف، العنوان، البيانات..."
+    // =================================================
+
+    const parts =
+        text
+            .split("،")
+            .map(
+                function (item) {
+
+                    return item.trim();
+
+                }
+            )
+            .filter(
+                Boolean
+            );
+
+
+    if (
+        parts.length >= 2
+    ) {
+
+        // الجزء الأول مرشح للمؤلف
+        parsed.author =
+            parts[0];
+
+
+        // الجزء الثاني مرشح لعنوان الكتاب
+        parsed.title =
+            parts[1];
+
+
+        parsed.confidence =
+            0.65;
+
+    }
+    else {
+
+        // إذا لم توجد فاصلة عربية،
+        // نحاول البحث عن بنية واضحة
+
+        const colonParts =
+            text.split(":");
+
+
+        if (
+            colonParts.length >= 2
+        ) {
+
+            parsed.author =
+                colonParts[0].trim();
+
+            parsed.title =
+                colonParts[1]
+                    .trim();
+
+            parsed.confidence =
+                0.5;
+
+        }
+
+    }
+
+
+    // =================================================
+    // تنظيف العنوان من بيانات النشر
+    // =================================================
+
+    if (
+        parsed.title
+    ) {
+
+        parsed.title =
+            parsed.title
+                .replace(
+                    /(?:ط|الطبعة)\s*\.?\s*[0-9٠-٩]+/i,
+                    ""
+                )
+                .trim();
+
+    }
+
+
+    // =================================================
+    // تحديد نوع المرجع
+    // =================================================
+
+    if (
+        parsed.referenceType !==
+        "hadith"
+    ) {
+
+        parsed.referenceType =
+            "book";
+
+    }
+
+
+    // =================================================
+    // رفع درجة الثقة
+    // =================================================
+
+    if (
+        parsed.volume &&
+        parsed.page
+    ) {
+
+        parsed.confidence +=
+            0.15;
+
+    }
+
+
+    if (
+        parsed.author
+    ) {
+
+        parsed.confidence +=
+            0.1;
+
+    }
+
+
+    if (
+        parsed.title
+    ) {
+
+        parsed.confidence +=
+            0.1;
+
+    }
+
+
+    parsed.confidence =
+        Math.min(
+            1,
+            parsed.confidence
+        );
+
+
+    // =================================================
+    // تحديد ما لم نستطع فهمه
+    // =================================================
+
+    if (
+        !parsed.author
+    ) {
+
+        parsed.unresolved.push(
+            "author"
+        );
+
+    }
+
+
+    if (
+        !parsed.title
+    ) {
+
+        parsed.unresolved.push(
+            "title"
+        );
+
+    }
+
+
+    if (
+        !parsed.page &&
+        !parsed.pageRange
+    ) {
+
+        parsed.unresolved.push(
+            "page"
+        );
+
+    }
+
+
+    return parsed;
 
 }
 
-function isLikelyFootnoteReference(
-    text
+// =====================================================
+// PARSE ALL REFERENCES
+// =====================================================
+
+function parseAllReferenceRecords(
+    records
 ) {
 
-    const value =
-        String(
-            text || ""
-        ).trim();
-
-
     if (
-        value.length < 4
+        !Array.isArray(records)
     ) {
 
-        return false;
+        return [];
 
     }
 
 
-    // وجود رقم صفحة منفرد في نهاية المرجع
-    if (
-        /(?:^|\s)\d{1,4}\s*\.?$/
-            .test(
-                value
-            )
-    ) {
+    return records
+        .map(
+            function (
+                record
+            ) {
 
-        return true;
+                return parseReferenceRecord(
+                    record
+                );
 
-    }
-
-
-    // وجود جزء/صفحة مثل 2/121
-    if (
-        /\d+\s*[\/:]\s*\d+/
-            .test(
-                value
-            )
-    ) {
-
-        return true;
-
-    }
-
-
-    // وجود كلمات توحي ببيانات كتاب
-    if (
-        /(?:ط\s*\d|تحقيق|دار\s+|مؤسسة\s+|بيروت|القاهرة|دمشق|الرياض|ابن\s+|أبو\s+)/i
-            .test(
-                value
-            )
-    ) {
-
-        return true;
-
-    }
-
-
-    return false;
+            }
+        )
+        .filter(
+            Boolean
+        );
 
 }
-
 // ======================================
 // Normalize Search Text
 // العربية
@@ -21842,9 +22704,49 @@ if (referencesContent) {
 
                                                 }
 
-                                                const referenceCandidates =
-                                                    extractReferenceCandidates(
-                                                        referenceSources
+                                                const parsedReferences =
+                                                    parseAllReferenceRecords(
+                                                        referenceCandidates
+                                                    );
+
+                                                console.log(
+                                                    "المراجع بعد تحليل المكونات:",
+                                                    parsedReferences
+                                                );
+
+                                                const referenceRecords =
+                                                    referenceCandidates.filter(
+                                                        item =>
+                                                            item.kind ===
+                                                            "reference"
+                                                    );
+
+                                                const ibidRecords =
+                                                    referenceCandidates.filter(
+                                                        item =>
+                                                            item.kind ===
+                                                            "ibid"
+                                                    );
+
+                                                const hadithRecords =
+                                                    referenceCandidates.filter(
+                                                        item =>
+                                                            item.kind ===
+                                                            "hadith"
+                                                    );
+
+                                                const reviewRecords =
+                                                    referenceCandidates.filter(
+                                                        item =>
+                                                            item.kind ===
+                                                            "review"
+                                                    );
+
+                                                const internalRecords =
+                                                    referenceCandidates.filter(
+                                                        item =>
+                                                            item.kind ===
+                                                            "internal"
                                                     );
 
                                                 const candidateRows =
@@ -21909,18 +22811,41 @@ if (referencesContent) {
                                                     referencesSourceWorkspace.insertAdjacentHTML(
                                                         "beforeend",
                                                         `
-                                                        <div class="references-candidates">
+                                                        <div class="references-analysis-status success">
+                                                            ✓ تم تحليل مواد المراجع
+                                                        </div>
 
-                                                            <div class="references-candidates-title">
-                                                                الإحالات المرشحة
-                                                                (${referenceCandidates.length})
+                                                        <div class="references-analysis-info">
+
+                                                            <div>
+                                                                مراجع:
+                                                                <strong>${referenceRecords.length}</strong>
                                                             </div>
 
-                                                            ${candidateRows || `
-                                                                <div class="references-empty">
-                                                                    لم يتم العثور على إحالات مرشحة.
-                                                                </div>
-                                                            `}
+                                                            <div>
+                                                                المصدر نفسه:
+                                                                <strong>${ibidRecords.length}</strong>
+                                                            </div>
+
+                                                            <div>
+                                                                تخريج الأحاديث:
+                                                                <strong>${hadithRecords.length}</strong>
+                                                            </div>
+
+                                                            <div>
+                                                                تحتاج مراجعة:
+                                                                <strong>${reviewRecords.length}</strong>
+                                                            </div>
+
+                                                            <div>
+                                                                إحالات داخلية:
+                                                                <strong>${internalRecords.length}</strong>
+                                                            </div>
+
+                                                            <div>
+                                                                إجمالي المواد:
+                                                                <strong>${referenceCandidates.length}</strong>
+                                                            </div>
 
                                                         </div>
                                                         `
