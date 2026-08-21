@@ -22042,27 +22042,9 @@ other
         }
 
 
-        const parsed =
-            parseUnifiedReferenceAIResult(
-                answer
-            );
-
-        console.log(
-            "نتيجة parseUnifiedReferenceAIResult:",
-            parsed
-        );
-
-        console.log(
-            "عدد المراجع قبل التطبيع:",
-            Array.isArray(parsed?.references)
-                ? parsed.references.length
-                : 0
-        );
-
-        return normalizeUnifiedReferenceResult(
-            parsed,
-            materials
-        );
+        return parseUnifiedReferenceAIResult(
+            answer
+        ).references;
 
     }
 
@@ -22206,27 +22188,9 @@ other
     }
 
 
-    const parsed =
-        parseUnifiedReferenceAIResult(
-            answer
-        );
-
-    console.log(
-        "نتيجة parseUnifiedReferenceAIResult:",
-        parsed
-    );
-
-    console.log(
-        "عدد المراجع قبل التطبيع:",
-        Array.isArray(parsed?.references)
-            ? parsed.references.length
-            : 0
-    );
-
-    return normalizeUnifiedReferenceResult(
-        parsed,
-        materials
-    );
+    return parseUnifiedReferenceAIResult(
+        answer
+    ).references;
 }
 
 function normalizeUnifiedReferenceResult(
