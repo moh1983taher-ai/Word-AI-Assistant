@@ -21342,21 +21342,14 @@ function escapeHTML(value) {
 
 async function analyzeReferencesWithAI(materials) {
 
-    // =====================================================
-    // 0. التحقق من المواد
-    // =====================================================
-
     if (
         !Array.isArray(materials) ||
         materials.length === 0
     ) {
 
         return {
-
             references: [],
-
             stats: {
-
                 totalMaterials: 0,
                 referenceCount: 0,
                 multipleReferenceCount: 0,
@@ -21366,17 +21359,11 @@ async function analyzeReferencesWithAI(materials) {
                 explanatoryCount: 0,
                 mixedCount: 0,
                 reviewCount: 0
-
             }
-
         };
 
     }
 
-
-    // =====================================================
-    // 1. إعدادات الذكاء الاصطناعي
-    // =====================================================
 
     const settings =
         getSavedSettings();
@@ -21426,7 +21413,7 @@ async function analyzeReferencesWithAI(materials) {
 
 
     // =====================================================
-    // 2. تجهيز المواد
+    // تجهيز المواد
     // =====================================================
 
     const payload =
@@ -21487,7 +21474,7 @@ async function analyzeReferencesWithAI(materials) {
 
 
     // =====================================================
-    // 3. تعليمات التحليل الكامل
+    // تعليمات الذكاء الاصطناعي
     // =====================================================
 
     const systemPrompt = `
@@ -21495,91 +21482,28 @@ async function analyzeReferencesWithAI(materials) {
 أنت محلل مراجع أكاديمي متخصص في البحوث العربية
 والدراسات الإسلامية والفقه وأصول الفقه.
 
-ستستلم جميع المواد المستخرجة من مستند Word.
-المواد مرتبة بحسب ترتيب ظهورها في المستند.
+ستستلم مواد كاملة مرتبة بحسب ظهورها في مستند Word.
 
-مهمتك تنفيذ التحليل الكامل للمستند في طلب واحد فقط.
+مهمتك تحديد هوية المراجع الواردة في هذه المواد وبناء قائمة
+نهائية للمراجع.
 
-لا تُخرج مرحلة تحليل أولية منفصلة.
-لا تُخرج مرحلة دمج لاحقة.
-ابنِ مباشرة القائمة النهائية الموحدة للمراجع.
+المطلوب منك أساسًا:
 
-=====================================================
-أولًا: تصنيف كل مادة
-=====================================================
-
-لكل مادة حدد طبيعتها:
-
-reference
-مرجع ببليوغرافي واحد.
-
-multiple-reference
-مادة تحتوي أكثر من مرجع مستقل.
-
-ibid
-المصدر نفسه أو المرجع نفسه أو إحالة تعتمد على مرجع سابق.
-
-internal-reference
-إحالة إلى صفحات الدراسة الحالية.
-
-hadith
-تخريج حديث أو إحالة حديثية.
-
-explanatory
-شرح أو تعليق لا يحتوي مرجعًا خارجيًا.
-
-mixed
-شرح أو اقتباس أو تعليق يحتوي داخله على مرجع.
-
-review
-مادة لا يمكن حسمها بثقة كافية.
+- تصنيف المواد.
+- فصل المراجع المتعددة داخل المادة الواحدة.
+- حل "المصدر نفسه" اعتمادًا على السياق السابق.
+- تحديد المؤلف والعنوان عندما تسمح المادة والسياق بذلك.
+- تحديد المراجع التي تعود إلى الكتاب نفسه.
+- عدم دمج الكتب المختلفة للمؤلف نفسه.
 
 =====================================================
-ثانيًا: قاعدة فصل المراجع المتعددة
+قواعد الهوية
 =====================================================
 
-هذه قاعدة إلزامية.
+المؤلف وحده لا يحدد هوية المرجع.
 
-إذا احتوت مادة واحدة على أكثر من مرجع مستقل،
-فيجب فصل كل مرجع إلى سجل مستقل.
-
-مثال:
-
-"الشيرازي، اللمع 37، السمعاني، قواطع الأدلة، 1/193"
-
-يجب أن ينتج:
-
-المرجع الأول:
-المؤلف = الشيرازي
-العنوان = اللمع
-الصفحة = 37
-
-المرجع الثاني:
-المؤلف = السمعاني
-العنوان = قواطع الأدلة
-الجزء = 1
-الصفحة = 193
-
-ممنوع إنشاء سجل واحد يجمع المرجعين.
-
-كذلك:
-
-"المحصول، 1/229، السبكي، الإبهاج، 1/275"
-
-يجب فصل المرجعين.
-
-لا تستخدم variants لإخفاء مراجع مستقلة.
-
-=====================================================
-ثالثًا: قاعدة هوية المرجع والدمج
-=====================================================
-
-قاعدة حاسمة جدًا:
-
-المؤلف وحده لا يكفي لدمج المرجعين.
-
-قد يكون للمؤلف الواحد عدة كتب،
-ويجب أن يكون كل كتاب سجلًا مستقلاً.
+إذا كان المؤلف نفسه وله كتب مختلفة،
+فكل كتاب مرجع مستقل.
 
 مثال:
 
@@ -21587,103 +21511,59 @@ review
 الغزالي - أساس القياس
 الغزالي - الوسيط في المذهب
 
-هذه ثلاثة مراجع مستقلة.
+ثلاثة مراجع مستقلة.
 
-مثال آخر:
+وكذلك:
 
 أبو مؤنس - الثوابت والمتغيرات في التشريع الإسلامي
 أبو مؤنس - التعليل بالحكمة وأثره في قواعد الفقه وأصوله
 
-هما مرجعان مستقلان.
+مرجعان مستقلان.
 
-حتى لو كان المؤلف نفسه، لا تدمجهما.
-
-=====================================================
-رابعًا: متى يجوز الدمج؟
-=====================================================
-
-ادمج مرجعين فقط إذا ثبت أن هويتهما هي هوية الكتاب نفسه.
-
-العناصر الأساسية لتحديد الهوية:
-
-1. المؤلف
-2. عنوان الكتاب
-3. السياق السابق عند التعامل مع "المصدر نفسه"
-4. المعلومات المرجعية الأخرى عند الحاجة
-
-يمكن دمج:
-
-"البحر المحيط"
-و
-"البحر المحيط في أصول الفقه"
-
-إذا كان واضحًا أن المقصود هو الكتاب نفسه.
-
-يمكن دمج:
-
-"المنخول"
-و
-"المنخول من تعليقات الأصول"
-
+يمكن دمج العنوان المختصر مع العنوان الكامل
 إذا كان واضحًا أنهما الكتاب نفسه.
-
-لكن لا تدمج:
-
-"المنخول"
-و
-"أساس القياس"
-
-ولا:
-
-"المجموع"
-و
-"المنثور"
-
-لمجرد تشابه المؤلف أو تشابه الصياغة.
-
-ولا تستخدم رقم الصفحة وحده لإثبات أن المرجعين كتاب واحد.
-
-ولا تستخدم اسم المؤلف وحده لإثبات ذلك.
-
-إذا كان العنوان مختلفًا اختلافًا جوهريًا،
-فهو مرجع مستقل.
-
-إذا كان الدمج غير مؤكد:
-لا تدمج،
-واستخدم needsReview = true.
-
-=====================================================
-خامسًا: المصدر نفسه
-=====================================================
-
-"المصدر نفسه"
-و
-"المرجع نفسه"
-
-ليسا مرجعًا مستقلًا.
-
-يجب ربطهما بالمرجع السابق المناسب.
 
 مثال:
 
-النووي، المجموع، 11/417
-المصدر نفسه، 11/415
+البحر المحيط
+البحر المحيط في أصول الفقه
 
-النتيجة:
+يجوز دمجهما إذا كان السياق واضحًا.
 
-مرجع واحد:
-النووي - المجموع
-
-locations:
-11/417
-11/415
-
-إذا كان المرجع السابق غير واضح:
-لا تخترع المرجع.
-استخدم needsReview = true.
+أما اختلاف العنوان اختلافًا جوهريًا فيعني كتابًا مستقلًا.
 
 =====================================================
-سادسًا: الإحالات الداخلية
+المراجع المتعددة
+=====================================================
+
+إذا احتوت المادة على أكثر من مرجع مستقل،
+فصلها إلى مراجع مستقلة.
+
+مثال:
+
+الشيرازي، اللمع 37، السمعاني، قواطع الأدلة، 1/193
+
+يجب أن ينتج مرجعان:
+
+الشيرازي - اللمع - 37
+
+السمعاني - قواطع الأدلة - 1/193
+
+ممنوع وضع المرجعين في سجل واحد.
+
+=====================================================
+المصدر نفسه
+=====================================================
+
+المصدر نفسه والمرجع نفسه ليسا كتابًا جديدًا.
+
+اربطهما بالمرجع السابق المناسب.
+
+إذا تعذر الربط بدرجة كافية من الثقة،
+لا تخترع المرجع.
+
+=====================================================
+الإحالات الداخلية
 =====================================================
 
 مثل:
@@ -21693,339 +21573,77 @@ locations:
 ص 25-26، ص 45-46
 في هذه الدراسة ص 67
 
-إذا كان السياق يشير إلى صفحات الدراسة الحالية،
-فهي internal-reference.
-
-لا تدخل هذه الإحالات في قائمة references النهائية.
+إذا كانت إحالة إلى صفحات الدراسة الحالية،
+فهي ليست مرجعًا خارجيًا.
 
 =====================================================
-سابعًا: الأحاديث
+الأحاديث
 =====================================================
-
-مثل:
 
 أخرجه البخاري
 رواه الترمذي
 رواه البيهقي
-حديث رقم 5364
 
-صنّفها hadith عندما يكون واضحًا أنها تخريج حديث.
-
-لا تحول تخريج الحديث إلى كتاب عادي.
+تصنف تخريج حديث.
 
 =====================================================
-ثامنًا: الشرح والشرح + المرجع
+الشرح
 =====================================================
 
-إذا كانت المادة شرحًا فقط:
-explanatory
+الشرح وحده لا يدخل قائمة المراجع.
 
-ولا تدخل في references.
-
-إذا كانت المادة تحتوي شرحًا ومرجعًا:
-mixed
-
-ويجب استخراج المرجع الموجود داخلها.
-
-مثال:
-
-"الخفرات جمع خفرة وهي الحيية... العين، الفراهيدي، 5/253"
-
-يجب استخراج:
-
-الفراهيدي
-العين
-5/253
+أما إذا احتوى الشرح على مرجع،
+فاستخرج المرجع الموجود داخله.
 
 =====================================================
-تاسعًا: المؤلف والعنوان
+المعلومات
 =====================================================
 
-لا تخترع أي معلومة.
+لا تخترع مؤلفًا أو عنوانًا أو ناشرًا أو سنة.
 
-إذا كان المؤلف غير مذكور:
-اترك author فارغًا.
+إذا كانت المعلومة غير موجودة فاتركها فارغة.
 
-إذا كان العنوان غير مذكور:
-اترك title فارغًا.
-
-يمكن استخدام سياق المواد السابقة لفهم الاختصار فقط
-عندما تكون العلاقة واضحة جدًا.
-
-مثال:
-
-النووي، المجموع، 11/417
-المصدر نفسه، 11/415
-
-يمكن ربط المصدر نفسه بالمجموع.
-
-لكن لا تفترض تلقائيًا أن:
-
-"المنخول 454"
-
-يعني:
-الغزالي، المنخول
-
-إلا إذا كان السياق يثبت ذلك بدرجة عالية.
+احتفظ بالنص الأصلي داخل variants.
 
 =====================================================
-عاشرًا: الأخطاء الأصلية
+locations
 =====================================================
 
-لا تصحح النص الأصلي بصمت.
+اجمع جميع مواضع المرجع نفسه.
 
-إذا ظهر:
+احتفظ بنطاق الصفحات كما ورد،
+ولا تحوّل:
 
-"لسان العرب 0/240"
+460-464
 
-فاحتفظ به في variants كما هو.
+إلى:
 
-إذا كان هناك احتمال خطأ:
-needsReview = true
+464
 
-واكتب السبب في notes.
+ولا تحوّل:
 
-=====================================================
-الحادي عشر: locations
-=====================================================
+96-101
 
-اجمع جميع مواضع الاستشهاد بالمرجع نفسه.
+إلى:
 
-مثال:
-
-المنثور:
-
-2/356
-2/362
-2/389
-
-يجب أن تكون في سجل واحد:
-
-locations = [
-    2/356,
-    2/362,
-    2/389
-]
-
-لا تكرر الموقع نفسه حرفيًا.
+101.
 
 =====================================================
-الثاني عشر: variants
+occurrences
 =====================================================
 
-احتفظ بالصيغ الأصلية المختلفة التي استخدمها الباحث.
+كل ظهور للمراجع داخل مادة أصلية يمثل occurrence واحدًا.
 
-مثال:
+وجود أكثر من صفحة داخل المادة نفسها لا يعني أكثر من occurrence.
 
-الزركشي، المنثور، 2/362
-انظر: الزركشي، المنثور، 2/362
-المنثور، 2/362
-
-هذه كلها variants للمرجع نفسه.
-
-لا تكرر النص نفسه حرفيًا.
+إذا احتوت مادة واحدة على مرجعين مستقلين،
+يحصل كل منهما على occurrence واحد.
 
 =====================================================
-الثالث عشر: occurrences
+النتيجة
 =====================================================
 
-=====================================================
-قاعدة occurrences — مهمة جدًا
-=====================================================
-
-occurrences تمثل "عدد مرات ظهور المرجع فعليًا في المواد الأصلية".
-
-كل occurrence يجب أن يقابل ظهورًا واحدًا للمرجع داخل مادة أصلية واحدة.
-
-مثال:
-
-إذا كانت المادة:
-
-"النووي، المجموع، 11/417"
-
-فهذا المرجع يحصل على occurrence واحد.
-
-إذا كانت المادة:
-
-"النووي، المجموع، 11/417، 11/415"
-
-فهذا المرجع يحصل على occurrence واحد فقط،
-وله locationان:
-
-11/417
-11/415
-
-ولا تجعل عدد locations مساويًا لعدد occurrences.
-
-إذا ظهر المرجع نفسه في ثلاث حواشٍ مختلفة:
-
-المادة 1 → النووي، المجموع، 11/417
-المادة 2 → انظر: النووي، المجموع، 11/415
-المادة 3 → المصدر نفسه، 11/382
-
-فالنتيجة:
-
-occurrences = 3
-
-و locations تجمع جميع المواضع:
-
-11/417
-11/415
-11/382
-
-كل occurrence يجب أن يحتوي:
-
-{
-  "materialId": "معرف المادة الأصلية",
-  "source": "main-text أو footnote أو endnote",
-  "noteNumber": رقم الحاشية أو null
-}
-
-لا تنشئ occurrence جديدًا بسبب:
-
-- اختلاف الصفحة
-- اختلاف الجزء
-- اختلاف الصياغة
-- وجود "انظر"
-- وجود "المصدر نفسه"
-- وجود أكثر من location داخل المادة نفسها.
-
-لكن إذا احتوت المادة الواحدة على مرجعين مستقلين،
-فكل مرجع يحصل على occurrence خاص به،
-مع نفس materialId لأنهما ظهرا داخل المادة نفسها.
-
-مثال:
-
-المادة:
-"الشيرازي، اللمع 37، السمعاني، قواطع الأدلة، 1/193"
-
-النتيجة:
-
-مرجع الشيرازي:
-occurrences = 1
-
-مرجع السمعاني:
-occurrences = 1
-
-ولا يجوز جعل:
-occurrences = 2
-لأحدهما بسبب وجود مرجعين في المادة.
-
-=====================================================
-قاعدة أخيرة
-=====================================================
-
-لا تجعل:
-
-occurrences.length = locations.length
-
-بالضرورة.
-
-قد يكون:
-
-occurrences.length = 5
-locations.length = 8
-
-وهذا صحيح إذا كانت بعض المواد تحتوي أكثر من موضع للمرجع نفسه.
-
-وقد يكون:
-
-occurrences.length = 5
-locations.length = 5
-
-وهذا صحيح أيضًا.
-
-المهم أن occurrences تحسب الظهور الفعلي،
-بينما locations تحسب مواضع الاستشهاد.
-
-=====================================================
-الرابع عشر: قاعدة مهمة لمنع الدمج الخاطئ
-=====================================================
-
-لا تدمج مرجعين عندما يكون:
-
-المؤلف نفسه + عنوان مختلف.
-
-مثال ممنوع:
-
-أبو مؤنس + الثوابت والمتغيرات
-أبو مؤنس + التعليل بالحكمة
-
-لا تدمجهما.
-
-وكذلك:
-
-الغزالي + المنخول
-الغزالي + أساس القياس
-
-لا تدمجهما.
-
-وكذلك:
-
-الجويني + البرهان
-الجويني + نهاية المطلب
-
-لا تدمجهما.
-
-=====================================================
-الخامس عشر: التحقق من كل سجل قبل إخراجه
-=====================================================
-
-قبل إخراج كل سجل نهائي اسأل:
-
-هل هذا هو الكتاب نفسه أم كتاب آخر للمؤلف نفسه؟
-
-إذا كان كتابًا آخر:
-أنشئ سجلًا مستقلًا.
-
-هل يحتوي هذا السجل على أكثر من كتاب مستقل؟
-
-إذا نعم:
-افصل الكتب.
-
-هل variants كلها تشير فعلًا إلى الكتاب نفسه؟
-
-إذا لا:
-افصل السجل.
-
-هل locations تخص هذا الكتاب نفسه؟
-
-إذا لا:
-لا تضفها.
-
-=====================================================
-السادس عشر: confidence
-=====================================================
-
-confidence إلزامي في كل مرجع.
-
-يجب أن يكون رقمًا بين 0 و1.
-
-إذا كانت هوية المرجع مؤكدة:
-0.95 إلى 1.00
-
-إذا كانت قوية مع نقص محدود:
-0.80 إلى 0.94
-
-إذا كان هناك شك حقيقي:
-أقل من 0.80
-
-إذا كان الدمج أو التعرف غير مؤكد:
-needsReview = true
-
-ممنوع ترك confidence = 0 عندما تكون هوية المرجع واضحة.
-
-=====================================================
-السابع عشر: النتيجة النهائية
-=====================================================
-
-أعد JSON فقط.
-
-لا Markdown.
-لا شرح.
-لا نص خارج JSON.
-
-البنية:
+أعد JSON فقط:
 
 {
   "stats": {
@@ -22082,40 +21700,18 @@ website
 hadith
 other
 
-قواعد نهائية إلزامية:
+حافظ على ترتيب أول ظهور للمراجع.
 
-1. references = المراجع النهائية الموحدة فقط.
-2. لا تنشئ سجلًا مستقلًا لكل ظهور.
-3. لا تضع مرجعين مستقلين في سجل واحد.
-4. افصل المراجع المتعددة.
-5. المؤلف وحده لا يكفي للدمج.
-6. اختلاف عنوان الكتاب يعني غالبًا مرجعًا مستقلًا.
-7. يمكن دمج العنوان المختصر مع العنوان الكامل إذا ثبت أنهما الكتاب نفسه.
-8. حل "المصدر نفسه" بالاعتماد على السياق السابق.
-9. اجمع locations.
-10. اجمع variants.
-11. اجمع occurrences.
-12. لا تخترع معلومات.
-13. حافظ على الأخطاء الأصلية داخل variants.
-14. استخدم needsReview عند الشك.
-15. confidence إلزامي وحقيقي.
-16. حافظ على ترتيب أول ظهور للمرجع في القائمة النهائية قدر الإمكان.
+لا تضع مرجعين مختلفين في سجل واحد.
+لا تدمج كتابين مختلفين للمؤلف نفسه.
 `;
 
 
-    // =====================================================
-    // 4. الطلب الواحد فقط
-    // =====================================================
-
     const userPrompt =
         [
-            "حلل جميع المواد التالية في طلب واحد.",
+            "حلل جميع المواد التالية.",
             "",
-            "ابنِ مباشرة قائمة المراجع النهائية الموحدة.",
-            "",
-            "انتبه بشدة إلى عدم دمج كتب المؤلف الواحد.",
-            "",
-            "إذا وجدت مادة تحتوي أكثر من مرجع مستقل فافصلها.",
+            "ابنِ قائمة المراجع النهائية.",
             "",
             JSON.stringify(
                 payload,
@@ -22129,7 +21725,7 @@ other
 
 
     // =====================================================
-    // 5. Gemini
+    // Gemini
     // =====================================================
 
     if (
@@ -22140,9 +21736,10 @@ other
             await fetch(
                 `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
                     normalizeGeminiModel(model)
-                )}:generateContent?key=${encodeURIComponent(key)}`,
+                )}:generateContent?key=${encodeURIComponent(
+                    key
+                )}`,
                 {
-
                     method:
                         "POST",
 
@@ -22153,46 +21750,45 @@ other
                         },
 
                     body:
-                        JSON.stringify({
-
-                            systemInstruction:
-                                {
-                                    parts:
-                                        [
-                                            {
-                                                text:
-                                                    systemPrompt
-                                            }
-                                        ]
-                                },
-
-                            contents:
-                                [
+                        JSON.stringify(
+                            {
+                                systemInstruction:
                                     {
-                                        role:
-                                            "user",
-
                                         parts:
                                             [
                                                 {
                                                     text:
-                                                        userPrompt
+                                                        systemPrompt
                                                 }
                                             ]
+                                    },
+
+                                contents:
+                                    [
+                                        {
+                                            role:
+                                                "user",
+
+                                            parts:
+                                                [
+                                                    {
+                                                        text:
+                                                            userPrompt
+                                                    }
+                                                ]
+                                        }
+                                    ],
+
+                                generationConfig:
+                                    {
+                                        temperature:
+                                            0.1,
+
+                                        responseMimeType:
+                                            "application/json"
                                     }
-                                ],
-
-                            generationConfig:
-                                {
-                                    temperature:
-                                        0.1,
-
-                                    responseMimeType:
-                                        "application/json"
-                                }
-
-                        })
-
+                            }
+                        )
                 }
             );
 
@@ -22225,9 +21821,7 @@ other
 
         if (
             !answer ||
-            !String(
-                answer
-            ).trim()
+            !String(answer).trim()
         ) {
 
             throw new Error(
@@ -22245,7 +21839,7 @@ other
 
 
     // =====================================================
-    // 6. OpenAI / OpenRouter / Groq
+    // OpenAI / OpenRouter / Groq
     // =====================================================
 
     const endpoint =
@@ -22266,8 +21860,7 @@ other
             "application/json",
 
         "Authorization":
-            "Bearer " +
-            key
+            "Bearer " + key
 
     };
 
@@ -22276,14 +21869,10 @@ other
         provider === "openrouter"
     ) {
 
-        headers[
-            "HTTP-Referer"
-        ] =
+        headers["HTTP-Referer"] =
             window.location.href;
 
-        headers[
-            "X-Title"
-        ] =
+        headers["X-Title"] =
             "Research Tools";
 
     }
@@ -22293,7 +21882,6 @@ other
         await fetch(
             endpoint,
             {
-
                 method:
                     "POST",
 
@@ -22301,46 +21889,45 @@ other
                     headers,
 
                 body:
-                    JSON.stringify({
+                    JSON.stringify(
+                        {
+                            model:
+                                model,
 
-                        model:
-                            model,
+                            messages:
+                                [
+                                    {
+                                        role:
+                                            "system",
 
-                        messages:
-                            [
+                                        content:
+                                            systemPrompt
+                                    },
+
+                                    {
+                                        role:
+                                            "user",
+
+                                        content:
+                                            userPrompt
+                                    }
+                                ],
+
+                            temperature:
+                                0.1,
+
+                            response_format:
                                 {
-                                    role:
-                                        "system",
-
-                                    content:
-                                        systemPrompt
+                                    type:
+                                        "json_object"
                                 },
 
-                                {
-                                    role:
-                                        "user",
-
-                                    content:
-                                        userPrompt
-                                }
-                            ],
-
-                        temperature:
-                            0.1,
-
-                        response_format:
-                            {
-                                type:
-                                    "json_object"
-                            },
-
-                        max_tokens:
-                            provider === "groq"
-                                ? 16000
-                                : 24000
-
-                    })
-
+                            max_tokens:
+                                provider === "groq"
+                                    ? 16000
+                                    : 24000
+                        }
+                    )
             }
         );
 
@@ -22374,9 +21961,7 @@ other
 
     if (
         !answer ||
-        !String(
-            answer
-        ).trim()
+        !String(answer).trim()
     ) {
 
         throw new Error(
@@ -22473,6 +22058,205 @@ function normalizeUnifiedReferenceResult(
     }
 
 
+    function uniqueStrings(values) {
+
+        const seen =
+            new Set();
+
+        const output =
+            [];
+
+        values.forEach(
+            function (value) {
+
+                const text =
+                    safeString(
+                        value
+                    );
+
+
+                if (
+                    !text ||
+                    seen.has(text)
+                ) {
+
+                    return;
+
+                }
+
+
+                seen.add(text);
+
+                output.push(
+                    text
+                );
+
+            }
+        );
+
+        return output;
+
+    }
+
+
+    function uniqueLocations(locations) {
+
+        const seen =
+            new Set();
+
+        const output =
+            [];
+
+
+        locations.forEach(
+            function (location) {
+
+                if (
+                    !location ||
+                    typeof location !== "object"
+                ) {
+
+                    return;
+
+                }
+
+
+                const normalizedLocation = {
+
+                    volume:
+                        safeString(
+                            location.volume
+                        ),
+
+                    page:
+                        safeString(
+                            location.page
+                        ),
+
+                    pageRange:
+                        safeString(
+                            location.pageRange
+                        )
+
+                };
+
+
+                if (
+                    !normalizedLocation.volume &&
+                    !normalizedLocation.page &&
+                    !normalizedLocation.pageRange
+                ) {
+
+                    return;
+
+                }
+
+
+                const key =
+                    [
+                        normalizedLocation.volume,
+                        normalizedLocation.page,
+                        normalizedLocation.pageRange
+                    ].join("|");
+
+
+                if (
+                    seen.has(key)
+                ) {
+
+                    return;
+
+                }
+
+
+                seen.add(key);
+
+                output.push(
+                    normalizedLocation
+                );
+
+            }
+        );
+
+
+        return output;
+
+    }
+
+
+    function uniqueOccurrences(occurrences) {
+
+        const seen =
+            new Set();
+
+        const output =
+            [];
+
+
+        occurrences.forEach(
+            function (occurrence) {
+
+                if (
+                    !occurrence ||
+                    typeof occurrence !== "object"
+                ) {
+
+                    return;
+
+                }
+
+
+                const normalizedOccurrence = {
+
+                    materialId:
+                        safeString(
+                            occurrence.materialId
+                        ),
+
+                    source:
+                        safeString(
+                            occurrence.source
+                        ),
+
+                    noteNumber:
+                        occurrence.noteNumber ??
+                        null
+
+                };
+
+
+                const key =
+                    [
+                        normalizedOccurrence.materialId,
+                        normalizedOccurrence.source,
+                        normalizedOccurrence.noteNumber ?? ""
+                    ].join("|");
+
+
+                if (
+                    seen.has(key)
+                ) {
+
+                    return;
+
+                }
+
+
+                seen.add(key);
+
+                output.push(
+                    normalizedOccurrence
+                );
+
+            }
+        );
+
+
+        return output;
+
+    }
+
+
     const normalized =
         references.map(
             function (
@@ -22490,112 +22274,6 @@ function normalizeUnifiedReferenceResult(
                         : {};
 
 
-                const locations =
-                    Array.isArray(
-                        item.locations
-                    )
-                        ? item.locations
-                            .filter(
-                                function (location) {
-
-                                    return (
-                                        location &&
-                                        typeof location === "object"
-                                    );
-
-                                }
-                            )
-                            .map(
-                                function (location) {
-
-                                    return {
-
-                                        volume:
-                                            safeString(
-                                                location.volume
-                                            ),
-
-                                        page:
-                                            safeString(
-                                                location.page
-                                            ),
-
-                                        pageRange:
-                                            safeString(
-                                                location.pageRange
-                                            )
-
-                                    };
-
-                                }
-                            )
-
-                        : [];
-
-
-                const variants =
-                    Array.isArray(
-                        item.variants
-                    )
-                        ? item.variants
-                            .map(
-                                function (variant) {
-
-                                    return safeString(
-                                        variant
-                                    );
-
-                                }
-                            )
-                            .filter(
-                                Boolean
-                            )
-
-                        : [];
-
-
-                const occurrences =
-                    Array.isArray(
-                        item.occurrences
-                    )
-                        ? item.occurrences
-                            .filter(
-                                function (occurrence) {
-
-                                    return (
-                                        occurrence &&
-                                        typeof occurrence === "object"
-                                    );
-
-                                }
-                            )
-                            .map(
-                                function (occurrence) {
-
-                                    return {
-
-                                        materialId:
-                                            safeString(
-                                                occurrence.materialId
-                                            ),
-
-                                        source:
-                                            safeString(
-                                                occurrence.source
-                                            ),
-
-                                        noteNumber:
-                                            occurrence.noteNumber ??
-                                            null
-
-                                    };
-
-                                }
-                            )
-
-                        : [];
-
-
                 return {
 
                     id:
@@ -22608,7 +22286,8 @@ function normalizeUnifiedReferenceResult(
                         safeString(
                             item.type ||
                             "book"
-                        ).toLowerCase(),
+                        )
+                            .toLowerCase(),
 
                     author:
                         safeString(
@@ -22646,13 +22325,31 @@ function normalizeUnifiedReferenceResult(
                         ),
 
                     locations:
-                        locations,
+                        uniqueLocations(
+                            Array.isArray(
+                                item.locations
+                            )
+                                ? item.locations
+                                : []
+                        ),
 
                     variants:
-                        variants,
+                        uniqueStrings(
+                            Array.isArray(
+                                item.variants
+                            )
+                                ? item.variants
+                                : []
+                        ),
 
                     occurrences:
-                        occurrences,
+                        uniqueOccurrences(
+                            Array.isArray(
+                                item.occurrences
+                            )
+                                ? item.occurrences
+                                : []
+                        ),
 
                     notes:
                         safeString(
@@ -22676,81 +22373,6 @@ function normalizeUnifiedReferenceResult(
 
 
     // =====================================================
-    // إزالة التكرار الحرفي داخل البيانات فقط
-    // =====================================================
-
-    normalized.forEach(
-        function (
-            reference
-        ) {
-
-            const locationKeys =
-                new Set();
-
-
-            reference.locations =
-                reference.locations.filter(
-                    function (
-                        location
-                    ) {
-
-                        const key =
-                            [
-                                location.volume,
-                                location.page,
-                                location.pageRange
-                            ].join("|");
-
-
-                        if (
-                            locationKeys.has(key)
-                        ) {
-
-                            return false;
-
-                        }
-
-
-                        locationKeys.add(key);
-
-                        return true;
-
-                    }
-                );
-
-
-            const variantKeys =
-                new Set();
-
-
-            reference.variants =
-                reference.variants.filter(
-                    function (
-                        variant
-                    ) {
-
-                        if (
-                            !variant ||
-                            variantKeys.has(variant)
-                        ) {
-
-                            return false;
-
-                        }
-
-
-                        variantKeys.add(variant);
-
-                        return true;
-
-                    }
-                );
-
-        }
-    );
-
-
-    // =====================================================
     // الإحصاءات
     // =====================================================
 
@@ -22768,48 +22390,57 @@ function normalizeUnifiedReferenceResult(
 
         referenceCount:
             Number(
-                statsSource.referenceCount ?? 0
+                statsSource.referenceCount ??
+                0
             ),
 
         multipleReferenceCount:
             Number(
-                statsSource.multipleReferenceCount ?? 0
+                statsSource.multipleReferenceCount ??
+                0
             ),
 
         ibidCount:
             Number(
-                statsSource.ibidCount ?? 0
+                statsSource.ibidCount ??
+                0
             ),
 
         internalReferenceCount:
             Number(
-                statsSource.internalReferenceCount ?? 0
+                statsSource.internalReferenceCount ??
+                0
             ),
 
         hadithCount:
             Number(
-                statsSource.hadithCount ?? 0
+                statsSource.hadithCount ??
+                0
             ),
 
         explanatoryCount:
             Number(
-                statsSource.explanatoryCount ?? 0
+                statsSource.explanatoryCount ??
+                0
             ),
 
         mixedCount:
             Number(
-                statsSource.mixedCount ?? 0
+                statsSource.mixedCount ??
+                0
             ),
 
         reviewCount:
             Number(
-                statsSource.reviewCount ?? 0
+                statsSource.reviewCount ??
+                0
             )
 
     };
 
 
     return normalized;
+
 }
 
 function parseUnifiedReferenceAIResult(answer) {
