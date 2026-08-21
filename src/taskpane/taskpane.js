@@ -1673,6 +1673,7 @@ function extractReferenceCandidates(referenceSources) {
     }
 
 
+
     // =====================================================
     // 2. الحواشي السفلية
     // =====================================================
@@ -1696,98 +1697,107 @@ function extractReferenceCandidates(referenceSources) {
 
 
                 if (!noteText) {
+
                     return;
+
                 }
 
 
+                const noteNumber =
+                    note.number ||
+                    noteIndex + 1;
+
+
+                const noteReference =
+                    String(
+                        note.reference || ""
+                    ).trim();
+
+
                 // -----------------------------------------
-                // النمط:
-                // ([1]) الفصول المفيدة 200.
-                // ([1]) منزلة المعنى في نظرية النحو العربي 19.
+                // أولوية أولى:
+                // التعامل مع نص الحاشية نفسه
+                // حتى لو كان رقم الحاشية منفصلًا
                 // -----------------------------------------
 
-                const numbered =
-                    noteText.match(
-                        /^\s*\(\s*\[\s*([0-9٠-٩]+)\s*\]\s*\)\s*(.+?)\s*\.?\s*$/
+                if (
+                    isExternalReference(
+                        noteText
+                    ) ||
+                    /\d{1,4}\s*$/.test(
+                        noteText
+                    )
+                ) {
+
+                    addCandidate(
+
+                        "footnote",
+
+                        "footnote",
+
+                        noteText,
+
+                        0,
+
+                        noteText,
+
+                        {
+                            noteNumber:
+                                noteNumber,
+
+                            marker:
+                                noteReference
+
+                        }
+
                     );
 
-
-                if (numbered) {
-
-                    const value =
-                        String(
-                            numbered[2] || ""
-                        ).trim();
-
-
-                    if (
-                        isExternalReference(
-                            value
-                        ) ||
-                        /\d{1,4}\s*$/.test(value)
-                    ) {
-
-                        addCandidate(
-                            "footnote",
-                            "numbered-footnote",
-                            value,
-                            0,
-                            noteText,
-                            {
-                                noteNumber:
-                                    note.number ||
-                                    noteIndex + 1,
-
-                                marker:
-                                    numbered[1]
-
-                            }
-                        );
-
-                    }
-
-                    return;
-
                 }
 
 
                 // -----------------------------------------
-                // إحالات لفظية داخل الحاشية
+                // أنماط لفظية داخل الحاشية
                 // -----------------------------------------
 
                 const noteVerbalPattern =
                     /(?:انظر|ينظر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,250})/gi;
 
 
-                let noteMatch;
+                let match;
 
 
                 while (
                     (
-                        noteMatch =
+                        match =
                             noteVerbalPattern.exec(
                                 noteText
                             )
                     ) !== null
                 ) {
 
-                    const whole =
-                        String(
-                            noteMatch[0] || ""
-                        ).trim();
-
-
                     addCandidate(
+
                         "footnote",
+
                         "verbal-footnote",
-                        whole,
-                        noteMatch.index,
+
+                        String(
+                            match[0] || ""
+                        ).trim(),
+
+                        match.index,
+
                         noteText,
+
                         {
                             noteNumber:
-                                note.number ||
-                                noteIndex + 1
+                                noteNumber,
+
+                            marker:
+                                noteReference
+
                         }
+
                     );
 
                 }
