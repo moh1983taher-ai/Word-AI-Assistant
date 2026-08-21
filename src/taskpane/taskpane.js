@@ -21886,6 +21886,497 @@ function parseReferenceAIJSON(
     }
 
 }
+
+// =====================================================
+// AI REFERENCE MERGER
+// توحيد وتجميع المراجع باستخدام الذكاء الاصطناعي
+// =====================================================
+
+async function mergeReferencesWithAI(
+    aiReferenceResults
+) {
+
+    if (
+        !Array.isArray(aiReferenceResults) ||
+        aiReferenceResults.length === 0
+    ) {
+        return [];
+    }
+
+
+    const settings =
+        getSavedSettings();
+
+    const provider =
+        String(
+            settings.provider || "openrouter"
+        ).toLowerCase();
+
+    const key =
+        String(
+            settings.key || ""
+        ).trim();
+
+    const model =
+        String(
+            settings.model || ""
+        ).trim();
+
+
+    if (!key) {
+        throw new Error(
+            "لم يتم إدخال مفتاح الذكاء الاصطناعي."
+        );
+    }
+
+
+    if (!model) {
+        throw new Error(
+            "لم يتم تحديد نموذج الذكاء الاصطناعي."
+        );
+    }
+
+
+    const systemPrompt = `
+
+أنت الآن في المرحلة الثانية من تحليل المراجع الأكاديمية.
+
+لديك مجموعة من نتائج تحليل أولي لمواد موجودة في مستند عربي
+أكاديمي.
+
+مهمتك الوحيدة هي بناء قائمة موحدة للمراجع.
+
+قواعد صارمة:
+
+1. لا تعتبر كل مادة مرجعًا.
+2. لا تكرر المرجع نفسه بسبب اختلاف:
+   - الصفحة
+   - الجزء
+   - طريقة كتابة الاسم
+   - وجود "انظر"
+   - وجود "المصدر نفسه".
+3. اجمع الإحالات المختلفة إلى الكتاب نفسه في سجل واحد.
+4. احتفظ بجميع مواضع الاستشهاد بالمرجع.
+5. احتفظ بكل الصيغ الأصلية التي استخدمها الباحث.
+6. "المصدر نفسه" و"المرجع نفسه" إحالة إلى مرجع سابق، وليسا مرجعًا جديدًا.
+7. اربط "المصدر نفسه" بالمرجع السابق المناسب ضمن ترتيب المواد.
+8. إذا احتوت مادة واحدة على عدة مراجع، أنشئ كل مرجع كسجل مستقل.
+9. لا تدمج كتابين لمجرد تشابه العنوان.
+10. لا تخترع اسم مؤلف أو عنوانًا غير موجود في البيانات.
+11. إذا كان المؤلف غير مذكور، أبقِه فارغًا.
+12. إذا وجدت احتمال خطأ في البيانات الأصلية، لا تصححه من نفسك؛ احتفظ به وأضف ملاحظة.
+13. الإحالات الداخلية إلى صفحات الدراسة ليست مراجع.
+14. تخريج الحديث ليس كتابًا، ولكنه يحتفظ كسجل حديث مستقل.
+15. الشرح الذي لا يحتوي مرجعًا لا يدخل قائمة المراجع.
+16. إذا كان الدمج غير مؤكد، لا تدمج السجلين وضع needsReview = true.
+
+أعد JSON فقط بهذه الصيغة:
+
+{
+  "references": [
+    {
+      "id": "",
+      "type": "book",
+      "author": "",
+      "title": "",
+      "edition": "",
+      "editor": "",
+      "publisher": "",
+      "city": "",
+      "year": "",
+      "locations": [
+        {
+          "volume": "",
+          "page": "",
+          "pageRange": ""
+        }
+      ],
+      "variants": [],
+      "occurrences": [],
+      "notes": "",
+      "confidence": 0.0,
+      "needsReview": false
+    }
+  ]
+}
+
+في occurrences احتفظ بمعرّف المادة الأصلية
+materialId، ومصدرها، ورقم الحاشية إن وجد.
+
+في variants احتفظ بالنصوص الأصلية المختلفة التي تشير إلى المرجع نفسه.
+
+لا تحذف المعلومات لمجرد أنها غير مكتملة.
+`;
+
+
+    // =====================================================
+    // تقسيم النتائج إلى دفعات
+    // =====================================================
+
+    const batchSize = 20;
+
+    const batches = [];
+
+    for (
+        let i = 0;
+        i < aiReferenceResults.length;
+        i += batchSize
+    ) {
+
+        batches.push(
+            aiReferenceResults.slice(
+                i,
+                i + batchSize
+            )
+        );
+
+    }
+
+
+    let mergedReferences = [];
+
+
+    // =====================================================
+    // إرسال الدفعات
+    // =====================================================
+
+    for (
+        let batchIndex = 0;
+        batchIndex < batches.length;
+        batchIndex++
+    ) {
+
+        const batch =
+            batches[batchIndex];
+
+
+        const userPrompt =
+            [
+                `هذه الدفعة رقم ${batchIndex + 1} من ${batches.length}.`,
+                "",
+                "وحّد المراجع التالية:",
+                "",
+                JSON.stringify(
+                    batch,
+                    null,
+                    2
+                )
+            ].join("\n");
+
+
+        let result;
+
+
+        // =================================================
+        // Gemini
+        // =================================================
+
+        if (
+            provider === "gemini"
+        ) {
+
+            const response =
+                await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizeGeminiModel(model))}:generateContent?key=${encodeURIComponent(key)}`,
+                    {
+
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+
+                            systemInstruction: {
+
+                                parts: [
+                                    {
+                                        text:
+                                            systemPrompt
+                                    }
+                                ]
+
+                            },
+
+                            contents: [
+
+                                {
+                                    role:
+                                        "user",
+
+                                    parts: [
+                                        {
+                                            text:
+                                                userPrompt
+                                        }
+                                    ]
+
+                                }
+
+                            ],
+
+                            generationConfig: {
+
+                                temperature:
+                                    0.1
+
+                            }
+
+                        })
+
+                    }
+                );
+
+
+            result =
+                await readJSON(
+                    response
+                );
+
+
+            if (
+                !response.ok
+            ) {
+
+                throw new Error(
+                    getAPIError(
+                        result,
+                        "فشل تحليل دمج المراجع."
+                    )
+                );
+
+            }
+
+
+            const answer =
+                extractGeminiAnswer(
+                    result
+                );
+
+
+            mergedReferences.push(
+                ...parseReferenceMergeJSON(
+                    answer
+                )
+            );
+
+        }
+
+        // =================================================
+        // OpenAI / OpenRouter / Groq
+        // =================================================
+
+        else {
+
+            const endpoint =
+                provider === "openai"
+
+                    ? "https://api.openai.com/v1/chat/completions"
+
+                    : provider === "groq"
+
+                        ? "https://api.groq.com/openai/v1/chat/completions"
+
+                        : "https://openrouter.ai/api/v1/chat/completions";
+
+
+            const headers = {
+
+                "Content-Type":
+                    "application/json",
+
+                "Authorization":
+                    "Bearer " + key
+
+            };
+
+
+            if (
+                provider ===
+                "openrouter"
+            ) {
+
+                headers[
+                    "HTTP-Referer"
+                ] =
+                    window.location.href;
+
+                headers[
+                    "X-Title"
+                ] =
+                    "Research Tools";
+
+            }
+
+
+            const response =
+                await fetch(
+                    endpoint,
+                    {
+
+                        method: "POST",
+
+                        headers: headers,
+
+                        body: JSON.stringify({
+
+                            model:
+                                model,
+
+                            messages: [
+
+                                {
+                                    role:
+                                        "system",
+
+                                    content:
+                                        systemPrompt
+                                },
+
+                                {
+                                    role:
+                                        "user",
+
+                                    content:
+                                        userPrompt
+                                }
+
+                            ],
+
+                            temperature:
+                                0.1,
+
+                            max_tokens:
+                                provider ===
+                                "groq"
+                                    ? 7000
+                                    : 10000
+
+                        })
+
+                    }
+                );
+
+
+            result =
+                await readJSON(
+                    response
+                );
+
+
+            if (
+                !response.ok
+            ) {
+
+                throw new Error(
+                    getAPIError(
+                        result,
+                        "فشل تحليل دمج المراجع."
+                    )
+                );
+
+            }
+
+
+            const answer =
+                extractOpenAIStyleAnswer(
+                    result,
+                    provider
+                );
+
+
+            mergedReferences.push(
+                ...parseReferenceMergeJSON(
+                    answer
+                )
+            );
+
+        }
+
+    }
+
+
+    return mergedReferences;
+
+}
+
+// =====================================================
+// PARSE REFERENCE MERGE JSON
+// =====================================================
+
+function parseReferenceMergeJSON(
+    text
+) {
+
+    let raw =
+        String(
+            text || ""
+        ).trim();
+
+
+    if (!raw) {
+        return [];
+    }
+
+
+    raw =
+        raw.replace(
+            /^```(?:json)?\s*/i,
+            ""
+        );
+
+
+    raw =
+        raw.replace(
+            /\s*```$/i,
+            ""
+        );
+
+
+    try {
+
+        const parsed =
+            JSON.parse(
+                raw
+            );
+
+
+        if (
+            !parsed ||
+            !Array.isArray(
+                parsed.references
+            )
+        ) {
+
+            throw new Error(
+                "صيغة دمج المراجع غير صحيحة."
+            );
+
+        }
+
+
+        return parsed.references;
+
+    }
+    catch (
+        error
+    ) {
+
+        console.error(
+            "نتيجة دمج المراجع غير صالحة:",
+            text
+        );
+
+
+        throw new Error(
+            "أعاد الذكاء الاصطناعي نتيجة غير منظمة أثناء توحيد المراجع."
+        );
+
+    }
+
+}
 // =====================================================
 // Ask AI Diagnostics
 // =====================================================
@@ -24560,6 +25051,201 @@ if (referencesContent) {
                                         console.log(
                                             "نتائج تحليل المراجع بالذكاء الاصطناعي:",
                                             aiReferenceResults
+                                        );
+
+                                        const mergedReferenceResults =
+                                            await mergeReferencesWithAI(
+                                                aiReferenceResults
+                                            );
+
+
+                                        console.log(
+                                            "المراجع الموحدة بالذكاء الاصطناعي:",
+                                            mergedReferenceResults
+                                        );
+
+                                        const mergedReferenceHTML =
+                                            mergedReferenceResults
+                                                .map(
+                                                    function (reference, index) {
+
+                                                        const locations =
+                                                            Array.isArray(
+                                                                reference.locations
+                                                            )
+                                                                ? reference.locations
+                                                                : [];
+
+                                                        const locationHTML =
+                                                            locations
+                                                                .map(
+                                                                    function (location) {
+
+                                                                        const volume =
+                                                                            location.volume || "";
+
+                                                                        const page =
+                                                                            location.page || "";
+
+                                                                        const pageRange =
+                                                                            location.pageRange || "";
+
+                                                                        if (
+                                                                            volume &&
+                                                                            page
+                                                                        ) {
+
+                                                                            return `
+                                                                                <div class="ai-merged-location">
+                                                                                    ج ${volume} / ص ${page}
+                                                                                </div>
+                                                                            `;
+
+                                                                        }
+
+                                                                        if (
+                                                                            pageRange
+                                                                        ) {
+
+                                                                            return `
+                                                                                <div class="ai-merged-location">
+                                                                                    ص ${pageRange}
+                                                                                </div>
+                                                                            `;
+
+                                                                        }
+
+                                                                        if (
+                                                                            page
+                                                                        ) {
+
+                                                                            return `
+                                                                                <div class="ai-merged-location">
+                                                                                    ص ${page}
+                                                                                </div>
+                                                                            `;
+
+                                                                        }
+
+                                                                        return "";
+
+                                                                    }
+                                                                )
+                                                                .join("");
+
+                                                        return `
+                                                            <div class="ai-merged-reference">
+
+                                                                <div class="ai-merged-reference-number">
+                                                                    ${index + 1}
+                                                                </div>
+
+                                                                <div class="ai-merged-reference-content">
+
+                                                                    <div class="ai-merged-reference-author">
+                                                                        ${reference.author || "مؤلف غير محدد"}
+                                                                    </div>
+
+                                                                    <div class="ai-merged-reference-title">
+                                                                        ${reference.title || "عنوان غير محدد"}
+                                                                    </div>
+
+                                                                    ${
+                                                                        locationHTML
+                                                                            ? `
+                                                                            <div class="ai-merged-reference-locations">
+                                                                                ${locationHTML}
+                                                                            </div>
+                                                                            `
+                                                                            : ""
+                                                                    }
+
+                                                                    <div class="ai-merged-reference-meta">
+
+                                                                        مرات الظهور:
+                                                                        ${
+                                                                            Array.isArray(
+                                                                                reference.occurrences
+                                                                            )
+                                                                                ? reference.occurrences.length
+                                                                                : 0
+                                                                        }
+
+                                                                        ${
+                                                                            reference.needsReview
+                                                                                ? `
+                                                                                <span>
+                                                                                    · يحتاج مراجعة
+                                                                                </span>
+                                                                                `
+                                                                                : ""
+                                                                        }
+
+                                                                    </div>
+
+                                                                </div>
+
+                                                            </div>
+                                                        `;
+
+                                                    }
+                                                )
+                                                .join("");
+
+
+                                        referencesSourceWorkspace.insertAdjacentHTML(
+                                            "beforeend",
+                                            `
+                                            <div class="references-analysis-result">
+
+                                                <div class="references-analysis-status success">
+                                                    ✓ تم توحيد المراجع بالذكاء الاصطناعي
+                                                </div>
+
+                                                <div class="references-analysis-info">
+
+                                                    المواد الأصلية:
+                                                    <strong>
+                                                        ${processedReferences.length}
+                                                    </strong>
+
+                                                    <br>
+
+                                                    نتائج التحليل الأولي:
+                                                    <strong>
+                                                        ${aiReferenceResults.length}
+                                                    </strong>
+
+                                                    <br>
+
+                                                    المراجع الموحدة:
+                                                    <strong>
+                                                        ${mergedReferenceResults.length}
+                                                    </strong>
+
+                                                </div>
+
+                                                <div class="references-final-results">
+
+                                                    <div class="references-final-results-title">
+
+                                                        المراجع الموحدة
+                                                        <strong>
+                                                            ${mergedReferenceResults.length}
+                                                        </strong>
+
+                                                    </div>
+
+                                                    <div class="references-final-list">
+
+                                                        ${mergedReferenceHTML}
+
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+                                            `
                                         );
 
 
