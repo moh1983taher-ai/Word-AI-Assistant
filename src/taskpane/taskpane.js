@@ -1793,73 +1793,73 @@ function isLikelyReferenceText(
 
 }
 
+// =====================================================
+// استخراج الحواشي السفلية 
+// =====================================================
+
 function extractReferenceTextsFromNote(
     noteText
 ) {
 
     const results = [];
 
-
     const sourceText =
         String(
             noteText || ""
+        ).trim();
+
+
+    if (!sourceText) {
+
+        return results;
+
+    }
+
+
+    // =====================================================
+    // 1. توثيق مرقّم داخل الحاشية
+    // أمثلة:
+    // ([1]) الفصول المفيدة 200
+    // ([1]) منزلة المعنى في نظرية النحو العربي 19
+    // =====================================================
+
+    const numberedPattern =
+        /^\s*\(\s*\[\s*([0-9٠-٩]+)\s*\]\s*\)\s*(.+?)\s*\.?\s*$/;
+
+
+    const numberedMatch =
+        sourceText.match(
+            numberedPattern
         );
 
 
-    // التوثيق بين الأقواس داخل الحاشية
-    const parentheticalPattern =
-        /(?:\(([^()\n]{2,220})\)|（([^（）\n]{2,220})）)/g;
+    if (numberedMatch) {
 
-
-    let match;
-
-
-    while (
-        (match =
-            parentheticalPattern.exec(
-                sourceText
-            )) !== null
-    ) {
-
-        const value =
-            (
-                match[1] ||
-                match[2] ||
-                ""
+        const referenceText =
+            String(
+                numberedMatch[2] || ""
             ).trim();
 
 
         if (
-            isLikelyReferenceText(
-                value
+            isLikelyFootnoteReference(
+                referenceText
             )
         ) {
 
             results.push({
 
                 text:
-                    value,
+                    referenceText,
 
                 position:
-                    match.index,
+                    0,
 
                 context:
-                    sourceText
-                        .slice(
-                            Math.max(
-                                0,
-                                match.index - 80
-                            ),
-                            Math.min(
-                                sourceText.length,
-                                parentheticalPattern.lastIndex + 150
-                            )
-                        )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
-                        .trim()
+                    sourceText,
+
+                noteMarker:
+                    numberedMatch[1]
 
             });
 
@@ -1868,9 +1868,18 @@ function extractReferenceTextsFromNote(
     }
 
 
-    // الحواشي التي تبدأ مباشرة بـ "ينظر" أو "انظر"
+    // =====================================================
+    // 2. توثيق داخل الحاشية دون ترقيم
+    // مثل:
+    // انظر: الفراهيدي، كتاب العين، 2/121
+    // المصدر نفسه
+    // =====================================================
+
     const verbalPattern =
-        /(?:ينظر|انظر|راجع|المصدر)\s*[:：]?\s*([^.\n؛]{3,220})/gi;
+        /(?:انظر|ينظر|راجع|المصدر نفسه|المصدر)\s*[:：]?\s*([^.\n؛]{3,250})/gi;
+
+
+    let match;
 
 
     while (
@@ -1880,33 +1889,25 @@ function extractReferenceTextsFromNote(
             )) !== null
     ) {
 
+        const wholeText =
+            String(
+                match[0] || ""
+            ).trim();
+
+
         results.push({
 
             text:
-                String(
-                    match[0] || ""
-                ).trim(),
+                wholeText,
 
             position:
                 match.index,
 
             context:
-                sourceText
-                    .slice(
-                        Math.max(
-                            0,
-                            match.index - 80
-                        ),
-                        Math.min(
-                            sourceText.length,
-                            verbalPattern.lastIndex + 150
-                        )
-                    )
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
-                    .trim()
+                sourceText,
+
+            noteMarker:
+                ""
 
         });
 
@@ -1916,6 +1917,69 @@ function extractReferenceTextsFromNote(
     return results;
 
 }
+
+function isLikelyFootnoteReference(
+    text
+) {
+
+    const value =
+        String(
+            text || ""
+        ).trim();
+
+
+    if (
+        value.length < 4
+    ) {
+
+        return false;
+
+    }
+
+
+    // وجود رقم صفحة منفرد في نهاية المرجع
+    if (
+        /(?:^|\s)\d{1,4}\s*\.?$/
+            .test(
+                value
+            )
+    ) {
+
+        return true;
+
+    }
+
+
+    // وجود جزء/صفحة مثل 2/121
+    if (
+        /\d+\s*[\/:]\s*\d+/
+            .test(
+                value
+            )
+    ) {
+
+        return true;
+
+    }
+
+
+    // وجود كلمات توحي ببيانات كتاب
+    if (
+        /(?:ط\s*\d|تحقيق|دار\s+|مؤسسة\s+|بيروت|القاهرة|دمشق|الرياض|ابن\s+|أبو\s+)/i
+            .test(
+                value
+            )
+    ) {
+
+        return true;
+
+    }
+
+
+    return false;
+
+}
+
 // ======================================
 // Normalize Search Text
 // العربية
