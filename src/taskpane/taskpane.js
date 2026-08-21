@@ -21967,8 +21967,9 @@ other
         }
 
 
-        return parseUnifiedReferenceAIResult(
-            answer
+        return normalizeUnifiedReferenceResult(
+            parseUnifiedReferenceAIResult(answer),
+            materials
         );
 
     }
@@ -22107,8 +22108,9 @@ other
     }
 
 
-    return parseUnifiedReferenceAIResult(
-        answer
+    return normalizeUnifiedReferenceResult(
+        parseUnifiedReferenceAIResult(answer),
+        materials
     );
 
 }
