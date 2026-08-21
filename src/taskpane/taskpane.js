@@ -23831,6 +23831,7 @@ if (referencesContent) {
                         e.preventDefault();
                         e.stopPropagation();
 
+
                         const source =
                             button.getAttribute(
                                 "data-reference-source"
@@ -23838,7 +23839,7 @@ if (referencesContent) {
 
 
                         // =====================================================
-                        // المستند الحالي
+                        // المستند الحالي المفتوح فعليًا في Word
                         // =====================================================
 
                         if (
@@ -23857,13 +23858,13 @@ if (referencesContent) {
                                     <div class="references-selected-icon">
 
                                         <svg xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="#000000"
-                                            stroke-width="1"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            aria-hidden="true">
+                                             viewBox="0 0 24 24"
+                                             fill="none"
+                                             stroke="#000000"
+                                             stroke-width="1"
+                                             stroke-linecap="round"
+                                             stroke-linejoin="round"
+                                             aria-hidden="true">
 
                                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
 
@@ -23878,6 +23879,7 @@ if (referencesContent) {
                                         </svg>
 
                                     </div>
+
 
                                     <div class="references-selected-info">
 
@@ -23904,418 +23906,349 @@ if (referencesContent) {
                                 </button>
                                 `;
 
-                                const analyzeReferencesBtn =
-                                    document.getElementById(
-                                        "analyze-references-btn"
-                                    );
+
+                            const analyzeReferencesBtn =
+                                document.getElementById(
+                                    "analyze-references-btn"
+                                );
 
 
-                                if (analyzeReferencesBtn) {
+                            if (
+                                !analyzeReferencesBtn
+                            ) {
 
-                                    analyzeReferencesBtn.onclick =
-                                        async function (e) {
+                                return;
 
-                                            e.preventDefault();
-                                            e.stopPropagation();
-
-
-                                            analyzeReferencesBtn.disabled =
-                                                true;
-
-                                            analyzeReferencesBtn.textContent =
-                                                "جارٍ تحليل المستند...";
+                            }
 
 
-                                            try {
+                            analyzeReferencesBtn.onclick =
+                                async function (e) {
 
-                                                const referenceSources =
-                                                    await readReferenceSources();
+                                    e.preventDefault();
+                                    e.stopPropagation();
 
 
-                                                if (
-                                                    !referenceSources ||
-                                                    !referenceSources.mainText
+                                    analyzeReferencesBtn.disabled =
+                                        true;
+
+                                    analyzeReferencesBtn.textContent =
+                                        "جارٍ تحليل المستند...";
+
+
+                                    try {
+
+                                        // =================================================
+                                        // المرحلة 1
+                                        // قراءة المستند المفتوح فعليًا في Word
+                                        // =================================================
+
+                                        const referenceSources =
+                                            await readReferenceSources();
+
+
+                                        if (
+                                            !referenceSources ||
+                                            !referenceSources.mainText
+                                        ) {
+
+                                            throw new Error(
+                                                "تعذر الحصول على نص المستند المفتوح."
+                                            );
+
+                                        }
+
+
+                                        // =================================================
+                                        // المرحلة 2
+                                        // تنظيف وتحليل موحد للمواد
+                                        // =================================================
+
+                                        const processedReferences =
+                                            processReferenceSources(
+                                                referenceSources
+                                            );
+
+
+                                        console.log(
+                                            "المواد بعد المعالجة الموحدة:",
+                                            processedReferences
+                                        );
+
+
+                                        // =================================================
+                                        // المرحلة 3
+                                        // تحليل مكونات المراجع
+                                        // =================================================
+
+                                        const parsedReferences =
+                                            parseAllReferenceRecords(
+                                                processedReferences
+                                            );
+
+
+                                        console.log(
+                                            "المراجع بعد تحليل المكونات:",
+                                            parsedReferences
+                                        );
+
+
+                                        // =================================================
+                                        // المرحلة 4
+                                        // توحيد الصيغ
+                                        // =================================================
+
+                                        const normalizedReferences =
+                                            normalizeAllParsedReferences(
+                                                parsedReferences
+                                            );
+
+
+                                        console.log(
+                                            "المراجع بعد التوحيد:",
+                                            normalizedReferences
+                                        );
+
+
+                                        // =================================================
+                                        // المرحلة 5
+                                        // حل المصدر نفسه
+                                        // =================================================
+
+                                        const resolvedReferences =
+                                            applyIbidResolution(
+                                                normalizedReferences
+                                            );
+
+
+                                        console.log(
+                                            "المراجع بعد حل المصدر نفسه:",
+                                            resolvedReferences
+                                        );
+
+
+                                        // =================================================
+                                        // المرحلة 6
+                                        // تجميع المراجع المتكررة
+                                        // =================================================
+
+                                        const groupedReferences =
+                                            groupDuplicateReferences(
+                                                resolvedReferences
+                                            );
+
+
+                                        console.log(
+                                            "المراجع بعد كشف التكرار:",
+                                            groupedReferences
+                                        );
+
+
+                                        // =================================================
+                                        // المرحلة 7
+                                        // بناء السجلات النهائية
+                                        // =================================================
+
+                                        const finalReferenceRecords =
+                                            buildFinalReferenceRecords(
+                                                groupedReferences
+                                            );
+
+
+                                        console.log(
+                                            "السجلات النهائية للمراجع:",
+                                            finalReferenceRecords
+                                        );
+
+
+                                        // =================================================
+                                        // المرحلة 8
+                                        // عرض السجلات النهائية فقط
+                                        // =================================================
+
+                                        const finalReferenceHTML =
+                                            renderFinalReferenceRecords(
+                                                finalReferenceRecords
+                                            );
+
+
+                                        // إزالة نتائج تحليل سابقة
+                                        referencesSourceWorkspace
+                                            .querySelectorAll(
+                                                ".references-analysis-result"
+                                            )
+                                            .forEach(
+                                                function (
+                                                    element
                                                 ) {
 
-                                                    throw new Error(
-                                                        "تعذر الحصول على نص المستند المفتوح."
-                                                    );
+                                                    element.remove();
 
                                                 }
+                                            );
 
-                                                const parsedReferences =
-                                                    parseAllReferenceRecords(
-                                                        referenceCandidates
-                                                    );
 
-                                                console.log(
-                                                    "المراجع بعد تحليل المكونات:",
-                                                    parsedReferences
-                                                );
+                                        referencesSourceWorkspace.insertAdjacentHTML(
+                                            "beforeend",
+                                            `
+                                            <div
+                                                class="references-analysis-result">
 
-                                                const normalizedReferences =
-                                                    normalizeAllParsedReferences(
-                                                        parsedReferences
-                                                    );
+                                                <div
+                                                    class="references-analysis-status success">
 
-                                                console.log(
-                                                    "المراجع بعد التوحيد:",
-                                                    normalizedReferences
-                                                );
+                                                    ✓ تم تحليل المستند كاملًا
 
-                                                const resolvedReferences =
-                                                    applyIbidResolution(
-                                                        normalizedReferences
-                                                    );
+                                                </div>
 
-                                                console.log(
-                                                    "المراجع بعد حل المصدر نفسه:",
-                                                    resolvedReferences
-                                                );
 
-                                                const groupedReferences =
-                                                    groupDuplicateReferences(
-                                                        resolvedReferences
-                                                    );
+                                                <div
+                                                    class="references-analysis-info">
 
-                                                console.log(
-                                                    "المراجع بعد كشف التكرار:",
-                                                    groupedReferences
-                                                );
-
-                                                const finalReferenceRecords =
-                                                    buildFinalReferenceRecords(
-                                                        groupedReferences
-                                                    );
-
-                                                console.log(
-                                                    "السجلات النهائية للمراجع:",
-                                                    finalReferenceRecords
-                                                );
-
-                                                const finalReferenceHTML =
-                                                    renderFinalReferenceRecords(
-                                                        finalReferenceRecords
-                                                    );
-
-
-                                                referencesSourceWorkspace.insertAdjacentHTML(
-                                                    "beforeend",
-                                                    `
-                                                    <div class="references-final-results">
-
-                                                        <div class="references-final-results-title">
-                                                            المراجع المكتشفة
-                                                            <strong>
-                                                                ${finalReferenceRecords.length}
-                                                            </strong>
-                                                        </div>
-
-                                                        <div class="references-final-list">
-                                                            ${finalReferenceHTML}
-                                                        </div>
-
-                                                    </div>
-                                                    `
-                                                );
-
-                                                const referenceRecords =
-                                                    referenceCandidates.filter(
-                                                        item =>
-                                                            item.kind ===
-                                                            "reference"
-                                                    );
-
-                                                const ibidRecords =
-                                                    referenceCandidates.filter(
-                                                        item =>
-                                                            item.kind ===
-                                                            "ibid"
-                                                    );
-
-                                                const hadithRecords =
-                                                    referenceCandidates.filter(
-                                                        item =>
-                                                            item.kind ===
-                                                            "hadith"
-                                                    );
-
-                                                const reviewRecords =
-                                                    referenceCandidates.filter(
-                                                        item =>
-                                                            item.kind ===
-                                                            "review"
-                                                    );
-
-                                                const internalRecords =
-                                                    referenceCandidates.filter(
-                                                        item =>
-                                                            item.kind ===
-                                                            "internal"
-                                                    );
-
-                                                const candidateRows =
-                                                    referenceCandidates
-                                                        .map(
-                                                            function (
-                                                                item,
-                                                                index
-                                                            ) {
-
-                                                                const sourceLabel =
-
-                                                                    item.source ===
-                                                                    "main-text"
-
-                                                                        ? "المتن"
-
-                                                                        : item.source ===
-                                                                        "footnote"
-
-                                                                            ? "حاشية سفلية"
-
-                                                                            : "حاشية ختامية";
-
-
-                                                                return `
-                                                                    <div class="reference-candidate">
-
-                                                                        <div class="reference-candidate-head">
-
-                                                                            <span class="reference-candidate-number">
-                                                                                ${index + 1}
-                                                                            </span>
-
-                                                                            <span class="reference-candidate-source">
-                                                                                ${sourceLabel}
-                                                                            </span>
-
-                                                                        </div>
-
-
-                                                                        <div class="reference-candidate-text">
-
-                                                                            ${item.text}
-
-                                                                        </div>
-
-
-                                                                        <div class="reference-candidate-context">
-
-                                                                            ${item.context}
-
-                                                                        </div>
-
-                                                                    </div>
-                                                                `;
-
-                                                            }
-                                                        )
-                                                        .join("");
-
-                                                    referencesSourceWorkspace.insertAdjacentHTML(
-                                                        "beforeend",
-                                                        `
-                                                        <div class="references-analysis-status success">
-                                                            ✓ تم تحليل مواد المراجع
-                                                        </div>
-
-                                                        <div class="references-analysis-info">
-
-                                                            <div>
-                                                                مراجع:
-                                                                <strong>${referenceRecords.length}</strong>
-                                                            </div>
-
-                                                            <div>
-                                                                المصدر نفسه:
-                                                                <strong>${ibidRecords.length}</strong>
-                                                            </div>
-
-                                                            <div>
-                                                                تخريج الأحاديث:
-                                                                <strong>${hadithRecords.length}</strong>
-                                                            </div>
-
-                                                            <div>
-                                                                تحتاج مراجعة:
-                                                                <strong>${reviewRecords.length}</strong>
-                                                            </div>
-
-                                                            <div>
-                                                                إحالات داخلية:
-                                                                <strong>${internalRecords.length}</strong>
-                                                            </div>
-
-                                                            <div>
-                                                                إجمالي المواد:
-                                                                <strong>${referenceCandidates.length}</strong>
-                                                            </div>
-
-                                                        </div>
-                                                        `
-                                                    );
-
-
-                                                const mainCandidates =
-                                                    referenceCandidates.filter(
-                                                        item =>
-                                                            item.source ===
-                                                            "main-text"
-                                                    );
-
-
-                                                const footnoteCandidates =
-                                                    referenceCandidates.filter(
-                                                        item =>
-                                                            item.source ===
-                                                            "footnote"
-                                                    );
-
-
-                                                const endnoteCandidates =
-                                                    referenceCandidates.filter(
-                                                        item =>
-                                                            item.source ===
-                                                            "endnote"
-                                                    );
-
-
-                                                console.log(
-                                                    "تحليل المراجع الشامل:",
-                                                    {
-                                                        mainTextCandidates:
-                                                            mainCandidates.length,
-
-                                                        footnoteCandidates:
-                                                            footnoteCandidates.length,
-
-                                                        endnoteCandidates:
-                                                            endnoteCandidates.length,
-
-                                                        totalCandidates:
-                                                            referenceCandidates.length
-                                                    }
-                                                );
-
-
-                                                analyzeReferencesBtn.textContent =
-                                                    "✓ تم التحليل";
-
-
-                                                referencesSourceWorkspace.insertAdjacentHTML(
-                                                    "beforeend",
-                                                    `
-                                                    <div class="references-analysis-status success">
-                                                        ✓ تم تحليل المستند كاملًا
+                                                    <div>
+                                                        المتن:
+                                                        <strong>
+                                                            ${referenceSources.mainText.length}
+                                                        </strong>
+                                                        حرف
                                                     </div>
 
 
-                                                    <div class="references-analysis-info">
-
-                                                        <div>
-                                                            المتن:
-                                                            <strong>
-                                                                ${referenceSources.mainText.length}
-                                                            </strong>
-                                                            حرف
-                                                        </div>
-
-
-                                                        <div>
-                                                            الحواشي السفلية:
-                                                            <strong>
-                                                                ${referenceSources.footnotes.length}
-                                                            </strong>
-                                                            (
-                                                            ${footnoteCandidates.length}
-                                                            مرشحًا
-                                                            )
-                                                        </div>
-
-
-                                                        <div>
-                                                            الحواشي الختامية:
-                                                            <strong>
-                                                                ${referenceSources.endnotes.length}
-                                                            </strong>
-                                                            (
-                                                            ${endnoteCandidates.length}
-                                                            مرشحًا
-                                                            )
-                                                        </div>
-
-
-                                                        <div>
-                                                            مرشحو التوثيق في المتن:
-                                                            <strong>
-                                                                ${mainCandidates.length}
-                                                            </strong>
-                                                        </div>
-
-
-                                                        <div>
-                                                            إجمالي المرشحين:
-                                                            <strong>
-                                                                ${referenceCandidates.length}
-                                                            </strong>
-                                                        </div>
-
-                                                    </div>
-                                                    `
-                                                );
-
-
-                                                console.log(
-                                                    "تم تحليل المستند المفتوح في Word:",
-                                                    {
-                                                        mainTextLength:
-                                                            referenceSources.mainText.length,
-
-                                                        footnotes:
-                                                            referenceSources.footnotes.length,
-
-                                                        endnotes:
-                                                            referenceSources.endnotes.length
-                                                    }
-                                                );
-
-
-                                            } catch (error) {
-
-                                                analyzeReferencesBtn.disabled =
-                                                    false;
-
-                                                analyzeReferencesBtn.textContent =
-                                                    "تحليل المراجع";
-
-
-                                                referencesSourceWorkspace.insertAdjacentHTML(
-                                                    "beforeend",
-                                                    `
-                                                    <div class="references-analysis-status error">
-                                                        ⚠ تعذر تحليل المستند
+                                                    <div>
+                                                        الحواشي السفلية:
+                                                        <strong>
+                                                            ${referenceSources.footnotes.length}
+                                                        </strong>
                                                     </div>
 
-                                                    <div class="references-analysis-info">
-                                                        ${error.message ||
-                                                        "حدث خطأ غير معروف."}
+
+                                                    <div>
+                                                        الحواشي الختامية:
+                                                        <strong>
+                                                            ${referenceSources.endnotes.length}
+                                                        </strong>
                                                     </div>
-                                                    `
-                                                );
 
 
-                                                console.error(
-                                                    "فشل تحليل المستند المفتوح:",
-                                                    error
-                                                );
+                                                    <div>
+                                                        المواد المحللة:
+                                                        <strong>
+                                                            ${processedReferences.length}
+                                                        </strong>
+                                                    </div>
 
+
+                                                    <div>
+                                                        السجلات النهائية:
+                                                        <strong>
+                                                            ${finalReferenceRecords.length}
+                                                        </strong>
+                                                    </div>
+
+                                                </div>
+
+
+                                                <div
+                                                    class="references-final-results">
+
+                                                    <div
+                                                        class="references-final-results-title">
+
+                                                        المراجع المكتشفة
+                                                        <strong>
+                                                            ${finalReferenceRecords.length}
+                                                        </strong>
+
+                                                    </div>
+
+
+                                                    <div
+                                                        class="references-final-list">
+
+                                                        ${finalReferenceHTML}
+
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+                                            `
+                                        );
+
+
+                                        analyzeReferencesBtn.textContent =
+                                            "✓ تم التحليل";
+
+
+                                        console.log(
+                                            "اكتمل تحليل المستند المفتوح في Word:",
+                                            {
+                                                mainTextLength:
+                                                    referenceSources.mainText.length,
+
+                                                footnotes:
+                                                    referenceSources.footnotes.length,
+
+                                                endnotes:
+                                                    referenceSources.endnotes.length,
+
+                                                processed:
+                                                    processedReferences.length,
+
+                                                finalRecords:
+                                                    finalReferenceRecords.length
                                             }
+                                        );
 
-                                        };
+                                    }
+                                    catch (
+                                        error
+                                    ) {
 
-                                }
+                                        analyzeReferencesBtn.disabled =
+                                            false;
 
+                                        analyzeReferencesBtn.textContent =
+                                            "تحليل المراجع";
+
+
+                                        referencesSourceWorkspace.insertAdjacentHTML(
+                                            "beforeend",
+                                            `
+                                            <div
+                                                class="references-analysis-result">
+
+                                                <div
+                                                    class="references-analysis-status error">
+
+                                                    ⚠ تعذر تحليل المستند
+
+                                                </div>
+
+
+                                                <div
+                                                    class="references-analysis-info">
+
+                                                    ${
+                                                        error.message ||
+                                                        "حدث خطأ غير معروف."
+                                                    }
+
+                                                </div>
+
+                                            </div>
+                                            `
+                                        );
+
+
+                                        console.error(
+                                            "فشل تحليل المستند المفتوح:",
+                                            error
+                                        );
+
+                                    }
+
+                                };
 
                             return;
 
