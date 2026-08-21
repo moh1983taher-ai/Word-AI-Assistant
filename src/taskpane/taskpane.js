@@ -26388,10 +26388,10 @@ if (referencesContent) {
                                     // =================================================
 
                                     const finalReferenceResults =
-                                        Array.isArray(
-                                            aiAnalysisResult.references
-                                        )
-                                            ? aiAnalysisResult.references
+                                        Array.isArray(aiAnalysisResult.references)
+                                            ? mergeEquivalentReferences(
+                                                aiAnalysisResult.references
+                                            )
                                             : [];
 
                                     if (
@@ -27062,7 +27062,144 @@ if (referencesContent) {
         );
 
 }
+function mergeEquivalentReferences(references) {
 
+    const merged = [];
+
+    function clean(value) {
+        return String(value ?? "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .replace(/[.,،:؛]+$/g, "");
+    }
+
+    function titleKey(title) {
+        return clean(title)
+            .replace(/^الـ/, "ال")
+            .toLowerCase();
+    }
+
+    references.forEach(function (reference) {
+
+        const author = clean(reference.author);
+        const title = clean(reference.title);
+
+        let existing = merged.find(function (item) {
+
+            if (
+                author &&
+                item.author &&
+                author !== clean(item.author)
+            ) {
+                return false;
+            }
+
+            const a = titleKey(title);
+            const b = titleKey(item.title);
+
+            return (
+                a === b ||
+                a.includes(b) ||
+                b.includes(a)
+            );
+
+        });
+
+        if (!existing) {
+
+            merged.push({
+                ...reference,
+                locations: Array.isArray(reference.locations)
+                    ? [...reference.locations]
+                    : [],
+                variants: Array.isArray(reference.variants)
+                    ? [...reference.variants]
+                    : [],
+                occurrences: Array.isArray(reference.occurrences)
+                    ? [...reference.occurrences]
+                    : []
+            });
+
+            return;
+        }
+
+        if (
+            title.length >
+            clean(existing.title).length
+        ) {
+            existing.title = title;
+        }
+
+        (reference.locations || []).forEach(function (location) {
+
+            const exists =
+                existing.locations.some(function (old) {
+
+                    return (
+                        String(old.volume ?? "") === String(location.volume ?? "") &&
+                        String(old.page ?? "") === String(location.page ?? "") &&
+                        String(old.pageRange ?? "") === String(location.pageRange ?? "")
+                    );
+
+                });
+
+            if (!exists) {
+                existing.locations.push(location);
+            }
+
+        });
+
+        (reference.variants || []).forEach(function (variant) {
+
+            const value = clean(variant);
+
+            if (
+                value &&
+                !existing.variants.some(function (item) {
+                    return clean(item) === value;
+                })
+            ) {
+                existing.variants.push(value);
+            }
+
+        });
+
+        (reference.occurrences || []).forEach(function (occurrence) {
+
+            const exists =
+                existing.occurrences.some(function (old) {
+
+                    return (
+                        old.materialId === occurrence.materialId &&
+                        old.source === occurrence.source &&
+                        String(old.noteNumber ?? "") ===
+                        String(occurrence.noteNumber ?? "")
+                    );
+
+                });
+
+            if (!exists) {
+                existing.occurrences.push(occurrence);
+            }
+
+        });
+
+        existing.confidence =
+            Math.max(
+                Number(existing.confidence ?? 0),
+                Number(reference.confidence ?? 0)
+            );
+
+        existing.needsReview =
+            Boolean(
+                existing.needsReview ||
+                reference.needsReview
+            );
+
+    });
+
+    return merged;
+}
 
 
 // =====================================================
