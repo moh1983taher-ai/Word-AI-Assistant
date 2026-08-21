@@ -131,7 +131,8 @@ const newChatBtn =
 const input =
     document.getElementById("user-input");
 
-
+const inputArea =
+    document.querySelector(".input-area");
 
 const sendBtn =
     document.getElementById("send-btn");
@@ -20761,6 +20762,7 @@ if (referencesBtn && referencesWorkspace) {
             referencesWorkspace.style.display =
                 "block";
 
+
             if (chatArea) {
 
                 chatArea.style.display =
@@ -20768,9 +20770,18 @@ if (referencesBtn && referencesWorkspace) {
 
             }
 
+
             if (documentTitle) {
 
                 documentTitle.style.display =
+                    "none";
+
+            }
+
+
+            if (inputArea) {
+
+                inputArea.style.display =
                     "none";
 
             }
