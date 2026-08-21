@@ -21687,6 +21687,53 @@ if (referencesContent) {
 
                                                 }
 
+                                                const referenceCandidates =
+                                                    extractReferenceCandidates(
+                                                        referenceSources
+                                                    );
+
+
+                                                const mainCandidates =
+                                                    referenceCandidates.filter(
+                                                        item =>
+                                                            item.source ===
+                                                            "main-text"
+                                                    );
+
+
+                                                const footnoteCandidates =
+                                                    referenceCandidates.filter(
+                                                        item =>
+                                                            item.source ===
+                                                            "footnote"
+                                                    );
+
+
+                                                const endnoteCandidates =
+                                                    referenceCandidates.filter(
+                                                        item =>
+                                                            item.source ===
+                                                            "endnote"
+                                                    );
+
+
+                                                console.log(
+                                                    "تحليل المراجع الشامل:",
+                                                    {
+                                                        mainTextCandidates:
+                                                            mainCandidates.length,
+
+                                                        footnoteCandidates:
+                                                            footnoteCandidates.length,
+
+                                                        endnoteCandidates:
+                                                            endnoteCandidates.length,
+
+                                                        totalCandidates:
+                                                            referenceCandidates.length
+                                                    }
+                                                );
+
 
                                                 analyzeReferencesBtn.textContent =
                                                     "✓ تم التحليل";
@@ -21696,8 +21743,9 @@ if (referencesContent) {
                                                     "beforeend",
                                                     `
                                                     <div class="references-analysis-status success">
-                                                        ✓ تم تحليل بنية المستند
+                                                        ✓ تم تحليل المستند كاملًا
                                                     </div>
+
 
                                                     <div class="references-analysis-info">
 
@@ -21709,17 +21757,43 @@ if (referencesContent) {
                                                             حرف
                                                         </div>
 
+
                                                         <div>
                                                             الحواشي السفلية:
                                                             <strong>
                                                                 ${referenceSources.footnotes.length}
                                                             </strong>
+                                                            (
+                                                            ${footnoteCandidates.length}
+                                                            مرشحًا
+                                                            )
                                                         </div>
+
 
                                                         <div>
                                                             الحواشي الختامية:
                                                             <strong>
                                                                 ${referenceSources.endnotes.length}
+                                                            </strong>
+                                                            (
+                                                            ${endnoteCandidates.length}
+                                                            مرشحًا
+                                                            )
+                                                        </div>
+
+
+                                                        <div>
+                                                            مرشحو التوثيق في المتن:
+                                                            <strong>
+                                                                ${mainCandidates.length}
+                                                            </strong>
+                                                        </div>
+
+
+                                                        <div>
+                                                            إجمالي المرشحين:
+                                                            <strong>
+                                                                ${referenceCandidates.length}
                                                             </strong>
                                                         </div>
 
