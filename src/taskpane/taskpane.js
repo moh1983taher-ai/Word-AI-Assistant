@@ -22156,10 +22156,8 @@ async function analyzeReferencesWithAI(materials) {
 
     }
 
-
     const settings =
         getSavedSettings();
-
 
     const provider =
         String(
@@ -22169,7 +22167,6 @@ async function analyzeReferencesWithAI(materials) {
             .trim()
             .toLowerCase();
 
-
     const key =
         String(
             settings?.key ||
@@ -22177,14 +22174,12 @@ async function analyzeReferencesWithAI(materials) {
         )
             .trim();
 
-
     const model =
         String(
             settings?.model ||
             ""
         )
             .trim();
-
 
     if (!key) {
 
@@ -22194,7 +22189,6 @@ async function analyzeReferencesWithAI(materials) {
 
     }
 
-
     if (!model) {
 
         throw new Error(
@@ -22202,7 +22196,6 @@ async function analyzeReferencesWithAI(materials) {
         );
 
     }
-
 
     // =====================================================
     // تجهيز المواد
@@ -22264,12 +22257,8 @@ async function analyzeReferencesWithAI(materials) {
             }
         );
 
-
     // =====================================================
     // خريطة المواد الأصلية
-    //
-    // نستخدمها لاستعادة source / noteNumber / position
-    // إذا أغفلها الذكاء الاصطناعي في occurrence.
     // =====================================================
 
     const materialIndex =
@@ -22290,11 +22279,11 @@ async function analyzeReferencesWithAI(materials) {
         }
     );
 
-
     // =====================================================
-    // استعادة بيانات occurrence من المادة الأصلية
+    // تصحيح بيانات occurrences
     //
-    // لا نغير المرجع ولا locations ولا variants.
+    // source و noteNumber و position تؤخذ من المادة الأصلية
+    // في Word، ولا نعتمد على قيم قد يعيدها الذكاء الاصطناعي.
     // =====================================================
 
     function hydrateAIResult(
@@ -22311,7 +22300,6 @@ async function analyzeReferencesWithAI(materials) {
             return aiResult;
 
         }
-
 
         aiResult.references.forEach(
             function (
@@ -22331,7 +22319,6 @@ async function analyzeReferencesWithAI(materials) {
 
                 }
 
-
                 reference.occurrences.forEach(
                     function (
                         occurrence
@@ -22345,50 +22332,23 @@ async function analyzeReferencesWithAI(materials) {
                                 )
                             );
 
-
                         if (!material) {
                             return;
                         }
 
+                        // هذه البيانات مصدرها Word نفسه
+                        occurrence.source =
+                            String(
+                                material.source || ""
+                            );
 
-                        // source
-                        if (
-                            !occurrence.source &&
-                            material.source
-                        ) {
+                        occurrence.noteNumber =
+                            material.noteNumber ??
+                            null;
 
-                            occurrence.source =
-                                material.source;
-
-                        }
-
-
-                        // noteNumber
-                        if (
-                            occurrence.noteNumber ===
-                                null ||
-                            occurrence.noteNumber ===
-                                undefined
-                        ) {
-
-                            occurrence.noteNumber =
-                                material.noteNumber;
-
-                        }
-
-
-                        // position
-                        if (
-                            occurrence.position ===
-                                null ||
-                            occurrence.position ===
-                                undefined
-                        ) {
-
-                            occurrence.position =
-                                material.position;
-
-                        }
+                        occurrence.position =
+                            material.position ??
+                            null;
 
                     }
                 );
@@ -22396,11 +22356,9 @@ async function analyzeReferencesWithAI(materials) {
             }
         );
 
-
         return aiResult;
 
     }
-
 
     // =====================================================
     // تعليمات الذكاء الاصطناعي
@@ -22614,6 +22572,8 @@ variants تستخدم فقط للصيغ المختلفة للمرجع نفسه.
 قاعدة occurrences
 =====================================================
 
+كل ظهور للمراجع داخل مادة أصلية يمثل occurrence واحدًا.
+
 إذا احتوت مادة واحدة على سبعة مراجع:
 
 كل مرجع يحصل على occurrence واحد.
@@ -22622,6 +22582,16 @@ variants تستخدم فقط للصيغ المختلفة للمرجع نفسه.
 
 نفس materialId يمكن أن يظهر في occurrence لعدة مراجع
 لأنها وردت داخل المادة الأصلية نفسها.
+
+occurrence يجب أن يحتوي فقط على:
+
+- materialId
+- source
+- noteNumber
+
+المادة الأصلية في Word هي المصدر الموثوق لـ source وnoteNumber.
+
+لا تغيّر source أو noteNumber.
 
 =====================================================
 المصدر نفسه
@@ -22700,73 +22670,54 @@ locations
 
 101.
 
-قاعدة locations وvariants:
-
-كل location يجب أن ينتمي إلى المرجع نفسه فقط، وينقل الجزء والصفحة أو نطاق الصفحة كما وردا في المادة الأصلية دون تغيير.
+كل location يجب أن ينتمي إلى المرجع نفسه فقط،
+وينقل الجزء والصفحة أو نطاق الصفحة كما وردا في المادة الأصلية دون تغيير.
 
 إذا ورد:
 11/388-389
+
 فيسجل:
+
 volume = 11
 pageRange = "388-389"
 
 ولا يجوز تحويله إلى:
 page = "388-389"
+
 ولا إلى:
 page = "389"
 
 وإذا ورد:
 15/927
+
 فهو للمرجع الذي ورد معه فقط.
 
 لا تنقل location أو variant من مادة إلى مرجع آخر.
 
-variants يجب أن تكون النصوص الأصلية الفعلية التي تشير إلى المرجع نفسه، ولا تُنشئ صيغة جديدة من عندك.
+variants يجب أن تكون النصوص الأصلية الفعلية التي تشير إلى المرجع نفسه،
+ولا تُنشئ صيغة جديدة من عندك.
 
 =====================================================
-occurrences
+الثقة والمراجعة
 =====================================================
-
-كل ظهور للمراجع داخل مادة أصلية يمثل occurrence واحدًا.
-
-وجود أكثر من صفحة داخل المادة نفسها لا يعني أكثر من occurrence.
-
-إذا احتوت مادة واحدة على مرجعين مستقلين،
-يحصل كل منهما على occurrence واحد.
 
 confidence رقم بين 0 و1، ويجب أن يعكس درجة الثقة الحقيقية في هوية المرجع.
-للمراجع الواضحة جدًا استخدم 0.95 إلى 1.00، ولا تستخدم 0 إذا كانت هوية المرجع واضحة.
+
+للمراجع الواضحة جدًا استخدم 0.95 إلى 1.00.
+
+لا تستخدم 0 إذا كانت هوية المرجع واضحة.
 
 إذا أخطأت المادة في اسم المؤلف، مثل:
+
 "النووي، العرف حجيته وأثره..."
+
 بينما المرجع المعروف في نفس المادة هو الزبيري،
-فلا تنقل الخطأ إلى هوية المرجع؛ احتفظ بالنص في variants،
-واستخدم هوية المرجع التي تدل عليها بقية المادة، مع needsReview عند الحاجة.
 
-كل occurrence يجب أن يحمل موضع الاستشهاد الخاص بهذا الظهور فقط.
+فلا تنقل الخطأ إلى هوية المرجع.
 
-إذا كان المرجع في هذه الحاشية:
-النووي، المجموع 11/417
-
-فيكون occurrence:
-volume = "11"
-page = "417"
-pageRange = ""
-
-ولا تستخدم أول location للمرجع بدل موضع هذا occurrence.
-
-إذا ورد:
-460-464
-فيكون:
-pageRange = "460-464"
-
-إذا ورد:
-11/388-389
-فيكون:
-volume = "11"
-pageRange = "388-389"
-
-الموضع في occurrence يجب أن يخص هذا الظهور وحده، ولا يجوز نقله من ظهور آخر.
+احتفظ بالنص في variants،
+واستخدم هوية المرجع التي تدل عليها بقية المادة،
+مع needsReview عند الحاجة.
 
 =====================================================
 النتيجة
@@ -22809,10 +22760,7 @@ pageRange = "388-389"
         {
           "materialId": "",
           "source": "",
-          "noteNumber": null,
-          "volume": "",
-          "page": "",
-          "pageRange": ""
+          "noteNumber": null
         }
       ],
       "notes": "",
@@ -22838,7 +22786,6 @@ other
 لا تدمج كتابين مختلفين للمؤلف نفسه.
 `;
 
-
     const userPrompt =
         [
             "حلل جميع المواد التالية.",
@@ -22852,9 +22799,7 @@ other
             )
         ].join("\n");
 
-
     let result;
-
 
     // =====================================================
     // Gemini
@@ -22924,12 +22869,10 @@ other
                 }
             );
 
-
         result =
             await readJSON(
                 response
             );
-
 
         if (
             !response.ok
@@ -22944,12 +22887,10 @@ other
 
         }
 
-
         const answer =
             extractGeminiAnswer(
                 result
             );
-
 
         if (
             !answer ||
@@ -22962,7 +22903,6 @@ other
 
         }
 
-
         return hydrateAIResult(
             parseUnifiedReferenceAIResult(
                 answer
@@ -22970,7 +22910,6 @@ other
         );
 
     }
-
 
     // =====================================================
     // OpenAI / OpenRouter / Groq
@@ -22987,7 +22926,6 @@ other
 
                 : "https://openrouter.ai/api/v1/chat/completions";
 
-
     const headers = {
 
         "Content-Type":
@@ -22997,7 +22935,6 @@ other
             "Bearer " + key
 
     };
-
 
     if (
         provider === "openrouter"
@@ -23010,7 +22947,6 @@ other
             "Research Tools";
 
     }
-
 
     const response =
         await fetch(
@@ -23065,12 +23001,10 @@ other
             }
         );
 
-
     result =
         await readJSON(
             response
         );
-
 
     if (
         !response.ok
@@ -23085,13 +23019,11 @@ other
 
     }
 
-
     const answer =
         extractOpenAIStyleAnswer(
             result,
             provider
         );
-
 
     if (
         !answer ||
@@ -23103,7 +23035,6 @@ other
         );
 
     }
-
 
     return hydrateAIResult(
         parseUnifiedReferenceAIResult(
@@ -24213,12 +24144,13 @@ async function mergeReferencesWithAI(
         }
       ],
       "variants": [],
-      "occurrences": [],
-      "notes": "",
-      "confidence": 0.0,
-      "needsReview": false
-    }
-  ]
+      "occurrences": [
+        {
+            "materialId": "",
+            "source": "",
+            "noteNumber": null
+        }
+    ]
 }
 
 في occurrences احتفظ بمعرّف المادة الأصلية
