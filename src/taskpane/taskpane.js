@@ -22604,6 +22604,30 @@ confidence رقم بين 0 و1، ويجب أن يعكس درجة الثقة ال
 فلا تنقل الخطأ إلى هوية المرجع؛ احتفظ بالنص في variants،
 واستخدم هوية المرجع التي تدل عليها بقية المادة، مع needsReview عند الحاجة.
 
+كل occurrence يجب أن يحمل موضع الاستشهاد الخاص بهذا الظهور فقط.
+
+إذا كان المرجع في هذه الحاشية:
+النووي، المجموع 11/417
+
+فيكون occurrence:
+volume = "11"
+page = "417"
+pageRange = ""
+
+ولا تستخدم أول location للمرجع بدل موضع هذا occurrence.
+
+إذا ورد:
+460-464
+فيكون:
+pageRange = "460-464"
+
+إذا ورد:
+11/388-389
+فيكون:
+volume = "11"
+pageRange = "388-389"
+
+الموضع في occurrence يجب أن يخص هذا الظهور وحده، ولا يجوز نقله من ظهور آخر.
 =====================================================
 النتيجة
 =====================================================
@@ -22643,11 +22667,14 @@ confidence رقم بين 0 و1، ويجب أن يعكس درجة الثقة ال
       "variants": [],
       "occurrences": [
         {
-          "materialId": "",
-          "source": "",
-          "noteNumber": null
+            "materialId": "",
+            "source": "",
+            "noteNumber": null,
+            "volume": "",
+            "page": "",
+            "pageRange": ""
         }
-      ],
+    ],
       "notes": "",
       "confidence": 0.0,
       "needsReview": false
@@ -28450,64 +28477,64 @@ if (referencesContent) {
 
 }
 
-function formatFootnoteReference(reference) {
+function formatFootnoteReference(
+    reference,
+    occurrence
+) {
 
     if (!reference) {
         return "";
-    }
-
-    const author =
-        String(
-            reference.author || ""
-        ).trim();
-
-    const title =
-        String(
-            reference.title || ""
-        ).trim();
-
-    const location =
-        Array.isArray(reference.locations) &&
-        reference.locations.length
-            ? reference.locations[0]
-            : null;
-
-    let locationText = "";
-
-    if (location) {
-
-        if (
-            location.volume &&
-            location.page
-        ) {
-
-            locationText =
-                `${location.volume}/${location.page}`;
-
-        }
-        else if (
-            location.pageRange
-        ) {
-
-            locationText =
-                `ص ${location.pageRange}`;
-
-        }
-        else if (
-            location.page
-        ) {
-
-            locationText =
-                `ص ${location.page}`;
-
-        }
-
     }
 
     const base =
         formatReferenceForOutput(
             reference
         );
+
+    let locationText = "";
+
+    const volume =
+        String(
+            occurrence?.volume ||
+            ""
+        ).trim();
+
+    const page =
+        String(
+            occurrence?.page ||
+            ""
+        ).trim();
+
+    const pageRange =
+        String(
+            occurrence?.pageRange ||
+            ""
+        ).trim();
+
+    if (volume && page) {
+
+        locationText =
+            `${volume}/${page}`;
+
+    }
+    else if (volume && pageRange) {
+
+        locationText =
+            `${volume}/${pageRange}`;
+
+    }
+    else if (pageRange) {
+
+        locationText =
+            `ص ${pageRange}`;
+
+    }
+    else if (page) {
+
+        locationText =
+            `ص ${page}`;
+
+    }
 
     return locationText
         ? `${base}، ${locationText}`
@@ -28543,7 +28570,8 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
 
             if (
                 noteNumber === null ||
-                noteNumber === undefined
+                noteNumber === undefined ||
+                !source
             ) {
                 return;
             }
@@ -28552,11 +28580,13 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
                 `${source}:${noteNumber}`;
 
             if (!map.has(key)) {
-                map.set(
-                    key,
-                    reference
-                );
+                map.set(key, []);
             }
+
+            map.get(key).push({
+                reference: reference,
+                occurrence: occurrence
+            });
 
         });
 
@@ -28600,10 +28630,7 @@ async function buildFootnoteSuggestions(
 
             const suggestions = [];
 
-            function addNotes(
-                notes,
-                source
-            ) {
+            function addNotes(notes, source) {
 
                 notes.forEach(function (note, index) {
 
@@ -28613,8 +28640,27 @@ async function buildFootnoteSuggestions(
                     const key =
                         `${source}:${noteNumber}`;
 
-                    const reference =
-                        unifiedFootnoteMap.get(key);
+                    const matches =
+                        unifiedFootnoteMap.get(key) || [];
+
+                    /*
+                     * الحاشية قد تحتوي عدة مراجع.
+                     */
+                    if (matches.length === 0) {
+
+                        suggestions.push({
+                            source: source,
+                            noteNumber: noteNumber,
+                            originalText:
+                                String(
+                                    note.body?.text || ""
+                                ).trim(),
+                            references: [],
+                            suggestedTexts: []
+                        });
+
+                        return;
+                    }
 
                     suggestions.push({
 
@@ -28627,15 +28673,25 @@ async function buildFootnoteSuggestions(
                                 note.body?.text || ""
                             ).trim(),
 
-                        reference:
-                            reference || null,
+                        references:
+                            matches.map(function (item) {
+                                return {
+                                    reference:
+                                        item.reference,
+                                    occurrence:
+                                        item.occurrence
+                                };
+                            }),
 
-                        suggestedText:
-                            reference
-                                ? formatFootnoteReference(
-                                    reference
-                                )
-                                : ""
+                        suggestedTexts:
+                            matches.map(function (item) {
+
+                                return formatFootnoteReference(
+                                    item.reference,
+                                    item.occurrence
+                                );
+
+                            })
 
                     });
 
