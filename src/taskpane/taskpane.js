@@ -1395,39 +1395,39 @@ async function readBibliographyFromCurrentDocument() {
     return await Word.run(
         async function (context) {
 
-            const body =
-                context.document.body;
-
             const paragraphs =
-                body.paragraphs;
+                context.document.body.paragraphs;
 
-            paragraphs.load(
-                "items/text"
-            );
+            paragraphs.load("items/text");
 
             await context.sync();
 
             const items =
                 paragraphs.items
-                    .map(function (paragraph, index) {
+                    .map(function (paragraph) {
 
-                        return {
-                            index: index,
-                            text: String(
-                                paragraph.text || ""
-                            ).trim()
-                        };
+                        return String(
+                            paragraph.text || ""
+                        )
+                            .replace(/\s+/g, " ")
+                            .trim();
 
                     })
-                    .filter(function (item) {
-
-                        return item.text.length > 0;
-
-                    });
+                    .filter(Boolean);
 
             if (!items.length) {
                 return [];
             }
+
+            /*
+             * نبحث عن أول فقرة تبدو بداية لقائمة مراجع.
+             * أمثلة:
+             * 1. ابن حجر...
+             * 2. ابن فارس...
+             * 10. البغا...
+             */
+            const startPattern =
+                /^\s*\d+\s*[\.\-–—]\s+/;
 
             let startIndex = -1;
 
@@ -1437,56 +1437,95 @@ async function readBibliographyFromCurrentDocument() {
                 i++
             ) {
 
-                const value =
-                    items[i].text
-                        .replace(/\s+/g, " ")
-                        .trim();
-
                 if (
-                    /^(?:المراجع|قائمة المراجع|المصادر والمراجع|المصادر)$/i.test(
-                        value
+                    startPattern.test(
+                        items[i]
                     )
                 ) {
 
-                    startIndex = i + 1;
+                    startIndex = i;
                     break;
 
                 }
 
             }
 
-            if (startIndex === -1) {
+            if (
+                startIndex === -1
+            ) {
 
                 console.warn(
-                    "لم يتم العثور على عنوان قائمة المراجع."
+                    "لم يتم العثور على بداية قائمة المراجع."
                 );
 
                 return [];
 
             }
 
-            const bibliography =
-                items
-                    .slice(startIndex)
-                    .map(function (item, index) {
+            const bibliography = [];
 
-                        return {
+            let current = null;
 
-                            id:
-                                `bibliography-${index + 1}`,
+            for (
+                let i = startIndex;
+                i < items.length;
+                i++
+            ) {
 
-                            number:
-                                index + 1,
+                const line =
+                    items[i];
 
-                            text:
-                                item.text
+                const match =
+                    line.match(
+                        /^\s*(\d+)\s*[\.\-–—]\s*(.*)$/
+                    );
 
-                        };
+                if (match) {
 
-                    });
+                    if (current) {
+                        bibliography.push(
+                            current
+                        );
+                    }
+
+                    current = {
+
+                        id:
+                            `bibliography-${match[1]}`,
+
+                        number:
+                            Number(
+                                match[1]
+                            ),
+
+                        text:
+                            String(
+                                match[2] || ""
+                            ).trim()
+
+                    };
+
+                }
+                else if (current) {
+
+                    current.text +=
+                        " " +
+                        line;
+
+                }
+
+            }
+
+            if (current) {
+
+                bibliography.push(
+                    current
+                );
+
+            }
 
             console.log(
-                "عناصر قائمة المراجع المستخرجة:",
+                "قائمة المراجع المستخرجة:",
                 bibliography
             );
 
