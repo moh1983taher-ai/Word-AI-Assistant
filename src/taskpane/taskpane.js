@@ -1566,34 +1566,164 @@ function compareUnifiedReferencesWithBibliography(
 
         return String(value || "")
             .toLowerCase()
+            .replace(/[ًٌٍَُِّْـ]/g, "")
             .replace(/[.,،:؛()[\]{}"'`]/g, " ")
             .replace(/\s+/g, " ")
             .trim();
 
     }
 
-    function referenceKey(reference) {
+    function titleWords(value) {
 
-        return normalize(
-            [
-                reference?.author || "",
-                reference?.title || ""
-            ].join(" ")
+        return normalize(value)
+            .split(" ")
+            .filter(function (word) {
+
+                return (
+                    word.length > 1 &&
+                    word !== "في" &&
+                    word !== "من" &&
+                    word !== "على" &&
+                    word !== "و"
+                );
+
+            });
+
+    }
+
+    function authorMatch(author, text) {
+
+        const value =
+            normalize(author);
+
+        if (!value) {
+            return true;
+        }
+
+        const words =
+            value
+                .split(" ")
+                .filter(Boolean);
+
+        return words.every(
+            function (word) {
+
+                return text.includes(word);
+
+            }
         );
 
     }
 
-    const referenceKeys =
-        references.map(
-            function (reference) {
+    function titleMatch(title, text) {
 
-                return {
-                    reference: reference,
-                    key: referenceKey(reference)
-                };
+        const words =
+            titleWords(title);
 
-            }
+        if (!words.length) {
+            return false;
+        }
+
+        const matched =
+            words.filter(
+                function (word) {
+
+                    return text.includes(word);
+
+                }
+            ).length;
+
+        /*
+         * يكفي تطابق معظم كلمات العنوان.
+         * وهذا يسمح مثلًا:
+         *
+         * المجموع
+         * المجموع شرح المهذب
+         *
+         * و:
+         *
+         * قواطع الأدلة
+         * قواطع الأدلة في الأصول
+         */
+
+        return (
+            matched >=
+            Math.max(
+                1,
+                Math.ceil(
+                    words.length * 0.6
+                )
+            )
         );
+
+    }
+
+    function referenceMatches(
+        reference,
+        bibliographyText
+    ) {
+
+        const text =
+            normalize(
+                bibliographyText
+            );
+
+        const author =
+            normalize(
+                reference?.author ||
+                ""
+            );
+
+        const title =
+            normalize(
+                reference?.title ||
+                ""
+            );
+
+        /*
+         * إذا كان المؤلف والعنوان موجودين:
+         * يجب أن يتطابقا معًا.
+         */
+
+        if (
+            author &&
+            title
+        ) {
+
+            return (
+                authorMatch(
+                    author,
+                    text
+                ) &&
+                titleMatch(
+                    title,
+                    text
+                )
+            );
+
+        }
+
+        /*
+         * إذا كان العنوان فقط معروفًا.
+         */
+
+        if (title) {
+
+            return titleMatch(
+                title,
+                text
+            );
+
+        }
+
+        /*
+         * إذا كان المؤلف فقط معروفًا.
+         * لا نعتبره تطابقًا كافيًا إلا إذا كان النص قصيرًا جدًا.
+         */
+
+        return false;
+
+    }
 
     const bibliographyResults =
         list.map(
@@ -1604,24 +1734,15 @@ function compareUnifiedReferencesWithBibliography(
                         item?.text || ""
                     ).trim();
 
-                const normalizedText =
-                    normalize(text);
+                const matches =
+                    references.filter(
+                        function (
+                            reference
+                        ) {
 
-                const match =
-                    referenceKeys.find(
-                        function (entry) {
-
-                            if (!entry.key) {
-                                return false;
-                            }
-
-                            return (
-                                normalizedText.includes(
-                                    entry.key
-                                ) ||
-                                entry.key.includes(
-                                    normalizedText
-                                )
+                            return referenceMatches(
+                                reference,
+                                text
                             );
 
                         }
@@ -1636,44 +1757,45 @@ function compareUnifiedReferencesWithBibliography(
                         text,
 
                     matched:
-                        Boolean(match),
+                        matches.length > 0,
 
-                    reference:
-                        match
-                            ? match.reference
-                            : null
+                    references:
+                        matches
 
                 };
 
             }
         );
 
-    const missingFromBibliography =
-        referenceKeys
-            .filter(
-                function (entry) {
+    const matchedReferences =
+        new Set();
 
-                    return !bibliographyResults.some(
-                        function (item) {
+    bibliographyResults.forEach(
+        function (item) {
 
-                            return (
-                                item.matched &&
-                                item.reference ===
-                                entry.reference
-                            );
+            item.references.forEach(
+                function (reference) {
 
-                        }
+                    matchedReferences.add(
+                        reference
                     );
 
                 }
-            )
-            .map(
-                function (entry) {
-
-                    return entry.reference;
-
-                }
             );
+
+        }
+    );
+
+    const missingFromBibliography =
+        references.filter(
+            function (reference) {
+
+                return !matchedReferences.has(
+                    reference
+                );
+
+            }
+        );
 
     const unusedBibliography =
         bibliographyResults.filter(
@@ -1693,11 +1815,7 @@ function compareUnifiedReferencesWithBibliography(
             list.length,
 
         matchedCount:
-            bibliographyResults.filter(
-                function (item) {
-                    return item.matched;
-                }
-            ).length,
+            matchedReferences.size,
 
         missingFromBibliography:
             missingFromBibliography,
