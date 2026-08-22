@@ -1395,108 +1395,136 @@ async function readBibliographyFromCurrentDocument() {
     return await Word.run(
         async function (context) {
 
-            const paragraphs =
-                context.document.body.paragraphs;
+            const body =
+                context.document.body;
 
-            paragraphs.load("items/text");
+            body.load("text");
 
             await context.sync();
 
-            const items =
-                paragraphs.items
-                    .map(function (paragraph) {
+            const rawText =
+                String(
+                    body.text || ""
+                );
 
-                        return String(
-                            paragraph.text || ""
-                        )
-                            .replace(/\s+/g, " ")
-                            .trim();
-
-                    });
-
-            let startIndex = -1;
-
-            for (
-                let i = 0;
-                i < items.length;
-                i++
-            ) {
-
-                if (
-                    /^(المراجع والمصادر|المصادر والمراجع)$/i.test(
-                        items[i]
-                    )
-                ) {
-
-                    startIndex = i + 1;
-                    break;
-
-                }
-
+            if (!rawText.trim()) {
+                return [];
             }
 
-            if (
-                startIndex === -1
-            ) {
+            const text =
+                rawText
+                    .replace(/\r/g, "\n")
+                    .replace(/[ \t]+/g, " ");
+
+            // البحث عن عنوان قائمة المراجع
+            const heading =
+                "المراجع والمصادر";
+
+            const headingIndex =
+                text.indexOf(heading);
+
+            if (headingIndex === -1) {
 
                 console.warn(
-                    "لم يتم العثور على عنوان المراجع والمصادر."
+                    "لم يتم العثور على عنوان: المراجع والمصادر"
                 );
 
                 return [];
+            }
 
+            const bibliographyText =
+                text.slice(
+                    headingIndex + heading.length
+                );
+
+            /*
+             * كل مرجع يبدأ برقم:
+             * 1.
+             * 2.
+             * 10.
+             */
+
+            const startPattern =
+                /(?:^|\n)\s*(\d+)\s*[\.\-–—]\s*/g;
+
+            const matches = [];
+
+            let match;
+
+            while (
+                (
+                    match =
+                        startPattern.exec(
+                            bibliographyText
+                        )
+                ) !== null
+            ) {
+
+                matches.push({
+                    number:
+                        Number(match[1]),
+
+                    start:
+                        match.index +
+                        match[0].length
+                });
+
+            }
+
+            if (!matches.length) {
+
+                console.warn(
+                    "تم العثور على عنوان المراجع ولكن لم يتم العثور على مراجع مرقمة بعده."
+                );
+
+                return [];
             }
 
             const bibliography = [];
 
-            let current = null;
-
             for (
-                let i = startIndex;
-                i < items.length;
+                let i = 0;
+                i < matches.length;
                 i++
             ) {
 
-                const line =
-                    items[i];
+                const current =
+                    matches[i];
 
-                const match =
-                    line.match(
-                        /^\s*(\d+)\s*[\.\-–—]\s*(.*)$/
-                    );
+                const next =
+                    matches[i + 1];
 
-                if (match) {
+                const end =
+                    next
+                        ? next.start
+                        : bibliographyText.length;
 
-                    if (current) {
-                        bibliography.push(current);
-                    }
+                const referenceText =
+                    bibliographyText
+                        .slice(
+                            current.start,
+                            end
+                        )
+                        .replace(/\s+/g, " ")
+                        .trim();
 
-                    current = {
-
-                        id:
-                            `bibliography-${match[1]}`,
-
-                        number:
-                            Number(match[1]),
-
-                        text:
-                            String(match[2] || "").trim()
-
-                    };
-
-                }
-                else if (current && line) {
-
-                    current.text +=
-                        " " +
-                        line;
-
+                if (!referenceText) {
+                    continue;
                 }
 
-            }
+                bibliography.push({
 
-            if (current) {
-                bibliography.push(current);
+                    id:
+                        `bibliography-${current.number}`,
+
+                    number:
+                        current.number,
+
+                    text:
+                        referenceText
+
+                });
+
             }
 
             console.log(
