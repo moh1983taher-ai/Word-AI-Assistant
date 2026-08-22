@@ -1620,6 +1620,12 @@ function compareUnifiedReferencesWithBibliography(
         const words =
             titleWords(title);
 
+        if (
+            words[0] === "كتاب"
+        ) {
+            words.shift();
+        }
+
         if (!words.length) {
             return false;
         }
@@ -1670,8 +1676,9 @@ function compareUnifiedReferencesWithBibliography(
 
         const author =
             normalize(
-                reference?.author ||
-                ""
+                reference?.author === "غير محدد"
+                    ? ""
+                    : reference?.author || ""
             );
 
         const title =
