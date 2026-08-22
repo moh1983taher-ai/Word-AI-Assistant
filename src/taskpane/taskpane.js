@@ -26908,6 +26908,7 @@ if (closeReferences) {
         };
 
 }
+
 // =====================================================
 // References Source
 // المستند الحالي
@@ -26994,7 +26995,48 @@ if (referencesContent) {
                             `
                             <div class="references-selected-source">
 
-                                <div class="reference-style-options">
+                                <div class="references-selected-icon">
+
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                         viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="#000000"
+                                         stroke-width="1"
+                                         stroke-linecap="round"
+                                         stroke-linejoin="round"
+                                         aria-hidden="true">
+
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+
+                                        <polyline points="14 2 14 8 20 8"/>
+
+                                        <line x1="8" y1="13" x2="16" y2="13"/>
+
+                                        <line x1="8" y1="17" x2="16" y2="17"/>
+
+                                        <line x1="8" y1="9" x2="10" y2="9"/>
+
+                                    </svg>
+
+                                </div>
+
+                                <div class="references-selected-info">
+
+                                    <div class="references-selected-title">
+                                        المستند المفتوح حاليًا في Word
+                                    </div>
+
+                                    <div class="references-selected-name">
+                                        سيتم تحليل المستند النشط
+                                    </div>
+
+                                </div>
+
+
+
+                            </div>
+
+                            <div class="reference-style-options">
 
                                 <div class="reference-style-title">
                                     نمط قائمة المراجع والحواشي
@@ -27045,49 +27087,6 @@ if (referencesContent) {
                                 </div>
 
                             </div>
-
-                                <div class="references-selected-icon">
-
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                         viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="#000000"
-                                         stroke-width="1"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round"
-                                         aria-hidden="true">
-
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-
-                                        <polyline points="14 2 14 8 20 8"/>
-
-                                        <line x1="8" y1="13" x2="16" y2="13"/>
-
-                                        <line x1="8" y1="17" x2="16" y2="17"/>
-
-                                        <line x1="8" y1="9" x2="10" y2="9"/>
-
-                                    </svg>
-
-                                </div>
-
-                                <div class="references-selected-info">
-
-                                    <div class="references-selected-title">
-                                        المستند المفتوح حاليًا في Word
-                                    </div>
-
-                                    <div class="references-selected-name">
-                                        سيتم تحليل المستند النشط
-                                    </div>
-
-                                </div>
-
-
-
-                            </div>
-
-                            
 
                             <button
                                 type="button"
@@ -27388,6 +27387,109 @@ if (referencesContent) {
 
                                             latestUnifiedReferences =
                                                 finalReferenceResults;
+
+                                            const unifiedFootnoteMap =
+                                                buildUnifiedFootnoteMap(
+                                                    latestUnifiedReferences
+                                                );
+
+                                            console.log(
+                                                "خريطة الحواشي والمراجع الموحدة:",
+                                                unifiedFootnoteMap
+                                            );
+
+                                            const footnoteSuggestions =
+                                                await buildFootnoteSuggestions(
+                                                    unifiedFootnoteMap
+                                                );
+
+                                            console.log(
+                                                "توثيق الحواشي المقترح:",
+                                                footnoteSuggestions
+                                            );
+
+                                            const footnoteSuggestionHTML =
+                                                footnoteSuggestions
+                                                    .filter(function (item) {
+                                                        return item.reference;
+                                                    })
+                                                    .map(function (item, index) {
+
+                                                        return `
+                                                            <div class="footnote-suggestion-item">
+
+                                                                <span class="footnote-suggestion-number">
+                                                                    ${index + 1}
+                                                                </span>
+
+                                                                <div class="footnote-suggestion-content">
+
+                                                                    <div class="footnote-suggestion-original">
+                                                                        ${escapeReferenceHTML(
+                                                                            item.originalText
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div class="footnote-suggestion-arrow">
+                                                                        ←
+                                                                    </div>
+
+                                                                    <div class="footnote-suggestion-new">
+                                                                        ${escapeReferenceHTML(
+                                                                            item.suggestedText
+                                                                        )}
+                                                                    </div>
+
+                                                                </div>
+
+                                                            </div>
+                                                        `;
+
+                                                    })
+                                                    .join("");
+
+                                            referencesSourceWorkspace.insertAdjacentHTML(
+                                                "beforeend",
+                                                `
+                                                <div class="footnote-suggestions-result">
+
+                                                    <div class="footnote-suggestions-title">
+                                                        توثيق الحواشي المقترح
+                                                        <strong>
+                                                            ${
+                                                                footnoteSuggestions.filter(
+                                                                    function (item) {
+                                                                        return item.reference;
+                                                                    }
+                                                                ).length
+                                                            }
+                                                        </strong>
+                                                    </div>
+
+                                                    <div class="footnote-suggestions-list">
+                                                        ${footnoteSuggestionHTML}
+                                                    </div>
+
+                                                    ${
+                                                        footnoteSuggestions.some(function (item) {
+                                                            return item.reference;
+                                                        })
+                                                            ? `
+                                                                <button
+                                                                    type="button"
+                                                                    id="apply-footnote-suggestions-btn"
+                                                                    class="apply-footnote-suggestions-btn">
+                                                                    تطبيق التوثيق على الحواشي
+                                                                </button>
+                                                            `
+                                                            : ""
+                                                    }
+
+                                                </div>
+                                                `
+                                            );
+
+                                            
 
                                     if (
                                         !Array.isArray(
@@ -28347,6 +28449,217 @@ if (referencesContent) {
         );
 
 }
+
+function formatFootnoteReference(reference) {
+
+    if (!reference) {
+        return "";
+    }
+
+    const author =
+        String(
+            reference.author || ""
+        ).trim();
+
+    const title =
+        String(
+            reference.title || ""
+        ).trim();
+
+    const location =
+        Array.isArray(reference.locations) &&
+        reference.locations.length
+            ? reference.locations[0]
+            : null;
+
+    let locationText = "";
+
+    if (location) {
+
+        if (
+            location.volume &&
+            location.page
+        ) {
+
+            locationText =
+                `${location.volume}/${location.page}`;
+
+        }
+        else if (
+            location.pageRange
+        ) {
+
+            locationText =
+                `ص ${location.pageRange}`;
+
+        }
+        else if (
+            location.page
+        ) {
+
+            locationText =
+                `ص ${location.page}`;
+
+        }
+
+    }
+
+    const base =
+        formatReferenceForOutput(
+            reference
+        );
+
+    return locationText
+        ? `${base}، ${locationText}`
+        : base;
+}
+
+function buildUnifiedFootnoteMap(unifiedReferences) {
+
+    const map = new Map();
+
+    if (!Array.isArray(unifiedReferences)) {
+        return map;
+    }
+
+    unifiedReferences.forEach(function (reference) {
+
+        const occurrences =
+            Array.isArray(reference?.occurrences)
+                ? reference.occurrences
+                : [];
+
+        occurrences.forEach(function (occurrence) {
+
+            const noteNumber =
+                occurrence?.noteNumber;
+
+            const source =
+                String(
+                    occurrence?.source || ""
+                )
+                    .trim()
+                    .toLowerCase();
+
+            if (
+                noteNumber === null ||
+                noteNumber === undefined
+            ) {
+                return;
+            }
+
+            const key =
+                `${source}:${noteNumber}`;
+
+            if (!map.has(key)) {
+                map.set(
+                    key,
+                    reference
+                );
+            }
+
+        });
+
+    });
+
+    return map;
+}
+
+async function buildFootnoteSuggestions(
+    unifiedFootnoteMap
+) {
+
+    return await Word.run(
+        async function (context) {
+
+            const body =
+                context.document.body;
+
+            const footnotes =
+                body.footnotes;
+
+            const endnotes =
+                body.endnotes;
+
+            footnotes.load("items");
+            endnotes.load("items");
+
+            await context.sync();
+
+            footnotes.items.forEach(function (note) {
+                note.reference.load("text");
+                note.body.load("text");
+            });
+
+            endnotes.items.forEach(function (note) {
+                note.reference.load("text");
+                note.body.load("text");
+            });
+
+            await context.sync();
+
+            const suggestions = [];
+
+            function addNotes(
+                notes,
+                source
+            ) {
+
+                notes.forEach(function (note, index) {
+
+                    const noteNumber =
+                        index + 1;
+
+                    const key =
+                        `${source}:${noteNumber}`;
+
+                    const reference =
+                        unifiedFootnoteMap.get(key);
+
+                    suggestions.push({
+
+                        source: source,
+
+                        noteNumber: noteNumber,
+
+                        originalText:
+                            String(
+                                note.body?.text || ""
+                            ).trim(),
+
+                        reference:
+                            reference || null,
+
+                        suggestedText:
+                            reference
+                                ? formatFootnoteReference(
+                                    reference
+                                )
+                                : ""
+
+                    });
+
+                });
+
+            }
+
+            addNotes(
+                footnotes.items,
+                "footnote"
+            );
+
+            addNotes(
+                endnotes.items,
+                "endnote"
+            );
+
+            return suggestions;
+
+        }
+    );
+
+}
+
 function mergeEquivalentReferences(references) {
 
     const merged = [];

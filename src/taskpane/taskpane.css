@@ -1447,6 +1447,71 @@ body {
     color: #444;
 }
 
+.footnote-suggestions-result {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #e8e8e8;
+    font-size: 12px;
+}
+
+.footnote-suggestions-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.footnote-suggestions-title strong {
+    color: #777;
+    font-size: 11px;
+}
+
+.footnote-suggestion-item {
+    display: flex;
+    gap: 7px;
+    padding: 7px 2px;
+    border-bottom: 1px solid #eeeeee;
+}
+
+.footnote-suggestion-number {
+    flex: 0 0 20px;
+    color: #999;
+    font-size: 10px;
+}
+
+.footnote-suggestion-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.footnote-suggestion-original {
+    color: #777;
+    font-size: 11px;
+}
+
+.footnote-suggestion-arrow {
+    margin: 2px 0;
+    color: #aaa;
+}
+
+.footnote-suggestion-new {
+    color: #444;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.apply-footnote-suggestions-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border: 1px solid #dfe2e6;
+    border-radius: 6px;
+    background: #f8f9fa;
+    color: #444;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
 /* =========================================================
    FINAL REFERENCES
    ========================================================= */
