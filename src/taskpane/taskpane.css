@@ -728,46 +728,7 @@ body {
 
 }
 
-.references-comparison-section {
-    margin-top: 12px;
-}
 
-.references-comparison-section-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #444;
-}
-
-.references-comparison-section-title strong {
-    color: #777;
-}
-
-.references-comparison-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.references-comparison-item {
-    display: flex;
-    gap: 7px;
-    padding: 6px 2px;
-    border-bottom: 1px solid #eeeeee;
-    font-size: 12px;
-    line-height: 1.6;
-}
-
-.references-comparison-number {
-    flex: 0 0 20px;
-    color: #999;
-}
-
-.references-comparison-text {
-    color: #555;
-}
 
 
 .compare-references-btn {
