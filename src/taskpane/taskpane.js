@@ -28549,6 +28549,35 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
         return map;
     }
 
+    function normalizeSource(source) {
+
+        const value =
+            String(source || "")
+                .trim()
+                .toLowerCase();
+
+        if (
+            value === "footnote" ||
+            value === "footnotes" ||
+            value === "حاشية" ||
+            value === "حاشية سفلية" ||
+            value === "الحواشي السفلية"
+        ) {
+            return "footnote";
+        }
+
+        if (
+            value === "endnote" ||
+            value === "endnotes" ||
+            value === "حاشية ختامية" ||
+            value === "الحواشي الختامية"
+        ) {
+            return "endnote";
+        }
+
+        return value;
+    }
+
     unifiedReferences.forEach(function (reference) {
 
         const occurrences =
@@ -28559,20 +28588,22 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
         occurrences.forEach(function (occurrence) {
 
             const noteNumber =
-                occurrence?.noteNumber;
-
-            const source =
-                String(
-                    occurrence?.source || ""
-                )
-                    .trim()
-                    .toLowerCase();
+                Number(
+                    occurrence?.noteNumber
+                );
 
             if (
-                noteNumber === null ||
-                noteNumber === undefined ||
-                !source
+                !Number.isFinite(noteNumber)
             ) {
+                return;
+            }
+
+            const source =
+                normalizeSource(
+                    occurrence?.source
+                );
+
+            if (!source) {
                 return;
             }
 
@@ -28591,6 +28622,11 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
         });
 
     });
+
+    console.log(
+        "مفاتيح خريطة الحواشي:",
+        Array.from(map.keys())
+    );
 
     return map;
 }
