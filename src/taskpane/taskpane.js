@@ -22266,6 +22266,143 @@ async function analyzeReferencesWithAI(materials) {
 
 
     // =====================================================
+    // خريطة المواد الأصلية
+    //
+    // نستخدمها لاستعادة source / noteNumber / position
+    // إذا أغفلها الذكاء الاصطناعي في occurrence.
+    // =====================================================
+
+    const materialIndex =
+        new Map();
+
+    payload.forEach(
+        function (
+            material
+        ) {
+
+            materialIndex.set(
+                String(
+                    material.materialId
+                ),
+                material
+            );
+
+        }
+    );
+
+
+    // =====================================================
+    // استعادة بيانات occurrence من المادة الأصلية
+    //
+    // لا نغير المرجع ولا locations ولا variants.
+    // =====================================================
+
+    function hydrateAIResult(
+        aiResult
+    ) {
+
+        if (
+            !aiResult ||
+            !Array.isArray(
+                aiResult.references
+            )
+        ) {
+
+            return aiResult;
+
+        }
+
+
+        aiResult.references.forEach(
+            function (
+                reference
+            ) {
+
+                if (
+                    !Array.isArray(
+                        reference.occurrences
+                    )
+                ) {
+
+                    reference.occurrences =
+                        [];
+
+                    return;
+
+                }
+
+
+                reference.occurrences.forEach(
+                    function (
+                        occurrence
+                    ) {
+
+                        const material =
+                            materialIndex.get(
+                                String(
+                                    occurrence?.materialId ||
+                                    ""
+                                )
+                            );
+
+
+                        if (!material) {
+                            return;
+                        }
+
+
+                        // source
+                        if (
+                            !occurrence.source &&
+                            material.source
+                        ) {
+
+                            occurrence.source =
+                                material.source;
+
+                        }
+
+
+                        // noteNumber
+                        if (
+                            occurrence.noteNumber ===
+                                null ||
+                            occurrence.noteNumber ===
+                                undefined
+                        ) {
+
+                            occurrence.noteNumber =
+                                material.noteNumber;
+
+                        }
+
+
+                        // position
+                        if (
+                            occurrence.position ===
+                                null ||
+                            occurrence.position ===
+                                undefined
+                        ) {
+
+                            occurrence.position =
+                                material.position;
+
+                        }
+
+                    }
+                );
+
+            }
+        );
+
+
+        return aiResult;
+
+    }
+
+
+    // =====================================================
     // تعليمات الذكاء الاصطناعي
     // =====================================================
 
@@ -22364,6 +22501,7 @@ async function analyzeReferencesWithAI(materials) {
 لا تدمج مرجعين مختلفين إذا اختلف المؤلف أو عنوان الكتاب.
 كل مؤلف + عنوان كتاب هو هوية مستقلة.
 ولا يجوز نقل location أو variant أو occurrence من مرجع إلى مرجع آخر.
+
 =====================================================
 كيف تكتشف بداية مرجع جديد؟
 =====================================================
@@ -22595,6 +22733,7 @@ occurrences
 
 إذا احتوت مادة واحدة على مرجعين مستقلين،
 يحصل كل منهما على occurrence واحد.
+
 confidence رقم بين 0 و1، ويجب أن يعكس درجة الثقة الحقيقية في هوية المرجع.
 للمراجع الواضحة جدًا استخدم 0.95 إلى 1.00، ولا تستخدم 0 إذا كانت هوية المرجع واضحة.
 
@@ -22628,6 +22767,7 @@ volume = "11"
 pageRange = "388-389"
 
 الموضع في occurrence يجب أن يخص هذا الظهور وحده، ولا يجوز نقله من ظهور آخر.
+
 =====================================================
 النتيجة
 =====================================================
@@ -22667,14 +22807,14 @@ pageRange = "388-389"
       "variants": [],
       "occurrences": [
         {
-            "materialId": "",
-            "source": "",
-            "noteNumber": null,
-            "volume": "",
-            "page": "",
-            "pageRange": ""
+          "materialId": "",
+          "source": "",
+          "noteNumber": null,
+          "volume": "",
+          "page": "",
+          "pageRange": ""
         }
-    ],
+      ],
       "notes": "",
       "confidence": 0.0,
       "needsReview": false
@@ -22823,8 +22963,10 @@ other
         }
 
 
-        return parseUnifiedReferenceAIResult(
-            answer
+        return hydrateAIResult(
+            parseUnifiedReferenceAIResult(
+                answer
+            )
         );
 
     }
@@ -22963,8 +23105,10 @@ other
     }
 
 
-    return parseUnifiedReferenceAIResult(
-        answer
+    return hydrateAIResult(
+        parseUnifiedReferenceAIResult(
+            answer
+        )
     );
 
 }
