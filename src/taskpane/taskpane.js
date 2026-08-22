@@ -1395,137 +1395,145 @@ async function readBibliographyFromCurrentDocument() {
     return await Word.run(
         async function (context) {
 
-            const body =
-                context.document.body;
+            const paragraphs =
+                context.document.body.paragraphs;
 
-            body.load("text");
+            paragraphs.load(
+                "items/text,items/isListItem"
+            );
 
             await context.sync();
 
-            const rawText =
-                String(
-                    body.text || ""
-                );
+            const items =
+                paragraphs.items;
 
-            if (!rawText.trim()) {
-                return [];
-            }
+            // ---------------------------------------------
+            // البحث عن عنوان "المراجع والمصادر"
+            // ---------------------------------------------
 
-            const text =
-                rawText
-                    .replace(/\r/g, "\n")
-                    .replace(/[ \t]+/g, " ");
-
-            // البحث عن عنوان قائمة المراجع
-            const heading =
-                "المراجع والمصادر";
-
-            const headingIndex =
-                text.indexOf(heading);
-
-            if (headingIndex === -1) {
-
-                console.warn(
-                    "لم يتم العثور على عنوان: المراجع والمصادر"
-                );
-
-                return [];
-            }
-
-            const bibliographyText =
-                text.slice(
-                    headingIndex + heading.length
-                );
-
-            /*
-             * كل مرجع يبدأ برقم:
-             * 1.
-             * 2.
-             * 10.
-             */
-
-            const startPattern =
-                /(?:^|\n)\s*(\d+)\s*[\.\-–—]\s*/g;
-
-            const matches = [];
-
-            let match;
-
-            while (
-                (
-                    match =
-                        startPattern.exec(
-                            bibliographyText
-                        )
-                ) !== null
-            ) {
-
-                matches.push({
-                    number:
-                        Number(match[1]),
-
-                    start:
-                        match.index +
-                        match[0].length
-                });
-
-            }
-
-            if (!matches.length) {
-
-                console.warn(
-                    "تم العثور على عنوان المراجع ولكن لم يتم العثور على مراجع مرقمة بعده."
-                );
-
-                return [];
-            }
-
-            const bibliography = [];
+            let startIndex = -1;
 
             for (
                 let i = 0;
-                i < matches.length;
+                i < items.length;
                 i++
             ) {
 
-                const current =
-                    matches[i];
-
-                const next =
-                    matches[i + 1];
-
-                const end =
-                    next
-                        ? next.start
-                        : bibliographyText.length;
-
-                const referenceText =
-                    bibliographyText
-                        .slice(
-                            current.start,
-                            end
-                        )
+                const text =
+                    String(
+                        items[i].text || ""
+                    )
                         .replace(/\s+/g, " ")
                         .trim();
 
-                if (!referenceText) {
-                    continue;
+                if (
+                    text === "المراجع والمصادر" ||
+                    text === "المصادر والمراجع"
+                ) {
+
+                    startIndex = i + 1;
+                    break;
+
                 }
 
-                bibliography.push({
+            }
 
-                    id:
-                        `bibliography-${current.number}`,
+            if (
+                startIndex === -1
+            ) {
 
-                    number:
-                        current.number,
+                console.warn(
+                    "لم يتم العثور على عنوان المراجع والمصادر."
+                );
 
-                    text:
-                        referenceText
-
-                });
+                return [];
 
             }
+
+            // ---------------------------------------------
+            // تحميل أرقام عناصر القائمة
+            // ---------------------------------------------
+
+            const listItems = [];
+
+            for (
+                let i = startIndex;
+                i < items.length;
+                i++
+            ) {
+
+                if (
+                    items[i].isListItem
+                ) {
+
+                    const listItem =
+                        items[i].listItemOrNullObject;
+
+                    listItem.load(
+                        "listString"
+                    );
+
+                    listItems.push({
+                        index: i,
+                        paragraph: items[i],
+                        listItem: listItem
+                    });
+
+                }
+
+            }
+
+            await context.sync();
+
+            // ---------------------------------------------
+            // استخراج المراجع
+            // ---------------------------------------------
+
+            const bibliography = [];
+
+            listItems.forEach(
+                function (
+                    item
+                ) {
+
+                    const listString =
+                        String(
+                            item.listItem.listString || ""
+                        ).trim();
+
+                    const text =
+                        String(
+                            item.paragraph.text || ""
+                        )
+                            .replace(/\s+/g, " ")
+                            .trim();
+
+                    if (
+                        !text
+                    ) {
+
+                        return;
+
+                    }
+
+                    bibliography.push({
+
+                        id:
+                            `bibliography-${bibliography.length + 1}`,
+
+                        number:
+                            bibliography.length + 1,
+
+                        listString:
+                            listString,
+
+                        text:
+                            text
+
+                    });
+
+                }
+            );
 
             console.log(
                 "قائمة المراجع والمصادر المستخرجة:",
