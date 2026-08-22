@@ -26356,6 +26356,8 @@ if (closeReferences) {
 
 if (referencesContent) {
 
+    let latestUnifiedReferences = [];
+
     referencesContent
         .querySelectorAll(
             ".references-source-option"
@@ -26670,6 +26672,9 @@ if (referencesContent) {
                                                 aiAnalysisResult.references
                                             )
                                             : [];
+
+                                            latestUnifiedReferences =
+                                                finalReferenceResults;
 
                                     if (
                                         !Array.isArray(
@@ -27355,7 +27360,7 @@ if (referencesContent) {
 
                                                 const comparison =
                                                     compareUnifiedReferencesWithBibliography(
-                                                        finalReferenceResults,
+                                                        latestUnifiedReferences,
                                                         bibliography
                                                     );
 
