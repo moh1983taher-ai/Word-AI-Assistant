@@ -1391,70 +1391,138 @@ async function readReferenceSources() {
 // قراءة قائمة المراجع من المستند
 // =====================================================
 async function readBibliographyFromCurrentDocument() {
-    return await Word.run(async function (context) {
 
-        const body = context.document.body;
+    return await Word.run(
+        async function (context) {
 
-        body.load("text");
+            const body =
+                context.document.body;
 
-        await context.sync();
+            body.load("text");
 
-        const text = String(body.text || "").trim();
+            await context.sync();
 
-        if (!text) {
-            return [];
-        }
+            const rawText =
+                String(
+                    body.text || ""
+                );
 
-        const lines =
-            text
-                .split(/\r?\n/)
-                .map(function (line) {
-                    return line.trim();
-                })
-                .filter(Boolean);
-
-        const headingPatterns = [
-            /^المراجع$/i,
-            /^قائمة المراجع$/i,
-            /^المصادر والمراجع$/i,
-            /^المصادر$/i
-        ];
-
-        let startIndex = -1;
-
-        for (
-            let i = 0;
-            i < lines.length;
-            i++
-        ) {
-            if (
-                headingPatterns.some(
-                    function (pattern) {
-                        return pattern.test(lines[i]);
-                    }
-                )
-            ) {
-                startIndex = i + 1;
-                break;
+            if (!rawText.trim()) {
+                return [];
             }
-        }
 
-        if (startIndex === -1) {
-            return [];
-        }
+            const text =
+                rawText
+                    .replace(/\r/g, "\n")
+                    .replace(/[ \t]+/g, " ");
 
-        return lines
-            .slice(startIndex)
-            .map(function (line, index) {
-                return {
+            /*
+             * كل مرجع يبدأ برقم:
+             * 1.
+             * 2.
+             * 10.
+             * إلخ
+             *
+             * والمراجع قد تمتد على عدة أسطر.
+             */
+
+            const matches = [];
+
+            const pattern =
+                /(?:^|\n)\s*(\d+)\.\s*/g;
+
+            let match;
+
+            while (
+                (
+                    match =
+                        pattern.exec(text)
+                ) !== null
+            ) {
+
+                matches.push({
+                    number:
+                        Number(match[1]),
+
+                    start:
+                        match.index +
+                        match[0].length
+                });
+
+            }
+
+            if (
+                matches.length === 0
+            ) {
+
+                return [];
+
+            }
+
+            const results = [];
+
+            for (
+                let i = 0;
+                i < matches.length;
+                i++
+            ) {
+
+                const current =
+                    matches[i];
+
+                const next =
+                    matches[i + 1];
+
+                const end =
+                    next
+                        ? next.start
+                        : text.length;
+
+                const referenceText =
+                    text
+                        .slice(
+                            current.start,
+                            end
+                        )
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim();
+
+                if (
+                    !referenceText
+                ) {
+
+                    continue;
+
+                }
+
+                results.push({
+
                     id:
-                        `bibliography-${index + 1}`,
+                        `bibliography-${current.number}`,
+
+                    number:
+                        current.number,
 
                     text:
-                        line
-                };
-            });
-    });
+                        referenceText
+
+                });
+
+            }
+
+            console.log(
+                "قائمة المراجع المستخرجة:",
+                results
+            );
+
+            return results;
+
+        }
+    );
+
 }
 
 function compareUnifiedReferencesWithBibliography(
