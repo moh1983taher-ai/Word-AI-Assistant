@@ -1410,6 +1410,43 @@ body {
 
 }
 
+
+.reference-style-options {
+    margin: 8px 0;
+    padding: 8px 0;
+    border-bottom: 1px solid #eeeeee;
+}
+
+.reference-style-title {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #444;
+}
+
+.reference-style-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.reference-style-row label {
+    width: 55px;
+    font-size: 11px;
+    color: #777;
+}
+
+.reference-style-row select {
+    flex: 1;
+    padding: 5px 7px;
+    border: 1px solid #dddddd;
+    border-radius: 5px;
+    background: #fff;
+    font-size: 11px;
+    color: #444;
+}
+
 /* =========================================================
    FINAL REFERENCES
    ========================================================= */

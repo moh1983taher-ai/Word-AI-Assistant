@@ -628,7 +628,96 @@ async function saveWorkingWordFile(
 
 }
 
+const referenceStyle = {
 
+    order: "appearance",
+    // appearance | author | title
+
+    format: "author-title"
+    // author-title | title-author
+
+};
+
+function formatReferenceForOutput(reference) {
+
+    const author =
+        String(reference?.author || "").trim();
+
+    const title =
+        String(reference?.title || "").trim();
+
+    if (
+        referenceStyle.format === "title-author"
+    ) {
+
+        return [
+            title,
+            author
+        ]
+            .filter(Boolean)
+            .join("، ");
+
+    }
+
+    return [
+        author,
+        title
+    ]
+        .filter(Boolean)
+        .join("، ");
+}
+
+function sortReferencesForOutput(references) {
+
+    const list =
+        Array.isArray(references)
+            ? [...references]
+            : [];
+
+    if (
+        referenceStyle.order === "author"
+    ) {
+
+        return list.sort(
+            function (a, b) {
+
+                return String(
+                    a?.author || ""
+                ).localeCompare(
+                    String(
+                        b?.author || ""
+                    ),
+                    "ar"
+                );
+
+            }
+        );
+
+    }
+
+    if (
+        referenceStyle.order === "title"
+    ) {
+
+        return list.sort(
+            function (a, b) {
+
+                return String(
+                    a?.title || ""
+                ).localeCompare(
+                    String(
+                        b?.title || ""
+                    ),
+                    "ar"
+                );
+
+            }
+        );
+
+    }
+
+    return list;
+}
 // ======================================
 // Get Working Word File
 // ======================================
@@ -1849,27 +1938,14 @@ async function writeFinalBibliographyToDocument(
         throw new Error("لا توجد مراجع.");
     }
 
-    function formatReference(reference) {
+    // =============================================
+    // تطبيق نمط الإخراج المشترك
+    // =============================================
 
-        return [
-            reference?.author,
-            reference?.title,
-            reference?.edition
-                ? `ط ${reference.edition}`
-                : "",
-            reference?.editor
-                ? `تحقيق: ${reference.editor}`
-                : "",
-            reference?.publisher,
-            reference?.city,
-            reference?.year
-        ]
-            .map(function (value) {
-                return String(value || "").trim();
-            })
-            .filter(Boolean)
-            .join("، ");
-    }
+    const outputBibliography =
+        sortReferencesForOutput(
+            finalBibliography
+        );
 
     return await Word.run(
         async function (context) {
@@ -1933,14 +2009,13 @@ async function writeFinalBibliographyToDocument(
 
                 let addedCount = 0;
 
-                finalBibliography.forEach(
+                outputBibliography.forEach(
                     function (
-                        reference,
-                        index
+                        reference
                     ) {
 
                         const text =
-                            formatReference(
+                            formatReferenceForOutput(
                                 reference
                             );
 
@@ -1949,7 +2024,7 @@ async function writeFinalBibliographyToDocument(
                         }
 
                         end.insertParagraph(
-                            `${index + 1}. ${text}`,
+                            text,
                             "Before"
                         );
 
@@ -1997,22 +2072,13 @@ async function writeFinalBibliographyToDocument(
             }
 
             // =============================================
-            // تحديد رقم المرجع التالي
+            // ترتيب المراجع الناقصة وفق النمط المختار
             // =============================================
 
-            let number =
-                paragraphs.items
-                    .filter(
-                        function (
-                            paragraph
-                        ) {
-
-                            return (
-                                paragraph.isListItem
-                            );
-
-                        }
-                    ).length + 1;
+            const outputMissing =
+                sortReferencesForOutput(
+                    missing
+                );
 
             // =============================================
             // آخر فقرة في المستند
@@ -2025,13 +2091,13 @@ async function writeFinalBibliographyToDocument(
 
             let addedCount = 0;
 
-            missing.forEach(
+            outputMissing.forEach(
                 function (
                     reference
                 ) {
 
                     const text =
-                        formatReference(
+                        formatReferenceForOutput(
                             reference
                         );
 
@@ -2040,11 +2106,10 @@ async function writeFinalBibliographyToDocument(
                     }
 
                     lastParagraph.insertParagraph(
-                        `${number}. ${text}`,
+                        text,
                         "After"
                     );
 
-                    number++;
                     addedCount++;
 
                 }
@@ -26854,6 +26919,39 @@ if (referencesContent) {
 
     let latestBibliographyComparison = null;
 
+    function loadReferenceStyle() {
+
+        try {
+
+            const saved =
+                JSON.parse(
+                    localStorage.getItem(
+                        "REFERENCE_STYLE"
+                    ) || "{}"
+                );
+
+            referenceStyle.order =
+                saved.order ||
+                "appearance";
+
+            referenceStyle.format =
+                saved.format ||
+                "author-title";
+
+        }
+        catch (error) {
+
+            console.warn(
+                "تعذر تحميل نمط المراجع:",
+                error
+            );
+
+        }
+
+    }
+
+    loadReferenceStyle();
+
     referencesContent
         .querySelectorAll(
             ".references-source-option"
@@ -26933,6 +27031,60 @@ if (referencesContent) {
 
                                 </div>
 
+
+
+                            </div>
+
+                            <div class="reference-style-options">
+
+                                <div class="reference-style-title">
+                                    نمط قائمة المراجع والحواشي
+                                </div>
+
+                                <div class="reference-style-row">
+
+                                    <label>
+                                        الترتيب
+                                    </label>
+
+                                    <select id="reference-order-select">
+
+                                        <option value="appearance">
+                                            حسب ترتيب الظهور
+                                        </option>
+
+                                        <option value="author">
+                                            حسب المؤلف
+                                        </option>
+
+                                        <option value="title">
+                                            حسب عنوان الكتاب
+                                        </option>
+
+                                    </select>
+
+                                </div>
+
+                                <div class="reference-style-row">
+
+                                    <label>
+                                        الصيغة
+                                    </label>
+
+                                    <select id="reference-format-select">
+
+                                        <option value="author-title">
+                                            المؤلف، العنوان
+                                        </option>
+
+                                        <option value="title-author">
+                                            العنوان، المؤلف
+                                        </option>
+
+                                    </select>
+
+                                </div>
+
                             </div>
 
                             <button
@@ -26961,6 +27113,61 @@ if (referencesContent) {
 
                             </button>
                             `;
+
+
+                        const referenceOrderSelect =
+                            document.getElementById(
+                                "reference-order-select"
+                            );
+
+                        const referenceFormatSelect =
+                            document.getElementById(
+                                "reference-format-select"
+                            );
+
+                        if (referenceOrderSelect) {
+
+                            referenceOrderSelect.value =
+                                referenceStyle.order;
+
+                            referenceOrderSelect.onchange =
+                                function () {
+
+                                    referenceStyle.order =
+                                        this.value;
+
+                                    localStorage.setItem(
+                                        "REFERENCE_STYLE",
+                                        JSON.stringify(
+                                            referenceStyle
+                                        )
+                                    );
+
+                                };
+
+                        }
+
+                        if (referenceFormatSelect) {
+
+                            referenceFormatSelect.value =
+                                referenceStyle.format;
+
+                            referenceFormatSelect.onchange =
+                                function () {
+
+                                    referenceStyle.format =
+                                        this.value;
+
+                                    localStorage.setItem(
+                                        "REFERENCE_STYLE",
+                                        JSON.stringify(
+                                            referenceStyle
+                                        )
+                                    );
+
+                                };
+
+                        }
 
                         const analyzeReferencesBtn =
                             document.getElementById(
