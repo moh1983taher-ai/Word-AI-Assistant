@@ -1845,23 +1845,44 @@ async function writeFinalBibliographyToDocument(
         !Array.isArray(finalBibliography) ||
         finalBibliography.length === 0
     ) {
-        throw new Error("لا توجد مراجع لإنشاء القائمة.");
+        throw new Error("لا توجد مراجع.");
     }
 
-    await Word.run(
+    function formatReference(reference) {
+
+        return [
+            reference?.author,
+            reference?.title,
+            reference?.edition
+                ? `ط ${reference.edition}`
+                : "",
+            reference?.editor
+                ? `تحقيق: ${reference.editor}`
+                : "",
+            reference?.publisher,
+            reference?.city,
+            reference?.year
+        ]
+            .map(function (value) {
+                return String(value || "").trim();
+            })
+            .filter(Boolean)
+            .join("، ");
+    }
+
+    return await Word.run(
         async function (context) {
 
-            const body =
-                context.document.body;
-
             const paragraphs =
-                body.paragraphs;
+                context.document.body.paragraphs;
 
-            paragraphs.load("items/text");
+            paragraphs.load(
+                "items/text,items/isListItem"
+            );
 
             await context.sync();
 
-            let headingParagraph = null;
+            let headingIndex = -1;
 
             for (
                 let i = 0;
@@ -1881,80 +1902,161 @@ async function writeFinalBibliographyToDocument(
                     text === "المصادر والمراجع"
                 ) {
 
-                    headingParagraph =
-                        paragraphs.items[i];
-
+                    headingIndex = i;
                     break;
 
                 }
 
             }
 
-            // لا توجد قائمة: أنشئها في النهاية
-            if (!headingParagraph) {
+            // =============================================
+            // لا توجد قائمة: إنشاء قائمة جديدة
+            // =============================================
 
-                const endRange =
-                    body.getRange("End");
+            if (
+                headingIndex === -1
+            ) {
 
-                endRange.insertParagraph(
+                const end =
+                    context.document.body.getRange("End");
+
+                end.insertParagraph(
                     "",
                     "Before"
                 );
 
-                const heading =
-                    endRange.insertParagraph(
-                        "المراجع والمصادر",
-                        "Before"
-                    );
+                end.insertParagraph(
+                    "المراجع والمصادر",
+                    "Before"
+                );
 
-                heading.font.bold = true;
+                let addedCount = 0;
 
                 finalBibliography.forEach(
-                    function (reference, index) {
-
-                        const author =
-                            String(
-                                reference?.author || ""
-                            ).trim();
-
-                        const title =
-                            String(
-                                reference?.title || ""
-                            ).trim();
+                    function (
+                        reference,
+                        index
+                    ) {
 
                         const text =
-                            [
-                                author,
-                                title
-                            ]
-                                .filter(Boolean)
-                                .join("، ");
+                            formatReference(
+                                reference
+                            );
 
                         if (!text) {
                             return;
                         }
 
-                        endRange.insertParagraph(
+                        end.insertParagraph(
                             `${index + 1}. ${text}`,
                             "Before"
                         );
 
+                        addedCount++;
+
                     }
                 );
 
+                await context.sync();
+
+                return {
+
+                    created: true,
+
+                    added: addedCount
+
+                };
+
             }
 
-            // توجد قائمة بالفعل:
-            // لا نحذفها الآن، بل نتركها كما هي.
-            else {
+            // =============================================
+            // توجد قائمة: إضافة الناقص فقط
+            // =============================================
 
-                console.log(
-                    "قائمة المراجع موجودة بالفعل؛ لم يتم إنشاء قائمة ثانية."
-                );
+            const missing =
+                latestBibliographyComparison &&
+                Array.isArray(
+                    latestBibliographyComparison
+                        .missingFromBibliography
+                )
+                    ? latestBibliographyComparison
+                        .missingFromBibliography
+                    : [];
+
+            if (
+                missing.length === 0
+            ) {
+
+                return {
+
+                    created: false,
+
+                    added: 0
+
+                };
 
             }
+
+            /*
+             * نحدد آخر فقرة في المستند،
+             * ونضيف المراجع بعدها.
+             */
+
+            const lastParagraph =
+                paragraphs.items[
+                    paragraphs.items.length - 1
+                ];
+
+            let number =
+                paragraphs.items
+                    .filter(
+                        function (
+                            paragraph
+                        ) {
+
+                            return (
+                                paragraph.isListItem
+                            );
+
+                        }
+                    ).length + 1;
+
+            let addedCount = 0;
+
+            missing.forEach(
+                function (
+                    reference
+                ) {
+
+                    const text =
+                        formatReference(
+                            reference
+                        );
+
+                    if (!text) {
+                        return;
+                    }
+
+                    lastParagraph.insertParagraph(
+                        `${number}. ${text}`,
+                        "After"
+                    );
+
+                    number++;
+                    addedCount++;
+
+                }
+            );
 
             await context.sync();
+
+            return {
+
+                created: false,
+
+                added: addedCount
+
+            };
 
         }
     );
@@ -27807,8 +27909,29 @@ if (referencesContent) {
                                                                     finalBibliography
                                                                 );
 
-                                                                buildBibliographyBtn.textContent =
-                                                                    "✓ تم إنشاء قائمة المراجع";
+                                                                const result =
+                                                                    await writeFinalBibliographyToDocument(
+                                                                        finalBibliography
+                                                                    );
+
+                                                                if (result.created) {
+
+                                                                    buildBibliographyBtn.textContent =
+                                                                        `✓ تم إنشاء قائمة المراجع (${result.added})`;
+
+                                                                }
+                                                                else if (result.added > 0) {
+
+                                                                    buildBibliographyBtn.textContent =
+                                                                        `✓ تم تحديث قائمة المراجع (+${result.added})`;
+
+                                                                }
+                                                                else {
+
+                                                                    buildBibliographyBtn.textContent =
+                                                                        "✓ قائمة المراجع مكتملة";
+
+                                                                }
 
                                                             };
 
