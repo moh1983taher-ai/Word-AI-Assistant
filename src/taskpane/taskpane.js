@@ -1836,6 +1836,181 @@ function compareUnifiedReferencesWithBibliography(
     };
 
 }
+
+async function writeFinalBibliographyToDocument(
+    finalBibliography
+) {
+
+    if (
+        !Array.isArray(finalBibliography) ||
+        finalBibliography.length === 0
+    ) {
+        throw new Error("لا توجد مراجع لإنشاء القائمة.");
+    }
+
+    await Word.run(
+        async function (context) {
+
+            const body =
+                context.document.body;
+
+            const paragraphs =
+                body.paragraphs;
+
+            paragraphs.load("items/text");
+
+            await context.sync();
+
+            let headingParagraph = null;
+
+            for (
+                let i = 0;
+                i < paragraphs.items.length;
+                i++
+            ) {
+
+                const text =
+                    String(
+                        paragraphs.items[i].text || ""
+                    )
+                        .replace(/\s+/g, " ")
+                        .trim();
+
+                if (
+                    text === "المراجع والمصادر" ||
+                    text === "المصادر والمراجع"
+                ) {
+
+                    headingParagraph =
+                        paragraphs.items[i];
+
+                    break;
+
+                }
+
+            }
+
+            // لا توجد قائمة: أنشئها في النهاية
+            if (!headingParagraph) {
+
+                const endRange =
+                    body.getRange("End");
+
+                endRange.insertParagraph(
+                    "",
+                    "Before"
+                );
+
+                const heading =
+                    endRange.insertParagraph(
+                        "المراجع والمصادر",
+                        "Before"
+                    );
+
+                heading.font.bold = true;
+
+                finalBibliography.forEach(
+                    function (reference, index) {
+
+                        const author =
+                            String(
+                                reference?.author || ""
+                            ).trim();
+
+                        const title =
+                            String(
+                                reference?.title || ""
+                            ).trim();
+
+                        const text =
+                            [
+                                author,
+                                title
+                            ]
+                                .filter(Boolean)
+                                .join("، ");
+
+                        if (!text) {
+                            return;
+                        }
+
+                        endRange.insertParagraph(
+                            `${index + 1}. ${text}`,
+                            "Before"
+                        );
+
+                    }
+                );
+
+            }
+
+            // توجد قائمة بالفعل:
+            // لا نحذفها الآن، بل نتركها كما هي.
+            else {
+
+                console.log(
+                    "قائمة المراجع موجودة بالفعل؛ لم يتم إنشاء قائمة ثانية."
+                );
+
+            }
+
+            await context.sync();
+
+        }
+    );
+
+}
+
+function buildFinalBibliography(
+    unifiedReferences,
+    comparison
+) {
+
+    const references =
+        Array.isArray(unifiedReferences)
+            ? unifiedReferences
+            : [];
+
+    const existing =
+        Array.isArray(comparison?.matches)
+            ? comparison.matches
+            : [];
+
+    const result = [];
+
+    // المراجع الموجودة في القائمة والمطابقة
+    existing.forEach(function (item) {
+
+        if (
+            item.matched &&
+            item.references &&
+            item.references.length
+        ) {
+
+            result.push(
+                item.references[0]
+            );
+
+        }
+
+    });
+
+    // المراجع المستشهد بها وغير الموجودة
+    (comparison?.missingFromBibliography || [])
+        .forEach(function (reference) {
+
+            if (
+                !result.includes(reference)
+            ) {
+
+                result.push(reference);
+
+            }
+
+        });
+
+    return result;
+}
 // =====================================================
 // REFERENCE PROCESSOR
 // المحرك الموحد لتنظيف وتحليل مواد المراجع
@@ -26573,6 +26748,8 @@ if (referencesContent) {
 
     let latestUnifiedReferences = [];
 
+    let latestBibliographyComparison = null;
+
     referencesContent
         .querySelectorAll(
             ".references-source-option"
@@ -26669,6 +26846,14 @@ if (referencesContent) {
                                 class="compare-references-btn">
 
                                 مقارنة قائمة المراجع
+
+                            </button>
+                            <button
+                                type="button"
+                                id="build-bibliography-btn"
+                                class="build-bibliography-btn">
+
+                                إنشاء/تحديث قائمة المراجع
 
                             </button>
                             `;
@@ -27578,6 +27763,56 @@ if (referencesContent) {
                                                         latestUnifiedReferences,
                                                         bibliography
                                                     );
+
+                                                    latestBibliographyComparison =
+                                                        comparison;
+
+                                                    const buildBibliographyBtn =
+                                                        document.getElementById(
+                                                            "build-bibliography-btn"
+                                                        );
+
+                                                    if (buildBibliographyBtn) {
+
+                                                        buildBibliographyBtn.onclick =
+                                                            async function (e) {
+
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+
+                                                                if (
+                                                                    !latestBibliographyComparison
+                                                                ) {
+
+                                                                    console.warn(
+                                                                        "يجب إجراء المقارنة أولًا."
+                                                                    );
+
+                                                                    return;
+
+                                                                }
+
+                                                                const finalBibliography =
+                                                                    buildFinalBibliography(
+                                                                        latestUnifiedReferences,
+                                                                        latestBibliographyComparison
+                                                                    );
+
+                                                                console.log(
+                                                                    "قائمة المراجع النهائية المقترحة:",
+                                                                    finalBibliography
+                                                                );
+
+                                                                await writeFinalBibliographyToDocument(
+                                                                    finalBibliography
+                                                                );
+
+                                                                buildBibliographyBtn.textContent =
+                                                                    "✓ تم إنشاء قائمة المراجع";
+
+                                                            };
+
+                                                    }
 
                                                 console.log(
                                                     "نتيجة مقارنة قائمة المراجع:",
