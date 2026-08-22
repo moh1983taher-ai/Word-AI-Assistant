@@ -1387,7 +1387,240 @@ async function readReferenceSources() {
     );
 
 }
+// =====================================================
+// قراءة قائمة المراجع من المستند
+// =====================================================
+async function readBibliographyFromCurrentDocument() {
+    return await Word.run(async function (context) {
 
+        const body = context.document.body;
+
+        body.load("text");
+
+        await context.sync();
+
+        const text = String(body.text || "").trim();
+
+        if (!text) {
+            return [];
+        }
+
+        const lines =
+            text
+                .split(/\r?\n/)
+                .map(function (line) {
+                    return line.trim();
+                })
+                .filter(Boolean);
+
+        const headingPatterns = [
+            /^المراجع$/i,
+            /^قائمة المراجع$/i,
+            /^المصادر والمراجع$/i,
+            /^المصادر$/i
+        ];
+
+        let startIndex = -1;
+
+        for (
+            let i = 0;
+            i < lines.length;
+            i++
+        ) {
+            if (
+                headingPatterns.some(
+                    function (pattern) {
+                        return pattern.test(lines[i]);
+                    }
+                )
+            ) {
+                startIndex = i + 1;
+                break;
+            }
+        }
+
+        if (startIndex === -1) {
+            return [];
+        }
+
+        return lines
+            .slice(startIndex)
+            .map(function (line, index) {
+                return {
+                    id:
+                        `bibliography-${index + 1}`,
+
+                    text:
+                        line
+                };
+            });
+    });
+}
+
+function compareUnifiedReferencesWithBibliography(
+    unifiedReferences,
+    bibliography
+) {
+
+    const references =
+        Array.isArray(unifiedReferences)
+            ? unifiedReferences
+            : [];
+
+    const list =
+        Array.isArray(bibliography)
+            ? bibliography
+            : [];
+
+    function normalize(value) {
+
+        return String(value || "")
+            .toLowerCase()
+            .replace(/[.,،:؛()[\]{}"'`]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+    }
+
+    function referenceKey(reference) {
+
+        return normalize(
+            [
+                reference?.author || "",
+                reference?.title || ""
+            ].join(" ")
+        );
+
+    }
+
+    const referenceKeys =
+        references.map(
+            function (reference) {
+
+                return {
+                    reference: reference,
+                    key: referenceKey(reference)
+                };
+
+            }
+        );
+
+    const bibliographyResults =
+        list.map(
+            function (item) {
+
+                const text =
+                    String(
+                        item?.text || ""
+                    ).trim();
+
+                const normalizedText =
+                    normalize(text);
+
+                const match =
+                    referenceKeys.find(
+                        function (entry) {
+
+                            if (!entry.key) {
+                                return false;
+                            }
+
+                            return (
+                                normalizedText.includes(
+                                    entry.key
+                                ) ||
+                                entry.key.includes(
+                                    normalizedText
+                                )
+                            );
+
+                        }
+                    );
+
+                return {
+
+                    id:
+                        item?.id || "",
+
+                    text:
+                        text,
+
+                    matched:
+                        Boolean(match),
+
+                    reference:
+                        match
+                            ? match.reference
+                            : null
+
+                };
+
+            }
+        );
+
+    const missingFromBibliography =
+        referenceKeys
+            .filter(
+                function (entry) {
+
+                    return !bibliographyResults.some(
+                        function (item) {
+
+                            return (
+                                item.matched &&
+                                item.reference ===
+                                entry.reference
+                            );
+
+                        }
+                    );
+
+                }
+            )
+            .map(
+                function (entry) {
+
+                    return entry.reference;
+
+                }
+            );
+
+    const unusedBibliography =
+        bibliographyResults.filter(
+            function (item) {
+
+                return !item.matched;
+
+            }
+        );
+
+    return {
+
+        totalUnifiedReferences:
+            references.length,
+
+        totalBibliographyEntries:
+            list.length,
+
+        matchedCount:
+            bibliographyResults.filter(
+                function (item) {
+                    return item.matched;
+                }
+            ).length,
+
+        missingFromBibliography:
+            missingFromBibliography,
+
+        unusedBibliography:
+            unusedBibliography,
+
+        matches:
+            bibliographyResults
+
+    };
+
+}
 // =====================================================
 // REFERENCE PROCESSOR
 // المحرك الموحد لتنظيف وتحليل مواد المراجع
@@ -21677,6 +21910,9 @@ variants تستخدم فقط للصيغ المختلفة للمرجع نفسه.
 لا تسمح لبنية الحاشية الواحدة بأن تجعل عدة مراجع
 في سجل واحد.
 
+لا تكرر نفس صيغة الظهور أكثر من مرة.
+اعتبر اختلاف المسافات وعلامات الترقيم البسيطة تكرارًا لنفس الصيغة.
+
 =====================================================
 قاعدة occurrences
 =====================================================
@@ -26209,6 +26445,15 @@ if (referencesContent) {
                                 تحليل المراجع
 
                             </button>
+
+                            <button
+                                type="button"
+                                id="compare-references-btn"
+                                class="compare-references-btn">
+
+                                مقارنة قائمة المراجع
+
+                            </button>
                             `;
 
                         const analyzeReferencesBtn =
@@ -27083,6 +27328,116 @@ if (referencesContent) {
                                         "فشل تحليل وتوحيد المراجع:",
                                         error
                                     );
+
+                                }
+
+                                const compareReferencesBtn =
+                                    document.getElementById(
+                                        "compare-references-btn"
+                                    );
+
+                                if (compareReferencesBtn) {
+
+                                    compareReferencesBtn.onclick =
+                                        async function (e) {
+
+                                            e.preventDefault();
+                                            e.stopPropagation();
+
+                                            compareReferencesBtn.disabled = true;
+                                            compareReferencesBtn.textContent =
+                                                "جارٍ مقارنة قائمة المراجع...";
+
+                                            try {
+
+                                                const bibliography =
+                                                    await readBibliographyFromCurrentDocument();
+
+                                                const comparison =
+                                                    compareUnifiedReferencesWithBibliography(
+                                                        finalReferenceResults,
+                                                        bibliography
+                                                    );
+
+                                                console.log(
+                                                    "نتيجة مقارنة قائمة المراجع:",
+                                                    comparison
+                                                );
+
+                                                referencesSourceWorkspace.insertAdjacentHTML(
+                                                    "beforeend",
+                                                    `
+                                                    <div class="references-comparison-result">
+
+                                                        <div class="references-comparison-title">
+                                                            مقارنة قائمة المراجع
+                                                        </div>
+
+                                                        <div class="references-comparison-summary">
+
+                                                            <div>
+                                                                المراجع الموحدة:
+                                                                <strong>
+                                                                    ${comparison.totalUnifiedReferences}
+                                                                </strong>
+                                                            </div>
+
+                                                            <div>
+                                                                عناصر القائمة:
+                                                                <strong>
+                                                                    ${comparison.totalBibliographyEntries}
+                                                                </strong>
+                                                            </div>
+
+                                                            <div>
+                                                                المطابق:
+                                                                <strong>
+                                                                    ${comparison.matchedCount}
+                                                                </strong>
+                                                            </div>
+
+                                                            <div>
+                                                                غير موجود في القائمة:
+                                                                <strong>
+                                                                    ${comparison.missingFromBibliography.length}
+                                                                </strong>
+                                                            </div>
+
+                                                            <div>
+                                                                موجود دون استشهاد:
+                                                                <strong>
+                                                                    ${comparison.unusedBibliography.length}
+                                                                </strong>
+                                                            </div>
+
+                                                        </div>
+
+                                                    </div>
+                                                    `
+                                                );
+
+                                                compareReferencesBtn.textContent =
+                                                    "✓ تمت المقارنة";
+
+                                            }
+                                            catch (error) {
+
+                                                compareReferencesBtn.textContent =
+                                                    "مقارنة قائمة المراجع";
+
+                                                console.error(
+                                                    "فشل مقارنة قائمة المراجع:",
+                                                    error
+                                                );
+
+                                            }
+                                            finally {
+
+                                                compareReferencesBtn.disabled = false;
+
+                                            }
+
+                                        };
 
                                 }
 
