@@ -1398,127 +1398,99 @@ async function readBibliographyFromCurrentDocument() {
             const body =
                 context.document.body;
 
-            body.load("text");
+            const paragraphs =
+                body.paragraphs;
+
+            paragraphs.load(
+                "items/text"
+            );
 
             await context.sync();
 
-            const rawText =
-                String(
-                    body.text || ""
-                );
+            const items =
+                paragraphs.items
+                    .map(function (paragraph, index) {
 
-            if (!rawText.trim()) {
+                        return {
+                            index: index,
+                            text: String(
+                                paragraph.text || ""
+                            ).trim()
+                        };
+
+                    })
+                    .filter(function (item) {
+
+                        return item.text.length > 0;
+
+                    });
+
+            if (!items.length) {
                 return [];
             }
 
-            const text =
-                rawText
-                    .replace(/\r/g, "\n")
-                    .replace(/[ \t]+/g, " ");
-
-            /*
-             * كل مرجع يبدأ برقم:
-             * 1.
-             * 2.
-             * 10.
-             * إلخ
-             *
-             * والمراجع قد تمتد على عدة أسطر.
-             */
-
-            const matches = [];
-
-            const pattern =
-                /(?:^|\n)\s*(\d+)\.\s*/g;
-
-            let match;
-
-            while (
-                (
-                    match =
-                        pattern.exec(text)
-                ) !== null
-            ) {
-
-                matches.push({
-                    number:
-                        Number(match[1]),
-
-                    start:
-                        match.index +
-                        match[0].length
-                });
-
-            }
-
-            if (
-                matches.length === 0
-            ) {
-
-                return [];
-
-            }
-
-            const results = [];
+            let startIndex = -1;
 
             for (
                 let i = 0;
-                i < matches.length;
+                i < items.length;
                 i++
             ) {
 
-                const current =
-                    matches[i];
-
-                const next =
-                    matches[i + 1];
-
-                const end =
-                    next
-                        ? next.start
-                        : text.length;
-
-                const referenceText =
-                    text
-                        .slice(
-                            current.start,
-                            end
-                        )
-                        .replace(
-                            /\s+/g,
-                            " "
-                        )
+                const value =
+                    items[i].text
+                        .replace(/\s+/g, " ")
                         .trim();
 
                 if (
-                    !referenceText
+                    /^(?:المراجع|قائمة المراجع|المصادر والمراجع|المصادر)$/i.test(
+                        value
+                    )
                 ) {
 
-                    continue;
+                    startIndex = i + 1;
+                    break;
 
                 }
 
-                results.push({
+            }
 
-                    id:
-                        `bibliography-${current.number}`,
+            if (startIndex === -1) {
 
-                    number:
-                        current.number,
+                console.warn(
+                    "لم يتم العثور على عنوان قائمة المراجع."
+                );
 
-                    text:
-                        referenceText
-
-                });
+                return [];
 
             }
 
+            const bibliography =
+                items
+                    .slice(startIndex)
+                    .map(function (item, index) {
+
+                        return {
+
+                            id:
+                                `bibliography-${index + 1}`,
+
+                            number:
+                                index + 1,
+
+                            text:
+                                item.text
+
+                        };
+
+                    });
+
             console.log(
-                "قائمة المراجع المستخرجة:",
-                results
+                "عناصر قائمة المراجع المستخرجة:",
+                bibliography
             );
 
-            return results;
+            return bibliography;
 
         }
     );
