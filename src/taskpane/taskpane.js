@@ -1838,7 +1838,8 @@ function compareUnifiedReferencesWithBibliography(
 }
 
 async function writeFinalBibliographyToDocument(
-    finalBibliography
+    finalBibliography,
+    bibliographyComparison
 ) {
 
     if (
@@ -1910,7 +1911,7 @@ async function writeFinalBibliographyToDocument(
             }
 
             // =============================================
-            // لا توجد قائمة: إنشاء قائمة جديدة
+            // لا توجد قائمة: إنشاء القائمة كاملة
             // =============================================
 
             if (
@@ -1970,17 +1971,15 @@ async function writeFinalBibliographyToDocument(
             }
 
             // =============================================
-            // توجد قائمة: إضافة الناقص فقط
+            // توجد قائمة: إضافة المراجع الناقصة فقط
             // =============================================
 
             const missing =
-                latestBibliographyComparison &&
+                bibliographyComparison &&
                 Array.isArray(
-                    latestBibliographyComparison
-                        .missingFromBibliography
+                    bibliographyComparison.missingFromBibliography
                 )
-                    ? latestBibliographyComparison
-                        .missingFromBibliography
+                    ? bibliographyComparison.missingFromBibliography
                     : [];
 
             if (
@@ -1997,15 +1996,9 @@ async function writeFinalBibliographyToDocument(
 
             }
 
-            /*
-             * نحدد آخر فقرة في المستند،
-             * ونضيف المراجع بعدها.
-             */
-
-            const lastParagraph =
-                paragraphs.items[
-                    paragraphs.items.length - 1
-                ];
+            // =============================================
+            // تحديد رقم المرجع التالي
+            // =============================================
 
             let number =
                 paragraphs.items
@@ -2020,6 +2013,15 @@ async function writeFinalBibliographyToDocument(
 
                         }
                     ).length + 1;
+
+            // =============================================
+            // آخر فقرة في المستند
+            // =============================================
+
+            const lastParagraph =
+                paragraphs.items[
+                    paragraphs.items.length - 1
+                ];
 
             let addedCount = 0;
 
@@ -27905,13 +27907,10 @@ if (referencesContent) {
                                                                     finalBibliography
                                                                 );
 
-                                                                await writeFinalBibliographyToDocument(
-                                                                    finalBibliography
-                                                                );
-
                                                                 const result =
                                                                     await writeFinalBibliographyToDocument(
-                                                                        finalBibliography
+                                                                        finalBibliography,
+                                                                        latestBibliographyComparison
                                                                     );
 
                                                                 if (result.created) {
