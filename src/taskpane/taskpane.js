@@ -1412,22 +1412,7 @@ async function readBibliographyFromCurrentDocument() {
                             .replace(/\s+/g, " ")
                             .trim();
 
-                    })
-                    .filter(Boolean);
-
-            if (!items.length) {
-                return [];
-            }
-
-            /*
-             * نبحث عن أول فقرة تبدو بداية لقائمة مراجع.
-             * أمثلة:
-             * 1. ابن حجر...
-             * 2. ابن فارس...
-             * 10. البغا...
-             */
-            const startPattern =
-                /^\s*\d+\s*[\.\-–—]\s+/;
+                    });
 
             let startIndex = -1;
 
@@ -1438,12 +1423,12 @@ async function readBibliographyFromCurrentDocument() {
             ) {
 
                 if (
-                    startPattern.test(
+                    /^(المراجع والمصادر|المصادر والمراجع)$/i.test(
                         items[i]
                     )
                 ) {
 
-                    startIndex = i;
+                    startIndex = i + 1;
                     break;
 
                 }
@@ -1455,7 +1440,7 @@ async function readBibliographyFromCurrentDocument() {
             ) {
 
                 console.warn(
-                    "لم يتم العثور على بداية قائمة المراجع."
+                    "لم يتم العثور على عنوان المراجع والمصادر."
                 );
 
                 return [];
@@ -1483,9 +1468,7 @@ async function readBibliographyFromCurrentDocument() {
                 if (match) {
 
                     if (current) {
-                        bibliography.push(
-                            current
-                        );
+                        bibliography.push(current);
                     }
 
                     current = {
@@ -1494,19 +1477,15 @@ async function readBibliographyFromCurrentDocument() {
                             `bibliography-${match[1]}`,
 
                         number:
-                            Number(
-                                match[1]
-                            ),
+                            Number(match[1]),
 
                         text:
-                            String(
-                                match[2] || ""
-                            ).trim()
+                            String(match[2] || "").trim()
 
                     };
 
                 }
-                else if (current) {
+                else if (current && line) {
 
                     current.text +=
                         " " +
@@ -1517,15 +1496,11 @@ async function readBibliographyFromCurrentDocument() {
             }
 
             if (current) {
-
-                bibliography.push(
-                    current
-                );
-
+                bibliography.push(current);
             }
 
             console.log(
-                "قائمة المراجع المستخرجة:",
+                "قائمة المراجع والمصادر المستخرجة:",
                 bibliography
             );
 
