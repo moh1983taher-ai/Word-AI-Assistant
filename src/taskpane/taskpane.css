@@ -6483,7 +6483,174 @@ body.sidebar-is-pinned .message-box {
     opacity: 0.85;
 }
 
+/* =====================================================
+   نتائج المراجع والحواشي القابلة للطي
+   ===================================================== */
 
+.reference-result-container {
+    width: 100%;
+    margin-top: 8px;
+}
+
+
+/* شريط عنوان النتيجة القابل للطي */
+
+.reference-collapsible-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    width: 100%;
+    box-sizing: border-box;
+
+    cursor: pointer;
+    user-select: none;
+
+    transition:
+        background-color 180ms ease,
+        opacity 180ms ease,
+        border-color 180ms ease;
+}
+
+
+/* السهم */
+
+.reference-collapsible-arrow {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex: 0 0 auto;
+
+    width: 24px;
+    height: 24px;
+
+    margin-inline-start: 8px;
+
+    font-size: 17px;
+    font-weight: 600;
+
+    line-height: 1;
+
+    transition:
+        transform 180ms ease,
+        opacity 180ms ease;
+}
+
+
+/* عند مرور المؤشر */
+
+.reference-collapsible-header:hover {
+    opacity: 0.86;
+}
+
+
+/* المحتوى */
+
+.reference-collapsible-content {
+    overflow: hidden;
+}
+
+
+/* المحتوى المطوي */
+
+.reference-collapsible-content.is-collapsed {
+    display: none;
+}
+
+
+/* -----------------------------------------------------
+   نتيجة تحليل المراجع
+   ----------------------------------------------------- */
+
+.references-analysis-result
+.reference-collapsible-header {
+
+    border-radius: 8px;
+
+    padding: 10px 12px;
+}
+
+
+/* -----------------------------------------------------
+   نتيجة المقارنة
+   ----------------------------------------------------- */
+
+.references-comparison-result
+.reference-collapsible-header {
+
+    border-radius: 8px;
+
+    padding: 10px 12px;
+}
+
+
+/* -----------------------------------------------------
+   نتيجة إنشاء / تحديث القائمة
+   ----------------------------------------------------- */
+
+.bibliography-build-result
+.reference-collapsible-header {
+
+    border-radius: 8px;
+
+    padding: 10px 12px;
+}
+
+
+/* -----------------------------------------------------
+   توثيق الحواشي
+   ----------------------------------------------------- */
+
+.footnote-suggestions-result
+.reference-collapsible-header {
+
+    border-radius: 8px;
+
+    padding: 10px 12px;
+}
+
+
+/* -----------------------------------------------------
+   مسافة منظمة بين الأقسام
+   ----------------------------------------------------- */
+
+.references-analysis-result,
+.references-comparison-result,
+.bibliography-build-result,
+.footnote-suggestions-result {
+
+    margin-top: 8px;
+}
+
+
+/* -----------------------------------------------------
+   تحسين السهم في RTL
+   ----------------------------------------------------- */
+
+[dir="rtl"] .reference-collapsible-arrow {
+
+    margin-inline-start: 0;
+    margin-inline-end: 8px;
+
+}
+
+
+/* -----------------------------------------------------
+   تقليل الحركة لمن يفضل ذلك
+   ----------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .reference-collapsible-header,
+    .reference-collapsible-arrow {
+
+        transition: none;
+
+    }
+
+}
 
 /* =========================================================
    END
