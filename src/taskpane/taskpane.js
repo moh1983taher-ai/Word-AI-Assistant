@@ -28567,45 +28567,96 @@ function formatFootnoteReference(
             reference
         );
 
+    let volume = "";
+    let page = "";
+    let pageRange = "";
+
+    if (occurrence) {
+
+        volume =
+            String(
+                occurrence.volume || ""
+            ).trim();
+
+        page =
+            String(
+                occurrence.page || ""
+            ).trim();
+
+        pageRange =
+            String(
+                occurrence.pageRange || ""
+            ).trim();
+
+    }
+
+    /*
+     * توافق مع البنية القديمة:
+     * إذا لم يحمل occurrence الموضع،
+     * نستخدم أول location للمرجع.
+     */
+
+    if (
+        !volume &&
+        !page &&
+        !pageRange &&
+        Array.isArray(
+            reference.locations
+        ) &&
+        reference.locations.length
+    ) {
+
+        const location =
+            reference.locations[0];
+
+        volume =
+            String(
+                location?.volume || ""
+            ).trim();
+
+        page =
+            String(
+                location?.page || ""
+            ).trim();
+
+        pageRange =
+            String(
+                location?.pageRange || ""
+            ).trim();
+
+    }
+
     let locationText = "";
 
-    const volume =
-        String(
-            occurrence?.volume ||
-            ""
-        ).trim();
-
-    const page =
-        String(
-            occurrence?.page ||
-            ""
-        ).trim();
-
-    const pageRange =
-        String(
-            occurrence?.pageRange ||
-            ""
-        ).trim();
-
-    if (volume && page) {
+    if (
+        volume &&
+        page
+    ) {
 
         locationText =
             `${volume}/${page}`;
 
     }
-    else if (volume && pageRange) {
+    else if (
+        volume &&
+        pageRange
+    ) {
 
         locationText =
             `${volume}/${pageRange}`;
 
     }
-    else if (pageRange) {
+    else if (
+        pageRange
+    ) {
 
         locationText =
             `ص ${pageRange}`;
 
     }
-    else if (page) {
+    else if (
+        page
+    ) {
 
         locationText =
             `ص ${page}`;
@@ -28729,22 +28780,32 @@ async function buildFootnoteSuggestions(
             await context.sync();
 
             footnotes.items.forEach(function (note) {
+
                 note.reference.load("text");
                 note.body.load("text");
+
             });
 
             endnotes.items.forEach(function (note) {
+
                 note.reference.load("text");
                 note.body.load("text");
+
             });
 
             await context.sync();
 
             const suggestions = [];
 
-            function addNotes(notes, source) {
+            function addNotes(
+                notes,
+                source
+            ) {
 
-                notes.forEach(function (note, index) {
+                notes.forEach(function (
+                    note,
+                    index
+                ) {
 
                     const noteNumber =
                         index + 1;
@@ -28753,57 +28814,82 @@ async function buildFootnoteSuggestions(
                         `${source}:${noteNumber}`;
 
                     const matches =
-                        unifiedFootnoteMap.get(key) || [];
+                        unifiedFootnoteMap.get(
+                            key
+                        ) || [];
 
-                    /*
-                     * الحاشية قد تحتوي عدة مراجع.
-                     */
-                    if (matches.length === 0) {
-
-                        suggestions.push({
-                            source: source,
-                            noteNumber: noteNumber,
-                            originalText:
-                                String(
-                                    note.body?.text || ""
-                                ).trim(),
-                            references: [],
-                            suggestedTexts: []
-                        });
+                    if (
+                        matches.length === 0
+                    ) {
 
                         return;
+
                     }
 
-                    suggestions.push({
+                    /*
+                     * نحافظ على البنية القديمة:
+                     *
+                     * reference
+                     * suggestedText
+                     *
+                     * ونضيف أيضًا:
+                     *
+                     * references
+                     * suggestedTexts
+                     *
+                     * لدعم الحاشية التي تحتوي عدة مراجع.
+                     */
 
-                        source: source,
+                    const references =
+                        matches.map(
+                            function (item) {
 
-                        noteNumber: noteNumber,
+                                return item.reference;
 
-                        originalText:
-                            String(
-                                note.body?.text || ""
-                            ).trim(),
+                            }
+                        );
 
-                        references:
-                            matches.map(function (item) {
-                                return {
-                                    reference:
-                                        item.reference,
-                                    occurrence:
-                                        item.occurrence
-                                };
-                            }),
-
-                        suggestedTexts:
-                            matches.map(function (item) {
+                    const suggestedTexts =
+                        matches.map(
+                            function (item) {
 
                                 return formatFootnoteReference(
                                     item.reference,
                                     item.occurrence
                                 );
 
-                            })
+                            }
+                        );
+
+                    suggestions.push({
+
+                        source:
+                            source,
+
+                        noteNumber:
+                            noteNumber,
+
+                        originalText:
+                            String(
+                                note.body?.text ||
+                                ""
+                            ).trim(),
+
+                        // البنية القديمة — للحفاظ على التوافق
+                        reference:
+                            references[0] ||
+                            null,
+
+                        suggestedText:
+                            suggestedTexts[0] ||
+                            "",
+
+                        // البنية الجديدة — للتعدد
+                        references:
+                            references,
+
+                        suggestedTexts:
+                            suggestedTexts
 
                     });
 
