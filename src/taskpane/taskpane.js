@@ -27200,6 +27200,11 @@ if (referencesContent) {
 
                             </button>
 
+                            <div
+                                id="references-analysis-container"
+                                class="reference-result-container">
+                            </div>
+
                             <button
                                 type="button"
                                 id="compare-references-btn"
@@ -27208,6 +27213,12 @@ if (referencesContent) {
                                 مقارنة قائمة المراجع
 
                             </button>
+
+                            <div
+                                id="references-comparison-container"
+                                class="reference-result-container">
+                            </div>
+
                             <button
                                 type="button"
                                 id="build-bibliography-btn"
@@ -27216,6 +27227,16 @@ if (referencesContent) {
                                 إنشاء/تحديث قائمة المراجع
 
                             </button>
+
+                            <div
+                                id="bibliography-build-container"
+                                class="reference-result-container">
+                            </div>
+
+                            <div
+                                id="footnote-suggestions-container"
+                                class="reference-result-container">
+                            </div>
                             `;
 
 
@@ -27327,6 +27348,118 @@ if (referencesContent) {
                                 );
 
                         }
+
+                        (function bindReferenceResultCollapse() {
+
+                            if (
+                                referencesSourceWorkspace.dataset.referenceCollapseBound ===
+                                "true"
+                            ) {
+                                return;
+                            }
+
+                            referencesSourceWorkspace.dataset.referenceCollapseBound =
+                                "true";
+
+                            if (
+                                !document.getElementById(
+                                    "reference-result-collapse-styles"
+                                )
+                            ) {
+
+                                const style =
+                                    document.createElement("style");
+
+                                style.id =
+                                    "reference-result-collapse-styles";
+
+                                style.textContent = `
+                                    .reference-result-container {
+                                        margin-top: 8px;
+                                    }
+
+                                    .reference-collapsible-header {
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: space-between;
+                                        gap: 10px;
+                                        cursor: pointer;
+                                        user-select: none;
+                                    }
+
+                                    .reference-collapsible-header
+                                    .reference-collapsible-arrow {
+                                        flex: 0 0 auto;
+                                        font-size: 16px;
+                                        line-height: 1;
+                                        margin-inline-start: 8px;
+                                    }
+
+                                    .reference-collapsible-content.is-collapsed {
+                                        display: none;
+                                    }
+
+                                    .reference-collapsible-header:hover {
+                                        opacity: .88;
+                                    }
+                                `;
+
+                                document.head.appendChild(style);
+                            }
+
+                            referencesSourceWorkspace.addEventListener(
+                                "click",
+                                function (e) {
+
+                                    const header =
+                                        e.target.closest(
+                                            "[data-reference-collapse-toggle]"
+                                        );
+
+                                    if (
+                                        !header ||
+                                        !referencesSourceWorkspace.contains(
+                                            header
+                                        )
+                                    ) {
+                                        return;
+                                    }
+
+                                    const targetId =
+                                        header.getAttribute(
+                                            "data-reference-collapse-target"
+                                        );
+
+                                    const content =
+                                        document.getElementById(
+                                            targetId
+                                        );
+
+                                    const arrow =
+                                        header.querySelector(
+                                            ".reference-collapsible-arrow"
+                                        );
+
+                                    if (!content) {
+                                        return;
+                                    }
+
+                                    const collapsed =
+                                        content.classList.toggle(
+                                            "is-collapsed"
+                                        );
+
+                                    if (arrow) {
+                                        arrow.textContent =
+                                            collapsed
+                                                ? "▸"
+                                                : "▾";
+                                    }
+
+                                }
+                            );
+
+                        })();
 
                         // =====================================================
                         // تنفيذ التحليل
@@ -27890,142 +28023,160 @@ if (referencesContent) {
                                     // 10. عرض النتيجة
                                     // =================================================
 
-                                    referencesSourceWorkspace.insertAdjacentHTML(
-                                        "beforeend",
-                                        `
-                                        <div class="references-analysis-result">
+                                    const referencesAnalysisContainer =
+                                        document.getElementById(
+                                            "references-analysis-container"
+                                        );
 
-                                            <div class="references-analysis-status success">
+                                    if (referencesAnalysisContainer) {
 
-                                                ✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي
+                                        referencesAnalysisContainer.innerHTML =
+                                            `
+                                            <div class="references-analysis-result">
+
+                                                <div
+                                                    class="references-analysis-status success reference-collapsible-header"
+                                                    data-reference-collapse-toggle
+                                                    data-reference-collapse-target="references-analysis-content">
+
+                                                    <span>
+                                                        ✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي
+                                                    </span>
+
+                                                    <span class="reference-collapsible-arrow">
+                                                        ▾
+                                                    </span>
+
+                                                </div>
+
+                                                <div
+                                                    id="references-analysis-content"
+                                                    class="references-analysis-info reference-collapsible-content">
+
+                                                    <div>
+                                                        المتن:
+                                                        <strong>
+                                                            ${mainText.length}
+                                                        </strong>
+                                                        حرف
+                                                    </div>
+
+                                                    <div>
+                                                        الحواشي السفلية:
+                                                        <strong>
+                                                            ${footnotes.length}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        الحواشي الختامية:
+                                                        <strong>
+                                                            ${endnotes.length}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        المواد المرسلة للتحليل:
+                                                        <strong>
+                                                            ${processedReferences.length}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        المراجع:
+                                                        <strong>
+                                                            ${referenceCount}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        مواد تحتوي عدة مراجع:
+                                                        <strong>
+                                                            ${multipleReferenceCount}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        المصدر نفسه:
+                                                        <strong>
+                                                            ${ibidCount}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        إحالات داخلية:
+                                                        <strong>
+                                                            ${internalReferenceCount}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        تخريج أحاديث:
+                                                        <strong>
+                                                            ${hadithCount}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        شرح فقط:
+                                                        <strong>
+                                                            ${explanatoryCount}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        شرح + مرجع:
+                                                        <strong>
+                                                            ${mixedCount}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        تحتاج مراجعة:
+                                                        <strong>
+                                                            ${reviewCount}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        المراجع الموحدة:
+                                                        <strong>
+                                                            ${finalReferenceResults.length}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div>
+                                                        مرات الاستشهاد:
+                                                        <strong>
+                                                            ${totalOccurrences}
+                                                        </strong>
+                                                    </div>
+
+                                                    <div class="references-final-results">
+
+                                                        <div class="references-final-results-title">
+
+                                                            المراجع الموحدة
+                                                            <strong>
+                                                                ${finalReferenceResults.length}
+                                                            </strong>
+
+                                                        </div>
+
+                                                        <div class="references-final-list">
+
+                                                            ${finalReferenceHTML}
+
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
 
                                             </div>
+                                            `;
 
-                                            <div class="references-analysis-info">
-
-                                                <div>
-                                                    المتن:
-                                                    <strong>
-                                                        ${mainText.length}
-                                                    </strong>
-                                                    حرف
-                                                </div>
-
-                                                <div>
-                                                    الحواشي السفلية:
-                                                    <strong>
-                                                        ${footnotes.length}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    الحواشي الختامية:
-                                                    <strong>
-                                                        ${endnotes.length}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    المواد المرسلة للتحليل:
-                                                    <strong>
-                                                        ${processedReferences.length}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    المراجع:
-                                                    <strong>
-                                                        ${referenceCount}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    مواد تحتوي عدة مراجع:
-                                                    <strong>
-                                                        ${multipleReferenceCount}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    المصدر نفسه:
-                                                    <strong>
-                                                        ${ibidCount}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    إحالات داخلية:
-                                                    <strong>
-                                                        ${internalReferenceCount}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    تخريج أحاديث:
-                                                    <strong>
-                                                        ${hadithCount}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    شرح فقط:
-                                                    <strong>
-                                                        ${explanatoryCount}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    شرح + مرجع:
-                                                    <strong>
-                                                        ${mixedCount}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    تحتاج مراجعة:
-                                                    <strong>
-                                                        ${reviewCount}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    المراجع الموحدة:
-                                                    <strong>
-                                                        ${finalReferenceResults.length}
-                                                    </strong>
-                                                </div>
-
-                                                <div>
-                                                    مرات الاستشهاد:
-                                                    <strong>
-                                                        ${totalOccurrences}
-                                                    </strong>
-                                                </div>
-
-                                            </div>
-
-                                            <div class="references-final-results">
-
-                                                <div class="references-final-results-title">
-
-                                                    المراجع الموحدة
-                                                    <strong>
-                                                        ${finalReferenceResults.length}
-                                                    </strong>
-
-                                                </div>
-
-                                                <div class="references-final-list">
-
-                                                    ${finalReferenceHTML}
-
-                                                </div>
-
-                                            </div>
-
-                                        </div>
-                                        `
-                                    );
+                                    }
 
                                     const unifiedFootnoteMap =
                                                 buildUnifiedFootnoteMap(
@@ -28087,46 +28238,74 @@ if (referencesContent) {
                                                     })
                                                     .join("");
 
-                                            referencesSourceWorkspace.insertAdjacentHTML(
-                                                "beforeend",
-                                                `
-                                                <div class="footnote-suggestions-result">
+                                            const footnoteSuggestionsContainer =
+                                                document.getElementById(
+                                                    "footnote-suggestions-container"
+                                                );
 
-                                                    <div class="footnote-suggestions-title">
-                                                        توثيق الحواشي المقترح
-                                                        <strong>
-                                                            ${
-                                                                footnoteSuggestions.filter(
-                                                                    function (item) {
-                                                                        return item.reference;
+                                            if (footnoteSuggestionsContainer) {
+
+                                                footnoteSuggestionsContainer.innerHTML =
+                                                    `
+                                                    <div class="footnote-suggestions-result">
+
+                                                        <div
+                                                            class="footnote-suggestions-title reference-collapsible-header"
+                                                            data-reference-collapse-toggle
+                                                            data-reference-collapse-target="footnote-suggestions-content">
+
+                                                            <span>
+
+                                                                توثيق الحواشي المقترح
+
+                                                                <strong>
+                                                                    ${
+                                                                        footnoteSuggestions.filter(
+                                                                            function (item) {
+                                                                                return item.reference;
+                                                                            }
+                                                                        ).length
                                                                     }
-                                                                ).length
-                                                            }
-                                                        </strong>
+                                                                </strong>
+
+                                                            </span>
+
+                                                            <span class="reference-collapsible-arrow">
+                                                                ▾
+                                                            </span>
+
+                                                        </div>
+
+                                                        <div
+                                                            id="footnote-suggestions-content"
+                                                            class="footnote-suggestions-list reference-collapsible-content">
+
+                                                            ${footnoteSuggestionHTML}
+
+                                                        </div>
+
+                                                        ${
+                                                            footnoteSuggestions.some(
+                                                                function (item) {
+                                                                    return item.reference;
+                                                                }
+                                                            )
+                                                                ? `
+                                                                    <button
+                                                                        type="button"
+                                                                        id="apply-footnote-suggestions-btn"
+                                                                        class="apply-footnote-suggestions-btn">
+
+                                                                        تطبيق التوثيق على الحواشي
+
+                                                                    </button>
+                                                                `
+                                                                : ""
+                                                        }
+
                                                     </div>
-
-                                                    <div class="footnote-suggestions-list">
-                                                        ${footnoteSuggestionHTML}
-                                                    </div>
-
-                                                    ${
-                                                        footnoteSuggestions.some(function (item) {
-                                                            return item.reference;
-                                                        })
-                                                            ? `
-                                                                <button
-                                                                    type="button"
-                                                                    id="apply-footnote-suggestions-btn"
-                                                                    class="apply-footnote-suggestions-btn">
-                                                                    تطبيق التوثيق على الحواشي
-                                                                </button>
-                                                            `
-                                                            : ""
-                                                    }
-
-                                                </div>
-                                                `
-                                            );
+                                                    `;
+                                            }
 
                                     // =================================================
                                     // 11. إنهاء التحليل
@@ -28348,6 +28527,70 @@ if (referencesContent) {
 
                                                                 }
 
+                                                                const bibliographyBuildContainer =
+                                                                    document.getElementById(
+                                                                        "bibliography-build-container"
+                                                                    );
+
+                                                                if (bibliographyBuildContainer) {
+
+                                                                    let bibliographyStatus = "";
+
+                                                                    if (result.created) {
+
+                                                                        bibliographyStatus =
+                                                                            `✓ تم إنشاء قائمة المراجع (${result.added})`;
+
+                                                                    }
+                                                                    else if (result.added > 0) {
+
+                                                                        bibliographyStatus =
+                                                                            `✓ تم تحديث قائمة المراجع (+${result.added})`;
+
+                                                                    }
+                                                                    else {
+
+                                                                        bibliographyStatus =
+                                                                            "✓ قائمة المراجع مكتملة";
+
+                                                                    }
+
+                                                                    bibliographyBuildContainer.innerHTML =
+                                                                        `
+                                                                        <div class="bibliography-build-result">
+
+                                                                            <div
+                                                                                class="bibliography-build-title reference-collapsible-header"
+                                                                                data-reference-collapse-toggle
+                                                                                data-reference-collapse-target="bibliography-build-content">
+
+                                                                                <span>
+                                                                                    ${bibliographyStatus}
+                                                                                </span>
+
+                                                                                <span class="reference-collapsible-arrow">
+                                                                                    ▾
+                                                                                </span>
+
+                                                                            </div>
+
+                                                                            <div
+                                                                                id="bibliography-build-content"
+                                                                                class="reference-collapsible-content">
+
+                                                                                <div class="references-analysis-info">
+
+                                                                                    تم تنفيذ العملية بنجاح.
+
+                                                                                </div>
+
+                                                                            </div>
+
+                                                                        </div>
+                                                                        `;
+
+                                                                }
+
                                                             };
 
                                                     }
@@ -28362,160 +28605,185 @@ if (referencesContent) {
                                                     `
                                                     <div class="references-comparison-result">
 
-                                                        <div class="references-comparison-title">
-                                                            مقارنة قائمة المراجع
-                                                        </div>
+                                                        <div
+                                                            class="references-comparison-title reference-collapsible-header"
+                                                            data-reference-collapse-toggle
+                                                            data-reference-collapse-target="references-comparison-content">
 
-                                                        <div class="references-comparison-summary">
+                                                            <span>
+                                                                ✓ تمت المقارنة
+                                                            </span>
 
-                                                            <div>
-                                                                المراجع الموحدة:
-                                                                <strong>
-                                                                    ${comparison.totalUnifiedReferences}
-                                                                </strong>
-                                                            </div>
-
-                                                            <div>
-                                                                عناصر القائمة:
-                                                                <strong>
-                                                                    ${comparison.totalBibliographyEntries}
-                                                                </strong>
-                                                            </div>
-
-                                                            <div>
-                                                                المطابق:
-                                                                <strong>
-                                                                    ${comparison.matchedCount}
-                                                                </strong>
-                                                            </div>
-
-                                                            <div>
-                                                                غير موجود في القائمة:
-                                                                <strong>
-                                                                    ${comparison.missingFromBibliography.length}
-                                                                </strong>
-                                                            </div>
-
-                                                            <div>
-                                                                موجود دون استشهاد:
-                                                                <strong>
-                                                                    ${comparison.unusedBibliography.length}
-                                                                </strong>
-                                                            </div>
+                                                            <span class="reference-collapsible-arrow">
+                                                                ▾
+                                                            </span>
 
                                                         </div>
 
-                                                        ${
-                                                            comparison.missingFromBibliography.length
-                                                                ? `
-                                                                    <div class="references-comparison-section">
+                                                        <div
+                                                            id="references-comparison-content"
+                                                            class="reference-collapsible-content">
 
-                                                                        <div class="references-comparison-section-title">
-                                                                            المراجع المستشهد بها وغير الموجودة في القائمة
-                                                                            <strong>
-                                                                                ${comparison.missingFromBibliography.length}
-                                                                            </strong>
+                                                            <div class="references-comparison-summary">
+
+                                                                <div>
+                                                                    المراجع الموحدة:
+                                                                    <strong>
+                                                                        ${comparison.totalUnifiedReferences}
+                                                                    </strong>
+                                                                </div>
+
+                                                                <div>
+                                                                    عناصر القائمة:
+                                                                    <strong>
+                                                                        ${comparison.totalBibliographyEntries}
+                                                                    </strong>
+                                                                </div>
+
+                                                                <div>
+                                                                    المطابق:
+                                                                    <strong>
+                                                                        ${comparison.matchedCount}
+                                                                    </strong>
+                                                                </div>
+
+                                                                <div>
+                                                                    غير موجود في القائمة:
+                                                                    <strong>
+                                                                        ${comparison.missingFromBibliography.length}
+                                                                    </strong>
+                                                                </div>
+
+                                                                <div>
+                                                                    موجود دون استشهاد:
+                                                                    <strong>
+                                                                        ${comparison.unusedBibliography.length}
+                                                                    </strong>
+                                                                </div>
+
+                                                            </div>
+
+                                                            ${
+                                                                comparison.missingFromBibliography.length
+                                                                    ? `
+                                                                        <div class="references-comparison-section">
+
+                                                                            <div class="references-comparison-section-title">
+
+                                                                                المراجع المستشهد بها وغير الموجودة في القائمة
+
+                                                                                <strong>
+                                                                                    ${comparison.missingFromBibliography.length}
+                                                                                </strong>
+
+                                                                            </div>
+
+                                                                            <div class="references-comparison-list">
+
+                                                                                ${comparison.missingFromBibliography
+                                                                                    .map(
+                                                                                        function (
+                                                                                            reference,
+                                                                                            index
+                                                                                        ) {
+
+                                                                                            return `
+                                                                                                <div class="references-comparison-item">
+
+                                                                                                    <span class="references-comparison-number">
+                                                                                                        ${index + 1}
+                                                                                                    </span>
+
+                                                                                                    <span class="references-comparison-text">
+
+                                                                                                        <strong>
+                                                                                                            ${escapeReferenceHTML(
+                                                                                                                reference?.author ||
+                                                                                                                "مؤلف غير محدد"
+                                                                                                            )}
+                                                                                                        </strong>
+
+                                                                                                        ${
+                                                                                                            reference?.title
+                                                                                                                ? `
+                                                                                                                    —
+                                                                                                                    ${escapeReferenceHTML(
+                                                                                                                        reference.title
+                                                                                                                    )}
+                                                                                                                `
+                                                                                                                : ""
+                                                                                                        }
+
+                                                                                                    </span>
+
+                                                                                                </div>
+                                                                                            `;
+
+                                                                                        }
+                                                                                    )
+                                                                                    .join("")}
+
+                                                                            </div>
+
                                                                         </div>
+                                                                    `
+                                                                    : ""
+                                                            }
 
-                                                                        <div class="references-comparison-list">
+                                                            ${
+                                                                comparison.unusedBibliography.length
+                                                                    ? `
+                                                                        <div class="references-comparison-section">
 
-                                                                            ${comparison.missingFromBibliography
-                                                                                .map(
-                                                                                    function (
-                                                                                        reference,
-                                                                                        index
-                                                                                    ) {
+                                                                            <div class="references-comparison-section-title">
 
-                                                                                        return `
-                                                                                            <div class="references-comparison-item">
+                                                                                مراجع موجودة في القائمة ولم يُعثر لها على استشهاد
 
-                                                                                                <span class="references-comparison-number">
-                                                                                                    ${index + 1}
-                                                                                                </span>
+                                                                                <strong>
+                                                                                    ${comparison.unusedBibliography.length}
+                                                                                </strong>
 
-                                                                                                <span class="references-comparison-text">
+                                                                            </div>
 
-                                                                                                    <strong>
+                                                                            <div class="references-comparison-list">
+
+                                                                                ${comparison.unusedBibliography
+                                                                                    .map(
+                                                                                        function (
+                                                                                            item,
+                                                                                            index
+                                                                                        ) {
+
+                                                                                            return `
+                                                                                                <div class="references-comparison-item">
+
+                                                                                                    <span class="references-comparison-number">
+                                                                                                        ${index + 1}
+                                                                                                    </span>
+
+                                                                                                    <span class="references-comparison-text">
+
                                                                                                         ${escapeReferenceHTML(
-                                                                                                            reference?.author ||
-                                                                                                            "مؤلف غير محدد"
+                                                                                                            item.text
                                                                                                         )}
-                                                                                                    </strong>
 
-                                                                                                    ${
-                                                                                                        reference?.title
-                                                                                                            ? `
-                                                                                                                —
-                                                                                                                ${escapeReferenceHTML(
-                                                                                                                    reference.title
-                                                                                                                )}
-                                                                                                            `
-                                                                                                            : ""
-                                                                                                    }
+                                                                                                    </span>
 
-                                                                                                </span>
+                                                                                                </div>
+                                                                                            `;
 
-                                                                                            </div>
-                                                                                        `;
+                                                                                        }
+                                                                                    )
+                                                                                    .join("")}
 
-                                                                                    }
-                                                                                )
-                                                                                .join("")}
+                                                                            </div>
 
                                                                         </div>
+                                                                    `
+                                                                    : ""
+                                                            }
 
-                                                                    </div>
-                                                                `
-                                                                : ""
-                                                        }
-
-                                                        ${
-                                                            comparison.unusedBibliography.length
-                                                                ? `
-                                                                    <div class="references-comparison-section">
-
-                                                                        <div class="references-comparison-section-title">
-                                                                            مراجع موجودة في القائمة ولم يُعثر لها على استشهاد
-                                                                            <strong>
-                                                                                ${comparison.unusedBibliography.length}
-                                                                            </strong>
-                                                                        </div>
-
-                                                                        <div class="references-comparison-list">
-
-                                                                            ${comparison.unusedBibliography
-                                                                                .map(
-                                                                                    function (
-                                                                                        item,
-                                                                                        index
-                                                                                    ) {
-
-                                                                                        return `
-                                                                                            <div class="references-comparison-item">
-
-                                                                                                <span class="references-comparison-number">
-                                                                                                    ${index + 1}
-                                                                                                </span>
-
-                                                                                                <span class="references-comparison-text">
-                                                                                                    ${escapeReferenceHTML(
-                                                                                                        item.text
-                                                                                                    )}
-                                                                                                </span>
-
-                                                                                            </div>
-                                                                                        `;
-
-                                                                                    }
-                                                                                )
-                                                                                .join("")}
-
-                                                                        </div>
-
-                                                                    </div>
-                                                                `
-                                                                : ""
-                                                        }
+                                                        </div>
 
                                                     </div>
                                                     `
