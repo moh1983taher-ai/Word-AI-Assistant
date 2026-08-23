@@ -1415,6 +1415,9 @@ async function readReferenceSources() {
 
                             return {
 
+                                id:
+                                    `footnote-${index + 1}`,
+
                                 number:
                                     index + 1,
 
@@ -1446,6 +1449,9 @@ async function readReferenceSources() {
                         ) {
 
                             return {
+
+                                id:
+                                    `endnote-${index + 1}`,
 
                                 number:
                                     index + 1,
@@ -2193,8 +2199,11 @@ function processReferenceSources(referenceSources) {
         !referenceSources ||
         typeof referenceSources !== "object"
     ) {
+
         return records;
+
     }
+
 
     // =====================================================
     // أدوات التنظيف الأساسية
@@ -2202,39 +2211,41 @@ function processReferenceSources(referenceSources) {
 
     function cleanRawText(value) {
 
-        let text = String(value || "");
+        let text =
+            String(
+                value || ""
+            );
 
-        // إزالة رموز التحكم غير المرغوبة
         text = text.replace(
             /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,
             " "
         );
 
-        // إزالة رمز الاستبدال
         text = text.replace(
             /\uFFFD/g,
             " "
         );
 
-        // إزالة الرمز الغريب الذي قد يظهر من Word
         text = text.replace(
             /\u0002/g,
             " "
         );
 
-        // توحيد الأسطر والمسافات
         text = text.replace(
             /\s+/g,
             " "
         );
 
         return text.trim();
+
     }
 
 
     function normalizeArabicDigits(value) {
 
-        return String(value || "")
+        return String(
+            value || ""
+        )
             .replace(
                 /[٠-٩]/g,
                 function (digit) {
@@ -2254,47 +2265,56 @@ function processReferenceSources(referenceSources) {
     function normalizeReferenceText(value) {
 
         let text =
-            cleanRawText(value);
+            cleanRawText(
+                value
+            );
 
         text =
-            normalizeArabicDigits(text);
+            normalizeArabicDigits(
+                text
+            );
 
-        // توحيد بعض المسافات حول علامات الترقيم
         text = text.replace(
-            /\s*([،,:؛])\s*/g,
+            /\s\*([،,:؛])\s\*/g,
             "$1 "
         );
 
         text = text.replace(
-            /\s*\/\s*/g,
+            /\s\***\\/**\s\*/g,
             "/"
         );
 
         text = text.replace(
-            /\s*([–—-])\s*/g,
+            /\s\*([–—-])\s\*/g,
             "$1"
         );
 
-        text =
-            text.trim();
+        return text.trim();
 
-        return text;
     }
 
 
     // =====================================================
     // إضافة مادة خام واحدة
     //
-    // لا نحكم هنا هل هي:
-    // مرجع / شرح / إحالة / حديث / مصدر نفسه
+    // recordId اختياري.
     //
-    // الذكاء الاصطناعي هو الذي سيقرر ذلك.
+    // إذا كانت المادة حاشية أو حاشية ختامية،
+    // نستخدم الهوية الثابتة القادمة من Word:
+    //
+    // footnote-1
+    // footnote-2
+    // endnote-1
+    // endnote-2
+    //
+    // أما مواد المتن فتبقى على النظام السابق.
     // =====================================================
 
     function addRawMaterial(
         source,
         text,
-        metadata = {}
+        metadata = {},
+        recordId = ""
     ) {
 
         const cleanedText =
@@ -2303,13 +2323,18 @@ function processReferenceSources(referenceSources) {
             );
 
         if (!cleanedText) {
+
             return;
+
         }
 
         records.push({
 
             id:
-                `reference-${records.length + 1}`,
+                String(
+                    recordId ||
+                    `reference-${records.length + 1}`
+                ),
 
             source:
                 source,
@@ -2337,9 +2362,6 @@ function processReferenceSources(referenceSources) {
 
     // =====================================================
     // 1. المتن
-    //
-    // نلتقط فقط المواضع التي تبدو كإحالات،
-    // ونترك الحكم النهائي للذكاء الاصطناعي.
     // =====================================================
 
     const mainText =
@@ -2350,17 +2372,9 @@ function processReferenceSources(referenceSources) {
 
     if (mainText) {
 
-        // -----------------------------------------------
-        // الإحالات الموجودة بين الأقواس
-        //
-        // (الخصائص، 1/33-34)
-        // （الكتاب، 3/22）
-        // [الصحاح، 2/619]
-        // -----------------------------------------------
-
         const parentheticalPatterns = [
 
-            /[([]([^()[\]\n]{2,400})[)\]]/g,
+            /[([]\([^()[**\\]**\n]{2,400})[)**\\]**]/g,
 
             /（([^（）\n]{2,400})）/g,
 
@@ -2389,7 +2403,9 @@ function processReferenceSources(referenceSources) {
                         ).trim();
 
                     if (!value) {
+
                         continue;
+
                     }
 
                     addRawMaterial(
@@ -2410,19 +2426,8 @@ function processReferenceSources(referenceSources) {
         );
 
 
-        // -----------------------------------------------
-        // الإحالات اللفظية
-        //
-        // انظر:
-        // ينظر:
-        // راجع:
-        // نقلاً عن:
-        // نقلًا عن:
-        // المصدر:
-        // -----------------------------------------------
-
         const verbalPattern =
-            /(?:انظر|ينظر|راجع|المصدر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,400})/gi;
+            /(?:انظر|ينظر|راجع|المصدر|نقلاً عن|نقلًا عن)\s\*[:：]?\s\*([^.\n؛]{3,400})/gi;
 
 
         let verbalMatch;
@@ -2442,7 +2447,9 @@ function processReferenceSources(referenceSources) {
                 ).trim();
 
             if (!fullText) {
+
                 continue;
+
             }
 
             addRawMaterial(
@@ -2465,16 +2472,10 @@ function processReferenceSources(referenceSources) {
     // =====================================================
     // 2. الحواشي السفلية
     //
-    // الحاشية نفسها هي وحدة التحليل.
+    // الحاشية نفسها وحدة التحليل.
     //
-    // لا نهتم:
-    // ( )
-    // [ ]
-    // { }
-    // 【 】
-    // أو أي علامة تحيط بالنص.
-    //
-    // نأخذ نص الحاشية كاملًا كما أعاده Word.
+    // الأهم:
+    // نمرر note.id كهوية المادة.
     // =====================================================
 
     if (
@@ -2494,7 +2495,6 @@ function processReferenceSources(referenceSources) {
                     note?.text ||
                     "";
 
-
                 addRawMaterial(
                     "footnote",
                     noteText,
@@ -2509,7 +2509,11 @@ function processReferenceSources(referenceSources) {
 
                         extraction:
                             "whole-footnote"
-                    }
+                    },
+
+                    note?.id ||
+                    `footnote-${index + 1}`
+
                 );
 
             }
@@ -2521,9 +2525,7 @@ function processReferenceSources(referenceSources) {
     // =====================================================
     // 3. الحواشي الختامية
     //
-    // نفس الفكرة تمامًا:
-    // الحاشية وحدة واحدة،
-    // والذكاء الاصطناعي هو الذي يقرر ما بداخلها.
+    // نستخدم الهوية الداخلية نفسها.
     // =====================================================
 
     if (
@@ -2543,7 +2545,6 @@ function processReferenceSources(referenceSources) {
                     note?.text ||
                     "";
 
-
                 addRawMaterial(
                     "endnote",
                     noteText,
@@ -2558,7 +2559,11 @@ function processReferenceSources(referenceSources) {
 
                         extraction:
                             "whole-endnote"
-                    }
+                    },
+
+                    note?.id ||
+                    `endnote-${index + 1}`
+
                 );
 
             }
@@ -2570,12 +2575,11 @@ function processReferenceSources(referenceSources) {
     // =====================================================
     // 4. إزالة التكرار التقني فقط
     //
-    // لا ندمج مراجع متشابهة هنا.
-    // لا نحذف "المصدر نفسه".
-    // لا نحذف الإحالات.
+    // لا نستخدم noteNumber كهوية للحاشية؛
+    // لأن الرقم الظاهر قد يعاد ترقيمه في Word.
     //
-    // نحذف فقط نفس المادة المكررة تقنيًا داخل
-    // نفس المصدر ونفس رقم الحاشية.
+    // الحواشي تعتمد على id الداخلي.
+    // مواد المتن تعتمد على المفتاح التقني السابق.
     // =====================================================
 
     const seen =
@@ -2587,18 +2591,31 @@ function processReferenceSources(referenceSources) {
             record
         ) {
 
-            const key =
-                [
-                    record.source,
+            let key = "";
 
-                    record.noteNumber ||
-                        "",
 
-                    record.cleanedText
+            if (
+                record.source === "footnote" ||
+                record.source === "endnote"
+            ) {
 
-                ].join(
-                    "|"
-                );
+                key =
+                    [
+                        record.source,
+                        record.id
+                    ].join("|");
+
+            }
+            else {
+
+                key =
+                    [
+                        record.source,
+                        record.position ?? "",
+                        record.cleanedText
+                    ].join("|");
+
+            }
 
 
             if (
@@ -28295,35 +28312,6 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
         return map;
     }
 
-    function normalizeSource(source) {
-
-        const value =
-            String(source || "")
-                .trim()
-                .toLowerCase();
-
-        if (
-            value === "footnote" ||
-            value === "footnotes" ||
-            value === "حاشية" ||
-            value === "حاشية سفلية" ||
-            value === "الحواشي السفلية"
-        ) {
-            return "footnote";
-        }
-
-        if (
-            value === "endnote" ||
-            value === "endnotes" ||
-            value === "حاشية ختامية" ||
-            value === "الحواشي الختامية"
-        ) {
-            return "endnote";
-        }
-
-        return value;
-    }
-
     unifiedReferences.forEach(function (reference) {
 
         const occurrences =
@@ -28333,34 +28321,37 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
 
         occurrences.forEach(function (occurrence) {
 
-            const noteNumber =
-                Number(
-                    occurrence?.noteNumber
-                );
+            /*
+             * المعرّف الداخلي للحاشية هو مفتاح الربط الحقيقي.
+             *
+             * مثال:
+             * footnote-1
+             * footnote-2
+             * endnote-1
+             * endnote-2
+             *
+             * ولا نعتمد على رقم الحاشية الظاهر في Word.
+             */
 
-            if (
-                !Number.isFinite(noteNumber)
-            ) {
+            const materialId =
+                String(
+                    occurrence?.materialId ||
+                    ""
+                ).trim();
+
+            if (!materialId) {
                 return;
             }
 
-            const source =
-                normalizeSource(
-                    occurrence?.source
+            if (!map.has(materialId)) {
+                map.set(
+                    materialId,
+                    []
                 );
-
-            if (!source) {
-                return;
             }
 
-            const key =
-                `${source}:${noteNumber}`;
+            map.get(materialId).push({
 
-            if (!map.has(key)) {
-                map.set(key, []);
-            }
-
-            map.get(key).push({
                 reference:
                     reference,
 
@@ -28368,6 +28359,7 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
                     occurrence,
 
                 location: {
+
                     volume:
                         String(
                             occurrence?.volume ||
@@ -28385,7 +28377,9 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
                             occurrence?.pageRange ||
                             ""
                         ).trim()
+
                 }
+
             });
 
         });
@@ -28393,11 +28387,14 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
     });
 
     console.log(
-        "مفاتيح خريطة الحواشي:",
-        Array.from(map.keys())
+        "مفاتيح خريطة الحواشي الداخلية:",
+        Array.from(
+            map.keys()
+        )
     );
 
     return map;
+
 }
 
 async function buildFootnoteSuggestions(
@@ -28452,12 +28449,28 @@ async function buildFootnoteSuggestions(
                     const noteNumber =
                         index + 1;
 
-                    const key =
-                        `${source}:${noteNumber}`;
+                    /*
+                     * نستخدم المعرّف الداخلي نفسه الذي
+                     * أنشأناه في readReferenceSources()
+                     * وحافظت عليه processReferenceSources().
+                     *
+                     * footnote-1
+                     * footnote-2
+                     * ...
+                     *
+                     * endnote-1
+                     * endnote-2
+                     * ...
+                     *
+                     * ولا نعتمد على الرقم الظاهر في Word.
+                     */
+
+                    const materialId =
+                        `${source}-${index + 1}`;
 
                     const matches =
                         unifiedFootnoteMap.get(
-                            key
+                            materialId
                         ) || [];
 
                     if (
@@ -28497,7 +28510,8 @@ async function buildFootnoteSuggestions(
 
                                 return formatFootnoteReference(
                                     item.reference,
-                                    item.occurrence
+                                    item.occurrence,
+                                    item.location
                                 );
 
                             }
@@ -28510,6 +28524,9 @@ async function buildFootnoteSuggestions(
 
                         noteNumber:
                             noteNumber,
+
+                        materialId:
+                            materialId,
 
                         originalText:
                             String(
