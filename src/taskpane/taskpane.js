@@ -28523,124 +28523,6 @@ async function buildFootnoteSuggestions(
 
             const suggestions = [];
 
-            function normalizeSource(source) {
-
-                const value =
-                    String(
-                        source || ""
-                    )
-                        .trim()
-                        .toLowerCase();
-
-                if (
-                    value === "footnote" ||
-                    value === "footnotes" ||
-                    value === "حاشية" ||
-                    value === "حاشية سفلية" ||
-                    value === "الحواشي السفلية"
-                ) {
-
-                    return "footnote";
-
-                }
-
-                if (
-                    value === "endnote" ||
-                    value === "endnotes" ||
-                    value === "حاشية ختامية" ||
-                    value === "الحواشي الختامية"
-                ) {
-
-                    return "endnote";
-
-                }
-
-                return value;
-
-            }
-
-
-            function findFallbackMatches(
-                source,
-                noteNumber
-            ) {
-
-                const normalizedSource =
-                    normalizeSource(
-                        source
-                    );
-
-                const result = [];
-
-                if (
-                    !Array.isArray(
-                        unifiedFootnoteMap
-                    )
-                ) {
-                    return result;
-                }
-
-                unifiedFootnoteMap.forEach(
-                    function (
-                        items
-                    ) {
-
-                        if (
-                            !Array.isArray(
-                                items
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-                        items.forEach(
-                            function (
-                                item
-                            ) {
-
-                                const occurrence =
-                                    item?.occurrence ||
-                                    {};
-
-                                const itemSource =
-                                    normalizeSource(
-                                        occurrence.source
-                                    );
-
-                                const itemNoteNumber =
-                                    Number(
-                                        occurrence.noteNumber
-                                    );
-
-                                if (
-                                    itemSource ===
-                                        normalizedSource &&
-                                    Number.isFinite(
-                                        itemNoteNumber
-                                    ) &&
-                                    itemNoteNumber ===
-                                        noteNumber
-                                ) {
-
-                                    result.push(
-                                        item
-                                    );
-
-                                }
-
-                            }
-                        );
-
-                    }
-                );
-
-                return result;
-
-            }
-
-
             function addNotes(
                 notes,
                 source
@@ -28655,57 +28537,29 @@ async function buildFootnoteSuggestions(
                         index + 1;
 
                     /*
-                     * المعرّف الداخلي الصحيح.
+                     * نستخدم المعرّف الداخلي نفسه الذي
+                     * أنشأناه في readReferenceSources()
+                     * وحافظت عليه processReferenceSources().
+                     *
+                     * footnote-1
+                     * footnote-2
+                     * ...
+                     *
+                     * endnote-1
+                     * endnote-2
+                     * ...
+                     *
+                     * ولا نعتمد على الرقم الظاهر في Word.
                      */
+
                     const materialId =
                         `${source}-${index + 1}`;
 
-
-                    /*
-                     * المسار الأساسي:
-                     * البحث بالهوية الداخلية.
-                     */
-                    let matches =
+                    const matches =
                         unifiedFootnoteMap.get(
                             materialId
                         ) || [];
 
-
-                    /*
-                     * الحواشي السفلية:
-                     *
-                     * إذا لم نجد الهوية الداخلية،
-                     * نحاول مسارًا احتياطيًا باستخدام
-                     * source + noteNumber.
-                     *
-                     * التعليقات الختامية لا نغير مسارها
-                     * إذا كانت المطابقة الأساسية موجودة.
-                     */
-                    if (
-                        matches.length === 0 &&
-                        normalizeSource(source) ===
-                            "footnote"
-                    ) {
-
-                        matches =
-                            findFallbackMatches(
-                                source,
-                                noteNumber
-                            );
-
-                    }
-
-
-                    /*
-                     * إذا لم نجد مرجعًا حتى بعد
-                     * المسار الاحتياطي، فلا ننشئ
-                     * اقتراحًا وهميًا.
-                     *
-                     * هذا يحافظ على تجاهل:
-                     * المصدر نفسه غير المربوط
-                     * والشرح فقط
-                     * والإحالات غير الخارجية.
-                     */
                     if (
                         matches.length === 0
                     ) {
@@ -28714,87 +28568,32 @@ async function buildFootnoteSuggestions(
 
                     }
 
-
                     /*
-                     * منع التكرار إذا أعاد مسار
-                     * المطابقة أكثر من occurrence
-                     * لنفس الحاشية.
+                     * نحافظ على البنية القديمة:
+                     *
+                     * reference
+                     * suggestedText
+                     *
+                     * ونضيف أيضًا:
+                     *
+                     * references
+                     * suggestedTexts
+                     *
+                     * لدعم الحاشية التي تحتوي عدة مراجع.
                      */
-                    const uniqueMatches = [];
-
-                    matches.forEach(
-                        function (
-                            item
-                        ) {
-
-                            const reference =
-                                item?.reference ||
-                                null;
-
-                            const occurrence =
-                                item?.occurrence ||
-                                null;
-
-                            const location =
-                                item?.location ||
-                                null;
-
-                            const exists =
-                                uniqueMatches.some(
-                                    function (
-                                        oldItem
-                                    ) {
-
-                                        return (
-                                            oldItem.reference ===
-                                                reference &&
-                                            oldItem.occurrence ===
-                                                occurrence
-                                        );
-
-                                    }
-                                );
-
-                            if (
-                                !exists
-                            ) {
-
-                                uniqueMatches.push({
-
-                                    reference:
-                                        reference,
-
-                                    occurrence:
-                                        occurrence,
-
-                                    location:
-                                        location
-
-                                });
-
-                            }
-
-                        }
-                    );
-
 
                     const references =
-                        uniqueMatches.map(
-                            function (
-                                item
-                            ) {
+                        matches.map(
+                            function (item) {
 
                                 return item.reference;
 
                             }
                         );
 
-
                     const suggestedTexts =
-                        uniqueMatches.map(
-                            function (
-                                item
-                            ) {
+                        matches.map(
+                            function (item) {
 
                                 return formatFootnoteReference(
                                     item.reference,
@@ -28805,13 +28604,10 @@ async function buildFootnoteSuggestions(
                             }
                         );
 
-
                     suggestions.push({
 
                         source:
-                            normalizeSource(
-                                source
-                            ),
+                            source,
 
                         noteNumber:
                             noteNumber,
@@ -28825,9 +28621,7 @@ async function buildFootnoteSuggestions(
                                 ""
                             ).trim(),
 
-                        /*
-                         * البنية القديمة
-                         */
+                        // البنية القديمة — للحفاظ على التوافق
                         reference:
                             references[0] ||
                             null,
@@ -28836,9 +28630,7 @@ async function buildFootnoteSuggestions(
                             suggestedTexts[0] ||
                             "",
 
-                        /*
-                         * البنية الجديدة
-                         */
+                        // البنية الجديدة — للتعدد
                         references:
                             references,
 
@@ -28851,18 +28643,15 @@ async function buildFootnoteSuggestions(
 
             }
 
-
             addNotes(
                 footnotes.items,
                 "footnote"
             );
 
-
             addNotes(
                 endnotes.items,
                 "endnote"
             );
-
 
             return suggestions;
 
