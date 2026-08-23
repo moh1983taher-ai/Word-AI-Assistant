@@ -27813,16 +27813,57 @@ if (referencesContent) {
 
                                             const footnoteSuggestionHTML =
                                                 footnoteSuggestions
-                                                    .filter(function (item) {
-                                                        return item.reference;
-                                                    })
-                                                    .map(function (item, index) {
+                                                    .map(function (item) {
+
+                                                        const suggestedTexts =
+                                                            Array.isArray(
+                                                                item.suggestedTexts
+                                                            )
+                                                                ? item.suggestedTexts
+                                                                : (
+                                                                    item.suggestedText
+                                                                        ? [item.suggestedText]
+                                                                        : []
+                                                                );
+
+                                                        if (
+                                                            suggestedTexts.length === 0
+                                                        ) {
+
+                                                            return "";
+
+                                                        }
+
+                                                        const suggestedReferencesHTML =
+                                                            suggestedTexts
+                                                                .map(function (
+                                                                    suggestedText
+                                                                ) {
+
+                                                                    return `
+                                                                        <div class="footnote-suggestion-reference">
+
+                                                                            <div class="footnote-suggestion-arrow">
+                                                                                ←
+                                                                            </div>
+
+                                                                            <div class="footnote-suggestion-new">
+                                                                                ${escapeReferenceHTML(
+                                                                                    suggestedText
+                                                                                )}
+                                                                            </div>
+
+                                                                        </div>
+                                                                    `;
+
+                                                                })
+                                                                .join("");
 
                                                         return `
                                                             <div class="footnote-suggestion-item">
 
                                                                 <span class="footnote-suggestion-number">
-                                                                    ${index + 1}
+                                                                    ${item.noteNumber}
                                                                 </span>
 
                                                                 <div class="footnote-suggestion-content">
@@ -27833,14 +27874,10 @@ if (referencesContent) {
                                                                         )}
                                                                     </div>
 
-                                                                    <div class="footnote-suggestion-arrow">
-                                                                        ←
-                                                                    </div>
+                                                                    <div class="footnote-suggestion-references">
 
-                                                                    <div class="footnote-suggestion-new">
-                                                                        ${escapeReferenceHTML(
-                                                                            item.suggestedText
-                                                                        )}
+                                                                        ${suggestedReferencesHTML}
+
                                                                     </div>
 
                                                                 </div>
