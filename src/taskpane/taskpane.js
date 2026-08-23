@@ -638,33 +638,62 @@ const referenceStyle = {
 
 };
 
-function formatReferenceForOutput(reference) {
+function formatReferenceForOutput(
+    reference,
+    includeAuthor = true
+) {
 
     const author =
-        String(reference?.author || "").trim();
+        String(
+            reference?.author ||
+            ""
+        ).trim();
 
     const title =
-        String(reference?.title || "").trim();
+        String(
+            reference?.title ||
+            ""
+        ).trim();
 
-    if (
-        referenceStyle.format === "title-author"
+    switch (
+        referenceStyle.format
     ) {
 
-        return [
-            title,
-            author
-        ]
-            .filter(Boolean)
-            .join("، ");
+        case "reference-only":
 
+            return title;
+
+        case "title-author":
+
+            return [
+                title,
+                author
+            ]
+                .filter(Boolean)
+                .join("، ");
+
+        case "title-author-first":
+
+            return [
+                title,
+                includeAuthor
+                    ? author
+                    : ""
+            ]
+                .filter(Boolean)
+                .join("، ");
+
+        case "author-title":
+
+        default:
+
+            return [
+                author,
+                title
+            ]
+                .filter(Boolean)
+                .join("، ");
     }
-
-    return [
-        author,
-        title
-    ]
-        .filter(Boolean)
-        .join("، ");
 }
 
 function sortReferencesForOutput(references) {
@@ -26471,7 +26500,7 @@ if (referencesContent) {
                                 <div class="reference-style-row">
 
                                     <label>
-                                        الترتيب
+                                        المراجع
                                     </label>
 
                                     <select id="reference-order-select">
@@ -26495,17 +26524,25 @@ if (referencesContent) {
                                 <div class="reference-style-row">
 
                                     <label>
-                                        الصيغة
+                                        التوثيق
                                     </label>
 
                                     <select id="reference-format-select">
 
+                                        <option value="reference-only">
+                                            المرجع فقط
+                                        </option>
+
                                         <option value="author-title">
-                                            المؤلف، العنوان
+                                             المؤلف، الكتاب
                                         </option>
 
                                         <option value="title-author">
-                                            العنوان، المؤلف
+                                             الكتاب، المؤلف
+                                        </option>
+
+                                        <option value="title-author-first">
+                                            الكتاب والمؤلف عند أول ذكر فقط
                                         </option>
 
                                     </select>
@@ -28192,7 +28229,8 @@ if (referencesContent) {
 
 function formatFootnoteReference(
     reference,
-    occurrence
+    occurrence,
+    includeAuthor = true
 ) {
 
     if (!reference) {
@@ -28201,7 +28239,8 @@ function formatFootnoteReference(
 
     const base =
         formatReferenceForOutput(
-            reference
+            reference,
+            includeAuthor
         );
 
     let volume = "";
@@ -28437,6 +28476,53 @@ async function buildFootnoteSuggestions(
 
             const suggestions = [];
 
+            /*
+             * المراجع التي سبق ظهورها في التوثيق.
+             *
+             * لا نستخدم رقم الحاشية في تحديد المرجع،
+             * لأن رقم الحاشية ليس هوية المرجع.
+             */
+            const seenReferences =
+                new Set();
+
+            function getReferenceKey(
+                reference
+            ) {
+
+                if (!reference) {
+                    return "";
+                }
+
+                const id =
+                    String(
+                        reference?.id ||
+                        ""
+                    ).trim();
+
+                if (id) {
+                    return `id:${id}`;
+                }
+
+                const author =
+                    String(
+                        reference?.author ||
+                        ""
+                    )
+                        .trim()
+                        .toLowerCase();
+
+                const title =
+                    String(
+                        reference?.title ||
+                        ""
+                    )
+                        .trim()
+                        .toLowerCase();
+
+                return `ref:${author}|${title}`;
+
+            }
+
             function addNotes(
                 notes,
                 source
@@ -28449,22 +28535,6 @@ async function buildFootnoteSuggestions(
 
                     const noteNumber =
                         index + 1;
-
-                    /*
-                     * نستخدم المعرّف الداخلي نفسه الذي
-                     * أنشأناه في readReferenceSources()
-                     * وحافظت عليه processReferenceSources().
-                     *
-                     * footnote-1
-                     * footnote-2
-                     * ...
-                     *
-                     * endnote-1
-                     * endnote-2
-                     * ...
-                     *
-                     * ولا نعتمد على الرقم الظاهر في Word.
-                     */
 
                     const materialId =
                         `${source}-${index + 1}`;
@@ -28482,20 +28552,6 @@ async function buildFootnoteSuggestions(
 
                     }
 
-                    /*
-                     * نحافظ على البنية القديمة:
-                     *
-                     * reference
-                     * suggestedText
-                     *
-                     * ونضيف أيضًا:
-                     *
-                     * references
-                     * suggestedTexts
-                     *
-                     * لدعم الحاشية التي تحتوي عدة مراجع.
-                     */
-
                     const references =
                         matches.map(
                             function (item) {
@@ -28507,12 +28563,59 @@ async function buildFootnoteSuggestions(
 
                     const suggestedTexts =
                         matches.map(
-                            function (item) {
+                            function (
+                                item
+                            ) {
+
+                                const reference =
+                                    item.reference;
+
+                                const referenceKey =
+                                    getReferenceKey(
+                                        reference
+                                    );
+
+                                /*
+                                 * الخيار:
+                                 * الكتاب والمؤلف عند أول ذكر فقط
+                                 *
+                                 * أول ظهور للمرجع:
+                                 * includeAuthor = true
+                                 *
+                                 * الظهور التالي:
+                                 * includeAuthor = false
+                                 *
+                                 * أما بقية الصيغ فلا تتأثر.
+                                 */
+                                let includeAuthor =
+                                    true;
+
+                                if (
+                                    referenceStyle.format ===
+                                    "title-author-first"
+                                ) {
+
+                                    includeAuthor =
+                                        !seenReferences.has(
+                                            referenceKey
+                                        );
+
+                                    if (
+                                        referenceKey
+                                    ) {
+
+                                        seenReferences.add(
+                                            referenceKey
+                                        );
+
+                                    }
+
+                                }
 
                                 return formatFootnoteReference(
-                                    item.reference,
+                                    reference,
                                     item.occurrence,
-                                    item.location
+                                    includeAuthor
                                 );
 
                             }
