@@ -2280,7 +2280,7 @@ function processReferenceSources(referenceSources) {
         );
 
         text = text.replace(
-            /\s\***\\/**\s\*/g,
+            /\s*\/\s*/g,
             "/"
         );
 
