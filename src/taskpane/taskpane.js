@@ -22170,8 +22170,10 @@ async function analyzeReferencesWithAI(materials) {
 
     }
 
+
     const settings =
         getSavedSettings();
+
 
     const provider =
         String(
@@ -22181,6 +22183,7 @@ async function analyzeReferencesWithAI(materials) {
             .trim()
             .toLowerCase();
 
+
     const key =
         String(
             settings?.key ||
@@ -22188,12 +22191,14 @@ async function analyzeReferencesWithAI(materials) {
         )
             .trim();
 
+
     const model =
         String(
             settings?.model ||
             ""
         )
             .trim();
+
 
     if (!key) {
 
@@ -22203,6 +22208,7 @@ async function analyzeReferencesWithAI(materials) {
 
     }
 
+
     if (!model) {
 
         throw new Error(
@@ -22210,6 +22216,7 @@ async function analyzeReferencesWithAI(materials) {
         );
 
     }
+
 
     // =====================================================
     // تجهيز المواد
@@ -22222,25 +22229,77 @@ async function analyzeReferencesWithAI(materials) {
                 index
             ) {
 
+                const materialId =
+                    String(
+                        material?.id ||
+                        `material-${index + 1}`
+                    );
+
+                const source =
+                    String(
+                        material?.source ||
+                        ""
+                    );
+
+                const kind =
+                    String(
+                        material?.kind ||
+                        ""
+                    );
+
+                const originalText =
+                    String(
+                        material?.originalText ||
+                        material?.cleanedText ||
+                        material?.text ||
+                        ""
+                    )
+                        .trim();
+
+
+                /*
+                 * علامة داخلية ثابتة للحواشي.
+                 *
+                 * هذه العلامة تدخل إلى نص المادة نفسها،
+                 * حتى لا يستطيع نموذج الذكاء الاصطناعي
+                 * الخلط بين الحواشي أو إسقاط هويتها.
+                 *
+                 * لا نضع العلامة في مواد المتن.
+                 */
+
+                let markedText =
+                    originalText;
+
+                if (
+                    source === "footnote" &&
+                    materialId
+                ) {
+
+                    markedText =
+                        `【FOOTNOTE_ID:${materialId}】\n${originalText}`;
+
+                }
+                else if (
+                    source === "endnote" &&
+                    materialId
+                ) {
+
+                    markedText =
+                        `【ENDNOTE_ID:${materialId}】\n${originalText}`;
+
+                }
+
+
                 return {
 
                     materialId:
-                        String(
-                            material?.id ||
-                            `material-${index + 1}`
-                        ),
+                        materialId,
 
                     source:
-                        String(
-                            material?.source ||
-                            ""
-                        ),
+                        source,
 
                     kind:
-                        String(
-                            material?.kind ||
-                            ""
-                        ),
+                        kind,
 
                     noteNumber:
                         material?.noteNumber ??
@@ -22251,13 +22310,7 @@ async function analyzeReferencesWithAI(materials) {
                         null,
 
                     text:
-                        String(
-                            material?.originalText ||
-                            material?.cleanedText ||
-                            material?.text ||
-                            ""
-                        )
-                            .trim(),
+                        markedText,
 
                     context:
                         String(
@@ -22271,12 +22324,14 @@ async function analyzeReferencesWithAI(materials) {
             }
         );
 
+
     // =====================================================
     // خريطة المواد الأصلية
     // =====================================================
 
     const materialIndex =
         new Map();
+
 
     payload.forEach(
         function (
@@ -22292,6 +22347,7 @@ async function analyzeReferencesWithAI(materials) {
 
         }
     );
+
 
     // =====================================================
     // تصحيح بيانات occurrences
@@ -22315,6 +22371,7 @@ async function analyzeReferencesWithAI(materials) {
 
         }
 
+
         aiResult.references.forEach(
             function (
                 reference
@@ -22333,6 +22390,7 @@ async function analyzeReferencesWithAI(materials) {
 
                 }
 
+
                 reference.occurrences.forEach(
                     function (
                         occurrence
@@ -22346,19 +22404,27 @@ async function analyzeReferencesWithAI(materials) {
                                 )
                             );
 
+
                         if (!material) {
+
                             return;
+
                         }
 
+
                         // هذه البيانات مصدرها Word نفسه
+
                         occurrence.source =
                             String(
-                                material.source || ""
+                                material.source ||
+                                ""
                             );
+
 
                         occurrence.noteNumber =
                             material.noteNumber ??
                             null;
+
 
                         occurrence.position =
                             material.position ??
@@ -22370,9 +22436,11 @@ async function analyzeReferencesWithAI(materials) {
             }
         );
 
+
         return aiResult;
 
     }
+
 
     // =====================================================
     // تعليمات الذكاء الاصطناعي
@@ -22396,6 +22464,73 @@ async function analyzeReferencesWithAI(materials) {
 - تحديد المؤلف والعنوان عندما تسمح المادة والسياق بذلك.
 - تحديد المراجع التي تعود إلى الكتاب نفسه.
 - عدم دمج الكتب المختلفة للمؤلف نفسه.
+
+=====================================================
+هوية المادة الأصلية — قاعدة حاسمة
+=====================================================
+
+بعض المواد تحتوي في بدايتها على علامة داخلية خاصة بالنظام، مثل:
+
+【FOOTNOTE_ID:footnote-4】
+
+أو:
+
+【ENDNOTE_ID:endnote-12】
+
+هذه العلامة ليست جزءًا من نص الحاشية الأصلي،
+وإنما هي هوية تقنية ثابتة للمادة الأصلية.
+
+يجب التعامل معها كمعرّف لا يتغير.
+
+إذا بدأت المادة بـ:
+
+【FOOTNOTE_ID:footnote-37】
+
+فإن أي occurrence ناتج عن أي مرجع موجود داخل هذه المادة
+يجب أن يحمل:
+
+materialId = "footnote-37"
+
+حرفيًا.
+
+لا تحذف هذه الهوية.
+لا تغيرها.
+لا تحولها إلى رقم فقط.
+لا تحولها إلى footnote:37.
+لا تستبدلها بـ reference-37.
+لا تنشئ هوية جديدة لها.
+
+وينطبق الأمر نفسه على:
+
+【ENDNOTE_ID:endnote-12】
+
+فيكون:
+
+materialId = "endnote-12"
+
+حرفيًا.
+
+مهم جدًا:
+
+قد تحتوي مادة واحدة على عدة مراجع مستقلة.
+في هذه الحالة يحصل كل مرجع على occurrence مستقل،
+لكن جميع occurrences الناتجة من المادة نفسها تحمل
+نفس materialId الخاص بالمادة الأصلية.
+
+مثال:
+
+【FOOTNOTE_ID:footnote-4】
+الكتاب 3/22، والأصول 2/220.
+
+إذا كان فيها مرجعان، فيكون الناتج مثلًا:
+
+occurrence للكتاب:
+materialId = "footnote-4"
+
+occurrence للأصول:
+materialId = "footnote-4"
+
+لا يجوز إسقاط أحدهما بسبب اشتراكهما في المادة.
 
 =====================================================
 قواعد الهوية
@@ -22518,6 +22653,14 @@ title = قواطع الأدلة
 volume = 1
 page = 193
 
+ومع ذلك، إذا كانت المادة تحمل:
+
+【FOOTNOTE_ID:footnote-25】
+
+فيجب أن يحمل كلا occurrence:
+
+materialId = "footnote-25"
+
 ممنوع وضعهما في سجل واحد.
 
 =====================================================
@@ -22537,6 +22680,32 @@ page = 193
 
 ويمكن أن تشترك المراجع المختلفة في نفس materialId،
 لأنها وردت في الحاشية الأصلية نفسها.
+
+=====================================================
+قاعدة عدم إسقاط المواد
+=====================================================
+
+يجب تحليل جميع المواد المرسلة دون إسقاطها.
+
+كل مادة تحمل علامة FOOTNOTE_ID أو ENDNOTE_ID
+يجب تتبعها أثناء التحليل.
+
+إذا كانت المادة تحتوي مرجعًا خارجيًا واضحًا:
+يجب إنشاء occurrence له.
+
+إذا كانت المادة تحتوي عدة مراجع:
+يجب إنشاء occurrence لكل مرجع.
+
+إذا كانت المادة شرحًا فقط:
+لا تنشئ مرجعًا خارجيًا لها.
+
+إذا كانت إحالة داخلية:
+لا تنشئ مرجعًا خارجيًا لها.
+
+إذا كانت "المصدر نفسه" بلا موضع ولا سياق كافٍ:
+لا تخترع مرجعًا.
+
+لكن لا تسقط مادة أخرى تحتوي على مرجع حقيقي بسبب ذلك.
 
 =====================================================
 قاعدة variants
@@ -22586,7 +22755,7 @@ variants تستخدم فقط للصيغ المختلفة للمرجع نفسه.
 قاعدة occurrences
 =====================================================
 
-كل ظهور للمراجع داخل مادة أصلية يمثل occurrence واحدًا.
+كل ظهور للمرجع داخل مادة أصلية يمثل occurrence واحدًا.
 
 إذا احتوت مادة واحدة على سبعة مراجع:
 
@@ -22597,56 +22766,7 @@ variants تستخدم فقط للصيغ المختلفة للمرجع نفسه.
 نفس materialId يمكن أن يظهر في occurrence لعدة مراجع
 لأنها وردت داخل المادة الأصلية نفسها.
 
-=====================================================
-قاعدة occurrences — حاسمة
-=====================================================
-
-كل ظهور للمرجع داخل مادة أصلية يمثل occurrence واحدًا.
-
-يجب أن يحتفظ occurrence بالهوية الدقيقة للمادة التي جاء منها
-دون أي تغيير.
-
-المهم جدًا:
-
-materialId يجب نسخه حرفيًا من المادة الداخلة في التحليل.
-
-إذا كانت المادة الداخلة تحتوي:
-
-materialId = "footnote-37"
-
-فيجب أن يكون occurrence:
-
-materialId = "footnote-37"
-
-ولا يجوز تحويله إلى:
-
-37
-أو
-footnote:37
-أو
-reference-37
-أو أي قيمة أخرى.
-
-وإذا كانت المادة:
-
-materialId = "endnote-12"
-
-فيجب أن يبقى:
-
-materialId = "endnote-12"
-
-حتى لو كان الرقم الظاهر في Word هو (1) أو (2) أو أعيد ترقيمه
-بسبب الصفحة أو المقطع.
-
-source وnoteNumber يجب أخذهما من المادة الأصلية.
-
-=====================================================
-موضع الاستشهاد داخل occurrence
-=====================================================
-
-كل occurrence يجب أن يحمل موضع الاستشهاد الخاص بهذا الظهور فقط.
-
-يجب أن يحتوي occurrence على:
+كل occurrence يجب أن يحتوي:
 
 - materialId
 - source
@@ -22654,6 +22774,12 @@ source وnoteNumber يجب أخذهما من المادة الأصلية.
 - volume
 - page
 - pageRange
+
+=====================================================
+موضع الاستشهاد داخل occurrence
+=====================================================
+
+كل occurrence يجب أن يحمل موضع الاستشهاد الخاص بهذا الظهور فقط.
 
 إذا كان الاستشهاد:
 
@@ -22685,14 +22811,14 @@ volume = "11"
 page = ""
 pageRange = "388-389"
 
-الموضع في occurrence يجب أن يخص هذا الظهور وحده.
-
 لا تستخدم أول location للمرجع بدل موضع occurrence.
 
 ولا تنقل location من ظهور إلى ظهور آخر.
 
-إذا احتوت مادة واحدة على عدة مراجع، فلكل مرجع occurrence مستقل،
-ويجب أن يحمل كل occurrence موضع المرجع الخاص به.
+إذا احتوت مادة واحدة على عدة مراجع،
+فلكل مرجع occurrence مستقل،
+وكل occurrence يحمل موضع ذلك المرجع فقط،
+مع الاحتفاظ بنفس materialId للمادة الأصلية.
 
 =====================================================
 المصدر نفسه
@@ -22704,6 +22830,13 @@ pageRange = "388-389"
 
 إذا تعذر الربط بدرجة كافية من الثقة،
 لا تخترع المرجع.
+
+إذا كان "المصدر نفسه" بلا رقم أو موضع واضح:
+لا تنشئ occurrence جديدًا.
+
+أما إذا كان معه موضع واضح:
+اربطه بالمرجع السابق المناسب وأنشئ occurrence جديدًا
+بنفس materialId الخاص بالمادة التي تحتوي "المصدر نفسه".
 
 =====================================================
 الإحالات الداخلية
@@ -22775,6 +22908,7 @@ locations
 وينقل الجزء والصفحة أو نطاق الصفحة كما وردا في المادة الأصلية دون تغيير.
 
 إذا ورد:
+
 11/388-389
 
 فيسجل:
@@ -22782,13 +22916,8 @@ locations
 volume = 11
 pageRange = "388-389"
 
-ولا يجوز تحويله إلى:
-page = "388-389"
-
-ولا إلى:
-page = "389"
-
 وإذا ورد:
+
 15/927
 
 فهو للمرجع الذي ورد معه فقط.
@@ -22808,13 +22937,8 @@ confidence رقم بين 0 و1، ويجب أن يعكس درجة الثقة ال
 
 لا تستخدم 0 إذا كانت هوية المرجع واضحة.
 
-إذا أخطأت المادة في اسم المؤلف، مثل:
-
-"النووي، العرف حجيته وأثره..."
-
-بينما المرجع المعروف في نفس المادة هو الزبيري،
-
-فلا تنقل الخطأ إلى هوية المرجع.
+إذا أخطأت المادة في اسم المؤلف،
+فلا تنقل الخطأ إلى هوية المرجع إذا كان السياق يحسم الهوية.
 
 احتفظ بالنص في variants،
 واستخدم هوية المرجع التي تدل عليها بقية المادة،
@@ -22859,14 +22983,14 @@ confidence رقم بين 0 و1، ويجب أن يعكس درجة الثقة ال
       "variants": [],
       "occurrences": [
         {
-            "materialId": "",
-            "source": "",
-            "noteNumber": null,
-            "volume": "",
-            "page": "",
-            "pageRange": ""
+          "materialId": "",
+          "source": "",
+          "noteNumber": null,
+          "volume": "",
+          "page": "",
+          "pageRange": ""
         }
-    ],
+      ],
       "notes": "",
       "confidence": 0.0,
       "needsReview": false
@@ -22890,9 +23014,14 @@ other
 لا تدمج كتابين مختلفين للمؤلف نفسه.
 `;
 
+
     const userPrompt =
         [
             "حلل جميع المواد التالية.",
+            "",
+            "مهم جدًا: لا تتجاهل أي مادة مرسلة.",
+            "حافظ حرفيًا على materialId الموجود داخل كل مادة.",
+            "إذا كانت المادة تحمل FOOTNOTE_ID أو ENDNOTE_ID فهذه الهوية إلزامية في occurrences الناتجة منها.",
             "",
             "ابنِ قائمة المراجع النهائية.",
             "",
@@ -22903,7 +23032,9 @@ other
             )
         ].join("\n");
 
+
     let result;
+
 
     // =====================================================
     // Gemini
@@ -22973,10 +23104,12 @@ other
                 }
             );
 
+
         result =
             await readJSON(
                 response
             );
+
 
         if (
             !response.ok
@@ -22991,10 +23124,12 @@ other
 
         }
 
+
         const answer =
             extractGeminiAnswer(
                 result
             );
+
 
         if (
             !answer ||
@@ -23007,6 +23142,7 @@ other
 
         }
 
+
         return hydrateAIResult(
             parseUnifiedReferenceAIResult(
                 answer
@@ -23014,6 +23150,7 @@ other
         );
 
     }
+
 
     // =====================================================
     // OpenAI / OpenRouter / Groq
@@ -23030,6 +23167,7 @@ other
 
                 : "https://openrouter.ai/api/v1/chat/completions";
 
+
     const headers = {
 
         "Content-Type":
@@ -23039,6 +23177,7 @@ other
             "Bearer " + key
 
     };
+
 
     if (
         provider === "openrouter"
@@ -23051,6 +23190,7 @@ other
             "Research Tools";
 
     }
+
 
     const response =
         await fetch(
@@ -23105,10 +23245,12 @@ other
             }
         );
 
+
     result =
         await readJSON(
             response
         );
+
 
     if (
         !response.ok
@@ -23123,11 +23265,13 @@ other
 
     }
 
+
     const answer =
         extractOpenAIStyleAnswer(
             result,
             provider
         );
+
 
     if (
         !answer ||
@@ -23139,6 +23283,7 @@ other
         );
 
     }
+
 
     return hydrateAIResult(
         parseUnifiedReferenceAIResult(
