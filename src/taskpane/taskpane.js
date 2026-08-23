@@ -2373,13 +2373,10 @@ function processReferenceSources(referenceSources) {
     if (mainText) {
 
         const parentheticalPatterns = [
-
-            /[([]\([^()[**\\]**\n]{2,400})[)**\\]**]/g,
-
+            /\(([^()\n]{2,400})\)/g,
+            /\[([^\[\]\n]{2,400})\]/g,
             /（([^（）\n]{2,400})）/g,
-
             /【([^【】\n]{2,400})】/g
-
         ];
 
 
@@ -2427,7 +2424,7 @@ function processReferenceSources(referenceSources) {
 
 
         const verbalPattern =
-            /(?:انظر|ينظر|راجع|المصدر|نقلاً عن|نقلًا عن)\s\*[:：]?\s\*([^.\n؛]{3,400})/gi;
+            /(?:انظر|ينظر|راجع|المصدر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,400})/gi;
 
 
         let verbalMatch;
