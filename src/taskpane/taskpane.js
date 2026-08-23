@@ -28600,194 +28600,201 @@ if (referencesContent) {
                                                     comparison
                                                 );
 
-                                                referencesSourceWorkspace.insertAdjacentHTML(
-                                                    "beforeend",
-                                                    `
-                                                    <div class="references-comparison-result">
+                                                const comparisonContainer =
+                                                    document.getElementById(
+                                                        "references-comparison-container"
+                                                    );
 
-                                                        <div
-                                                            class="references-comparison-title reference-collapsible-header"
-                                                            data-reference-collapse-toggle
-                                                            data-reference-collapse-target="references-comparison-content">
+                                                if (comparisonContainer) {
 
-                                                            <span>
-                                                                ✓ تمت المقارنة
-                                                            </span>
+                                                    comparisonContainer.innerHTML =
+                                                        `
+                                                        <div class="references-comparison-result">
 
-                                                            <span class="reference-collapsible-arrow">
-                                                                ▾
-                                                            </span>
+                                                            <div
+                                                                class="references-comparison-title reference-collapsible-header"
+                                                                data-reference-collapse-toggle
+                                                                data-reference-collapse-target="references-comparison-content">
 
-                                                        </div>
+                                                                <span>
+                                                                    ✓ تمت المقارنة
+                                                                </span>
 
-                                                        <div
-                                                            id="references-comparison-content"
-                                                            class="reference-collapsible-content">
-
-                                                            <div class="references-comparison-summary">
-
-                                                                <div>
-                                                                    المراجع الموحدة:
-                                                                    <strong>
-                                                                        ${comparison.totalUnifiedReferences}
-                                                                    </strong>
-                                                                </div>
-
-                                                                <div>
-                                                                    عناصر القائمة:
-                                                                    <strong>
-                                                                        ${comparison.totalBibliographyEntries}
-                                                                    </strong>
-                                                                </div>
-
-                                                                <div>
-                                                                    المطابق:
-                                                                    <strong>
-                                                                        ${comparison.matchedCount}
-                                                                    </strong>
-                                                                </div>
-
-                                                                <div>
-                                                                    غير موجود في القائمة:
-                                                                    <strong>
-                                                                        ${comparison.missingFromBibliography.length}
-                                                                    </strong>
-                                                                </div>
-
-                                                                <div>
-                                                                    موجود دون استشهاد:
-                                                                    <strong>
-                                                                        ${comparison.unusedBibliography.length}
-                                                                    </strong>
-                                                                </div>
+                                                                <span class="reference-collapsible-arrow">
+                                                                    ▸
+                                                                </span>
 
                                                             </div>
 
-                                                            ${
-                                                                comparison.missingFromBibliography.length
-                                                                    ? `
-                                                                        <div class="references-comparison-section">
+                                                            <div
+                                                                id="references-comparison-content"
+                                                                class="reference-collapsible-content is-collapsed">
 
-                                                                            <div class="references-comparison-section-title">
+                                                                <div class="references-comparison-summary">
 
-                                                                                المراجع المستشهد بها وغير الموجودة في القائمة
+                                                                    <div>
+                                                                        المراجع الموحدة:
+                                                                        <strong>
+                                                                            ${comparison.totalUnifiedReferences}
+                                                                        </strong>
+                                                                    </div>
 
-                                                                                <strong>
-                                                                                    ${comparison.missingFromBibliography.length}
-                                                                                </strong>
+                                                                    <div>
+                                                                        عناصر القائمة:
+                                                                        <strong>
+                                                                            ${comparison.totalBibliographyEntries}
+                                                                        </strong>
+                                                                    </div>
+
+                                                                    <div>
+                                                                        المطابق:
+                                                                        <strong>
+                                                                            ${comparison.matchedCount}
+                                                                        </strong>
+                                                                    </div>
+
+                                                                    <div>
+                                                                        غير موجود في القائمة:
+                                                                        <strong>
+                                                                            ${comparison.missingFromBibliography.length}
+                                                                        </strong>
+                                                                    </div>
+
+                                                                    <div>
+                                                                        موجود دون استشهاد:
+                                                                        <strong>
+                                                                            ${comparison.unusedBibliography.length}
+                                                                        </strong>
+                                                                    </div>
+
+                                                                </div>
+
+                                                                ${
+                                                                    comparison.missingFromBibliography.length
+                                                                        ? `
+                                                                            <div class="references-comparison-section">
+
+                                                                                <div class="references-comparison-section-title">
+
+                                                                                    المراجع المستشهد بها وغير الموجودة في القائمة
+
+                                                                                    <strong>
+                                                                                        ${comparison.missingFromBibliography.length}
+                                                                                    </strong>
+
+                                                                                </div>
+
+                                                                                <div class="references-comparison-list">
+
+                                                                                    ${comparison.missingFromBibliography
+                                                                                        .map(
+                                                                                            function (
+                                                                                                reference,
+                                                                                                index
+                                                                                            ) {
+
+                                                                                                return `
+                                                                                                    <div class="references-comparison-item">
+
+                                                                                                        <span class="references-comparison-number">
+                                                                                                            ${index + 1}
+                                                                                                        </span>
+
+                                                                                                        <span class="references-comparison-text">
+
+                                                                                                            <strong>
+                                                                                                                ${escapeReferenceHTML(
+                                                                                                                    reference?.author ||
+                                                                                                                    "مؤلف غير محدد"
+                                                                                                                )}
+                                                                                                            </strong>
+
+                                                                                                            ${
+                                                                                                                reference?.title
+                                                                                                                    ? `
+                                                                                                                        —
+                                                                                                                        ${escapeReferenceHTML(
+                                                                                                                            reference.title
+                                                                                                                        )}
+                                                                                                                    `
+                                                                                                                    : ""
+                                                                                                            }
+
+                                                                                                        </span>
+
+                                                                                                    </div>
+                                                                                                `;
+
+                                                                                            }
+                                                                                        )
+                                                                                        .join("")}
+
+                                                                                </div>
 
                                                                             </div>
+                                                                        `
+                                                                        : ""
+                                                                }
 
-                                                                            <div class="references-comparison-list">
+                                                                ${
+                                                                    comparison.unusedBibliography.length
+                                                                        ? `
+                                                                            <div class="references-comparison-section">
 
-                                                                                ${comparison.missingFromBibliography
-                                                                                    .map(
-                                                                                        function (
-                                                                                            reference,
-                                                                                            index
-                                                                                        ) {
+                                                                                <div class="references-comparison-section-title">
 
-                                                                                            return `
-                                                                                                <div class="references-comparison-item">
+                                                                                    مراجع موجودة في القائمة ولم يُعثر لها على استشهاد
 
-                                                                                                    <span class="references-comparison-number">
-                                                                                                        ${index + 1}
-                                                                                                    </span>
+                                                                                    <strong>
+                                                                                        ${comparison.unusedBibliography.length}
+                                                                                    </strong>
 
-                                                                                                    <span class="references-comparison-text">
+                                                                                </div>
 
-                                                                                                        <strong>
+                                                                                <div class="references-comparison-list">
+
+                                                                                    ${comparison.unusedBibliography
+                                                                                        .map(
+                                                                                            function (
+                                                                                                item,
+                                                                                                index
+                                                                                            ) {
+
+                                                                                                return `
+                                                                                                    <div class="references-comparison-item">
+
+                                                                                                        <span class="references-comparison-number">
+                                                                                                            ${index + 1}
+                                                                                                        </span>
+
+                                                                                                        <span class="references-comparison-text">
+
                                                                                                             ${escapeReferenceHTML(
-                                                                                                                reference?.author ||
-                                                                                                                "مؤلف غير محدد"
+                                                                                                                item.text
                                                                                                             )}
-                                                                                                        </strong>
 
-                                                                                                        ${
-                                                                                                            reference?.title
-                                                                                                                ? `
-                                                                                                                    —
-                                                                                                                    ${escapeReferenceHTML(
-                                                                                                                        reference.title
-                                                                                                                    )}
-                                                                                                                `
-                                                                                                                : ""
-                                                                                                        }
+                                                                                                        </span>
 
-                                                                                                    </span>
+                                                                                                    </div>
+                                                                                                `;
 
-                                                                                                </div>
-                                                                                            `;
+                                                                                            }
+                                                                                        )
+                                                                                        .join("")}
 
-                                                                                        }
-                                                                                    )
-                                                                                    .join("")}
+                                                                                </div>
 
                                                                             </div>
+                                                                        `
+                                                                        : ""
+                                                                }
 
-                                                                        </div>
-                                                                    `
-                                                                    : ""
-                                                            }
-
-                                                            ${
-                                                                comparison.unusedBibliography.length
-                                                                    ? `
-                                                                        <div class="references-comparison-section">
-
-                                                                            <div class="references-comparison-section-title">
-
-                                                                                مراجع موجودة في القائمة ولم يُعثر لها على استشهاد
-
-                                                                                <strong>
-                                                                                    ${comparison.unusedBibliography.length}
-                                                                                </strong>
-
-                                                                            </div>
-
-                                                                            <div class="references-comparison-list">
-
-                                                                                ${comparison.unusedBibliography
-                                                                                    .map(
-                                                                                        function (
-                                                                                            item,
-                                                                                            index
-                                                                                        ) {
-
-                                                                                            return `
-                                                                                                <div class="references-comparison-item">
-
-                                                                                                    <span class="references-comparison-number">
-                                                                                                        ${index + 1}
-                                                                                                    </span>
-
-                                                                                                    <span class="references-comparison-text">
-
-                                                                                                        ${escapeReferenceHTML(
-                                                                                                            item.text
-                                                                                                        )}
-
-                                                                                                    </span>
-
-                                                                                                </div>
-                                                                                            `;
-
-                                                                                        }
-                                                                                    )
-                                                                                    .join("")}
-
-                                                                            </div>
-
-                                                                        </div>
-                                                                    `
-                                                                    : ""
-                                                            }
+                                                            </div>
 
                                                         </div>
+                                                        `;
 
-                                                    </div>
-                                                    `
-                                                );
+                                                }
 
                                                 compareReferencesBtn.textContent =
                                                     "✓ تمت المقارنة";
