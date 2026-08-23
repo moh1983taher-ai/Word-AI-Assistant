@@ -27491,106 +27491,7 @@ if (referencesContent) {
                                             latestUnifiedReferences =
                                                 finalReferenceResults;
 
-                                            const unifiedFootnoteMap =
-                                                buildUnifiedFootnoteMap(
-                                                    latestUnifiedReferences
-                                                );
-
-                                            console.log(
-                                                "خريطة الحواشي والمراجع الموحدة:",
-                                                unifiedFootnoteMap
-                                            );
-
-                                            const footnoteSuggestions =
-                                                await buildFootnoteSuggestions(
-                                                    unifiedFootnoteMap
-                                                );
-
-                                            console.log(
-                                                "توثيق الحواشي المقترح:",
-                                                footnoteSuggestions
-                                            );
-
-                                            const footnoteSuggestionHTML =
-                                                footnoteSuggestions
-                                                    .filter(function (item) {
-                                                        return item.reference;
-                                                    })
-                                                    .map(function (item, index) {
-
-                                                        return `
-                                                            <div class="footnote-suggestion-item">
-
-                                                                <span class="footnote-suggestion-number">
-                                                                    ${index + 1}
-                                                                </span>
-
-                                                                <div class="footnote-suggestion-content">
-
-                                                                    <div class="footnote-suggestion-original">
-                                                                        ${escapeReferenceHTML(
-                                                                            item.originalText
-                                                                        )}
-                                                                    </div>
-
-                                                                    <div class="footnote-suggestion-arrow">
-                                                                        ←
-                                                                    </div>
-
-                                                                    <div class="footnote-suggestion-new">
-                                                                        ${escapeReferenceHTML(
-                                                                            item.suggestedText
-                                                                        )}
-                                                                    </div>
-
-                                                                </div>
-
-                                                            </div>
-                                                        `;
-
-                                                    })
-                                                    .join("");
-
-                                            referencesSourceWorkspace.insertAdjacentHTML(
-                                                "beforeend",
-                                                `
-                                                <div class="footnote-suggestions-result">
-
-                                                    <div class="footnote-suggestions-title">
-                                                        توثيق الحواشي المقترح
-                                                        <strong>
-                                                            ${
-                                                                footnoteSuggestions.filter(
-                                                                    function (item) {
-                                                                        return item.reference;
-                                                                    }
-                                                                ).length
-                                                            }
-                                                        </strong>
-                                                    </div>
-
-                                                    <div class="footnote-suggestions-list">
-                                                        ${footnoteSuggestionHTML}
-                                                    </div>
-
-                                                    ${
-                                                        footnoteSuggestions.some(function (item) {
-                                                            return item.reference;
-                                                        })
-                                                            ? `
-                                                                <button
-                                                                    type="button"
-                                                                    id="apply-footnote-suggestions-btn"
-                                                                    class="apply-footnote-suggestions-btn">
-                                                                    تطبيق التوثيق على الحواشي
-                                                                </button>
-                                                            `
-                                                            : ""
-                                                    }
-
-                                                </div>
-                                                `
-                                            );
+                                            
 
                                             
 
@@ -28125,6 +28026,107 @@ if (referencesContent) {
                                         </div>
                                         `
                                     );
+
+                                    const unifiedFootnoteMap =
+                                                buildUnifiedFootnoteMap(
+                                                    latestUnifiedReferences
+                                                );
+
+                                            console.log(
+                                                "خريطة الحواشي والمراجع الموحدة:",
+                                                unifiedFootnoteMap
+                                            );
+
+                                            const footnoteSuggestions =
+                                                await buildFootnoteSuggestions(
+                                                    unifiedFootnoteMap
+                                                );
+
+                                            console.log(
+                                                "توثيق الحواشي المقترح:",
+                                                footnoteSuggestions
+                                            );
+
+                                            const footnoteSuggestionHTML =
+                                                footnoteSuggestions
+                                                    .filter(function (item) {
+                                                        return item.reference;
+                                                    })
+                                                    .map(function (item, index) {
+
+                                                        return `
+                                                            <div class="footnote-suggestion-item">
+
+                                                                <span class="footnote-suggestion-number">
+                                                                    ${index + 1}
+                                                                </span>
+
+                                                                <div class="footnote-suggestion-content">
+
+                                                                    <div class="footnote-suggestion-original">
+                                                                        ${escapeReferenceHTML(
+                                                                            item.originalText
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div class="footnote-suggestion-arrow">
+                                                                        ←
+                                                                    </div>
+
+                                                                    <div class="footnote-suggestion-new">
+                                                                        ${escapeReferenceHTML(
+                                                                            item.suggestedText
+                                                                        )}
+                                                                    </div>
+
+                                                                </div>
+
+                                                            </div>
+                                                        `;
+
+                                                    })
+                                                    .join("");
+
+                                            referencesSourceWorkspace.insertAdjacentHTML(
+                                                "beforeend",
+                                                `
+                                                <div class="footnote-suggestions-result">
+
+                                                    <div class="footnote-suggestions-title">
+                                                        توثيق الحواشي المقترح
+                                                        <strong>
+                                                            ${
+                                                                footnoteSuggestions.filter(
+                                                                    function (item) {
+                                                                        return item.reference;
+                                                                    }
+                                                                ).length
+                                                            }
+                                                        </strong>
+                                                    </div>
+
+                                                    <div class="footnote-suggestions-list">
+                                                        ${footnoteSuggestionHTML}
+                                                    </div>
+
+                                                    ${
+                                                        footnoteSuggestions.some(function (item) {
+                                                            return item.reference;
+                                                        })
+                                                            ? `
+                                                                <button
+                                                                    type="button"
+                                                                    id="apply-footnote-suggestions-btn"
+                                                                    class="apply-footnote-suggestions-btn">
+                                                                    تطبيق التوثيق على الحواشي
+                                                                </button>
+                                                            `
+                                                            : ""
+                                                    }
+
+                                                </div>
+                                                `
+                                            );
 
                                     // =================================================
                                     // 11. إنهاء التحليل
