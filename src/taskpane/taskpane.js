@@ -28285,11 +28285,15 @@ function formatFootnoteReference(
         return "";
     }
 
-    const base =
-        formatReferenceForOutput(
-            reference,
-            includeAuthor
-        );
+    let title =
+        String(
+            reference?.title || ""
+        ).trim();
+
+    const author =
+        String(
+            reference?.author || ""
+        ).trim();
 
     let volume = "";
     let page = "";
@@ -28299,34 +28303,30 @@ function formatFootnoteReference(
 
         volume =
             String(
-                occurrence.volume || ""
+                occurrence?.volume || ""
             ).trim();
 
         page =
             String(
-                occurrence.page || ""
+                occurrence?.page || ""
             ).trim();
 
         pageRange =
             String(
-                occurrence.pageRange || ""
+                occurrence?.pageRange || ""
             ).trim();
 
     }
 
     /*
-     * توافق مع البنية القديمة:
      * إذا لم يحمل occurrence الموضع،
      * نستخدم أول location للمرجع.
      */
-
     if (
         !volume &&
         !page &&
         !pageRange &&
-        Array.isArray(
-            reference.locations
-        ) &&
+        Array.isArray(reference?.locations) &&
         reference.locations.length
     ) {
 
@@ -28347,44 +28347,138 @@ function formatFootnoteReference(
             String(
                 location?.pageRange || ""
             ).trim();
-
     }
 
     let locationText = "";
 
-    if (
-        volume &&
-        page
-    ) {
+    if (volume && page) {
 
         locationText =
             `${volume}/${page}`;
 
     }
-    else if (
-        volume &&
-        pageRange
-    ) {
+    else if (volume && pageRange) {
 
         locationText =
             `${volume}/${pageRange}`;
 
     }
-    else if (
-        pageRange
-    ) {
+    else if (pageRange) {
 
         locationText =
             `ص ${pageRange}`;
 
     }
-    else if (
-        page
-    ) {
+    else if (page) {
 
         locationText =
             `ص ${page}`;
+    }
 
+    /*
+     * منع تكرار موضع الاستشهاد إذا كان الذكاء الاصطناعي
+     * قد أدخله خطأً داخل title.
+     *
+     * مثال:
+     * title = "دور الكلمة في اللغة 45"
+     * location = "45"
+     *
+     * تصبح:
+     * title = "دور الكلمة في اللغة"
+     */
+    if (
+        locationText &&
+        title
+    ) {
+
+        const rawLocation =
+            locationText
+                .replace(
+                    /^ص\s*/,
+                    ""
+                )
+                .trim();
+
+        if (rawLocation) {
+
+            const escapedLocation =
+                rawLocation.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&"
+                );
+
+            const duplicateLocationPattern =
+                new RegExp(
+                    `(?:\\s|،|\\(|\\[)*${escapedLocation}\\s*$`
+                );
+
+            title =
+                title
+                    .replace(
+                        duplicateLocationPattern,
+                        ""
+                    )
+                    .trim()
+                    .replace(
+                        /[،,؛:\s]+$/,
+                        ""
+                    )
+                    .trim();
+        }
+    }
+
+    let base = "";
+
+    switch (
+        referenceStyle.format
+    ) {
+
+        case "reference-only":
+
+            base =
+                title;
+
+            break;
+
+        case "title-author":
+
+            base =
+                [
+                    title,
+                    author
+                ]
+                    .filter(Boolean)
+                    .join("، ");
+
+            break;
+
+        case "title-author-first":
+
+            base =
+                [
+                    title,
+                    includeAuthor
+                        ? author
+                        : ""
+                ]
+                    .filter(Boolean)
+                    .join("، ");
+
+            break;
+
+        case "author-title":
+
+        default:
+
+            base =
+                [
+                    author,
+                    title
+                ]
+                    .filter(Boolean)
+                    .join("، ");
+
+            break;
     }
 
     return locationText
