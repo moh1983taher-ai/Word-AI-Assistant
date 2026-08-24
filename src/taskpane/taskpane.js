@@ -28774,47 +28774,62 @@ async function applyFootnoteSuggestions(
                     const note =
                         notes.items[index];
 
-                    const materialId =
-                        `${source}-${index + 1}`;
+                    const noteNumber =
+                        index + 1;
 
                     const suggestion =
                         footnoteSuggestions.find(
                             function (item) {
 
                                 return (
-                                    item?.materialId ===
-                                    materialId
+                                    item?.source === source &&
+                                    Number(
+                                        item?.noteNumber
+                                    ) === noteNumber
                                 );
 
                             }
                         );
 
                     if (
-                        !suggestion ||
-                        !Array.isArray(
+                        !suggestion
+                    ) {
+                        continue;
+                    }
+
+                    const references =
+                        Array.isArray(
                             suggestion.references
-                        ) ||
-                        !Array.isArray(
+                        )
+                            ? suggestion.references
+                            : [];
+
+                    const suggestedTexts =
+                        Array.isArray(
                             suggestion.suggestedTexts
                         )
+                            ? suggestion.suggestedTexts
+                            : [];
+
+                    if (
+                        references.length === 0 ||
+                        suggestedTexts.length === 0
                     ) {
-
                         continue;
-
                     }
 
                     for (
                         let i = 0;
-                        i < suggestion.references.length;
+                        i < references.length;
                         i++
                     ) {
 
                         const reference =
-                            suggestion.references[i];
+                            references[i];
 
                         const suggestedText =
                             String(
-                                suggestion.suggestedTexts[i] ||
+                                suggestedTexts[i] ||
                                 ""
                             ).trim();
 
@@ -28822,9 +28837,7 @@ async function applyFootnoteSuggestions(
                             !reference ||
                             !suggestedText
                         ) {
-
                             continue;
-
                         }
 
                         const variants =
@@ -28834,13 +28847,9 @@ async function applyFootnoteSuggestions(
                                 ? reference.variants
                                 : [];
 
-                        let sourceVariant =
-                            "";
+                        let found =
+                            false;
 
-                        /*
-                         * نبحث عن صيغة المرجع الأصلية
-                         * داخل نص الحاشية نفسها.
-                         */
                         for (
                             let v = 0;
                             v < variants.length;
@@ -28868,7 +28877,7 @@ async function applyFootnoteSuggestions(
                                 );
 
                             searchResults.load(
-                                "items/text"
+                                "items"
                             );
 
                             await context.sync();
@@ -28877,23 +28886,28 @@ async function applyFootnoteSuggestions(
                                 searchResults.items.length > 0
                             ) {
 
-                                sourceVariant =
-                                    candidate;
-
-                                searchResults.items[0].text =
-                                    suggestedText;
+                                /*
+                                 * نستبدل نطاق المرجع فقط،
+                                 * ولا نلمس بقية الحاشية.
+                                 */
+                                searchResults.items[0].insertText(
+                                    suggestedText,
+                                    Word.InsertLocation.replace
+                                );
 
                                 applied++;
+
+                                found =
+                                    true;
 
                                 await context.sync();
 
                                 break;
-
                             }
 
                         }
 
-                        if (!sourceVariant) {
+                        if (!found) {
                             skipped++;
                         }
 
@@ -28912,6 +28926,8 @@ async function applyFootnoteSuggestions(
                 endnotes,
                 "endnote"
             );
+
+            await context.sync();
 
             return {
                 applied: applied,
