@@ -28275,200 +28275,121 @@ if (referencesContent) {
 
 }
 
-async function applyFootnoteSuggestions(
-    footnoteSuggestions
+function formatFootnoteReference(
+    reference,
+    occurrence,
+    includeAuthor = true
 ) {
 
-    if (
-        !Array.isArray(footnoteSuggestions) ||
-        footnoteSuggestions.length === 0
-    ) {
-        return {
-            applied: 0,
-            skipped: 0
-        };
+    if (!reference) {
+        return "";
     }
 
-    return await Word.run(
-        async function (context) {
+    const base =
+        formatReferenceForOutput(
+            reference,
+            includeAuthor
+        );
 
-            const body =
-                context.document.body;
+    let volume = "";
+    let page = "";
+    let pageRange = "";
 
-            const footnotes =
-                body.footnotes;
+    if (occurrence) {
 
-            const endnotes =
-                body.endnotes;
+        volume =
+            String(
+                occurrence.volume || ""
+            ).trim();
 
-            footnotes.load("items");
-            endnotes.load("items");
+        page =
+            String(
+                occurrence.page || ""
+            ).trim();
 
-            await context.sync();
+        pageRange =
+            String(
+                occurrence.pageRange || ""
+            ).trim();
 
-            let applied = 0;
-            let skipped = 0;
+    }
 
-            async function applyToNotes(
-                notes,
-                source
-            ) {
+    /*
+     * توافق مع البنية القديمة:
+     * إذا لم يحمل occurrence الموضع،
+     * نستخدم أول location للمرجع.
+     */
 
-                for (
-                    let index = 0;
-                    index < notes.items.length;
-                    index++
-                ) {
+    if (
+        !volume &&
+        !page &&
+        !pageRange &&
+        Array.isArray(
+            reference.locations
+        ) &&
+        reference.locations.length
+    ) {
 
-                    const note =
-                        notes.items[index];
+        const location =
+            reference.locations[0];
 
-                    const materialId =
-                        `${source}-${index + 1}`;
+        volume =
+            String(
+                location?.volume || ""
+            ).trim();
 
-                    const suggestion =
-                        footnoteSuggestions.find(
-                            function (item) {
+        page =
+            String(
+                location?.page || ""
+            ).trim();
 
-                                return (
-                                    item?.materialId ===
-                                    materialId
-                                );
+        pageRange =
+            String(
+                location?.pageRange || ""
+            ).trim();
 
-                            }
-                        );
+    }
 
-                    if (
-                        !suggestion ||
-                        !Array.isArray(
-                            suggestion.references
-                        ) ||
-                        !Array.isArray(
-                            suggestion.suggestedTexts
-                        )
-                    ) {
+    let locationText = "";
 
-                        continue;
+    if (
+        volume &&
+        page
+    ) {
 
-                    }
+        locationText =
+            `${volume}/${page}`;
 
-                    for (
-                        let i = 0;
-                        i < suggestion.references.length;
-                        i++
-                    ) {
+    }
+    else if (
+        volume &&
+        pageRange
+    ) {
 
-                        const reference =
-                            suggestion.references[i];
+        locationText =
+            `${volume}/${pageRange}`;
 
-                        const suggestedText =
-                            String(
-                                suggestion.suggestedTexts[i] ||
-                                ""
-                            ).trim();
+    }
+    else if (
+        pageRange
+    ) {
 
-                        if (
-                            !reference ||
-                            !suggestedText
-                        ) {
+        locationText =
+            `ص ${pageRange}`;
 
-                            continue;
+    }
+    else if (
+        page
+    ) {
 
-                        }
+        locationText =
+            `ص ${page}`;
 
-                        const variants =
-                            Array.isArray(
-                                reference?.variants
-                            )
-                                ? reference.variants
-                                : [];
+    }
 
-                        let sourceVariant =
-                            "";
-
-                        /*
-                         * نبحث عن صيغة المرجع الأصلية
-                         * داخل نص الحاشية نفسها.
-                         */
-                        for (
-                            let v = 0;
-                            v < variants.length;
-                            v++
-                        ) {
-
-                            const candidate =
-                                String(
-                                    variants[v] ||
-                                    ""
-                                ).trim();
-
-                            if (!candidate) {
-                                continue;
-                            }
-
-                            const searchResults =
-                                note.body.search(
-                                    candidate,
-                                    {
-                                        matchCase: false,
-                                        matchWholeWord: false,
-                                        matchWildcards: false
-                                    }
-                                );
-
-                            searchResults.load(
-                                "items/text"
-                            );
-
-                            await context.sync();
-
-                            if (
-                                searchResults.items.length > 0
-                            ) {
-
-                                sourceVariant =
-                                    candidate;
-
-                                searchResults.items[0].text =
-                                    suggestedText;
-
-                                applied++;
-
-                                await context.sync();
-
-                                break;
-
-                            }
-
-                        }
-
-                        if (!sourceVariant) {
-                            skipped++;
-                        }
-
-                    }
-
-                }
-
-            }
-
-            await applyToNotes(
-                footnotes,
-                "footnote"
-            );
-
-            await applyToNotes(
-                endnotes,
-                "endnote"
-            );
-
-            return {
-                applied: applied,
-                skipped: skipped
-            };
-
-        }
-    );
+    return locationText
+        ? `${base}، ${locationText}`
+        : base;
 }
 
 function buildUnifiedFootnoteMap(unifiedReferences) {
@@ -28814,7 +28735,8 @@ async function applyFootnoteSuggestions(
         footnoteSuggestions.length === 0
     ) {
         return {
-            applied: 0
+            applied: 0,
+            skipped: 0
         };
     }
 
@@ -28836,6 +28758,7 @@ async function applyFootnoteSuggestions(
             await context.sync();
 
             let applied = 0;
+            let skipped = 0;
 
             async function applyToNotes(
                 notes,
@@ -28857,38 +28780,125 @@ async function applyFootnoteSuggestions(
                     const suggestion =
                         footnoteSuggestions.find(
                             function (item) {
+
                                 return (
-                                    item.materialId ===
+                                    item?.materialId ===
                                     materialId
                                 );
+
                             }
                         );
 
                     if (
                         !suggestion ||
                         !Array.isArray(
-                            suggestion.suggestedTexts
+                            suggestion.references
                         ) ||
-                        suggestion.suggestedTexts.length === 0
+                        !Array.isArray(
+                            suggestion.suggestedTexts
+                        )
                     ) {
+
                         continue;
+
                     }
 
-                    const newText =
-                        suggestion.suggestedTexts
-                            .filter(Boolean)
-                            .join("، ");
+                    for (
+                        let i = 0;
+                        i < suggestion.references.length;
+                        i++
+                    ) {
 
-                    if (!newText.trim()) {
-                        continue;
+                        const reference =
+                            suggestion.references[i];
+
+                        const suggestedText =
+                            String(
+                                suggestion.suggestedTexts[i] ||
+                                ""
+                            ).trim();
+
+                        if (
+                            !reference ||
+                            !suggestedText
+                        ) {
+
+                            continue;
+
+                        }
+
+                        const variants =
+                            Array.isArray(
+                                reference?.variants
+                            )
+                                ? reference.variants
+                                : [];
+
+                        let sourceVariant =
+                            "";
+
+                        /*
+                         * نبحث عن صيغة المرجع الأصلية
+                         * داخل نص الحاشية نفسها.
+                         */
+                        for (
+                            let v = 0;
+                            v < variants.length;
+                            v++
+                        ) {
+
+                            const candidate =
+                                String(
+                                    variants[v] ||
+                                    ""
+                                ).trim();
+
+                            if (!candidate) {
+                                continue;
+                            }
+
+                            const searchResults =
+                                note.body.search(
+                                    candidate,
+                                    {
+                                        matchCase: false,
+                                        matchWholeWord: false,
+                                        matchWildcards: false
+                                    }
+                                );
+
+                            searchResults.load(
+                                "items/text"
+                            );
+
+                            await context.sync();
+
+                            if (
+                                searchResults.items.length > 0
+                            ) {
+
+                                sourceVariant =
+                                    candidate;
+
+                                searchResults.items[0].text =
+                                    suggestedText;
+
+                                applied++;
+
+                                await context.sync();
+
+                                break;
+
+                            }
+
+                        }
+
+                        if (!sourceVariant) {
+                            skipped++;
+                        }
+
                     }
 
-                    note.body.insertText(
-                        newText,
-                        Word.InsertLocation.replace
-                    );
-
-                    applied++;
                 }
 
             }
@@ -28903,10 +28913,9 @@ async function applyFootnoteSuggestions(
                 "endnote"
             );
 
-            await context.sync();
-
             return {
-                applied: applied
+                applied: applied,
+                skipped: skipped
             };
 
         }
