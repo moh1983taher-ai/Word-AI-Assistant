@@ -28897,6 +28897,9 @@ async function applyFootnoteSuggestions(
                         continue;
                     }
 
+                    /*
+                     * كل مرجع داخل الحاشية يعالج منفردًا.
+                     */
                     for (
                         let i = 0;
                         i < suggestion.references.length;
@@ -28919,6 +28922,12 @@ async function applyFootnoteSuggestions(
                             continue;
                         }
 
+                        /*
+                         * لا نبحث عن title أو author.
+                         *
+                         * نبحث فقط عن الصيغ الأصلية الكاملة
+                         * التي حفظها الذكاء الاصطناعي في variants.
+                         */
                         const variants =
                             Array.isArray(
                                 reference?.variants
@@ -28926,85 +28935,65 @@ async function applyFootnoteSuggestions(
                                 ? reference.variants
                                 : [];
 
-                        const candidates = [];
-
-                        /*
-                         * أولًا: الصيغ الأصلية التي حفظها الذكاء الاصطناعي.
-                         */
-                        variants.forEach(
-                            function (variant) {
-
-                                const value =
-                                    String(
-                                        variant || ""
-                                    ).trim();
-
-                                if (
-                                    value &&
-                                    !candidates.includes(value)
-                                ) {
-                                    candidates.push(value);
-                                }
-
-                            }
-                        );
-
-                        /*
-                         * ثانيًا: محاولة تكوين صيغة بحث
-                         * من العنوان + موضع الاستشهاد.
-                         */
-                        const occurrence =
-                            Array.isArray(
-                                suggestion?.references
-                            )
-                                ? (
-                                    suggestion.references[i]
-                                        ? suggestion.references[i]
-                                        : null
-                                )
-                                : null;
-
-                        const occurrenceData =
-                            Array.isArray(
-                                suggestion?.suggestedTexts
-                            )
-                                ? null
-                                : null;
-
-                        const title =
-                            String(
-                                reference?.title ||
-                                ""
-                            ).trim();
-
-                        if (title) {
-
-                            candidates.push(
-                                title
-                            );
-
+                        if (
+                            variants.length === 0
+                        ) {
+                            skipped++;
+                            continue;
                         }
 
                         let found =
                             false;
 
                         /*
-                         * البحث عن المرجع داخل جسم الحاشية
-                         * واستبدال المرجع وحده.
+                         * نبدأ بأطول صيغة؛ لأنها غالبًا
+                         * أكثر دقة وأقل احتمالًا لمطابقة
+                         * جزء من المرجع فقط.
                          */
+                        const candidates =
+                            variants
+                                .map(
+                                    function (variant) {
+
+                                        return String(
+                                            variant || ""
+                                        )
+                                            .replace(
+                                                /\s+/g,
+                                                " "
+                                            )
+                                            .trim();
+
+                                    }
+                                )
+                                .filter(Boolean)
+                                .sort(
+                                    function (a, b) {
+
+                                        return (
+                                            b.length -
+                                            a.length
+                                        );
+
+                                    }
+                                );
+
                         for (
-                            let c = 0;
-                            c < candidates.length;
-                            c++
+                            let v = 0;
+                            v < candidates.length;
+                            v++
                         ) {
 
                             const candidate =
-                                candidates[c];
+                                candidates[v];
 
                             if (!candidate) {
                                 continue;
                             }
 
+                            /*
+                             * بحث مطابق للصيغة الأصلية الكاملة.
+                             */
                             const searchResults =
                                 note.body.search(
                                     candidate,
@@ -29028,7 +29017,9 @@ async function applyFootnoteSuggestions(
                             }
 
                             /*
-                             * نستبدل النطاق المطابق فقط،
+                             * استبدال المرجع المطابق فقط.
+                             *
+                             * لا نستخدم note.body.replace
                              * ولا نستبدل جسم الحاشية كله.
                              */
                             searchResults.items[0].insertText(
