@@ -559,6 +559,7 @@ function openDocumentDatabase() {
 }
 
 
+
 // ======================================
 // Save Working Word File
 // ======================================
@@ -27704,6 +27705,53 @@ if (referencesContent) {
                                                     `;
                                             }
 
+
+                                            const applyFootnoteSuggestionsBtn =
+                                                document.getElementById(
+                                                    "apply-footnote-suggestions-btn"
+                                                );
+
+                                            if (applyFootnoteSuggestionsBtn) {
+
+                                                applyFootnoteSuggestionsBtn.onclick =
+                                                    async function () {
+
+                                                        applyFootnoteSuggestionsBtn.disabled =
+                                                            true;
+
+                                                        applyFootnoteSuggestionsBtn.textContent =
+                                                            "جارٍ تطبيق التوثيق...";
+
+                                                        try {
+
+                                                            const result =
+                                                                await applyFootnoteSuggestions(
+                                                                    footnoteSuggestions
+                                                                );
+
+                                                            applyFootnoteSuggestionsBtn.textContent =
+                                                                `✓ تم تطبيق التوثيق (${result.applied})`;
+
+                                                        }
+                                                        catch (error) {
+
+                                                            console.error(
+                                                                "فشل تطبيق التوثيق على الحواشي:",
+                                                                error
+                                                            );
+
+                                                            applyFootnoteSuggestionsBtn.disabled =
+                                                                false;
+
+                                                            applyFootnoteSuggestionsBtn.textContent =
+                                                                "تطبيق التوثيق على الحواشي";
+
+                                                        }
+
+                                                    };
+
+                                            }
+
                                     // =================================================
                                     // 11. إنهاء التحليل
                                     // =================================================
@@ -28675,6 +28723,115 @@ async function buildFootnoteSuggestions(
         }
     );
 
+}
+
+
+async function applyFootnoteSuggestions(
+    footnoteSuggestions
+) {
+
+    if (
+        !Array.isArray(footnoteSuggestions) ||
+        footnoteSuggestions.length === 0
+    ) {
+        return {
+            applied: 0
+        };
+    }
+
+    return await Word.run(
+        async function (context) {
+
+            const body =
+                context.document.body;
+
+            const footnotes =
+                body.footnotes;
+
+            const endnotes =
+                body.endnotes;
+
+            footnotes.load("items");
+            endnotes.load("items");
+
+            await context.sync();
+
+            let applied = 0;
+
+            async function applyToNotes(
+                notes,
+                source
+            ) {
+
+                for (
+                    let index = 0;
+                    index < notes.items.length;
+                    index++
+                ) {
+
+                    const note =
+                        notes.items[index];
+
+                    const materialId =
+                        `${source}-${index + 1}`;
+
+                    const suggestion =
+                        footnoteSuggestions.find(
+                            function (item) {
+                                return (
+                                    item.materialId ===
+                                    materialId
+                                );
+                            }
+                        );
+
+                    if (
+                        !suggestion ||
+                        !Array.isArray(
+                            suggestion.suggestedTexts
+                        ) ||
+                        suggestion.suggestedTexts.length === 0
+                    ) {
+                        continue;
+                    }
+
+                    const newText =
+                        suggestion.suggestedTexts
+                            .filter(Boolean)
+                            .join("، ");
+
+                    if (!newText.trim()) {
+                        continue;
+                    }
+
+                    note.body.insertText(
+                        newText,
+                        Word.InsertLocation.replace
+                    );
+
+                    applied++;
+                }
+
+            }
+
+            await applyToNotes(
+                footnotes,
+                "footnote"
+            );
+
+            await applyToNotes(
+                endnotes,
+                "endnote"
+            );
+
+            await context.sync();
+
+            return {
+                applied: applied
+            };
+
+        }
+    );
 }
 
 function mergeEquivalentReferences(references) {
