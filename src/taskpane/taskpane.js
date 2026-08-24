@@ -28706,10 +28706,6 @@ async function buildFootnoteSuggestions(
                     return "";
                 }
 
-                /*
-                 * 1. variants أولًا؛ لأنها أكثر شيء
-                 * يحتمل أن يكون قريبًا من النص الأصلي.
-                 */
                 const variants =
                     Array.isArray(
                         reference?.variants
@@ -28717,6 +28713,10 @@ async function buildFootnoteSuggestions(
                         ? reference.variants
                         : [];
 
+                /*
+                * نبحث عن الصيغة الأصلية الكاملة للمرجع،
+                * مع السماح باختلاف المسافات فقط.
+                */
                 for (
                     let i = 0;
                     i < variants.length;
@@ -28732,199 +28732,34 @@ async function buildFootnoteSuggestions(
                         continue;
                     }
 
-                    const normalizedCandidate =
-                        normalizeSearchText(
-                            candidate
+                    const escaped =
+                        candidate
+                            .replace(
+                                /[.*+?^${}()|[\]\\]/g,
+                                "\\$&"
+                            )
+                            .replace(
+                                /\s+/g,
+                                "\\s*"
+                            );
+
+                    const pattern =
+                        new RegExp(
+                            escaped,
+                            "i"
                         );
 
-                    const normalizedText =
-                        normalizeSearchText(
+                    const match =
+                        pattern.exec(
                             text
                         );
 
-                    const pos =
-                        normalizedText.indexOf(
-                            normalizedCandidate
-                        );
+                    if (match) {
 
-                    if (
-                        pos !== -1
-                    ) {
+                        return match[0];
 
-                        /*
-                         * نحاول إيجاد النص نفسه في الأصل
-                         * دون الاعتماد على التطابق الحرفي للمسافات.
-                         */
-                        const rawIndex =
-                            text.toLowerCase()
-                                .indexOf(
-                                    candidate.toLowerCase()
-                                );
-
-                        if (
-                            rawIndex !== -1
-                        ) {
-
-                            return text
-                                .substring(
-                                    rawIndex,
-                                    rawIndex +
-                                    candidate.length
-                                );
-
-                        }
-
-                        /*
-                         * fallback:
-                         * إذا اختلفت المسافات فقط، نأخذ
-                         * نافذة النص الأقرب حسب طول المرشح.
-                         */
-                        return text.substring(
-                            Math.max(
-                                0,
-                                pos
-                            ),
-                            Math.min(
-                                text.length,
-                                pos +
-                                candidate.length
-                            )
-                        );
-                    }
-                }
-
-                /*
-                 * 2. محاولة أكثر دقة:
-                 * عنوان المرجع + موضعه.
-                 */
-                const title =
-                    String(
-                        reference?.title ||
-                        ""
-                    ).trim();
-
-                if (!title) {
-                    return "";
-                }
-
-                const volume =
-                    String(
-                        occurrence?.volume ||
-                        ""
-                    ).trim();
-
-                const page =
-                    String(
-                        occurrence?.page ||
-                        ""
-                    ).trim();
-
-                const pageRange =
-                    String(
-                        occurrence?.pageRange ||
-                        ""
-                    ).trim();
-
-                const location =
-                    volume && page
-                        ? `${volume}/${page}`
-                        : volume && pageRange
-                            ? `${volume}/${pageRange}`
-                            : pageRange
-                                ? pageRange
-                                : page;
-
-                /*
-                 * ابحث عن العنوان، ثم عن الموضع القريب منه.
-                 */
-                const normalizedOriginal =
-                    normalizeSearchText(
-                        text
-                    );
-
-                const normalizedTitle =
-                    normalizeSearchText(
-                        title
-                    );
-
-                let titlePos =
-                    normalizedOriginal.indexOf(
-                        normalizedTitle
-                    );
-
-                while (
-                    titlePos !== -1
-                ) {
-
-                    /*
-                     * خذ جزءًا لاحقًا من النص يبدأ من العنوان،
-                     * وابحث داخله عن الموضع.
-                     */
-                    const tail =
-                        normalizedOriginal.substring(
-                            titlePos
-                        );
-
-                    if (
-                        location
-                    ) {
-
-                        const normalizedLocation =
-                            normalizeSearchText(
-                                location
-                            );
-
-                        const locationPos =
-                            tail.indexOf(
-                                normalizedLocation
-                            );
-
-                        if (
-                            locationPos !== -1 &&
-                            locationPos < 250
-                        ) {
-
-                            /*
-                             * fallback آمن:
-                             * نحاول استخراج النص من العنوان
-                             * إلى نهاية الموضع من النص الأصلي.
-                             */
-                            const approximateLength =
-                                normalizedTitle.length +
-                                locationPos +
-                                normalizedLocation.length;
-
-                            const rawStart =
-                                Math.max(
-                                    0,
-                                    titlePos
-                                );
-
-                            return text.substring(
-                                rawStart,
-                                Math.min(
-                                    text.length,
-                                    rawStart +
-                                    approximateLength +
-                                    20
-                                )
-                            )
-                                .replace(
-                                    /[،,؛:.\s]+$/g,
-                                    ""
-                                )
-                                .trim();
-                        }
                     }
 
-                    const next =
-                        normalizedOriginal.indexOf(
-                            normalizedTitle,
-                            titlePos + 1
-                        );
-
-                    titlePos =
-                        next;
                 }
 
                 return "";
