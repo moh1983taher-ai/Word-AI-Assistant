@@ -28620,9 +28620,6 @@ async function buildFootnoteSuggestions(
 
             /*
              * المراجع التي سبق ظهورها في التوثيق.
-             *
-             * لا نستخدم رقم الحاشية في تحديد المرجع،
-             * لأن رقم الحاشية ليس هوية المرجع.
              */
             const seenReferences =
                 new Set();
@@ -28662,7 +28659,275 @@ async function buildFootnoteSuggestions(
                         .toLowerCase();
 
                 return `ref:${author}|${title}`;
+            }
 
+            /*
+             * تطبيع النص للمقارنة فقط.
+             * لا نستخدم النص المطبع في الاستبدال.
+             */
+            function normalizeSearchText(
+                value
+            ) {
+
+                return String(
+                    value || ""
+                )
+                    .replace(
+                        /[\u064B-\u065F\u0670]/g,
+                        ""
+                    )
+                    .replace(
+                        /[\u200C-\u200F\u202A-\u202E]/g,
+                        ""
+                    )
+                    .replace(
+                        /[\s\u00A0]+/g,
+                        " "
+                    )
+                    .trim()
+                    .toLowerCase();
+            }
+
+            /*
+             * البحث أولًا عن الصيغة الأصلية الكاملة للمرجع.
+             */
+            function findSourceText(
+                originalText,
+                reference,
+                occurrence
+            ) {
+
+                const text =
+                    String(
+                        originalText || ""
+                    );
+
+                if (!text.trim()) {
+                    return "";
+                }
+
+                /*
+                 * 1. variants أولًا؛ لأنها أكثر شيء
+                 * يحتمل أن يكون قريبًا من النص الأصلي.
+                 */
+                const variants =
+                    Array.isArray(
+                        reference?.variants
+                    )
+                        ? reference.variants
+                        : [];
+
+                for (
+                    let i = 0;
+                    i < variants.length;
+                    i++
+                ) {
+
+                    const candidate =
+                        String(
+                            variants[i] || ""
+                        ).trim();
+
+                    if (!candidate) {
+                        continue;
+                    }
+
+                    const normalizedCandidate =
+                        normalizeSearchText(
+                            candidate
+                        );
+
+                    const normalizedText =
+                        normalizeSearchText(
+                            text
+                        );
+
+                    const pos =
+                        normalizedText.indexOf(
+                            normalizedCandidate
+                        );
+
+                    if (
+                        pos !== -1
+                    ) {
+
+                        /*
+                         * نحاول إيجاد النص نفسه في الأصل
+                         * دون الاعتماد على التطابق الحرفي للمسافات.
+                         */
+                        const rawIndex =
+                            text.toLowerCase()
+                                .indexOf(
+                                    candidate.toLowerCase()
+                                );
+
+                        if (
+                            rawIndex !== -1
+                        ) {
+
+                            return text
+                                .substring(
+                                    rawIndex,
+                                    rawIndex +
+                                    candidate.length
+                                );
+
+                        }
+
+                        /*
+                         * fallback:
+                         * إذا اختلفت المسافات فقط، نأخذ
+                         * نافذة النص الأقرب حسب طول المرشح.
+                         */
+                        return text.substring(
+                            Math.max(
+                                0,
+                                pos
+                            ),
+                            Math.min(
+                                text.length,
+                                pos +
+                                candidate.length
+                            )
+                        );
+                    }
+                }
+
+                /*
+                 * 2. محاولة أكثر دقة:
+                 * عنوان المرجع + موضعه.
+                 */
+                const title =
+                    String(
+                        reference?.title ||
+                        ""
+                    ).trim();
+
+                if (!title) {
+                    return "";
+                }
+
+                const volume =
+                    String(
+                        occurrence?.volume ||
+                        ""
+                    ).trim();
+
+                const page =
+                    String(
+                        occurrence?.page ||
+                        ""
+                    ).trim();
+
+                const pageRange =
+                    String(
+                        occurrence?.pageRange ||
+                        ""
+                    ).trim();
+
+                const location =
+                    volume && page
+                        ? `${volume}/${page}`
+                        : volume && pageRange
+                            ? `${volume}/${pageRange}`
+                            : pageRange
+                                ? pageRange
+                                : page;
+
+                /*
+                 * ابحث عن العنوان، ثم عن الموضع القريب منه.
+                 */
+                const normalizedOriginal =
+                    normalizeSearchText(
+                        text
+                    );
+
+                const normalizedTitle =
+                    normalizeSearchText(
+                        title
+                    );
+
+                let titlePos =
+                    normalizedOriginal.indexOf(
+                        normalizedTitle
+                    );
+
+                while (
+                    titlePos !== -1
+                ) {
+
+                    /*
+                     * خذ جزءًا لاحقًا من النص يبدأ من العنوان،
+                     * وابحث داخله عن الموضع.
+                     */
+                    const tail =
+                        normalizedOriginal.substring(
+                            titlePos
+                        );
+
+                    if (
+                        location
+                    ) {
+
+                        const normalizedLocation =
+                            normalizeSearchText(
+                                location
+                            );
+
+                        const locationPos =
+                            tail.indexOf(
+                                normalizedLocation
+                            );
+
+                        if (
+                            locationPos !== -1 &&
+                            locationPos < 250
+                        ) {
+
+                            /*
+                             * fallback آمن:
+                             * نحاول استخراج النص من العنوان
+                             * إلى نهاية الموضع من النص الأصلي.
+                             */
+                            const approximateLength =
+                                normalizedTitle.length +
+                                locationPos +
+                                normalizedLocation.length;
+
+                            const rawStart =
+                                Math.max(
+                                    0,
+                                    titlePos
+                                );
+
+                            return text.substring(
+                                rawStart,
+                                Math.min(
+                                    text.length,
+                                    rawStart +
+                                    approximateLength +
+                                    20
+                                )
+                            )
+                                .replace(
+                                    /[،,؛:.\s]+$/g,
+                                    ""
+                                )
+                                .trim();
+                        }
+                    }
+
+                    const next =
+                        normalizedOriginal.indexOf(
+                            normalizedTitle,
+                            titlePos + 1
+                        );
+
+                    titlePos =
+                        next;
+                }
+
+                return "";
             }
 
             function addNotes(
@@ -28680,6 +28945,12 @@ async function buildFootnoteSuggestions(
 
                     const materialId =
                         `${source}-${index + 1}`;
+
+                    const originalText =
+                        String(
+                            note.body?.text ||
+                            ""
+                        ).trim();
 
                     const matches =
                         unifiedFootnoteMap.get(
@@ -28703,6 +28974,21 @@ async function buildFootnoteSuggestions(
                             }
                         );
 
+                    const sourceTexts =
+                        matches.map(
+                            function (
+                                item
+                            ) {
+
+                                return findSourceText(
+                                    originalText,
+                                    item.reference,
+                                    item.occurrence
+                                );
+
+                            }
+                        );
+
                     const suggestedTexts =
                         matches.map(
                             function (
@@ -28717,18 +29003,6 @@ async function buildFootnoteSuggestions(
                                         reference
                                     );
 
-                                /*
-                                 * الخيار:
-                                 * الكتاب والمؤلف عند أول ذكر فقط
-                                 *
-                                 * أول ظهور للمرجع:
-                                 * includeAuthor = true
-                                 *
-                                 * الظهور التالي:
-                                 * includeAuthor = false
-                                 *
-                                 * أما بقية الصيغ فلا تتأثر.
-                                 */
                                 let includeAuthor =
                                     true;
 
@@ -28751,7 +29025,6 @@ async function buildFootnoteSuggestions(
                                         );
 
                                     }
-
                                 }
 
                                 return formatFootnoteReference(
@@ -28775,12 +29048,8 @@ async function buildFootnoteSuggestions(
                             materialId,
 
                         originalText:
-                            String(
-                                note.body?.text ||
-                                ""
-                            ).trim(),
+                            originalText,
 
-                        // البنية القديمة — للحفاظ على التوافق
                         reference:
                             references[0] ||
                             null,
@@ -28789,12 +29058,19 @@ async function buildFootnoteSuggestions(
                             suggestedTexts[0] ||
                             "",
 
-                        // البنية الجديدة — للتعدد
                         references:
                             references,
 
                         suggestedTexts:
-                            suggestedTexts
+                            suggestedTexts,
+
+                        /*
+                         * النص الأصلي لكل مرجع داخل الحاشية.
+                         * هذا هو المفتاح الذي سيستخدمه التطبيق
+                         * لاستبدال المرجع فقط.
+                         */
+                        sourceTexts:
+                            sourceTexts
 
                     });
 
@@ -28892,13 +29168,16 @@ async function applyFootnoteSuggestions(
                         ) ||
                         !Array.isArray(
                             suggestion.suggestedTexts
+                        ) ||
+                        !Array.isArray(
+                            suggestion.sourceTexts
                         )
                     ) {
                         continue;
                     }
 
                     /*
-                     * كل مرجع داخل الحاشية يعالج منفردًا.
+                     * نعالج كل مرجع داخل الحاشية منفردًا.
                      */
                     for (
                         let i = 0;
@@ -28906,8 +29185,11 @@ async function applyFootnoteSuggestions(
                         i++
                     ) {
 
-                        const reference =
-                            suggestion.references[i];
+                        const sourceText =
+                            String(
+                                suggestion.sourceTexts[i] ||
+                                ""
+                            ).trim();
 
                         const suggestedText =
                             String(
@@ -28916,129 +29198,57 @@ async function applyFootnoteSuggestions(
                             ).trim();
 
                         if (
-                            !reference ||
+                            !sourceText ||
                             !suggestedText
                         ) {
+                            skipped++;
                             continue;
                         }
 
                         /*
-                         * لا نبحث عن title أو author.
+                         * نبحث عن النص الأصلي الكامل للمرجع
+                         * داخل الحاشية.
                          *
-                         * نبحث فقط عن الصيغ الأصلية الكاملة
-                         * التي حفظها الذكاء الاصطناعي في variants.
+                         * لا نبحث عن العنوان وحده،
+                         * ولا عن المؤلف وحده،
+                         * ولا عن variants.
                          */
-                        const variants =
-                            Array.isArray(
-                                reference?.variants
-                            )
-                                ? reference.variants
-                                : [];
+                        const searchResults =
+                            note.body.search(
+                                sourceText,
+                                {
+                                    matchCase: false,
+                                    matchWholeWord: false,
+                                    matchWildcards: false
+                                }
+                            );
+
+                        searchResults.load(
+                            "items"
+                        );
+
+                        await context.sync();
 
                         if (
-                            variants.length === 0
+                            searchResults.items.length === 0
                         ) {
+
                             skipped++;
                             continue;
                         }
 
-                        let found =
-                            false;
-
                         /*
-                         * نبدأ بأطول صيغة؛ لأنها غالبًا
-                         * أكثر دقة وأقل احتمالًا لمطابقة
-                         * جزء من المرجع فقط.
+                         * استبدال المرجع نفسه فقط.
+                         * بقية نص الحاشية يبقى كما هو.
                          */
-                        const candidates =
-                            variants
-                                .map(
-                                    function (variant) {
+                        searchResults.items[0].insertText(
+                            suggestedText,
+                            Word.InsertLocation.replace
+                        );
 
-                                        return String(
-                                            variant || ""
-                                        )
-                                            .replace(
-                                                /\s+/g,
-                                                " "
-                                            )
-                                            .trim();
+                        applied++;
 
-                                    }
-                                )
-                                .filter(Boolean)
-                                .sort(
-                                    function (a, b) {
-
-                                        return (
-                                            b.length -
-                                            a.length
-                                        );
-
-                                    }
-                                );
-
-                        for (
-                            let v = 0;
-                            v < candidates.length;
-                            v++
-                        ) {
-
-                            const candidate =
-                                candidates[v];
-
-                            if (!candidate) {
-                                continue;
-                            }
-
-                            /*
-                             * بحث مطابق للصيغة الأصلية الكاملة.
-                             */
-                            const searchResults =
-                                note.body.search(
-                                    candidate,
-                                    {
-                                        matchCase: false,
-                                        matchWholeWord: false,
-                                        matchWildcards: false
-                                    }
-                                );
-
-                            searchResults.load(
-                                "items"
-                            );
-
-                            await context.sync();
-
-                            if (
-                                searchResults.items.length === 0
-                            ) {
-                                continue;
-                            }
-
-                            /*
-                             * استبدال المرجع المطابق فقط.
-                             *
-                             * لا نستخدم note.body.replace
-                             * ولا نستبدل جسم الحاشية كله.
-                             */
-                            searchResults.items[0].insertText(
-                                suggestedText,
-                                Word.InsertLocation.replace
-                            );
-
-                            await context.sync();
-
-                            applied++;
-                            found = true;
-
-                            break;
-                        }
-
-                        if (!found) {
-                            skipped++;
-                        }
-
+                        await context.sync();
                     }
 
                 }
@@ -29054,8 +29264,6 @@ async function applyFootnoteSuggestions(
                 endnotes,
                 "endnote"
             );
-
-            await context.sync();
 
             return {
                 applied: applied,
