@@ -28792,44 +28792,29 @@ async function applyFootnoteSuggestions(
                         );
 
                     if (
-                        !suggestion
-                    ) {
-                        continue;
-                    }
-
-                    const references =
-                        Array.isArray(
+                        !suggestion ||
+                        !Array.isArray(
                             suggestion.references
-                        )
-                            ? suggestion.references
-                            : [];
-
-                    const suggestedTexts =
-                        Array.isArray(
+                        ) ||
+                        !Array.isArray(
                             suggestion.suggestedTexts
                         )
-                            ? suggestion.suggestedTexts
-                            : [];
-
-                    if (
-                        references.length === 0 ||
-                        suggestedTexts.length === 0
                     ) {
                         continue;
                     }
 
                     for (
                         let i = 0;
-                        i < references.length;
+                        i < suggestion.references.length;
                         i++
                     ) {
 
                         const reference =
-                            references[i];
+                            suggestion.references[i];
 
                         const suggestedText =
                             String(
-                                suggestedTexts[i] ||
+                                suggestion.suggestedTexts[i] ||
                                 ""
                             ).trim();
 
@@ -28847,20 +28832,80 @@ async function applyFootnoteSuggestions(
                                 ? reference.variants
                                 : [];
 
+                        const candidates = [];
+
+                        /*
+                         * أولًا: الصيغ الأصلية التي حفظها الذكاء الاصطناعي.
+                         */
+                        variants.forEach(
+                            function (variant) {
+
+                                const value =
+                                    String(
+                                        variant || ""
+                                    ).trim();
+
+                                if (
+                                    value &&
+                                    !candidates.includes(value)
+                                ) {
+                                    candidates.push(value);
+                                }
+
+                            }
+                        );
+
+                        /*
+                         * ثانيًا: محاولة تكوين صيغة بحث
+                         * من العنوان + موضع الاستشهاد.
+                         */
+                        const occurrence =
+                            Array.isArray(
+                                suggestion?.references
+                            )
+                                ? (
+                                    suggestion.references[i]
+                                        ? suggestion.references[i]
+                                        : null
+                                )
+                                : null;
+
+                        const occurrenceData =
+                            Array.isArray(
+                                suggestion?.suggestedTexts
+                            )
+                                ? null
+                                : null;
+
+                        const title =
+                            String(
+                                reference?.title ||
+                                ""
+                            ).trim();
+
+                        if (title) {
+
+                            candidates.push(
+                                title
+                            );
+
+                        }
+
                         let found =
                             false;
 
+                        /*
+                         * البحث عن المرجع داخل جسم الحاشية
+                         * واستبدال المرجع وحده.
+                         */
                         for (
-                            let v = 0;
-                            v < variants.length;
-                            v++
+                            let c = 0;
+                            c < candidates.length;
+                            c++
                         ) {
 
                             const candidate =
-                                String(
-                                    variants[v] ||
-                                    ""
-                                ).trim();
+                                candidates[c];
 
                             if (!candidate) {
                                 continue;
@@ -28883,28 +28928,26 @@ async function applyFootnoteSuggestions(
                             await context.sync();
 
                             if (
-                                searchResults.items.length > 0
+                                searchResults.items.length === 0
                             ) {
-
-                                /*
-                                 * نستبدل نطاق المرجع فقط،
-                                 * ولا نلمس بقية الحاشية.
-                                 */
-                                searchResults.items[0].insertText(
-                                    suggestedText,
-                                    Word.InsertLocation.replace
-                                );
-
-                                applied++;
-
-                                found =
-                                    true;
-
-                                await context.sync();
-
-                                break;
+                                continue;
                             }
 
+                            /*
+                             * نستبدل النطاق المطابق فقط،
+                             * ولا نستبدل جسم الحاشية كله.
+                             */
+                            searchResults.items[0].insertText(
+                                suggestedText,
+                                Word.InsertLocation.replace
+                            );
+
+                            await context.sync();
+
+                            applied++;
+                            found = true;
+
+                            break;
                         }
 
                         if (!found) {
