@@ -28965,7 +28965,9 @@ async function applyFootnoteSuggestions(
             let applied = 0;
             let skipped = 0;
 
-            function normalizeForSearch(value) {
+            function normalizeForSearch(
+                value
+            ) {
 
                 return String(
                     value || ""
@@ -28986,11 +28988,6 @@ async function applyFootnoteSuggestions(
                     .toLowerCase();
             }
 
-            /*
-             * يبني النص المرشح للبحث من:
-             * - variants إن وجدت
-             * - وإلا العنوان + الموضع الخاص بهذا الظهور
-             */
             function getCandidates(
                 reference,
                 materialId
@@ -29006,7 +29003,9 @@ async function applyFootnoteSuggestions(
                         : [];
 
                 variants.forEach(
-                    function (variant) {
+                    function (
+                        variant
+                    ) {
 
                         const value =
                             String(
@@ -29015,106 +29014,160 @@ async function applyFootnoteSuggestions(
 
                         if (
                             value &&
-                            !candidates.includes(value)
+                            !candidates.includes(
+                                value
+                            )
                         ) {
-                            candidates.push(value);
+
+                            candidates.push(
+                                value
+                            );
+
                         }
 
                     }
                 );
 
-                if (candidates.length) {
-                    return candidates.sort(
-                        function (a, b) {
-                            return b.length - a.length;
-                        }
-                    );
+                /*
+                 * نستفيد من العنوان + موضع occurrence
+                 * إذا لم نجد صيغة مناسبة في variants.
+                 */
+                if (
+                    candidates.length === 0
+                ) {
+
+                    const title =
+                        String(
+                            reference?.title ||
+                            ""
+                        ).trim();
+
+                    if (!title) {
+                        return [];
+                    }
+
+                    const occurrences =
+                        Array.isArray(
+                            reference?.occurrences
+                        )
+                            ? reference.occurrences
+                            : [];
+
+                    const occurrence =
+                        occurrences.find(
+                            function (
+                                item
+                            ) {
+
+                                return (
+                                    String(
+                                        item?.materialId ||
+                                        ""
+                                    ).trim() ===
+                                    materialId
+                                );
+
+                            }
+                        );
+
+                    if (!occurrence) {
+                        return [title];
+                    }
+
+                    const volume =
+                        String(
+                            occurrence?.volume ||
+                            ""
+                        ).trim();
+
+                    const page =
+                        String(
+                            occurrence?.page ||
+                            ""
+                        ).trim();
+
+                    const pageRange =
+                        String(
+                            occurrence?.pageRange ||
+                            ""
+                        ).trim();
+
+                    let location = "";
+
+                    if (
+                        volume &&
+                        page
+                    ) {
+
+                        location =
+                            `${volume}/${page}`;
+
+                    }
+                    else if (
+                        volume &&
+                        pageRange
+                    ) {
+
+                        location =
+                            `${volume}/${pageRange}`;
+
+                    }
+                    else if (
+                        pageRange
+                    ) {
+
+                        location =
+                            pageRange;
+
+                    }
+                    else if (
+                        page
+                    ) {
+
+                        location =
+                            page;
+
+                    }
+
+                    if (location) {
+
+                        candidates.push(
+                            `${title} ${location}`
+                        );
+
+                    }
+                    else {
+
+                        candidates.push(
+                            title
+                        );
+
+                    }
+
                 }
 
-                const title =
-                    String(
-                        reference?.title || ""
-                    ).trim();
+                return candidates.sort(
+                    function (
+                        a,
+                        b
+                    ) {
 
-                if (!title) {
-                    return [];
-                }
+                        return (
+                            b.length -
+                            a.length
+                        );
 
-                const occurrences =
-                    Array.isArray(
-                        reference?.occurrences
-                    )
-                        ? reference.occurrences
-                        : [];
+                    }
+                );
 
-                const occurrence =
-                    occurrences.find(
-                        function (item) {
-                            return (
-                                String(
-                                    item?.materialId || ""
-                                ).trim() ===
-                                materialId
-                            );
-                        }
-                    );
-
-                if (!occurrence) {
-                    return [title];
-                }
-
-                const volume =
-                    String(
-                        occurrence?.volume || ""
-                    ).trim();
-
-                const page =
-                    String(
-                        occurrence?.page || ""
-                    ).trim();
-
-                const pageRange =
-                    String(
-                        occurrence?.pageRange || ""
-                    ).trim();
-
-                let location = "";
-
-                if (volume && page) {
-                    location =
-                        `${volume}/${page}`;
-                }
-                else if (volume && pageRange) {
-                    location =
-                        `${volume}/${pageRange}`;
-                }
-                else if (pageRange) {
-                    location =
-                        pageRange;
-                }
-                else if (page) {
-                    location =
-                        page;
-                }
-
-                if (location) {
-                    return [
-                        `${title} ${location}`
-                    ];
-                }
-
-                return [title];
             }
 
-            /*
-             * تحويل النص إلى نسخة مطبعة مع الاحتفاظ
-             * بمؤشرات النص الأصلي.
-             */
             function buildNormalizedMap(
                 text
             ) {
 
                 let normalized = "";
+
                 const starts = [];
                 const ends = [];
 
@@ -29127,9 +29180,6 @@ async function applyFootnoteSuggestions(
                     const char =
                         text[i];
 
-                    /*
-                     * حذف التشكيل والعلامات الخفية.
-                     */
                     if (
                         /[\u064B-\u065F\u0670]/.test(
                             char
@@ -29141,11 +29191,9 @@ async function applyFootnoteSuggestions(
 
                         i++;
                         continue;
+
                     }
 
-                    /*
-                     * توحيد المسافات.
-                     */
                     if (
                         /[\s\u00A0]/.test(
                             char
@@ -29161,12 +29209,20 @@ async function applyFootnoteSuggestions(
                                 text[i]
                             )
                         ) {
+
                             i++;
+
                         }
 
                         normalized += " ";
-                        starts.push(start);
-                        ends.push(i);
+
+                        starts.push(
+                            start
+                        );
+
+                        ends.push(
+                            i
+                        );
 
                         continue;
                     }
@@ -29174,10 +29230,16 @@ async function applyFootnoteSuggestions(
                     normalized +=
                         char.toLowerCase();
 
-                    starts.push(i);
-                    ends.push(i + 1);
+                    starts.push(
+                        i
+                    );
+
+                    ends.push(
+                        i + 1
+                    );
 
                     i++;
+
                 }
 
                 return {
@@ -29193,13 +29255,9 @@ async function applyFootnoteSuggestions(
 
             }
 
-            /*
-             * العثور على النص الأصلي المقابل
-             * لمرشح مطبع.
-             */
-            function findOriginalRange(
+            function findOriginalText(
                 originalText,
-                candidate
+                candidates
             ) {
 
                 const normalizedData =
@@ -29207,69 +29265,81 @@ async function applyFootnoteSuggestions(
                         originalText
                     );
 
-                const normalizedCandidate =
-                    normalizeForSearch(
-                        candidate
-                    );
-
-                if (
-                    !normalizedCandidate
+                for (
+                    let i = 0;
+                    i < candidates.length;
+                    i++
                 ) {
-                    return null;
-                }
 
-                const start =
-                    normalizedData.text.indexOf(
-                        normalizedCandidate
-                    );
+                    const candidate =
+                        String(
+                            candidates[i] || ""
+                        ).trim();
 
-                if (
-                    start === -1
-                ) {
-                    return null;
-                }
+                    if (!candidate) {
+                        continue;
+                    }
 
-                const end =
-                    start +
-                    normalizedCandidate.length;
+                    const normalizedCandidate =
+                        normalizeForSearch(
+                            candidate
+                        );
 
-                /*
-                 * لأننا trim للنص، نضمن عدم الخروج
-                 * من حدود المصفوفة.
-                 */
-                if (
-                    start >=
-                    normalizedData.starts.length
-                ) {
-                    return null;
-                }
+                    const position =
+                        normalizedData.text.indexOf(
+                            normalizedCandidate
+                        );
 
-                const rawStart =
-                    normalizedData.starts[
-                        start
-                    ];
+                    if (
+                        position === -1
+                    ) {
 
-                const rawEnd =
-                    normalizedData.ends[
-                        Math.min(
-                            end - 1,
-                            normalizedData.ends.length - 1
-                        )
-                    ];
+                        continue;
 
-                if (
-                    rawEnd <= rawStart
-                ) {
-                    return null;
-                }
+                    }
 
-                return {
-                    start:
+                    const end =
+                        position +
+                        normalizedCandidate.length;
+
+                    if (
+                        position >=
+                        normalizedData.starts.length
+                    ) {
+
+                        continue;
+
+                    }
+
+                    const rawStart =
+                        normalizedData.starts[
+                            position
+                        ];
+
+                    const rawEnd =
+                        normalizedData.ends[
+                            Math.min(
+                                end - 1,
+                                normalizedData.ends.length - 1
+                            )
+                        ];
+
+                    if (
+                        rawEnd <= rawStart
+                    ) {
+
+                        continue;
+
+                    }
+
+                    return originalText.substring(
                         rawStart,
-
-                    end:
                         rawEnd
-                };
+                    );
+
+                }
+
+                return "";
 
             }
 
@@ -29292,7 +29362,9 @@ async function applyFootnoteSuggestions(
 
                     const suggestion =
                         footnoteSuggestions.find(
-                            function (item) {
+                            function (
+                                item
+                            ) {
 
                                 return (
                                     item?.source ===
@@ -29317,24 +29389,9 @@ async function applyFootnoteSuggestions(
                     ) {
 
                         continue;
+
                     }
 
-                    /*
-                     * نقرأ النص الأصلي للحاشية مرة واحدة.
-                     */
-                    note.body.load("text");
-
-                    await context.sync();
-
-                    const originalText =
-                        String(
-                            note.body.text || ""
-                        );
-
-                    /*
-                     * نبحث في النص الحالي عن كل مرجع
-                     * بصورة مستقلة.
-                     */
                     for (
                         let i = 0;
                         i < suggestion.references.length;
@@ -29356,6 +29413,7 @@ async function applyFootnoteSuggestions(
                         ) {
 
                             continue;
+
                         }
 
                         const materialId =
@@ -29367,94 +29425,84 @@ async function applyFootnoteSuggestions(
                                 materialId
                             );
 
-                        let rangeInfo =
-                            null;
+                        /*
+                         * نحدد النص الأصلي للمرجع فقط.
+                         */
+                        const noteTextRange =
+                            note.body;
 
-                        for (
-                            let c = 0;
-                            c < candidates.length;
-                            c++
-                        ) {
+                        noteTextRange.load(
+                            "text"
+                        );
 
-                            rangeInfo =
-                                findOriginalRange(
-                                    originalText,
-                                    candidates[c]
-                                );
+                        await context.sync();
 
-                            if (
-                                rangeInfo
-                            ) {
-                                break;
-                            }
+                        const currentText =
+                            String(
+                                noteTextRange.text ||
+                                ""
+                            );
 
-                        }
+                        const sourceText =
+                            findOriginalText(
+                                currentText,
+                                candidates
+                            );
 
                         if (
-                            !rangeInfo
+                            !sourceText
                         ) {
 
                             skipped++;
                             continue;
+
                         }
 
                         /*
-                         * الحصول على النص الحقيقي
-                         * من النطاق الذي عثرنا عليه.
-                         */
-                        const before =
-                            originalText.substring(
-                                0,
-                                rangeInfo.start
-                            );
-
-                        const targetText =
-                            originalText.substring(
-                                rangeInfo.start,
-                                rangeInfo.end
-                            );
-
-                        const after =
-                            originalText.substring(
-                                rangeInfo.end
-                            );
-
-                        const rebuiltText =
-                            before +
-                            suggestedText +
-                            after;
-
-                        /*
-                         * استبدال جسم الحاشية مؤقتًا بالنص
-                         * الناتج مع المحافظة على كل النص
-                         * الأصلي خارج المرجع.
+                         * مهم جدًا:
+                         * لا نستبدل note.body.
                          *
-                         * لا نلمس note.reference.
+                         * نبحث عن النص الذي حددناه،
+                         * ثم نستبدل Range نفسه فقط.
                          */
-                        note.body.insertText(
-                            rebuiltText,
+                        const searchResults =
+                            note.body.search(
+                                sourceText,
+                                {
+                                    matchCase:
+                                        false,
+
+                                    matchWholeWord:
+                                        false,
+
+                                    matchWildcards:
+                                        false
+                                }
+                            );
+
+                        searchResults.load(
+                            "items"
+                        );
+
+                        await context.sync();
+
+                        if (
+                            searchResults.items.length === 0
+                        ) {
+
+                            skipped++;
+                            continue;
+
+                        }
+
+                        searchResults.items[0].insertText(
+                            suggestedText,
                             Word.InsertLocation.replace
                         );
 
+                        await context.sync();
+
                         applied++;
-
-                        await context.sync();
-
-                        /*
-                         * نعيد قراءة النص بعد التعديل حتى تكون
-                         * العملية التالية مبنية على النص الحالي.
-                         */
-                        note.body.load("text");
-
-                        await context.sync();
-
-                        /*
-                         * تحديث النسخة المحلية للحاشية.
-                         */
-                        originalText =
-                            String(
-                                note.body.text || ""
-                            );
 
                     }
 
