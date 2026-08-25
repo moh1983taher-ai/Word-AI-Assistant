@@ -29479,8 +29479,59 @@ async function applyFootnoteSuggestions(
                     }
 
                     /*
-                    * نبحث ونستبدل من الأخير إلى الأول،
-                    * كما في النسخة المستقرة السابقة.
+                    * المراجع التي تم توثيق اسمها بالفعل
+                    * داخل هذه الحاشية.
+                    *
+                    * المرجع نفسه قد يظهر أكثر من مرة
+                    * بسبب تعدد مواضعه، لكن الاسم يجب
+                    * أن يستبدل مرة واحدة فقط.
+                    */
+                    const appliedReferenceKeys =
+                        new Set();
+
+                    function getReferenceKey(
+                        reference
+                    ) {
+
+                        if (!reference) {
+                            return "";
+                        }
+
+                        const id =
+                            String(
+                                reference?.id ||
+                                ""
+                            ).trim();
+
+                        if (id) {
+                            return `id:${id}`;
+                        }
+
+                        const author =
+                            String(
+                                reference?.author ||
+                                ""
+                            )
+                                .trim()
+                                .toLowerCase();
+
+                        const title =
+                            String(
+                                reference?.title ||
+                                ""
+                            )
+                                .trim()
+                                .toLowerCase();
+
+                        return (
+                            `ref:${author}|${title}`
+                        );
+
+                    }
+
+                    /*
+                    * نبدأ من آخر مرجع إلى الأول
+                    * كما في النسخة المستقرة.
                     */
                     for (
                         let i =
@@ -29507,151 +29558,30 @@ async function applyFootnoteSuggestions(
 
                         }
 
-                        /*
-                        * -------------------------------------------------
-                        * تحديد هل التوثيق المطلوب يتضمن المؤلف أم لا.
-                        *
-                        * في نمط:
-                        * title-author-first
-                        *
-                        * يكون suggestedText في الظهور الأول
-                        * متضمنًا للمؤلف، وفي الظهور التالي
-                        * يكون اسم الكتاب فقط.
-                        *
-                        * نستفيد من النص المقترح الموجود أصلًا
-                        * ولا نعيد حساب ترتيب الظهور.
-                        * -------------------------------------------------
-                        */
-
-                        const author =
-                            String(
-                                reference?.author ||
-                                ""
-                            ).trim();
-
-                        const suggestedNormalized =
-                            normalizeForSearch(
-                                suggestedText
-                            );
-
-                        const authorNormalized =
-                            normalizeForSearch(
-                                author
-                            );
-
-                        const includeAuthor =
-                            Boolean(
-                                authorNormalized &&
-                                suggestedNormalized.includes(
-                                    authorNormalized
-                                )
+                        const referenceKey =
+                            getReferenceKey(
+                                reference
                             );
 
                         /*
-                        * -------------------------------------------------
-                        * النص الذي سيُستبدل:
+                        * إذا كان المرجع نفسه قد عولج
+                        * سابقًا داخل الحاشية الحالية،
+                        * فلا نكرر اسمه.
                         *
-                        * هوية المرجع فقط.
-                        *
-                        * لا نستخدم suggestedText نفسه لأنه يحتوي
-                        * على المجلد والصفحة، ونحن لا نريد لمسها.
-                        * -------------------------------------------------
+                        * نترك الأرقام الموجودة في الحاشية
+                        * كما هي.
                         */
-
-                        let replacementText =
-                            "";
-
-                        switch (
-                            referenceStyle.format
-                        ) {
-
-                            case "reference-only":
-
-                                replacementText =
-                                    String(
-                                        reference?.title ||
-                                        ""
-                                    ).trim();
-
-                                break;
-
-                            case "title-author":
-
-                                replacementText =
-                                    [
-                                        reference?.title,
-                                        reference?.author
-                                    ]
-                                        .map(
-                                            function (value) {
-                                                return String(
-                                                    value || ""
-                                                ).trim();
-                                            }
-                                        )
-                                        .filter(Boolean)
-                                        .join("، ");
-
-                                break;
-
-                            case "title-author-first":
-
-                                replacementText =
-                                    [
-                                        reference?.title,
-                                        includeAuthor
-                                            ? reference?.author
-                                            : ""
-                                    ]
-                                        .map(
-                                            function (value) {
-                                                return String(
-                                                    value || ""
-                                                ).trim();
-                                            }
-                                        )
-                                        .filter(Boolean)
-                                        .join("، ");
-
-                                break;
-
-                            case "author-title":
-
-                            default:
-
-                                replacementText =
-                                    [
-                                        reference?.author,
-                                        reference?.title
-                                    ]
-                                        .map(
-                                            function (value) {
-                                                return String(
-                                                    value || ""
-                                                ).trim();
-                                            }
-                                        )
-                                        .filter(Boolean)
-                                        .join("، ");
-
-                                break;
-                        }
-
                         if (
-                            !replacementText.trim()
+                            referenceKey &&
+                            appliedReferenceKeys.has(
+                                referenceKey
+                            )
                         ) {
 
-                            skipped++;
                             continue;
 
                         }
 
-                        /*
-                        * materialId لا نحتاج إليه الآن في المطابقة
-                        * لأننا لا نبحث عن موضع المرجع بالأرقام.
-                        *
-                        * يبقى تمريره للحفاظ على بنية الدالة.
-                        */
                         const materialId =
                             `${source}-${index + 1}`;
 
@@ -29670,9 +29600,6 @@ async function applyFootnoteSuggestions(
 
                         }
 
-                        /*
-                        * البحث عن هوية المرجع فقط.
-                        */
                         const range =
                             await findLastMatch(
                                 note.body,
@@ -29689,17 +29616,101 @@ async function applyFootnoteSuggestions(
                         }
 
                         /*
-                        * استبدال هوية المرجع فقط.
+                        * نستخرج هوية المرجع فقط من
+                        * suggestedText، ونترك الأرقام.
                         *
-                        * أي رقم أو مجلد أو صفحة بعد المرجع
-                        * يبقى كما هو في الحاشية الأصلية.
+                        * لأن الأرقام ليست من مهمة هذه الدالة.
                         */
+                        const title =
+                            String(
+                                reference?.title ||
+                                ""
+                            ).trim();
+
+                        const author =
+                            String(
+                                reference?.author ||
+                                ""
+                            ).trim();
+
+                        let replacementText =
+                            "";
+
+                        switch (
+                            referenceStyle.format
+                        ) {
+
+                            case "reference-only":
+
+                                replacementText =
+                                    title;
+
+                                break;
+
+                            case "title-author":
+
+                                replacementText =
+                                    [
+                                        title,
+                                        author
+                                    ]
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+
+                            case "title-author-first":
+
+                                replacementText =
+                                    [
+                                        title,
+                                        author
+                                    ]
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+
+                            case "author-title":
+
+                            default:
+
+                                replacementText =
+                                    [
+                                        author,
+                                        title
+                                    ]
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+                        }
+
+                        if (
+                            !replacementText
+                        ) {
+
+                            skipped++;
+                            continue;
+
+                        }
+
                         range.insertText(
                             replacementText,
                             Word.InsertLocation.replace
                         );
 
                         applied++;
+
+                        if (
+                            referenceKey
+                        ) {
+
+                            appliedReferenceKeys.add(
+                                referenceKey
+                            );
+
+                        }
 
                         await context.sync();
 
