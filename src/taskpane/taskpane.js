@@ -29548,14 +29548,12 @@ async function applyFootnoteSuggestions(
                     }
 
                     /*
-                    * -------------------------------------------------
+                    * =================================================
                     * المرحلة الأولى:
-                    * العثور على جميع المراجع في الحاشية الحالية
-                    * دون إجراء أي تعديل عليها.
+                    * تحديد جميع المواضع في الحاشية الأصلية.
                     *
-                    * هذا مهم جدًا حتى لا يؤثر تعديل مرجع
-                    * في البحث عن المرجع التالي.
-                    * -------------------------------------------------
+                    * لا يتم تعديل الحاشية هنا إطلاقًا.
+                    * =================================================
                     */
 
                     const pendingReplacements = [];
@@ -29604,8 +29602,8 @@ async function applyFootnoteSuggestions(
                         }
 
                         /*
-                        * نبحث عن Range المرجع في النص الحالي،
-                        * لكننا لا نعدله بعد.
+                        * مهم:
+                        * findLastMatch هنا لا يغير الحاشية.
                         */
                         const range =
                             await findLastMatch(
@@ -29628,42 +29626,47 @@ async function applyFootnoteSuggestions(
                                 range,
 
                             text:
-                                suggestedText
+                                suggestedText,
+
+                            referenceIndex:
+                                i
 
                         });
 
                     }
 
                     /*
-                    * -------------------------------------------------
+                    * =================================================
                     * المرحلة الثانية:
-                    * بعد الانتهاء من العثور على جميع المراجع،
-                    * نطبق جميع الاستبدالات دفعة واحدة.
-                    * -------------------------------------------------
+                    *
+                    * نطبق الاستبدالات واحدًا واحدًا،
+                    * من اليمين إلى اليسار.
+                    *
+                    * الـRanges تم تحديدها قبل أي تعديل.
+                    * =================================================
                     */
 
-                    pendingReplacements.forEach(
-                        function (
-                            replacement
-                        ) {
-
-                            replacement.range.insertText(
-                                replacement.text,
-                                Word.InsertLocation.replace
-                            );
-
-                            applied++;
-
-                        }
-                    );
-
-                    /*
-                    * مزامنة واحدة فقط بعد جميع الاستبدالات.
-                    */
-                    if (
-                        pendingReplacements.length > 0
+                    for (
+                        let i = 0;
+                        i < pendingReplacements.length;
+                        i++
                     ) {
 
+                        const replacement =
+                            pendingReplacements[i];
+
+                        replacement.range.insertText(
+                            replacement.text,
+                            Word.InsertLocation.replace
+                        );
+
+                        applied++;
+
+                        /*
+                        * مزامنة بعد استبدال واحد فقط.
+                        *
+                        * لا نعيد البحث عن المرجع التالي.
+                        */
                         await context.sync();
 
                     }
