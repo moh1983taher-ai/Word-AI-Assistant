@@ -29004,7 +29004,9 @@ async function applyFootnoteSuggestions(
 
                 const candidates = [];
 
-                function addCandidate(value) {
+                function addCandidate(
+                    value
+                ) {
 
                     const text =
                         String(
@@ -29013,10 +29015,17 @@ async function applyFootnoteSuggestions(
 
                     if (
                         text &&
-                        !candidates.includes(text)
+                        !candidates.includes(
+                            text
+                        )
                     ) {
-                        candidates.push(text);
+
+                        candidates.push(
+                            text
+                        );
+
                     }
+
                 }
 
                 const title =
@@ -29031,157 +29040,63 @@ async function applyFootnoteSuggestions(
                         ""
                     ).trim();
 
-                const variants =
-                    Array.isArray(
-                        reference?.variants
-                    )
-                        ? reference.variants
-                        : [];
-
                 /*
-                * صيغ الذكاء الاصطناعي أولًا.
+                * -------------------------------------------------
+                * هوية المرجع فقط.
+                *
+                * لا نضيف volume/page/pageRange هنا إطلاقًا.
+                * -------------------------------------------------
                 */
-                variants.forEach(
-                    function (variant) {
 
-                        addCandidate(
-                            variant
-                        );
-
-                    }
-                );
-
-                /*
-                * occurrence الخاص بهذه الحاشية فقط.
-                */
-                const occurrences =
-                    Array.isArray(
-                        reference?.occurrences
-                    )
-                        ? reference.occurrences
-                        : [];
-
-                const occurrence =
-                    occurrences.find(
-                        function (item) {
-
-                            return (
-                                String(
-                                    item?.materialId ||
-                                    ""
-                                ).trim() ===
-                                String(
-                                    materialId ||
-                                    ""
-                                ).trim()
-                            );
-
-                        }
-                    );
-
-                let location = "";
-
-                if (occurrence) {
-
-                    const volume =
-                        String(
-                            occurrence?.volume ||
-                            ""
-                        ).trim();
-
-                    const page =
-                        String(
-                            occurrence?.page ||
-                            ""
-                        ).trim();
-
-                    const pageRange =
-                        String(
-                            occurrence?.pageRange ||
-                            ""
-                        ).trim();
-
-                    if (
-                        volume &&
-                        page
-                    ) {
-
-                        location =
-                            `${volume}/${page}`;
-
-                    }
-                    else if (
-                        volume &&
-                        pageRange
-                    ) {
-
-                        location =
-                            `${volume}/${pageRange}`;
-
-                    }
-                    else if (
-                        pageRange
-                    ) {
-
-                        location =
-                            pageRange;
-
-                    }
-                    else if (
-                        page
-                    ) {
-
-                        location =
-                            page;
-
-                    }
-                }
-
-                /*
-                * العنوان + الموضع الحقيقي.
-                */
                 if (
                     title &&
-                    location
+                    author
                 ) {
 
-                    addCandidate(
-                        `${title} ${location}`
-                    );
-
-                    addCandidate(
-                        `${title}${location}`
-                    );
-
                     /*
-                    * معالجة الصيغة التي يكون فيها المؤلف
-                    * جزءًا من اسم المرجع في النص الأصلي.
+                    * الصيغ المحتملة لهوية المرجع.
                     */
-                    if (author) {
+                    addCandidate(
+                        `${author}، ${title}`
+                    );
 
-                        addCandidate(
-                            `${title} لل${author} ${location}`
-                        );
+                    addCandidate(
+                        `${author}, ${title}`
+                    );
 
-                        addCandidate(
-                            `${title} لـ${author} ${location}`
-                        );
+                    addCandidate(
+                        `${title}، ${author}`
+                    );
 
-                        addCandidate(
-                            `${author}، ${title} ${location}`
-                        );
+                    addCandidate(
+                        `${title}, ${author}`
+                    );
 
-                        addCandidate(
-                            `${title}، ${author} ${location}`
-                        );
+                    addCandidate(
+                        `${title} لل${author}`
+                    );
 
-                    }
+                    addCandidate(
+                        `${title} لـ${author}`
+                    );
+
+                    addCandidate(
+                        `${author} ${title}`
+                    );
+
+                    addCandidate(
+                        `${title} ${author}`
+                    );
+
                 }
 
                 /*
-                * العنوان وحده احتياط أخير.
+                * العنوان نفسه هو المرشح الأهم في الحالات
+                * التي لا يظهر فيها المؤلف في النص الأصلي.
                 */
-                if (title) {
+                if (
+                    title
+                ) {
 
                     addCandidate(
                         title
@@ -29189,8 +29104,23 @@ async function applyFootnoteSuggestions(
 
                 }
 
+                /*
+                * المؤلف وحده لا نستخدمه كمرشح،
+                * حتى لا نستبدل اسم المؤلف الموجود في
+                * نص آخر داخل الحاشية بالخطأ.
+                */
+
+                /*
+                * variants لا نستخدمها هنا كاملة؛ لأنها غالبًا
+                * تحتوي على أرقام المواضع التي لم نعد نريد
+                * إدخالها في المطابقة.
+                */
+
                 return candidates.sort(
-                    function (a, b) {
+                    function (
+                        a,
+                        b
+                    ) {
 
                         return (
                             b.length -
@@ -29199,6 +29129,7 @@ async function applyFootnoteSuggestions(
 
                     }
                 );
+
             }
 
             async function findLastMatch(
@@ -29548,16 +29479,9 @@ async function applyFootnoteSuggestions(
                     }
 
                     /*
-                    * =================================================
-                    * المرحلة الأولى:
-                    * تحديد جميع المواضع في الحاشية الأصلية.
-                    *
-                    * لا يتم تعديل الحاشية هنا إطلاقًا.
-                    * =================================================
+                    * نبحث ونستبدل من الأخير إلى الأول،
+                    * كما في النسخة المستقرة السابقة.
                     */
-
-                    const pendingReplacements = [];
-
                     for (
                         let i =
                             suggestion.references.length - 1;
@@ -29583,6 +29507,151 @@ async function applyFootnoteSuggestions(
 
                         }
 
+                        /*
+                        * -------------------------------------------------
+                        * تحديد هل التوثيق المطلوب يتضمن المؤلف أم لا.
+                        *
+                        * في نمط:
+                        * title-author-first
+                        *
+                        * يكون suggestedText في الظهور الأول
+                        * متضمنًا للمؤلف، وفي الظهور التالي
+                        * يكون اسم الكتاب فقط.
+                        *
+                        * نستفيد من النص المقترح الموجود أصلًا
+                        * ولا نعيد حساب ترتيب الظهور.
+                        * -------------------------------------------------
+                        */
+
+                        const author =
+                            String(
+                                reference?.author ||
+                                ""
+                            ).trim();
+
+                        const suggestedNormalized =
+                            normalizeForSearch(
+                                suggestedText
+                            );
+
+                        const authorNormalized =
+                            normalizeForSearch(
+                                author
+                            );
+
+                        const includeAuthor =
+                            Boolean(
+                                authorNormalized &&
+                                suggestedNormalized.includes(
+                                    authorNormalized
+                                )
+                            );
+
+                        /*
+                        * -------------------------------------------------
+                        * النص الذي سيُستبدل:
+                        *
+                        * هوية المرجع فقط.
+                        *
+                        * لا نستخدم suggestedText نفسه لأنه يحتوي
+                        * على المجلد والصفحة، ونحن لا نريد لمسها.
+                        * -------------------------------------------------
+                        */
+
+                        let replacementText =
+                            "";
+
+                        switch (
+                            referenceStyle.format
+                        ) {
+
+                            case "reference-only":
+
+                                replacementText =
+                                    String(
+                                        reference?.title ||
+                                        ""
+                                    ).trim();
+
+                                break;
+
+                            case "title-author":
+
+                                replacementText =
+                                    [
+                                        reference?.title,
+                                        reference?.author
+                                    ]
+                                        .map(
+                                            function (value) {
+                                                return String(
+                                                    value || ""
+                                                ).trim();
+                                            }
+                                        )
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+
+                            case "title-author-first":
+
+                                replacementText =
+                                    [
+                                        reference?.title,
+                                        includeAuthor
+                                            ? reference?.author
+                                            : ""
+                                    ]
+                                        .map(
+                                            function (value) {
+                                                return String(
+                                                    value || ""
+                                                ).trim();
+                                            }
+                                        )
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+
+                            case "author-title":
+
+                            default:
+
+                                replacementText =
+                                    [
+                                        reference?.author,
+                                        reference?.title
+                                    ]
+                                        .map(
+                                            function (value) {
+                                                return String(
+                                                    value || ""
+                                                ).trim();
+                                            }
+                                        )
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+                        }
+
+                        if (
+                            !replacementText.trim()
+                        ) {
+
+                            skipped++;
+                            continue;
+
+                        }
+
+                        /*
+                        * materialId لا نحتاج إليه الآن في المطابقة
+                        * لأننا لا نبحث عن موضع المرجع بالأرقام.
+                        *
+                        * يبقى تمريره للحفاظ على بنية الدالة.
+                        */
                         const materialId =
                             `${source}-${index + 1}`;
 
@@ -29602,8 +29671,7 @@ async function applyFootnoteSuggestions(
                         }
 
                         /*
-                        * مهم:
-                        * findLastMatch هنا لا يغير الحاشية.
+                        * البحث عن هوية المرجع فقط.
                         */
                         const range =
                             await findLastMatch(
@@ -29620,53 +29688,19 @@ async function applyFootnoteSuggestions(
 
                         }
 
-                        pendingReplacements.push({
-
-                            range:
-                                range,
-
-                            text:
-                                suggestedText,
-
-                            referenceIndex:
-                                i
-
-                        });
-
-                    }
-
-                    /*
-                    * =================================================
-                    * المرحلة الثانية:
-                    *
-                    * نطبق الاستبدالات واحدًا واحدًا،
-                    * من اليمين إلى اليسار.
-                    *
-                    * الـRanges تم تحديدها قبل أي تعديل.
-                    * =================================================
-                    */
-
-                    for (
-                        let i = 0;
-                        i < pendingReplacements.length;
-                        i++
-                    ) {
-
-                        const replacement =
-                            pendingReplacements[i];
-
-                        replacement.range.insertText(
-                            replacement.text,
+                        /*
+                        * استبدال هوية المرجع فقط.
+                        *
+                        * أي رقم أو مجلد أو صفحة بعد المرجع
+                        * يبقى كما هو في الحاشية الأصلية.
+                        */
+                        range.insertText(
+                            replacementText,
                             Word.InsertLocation.replace
                         );
 
                         applied++;
 
-                        /*
-                        * مزامنة بعد استبدال واحد فقط.
-                        *
-                        * لا نعيد البحث عن المرجع التالي.
-                        */
                         await context.sync();
 
                     }
