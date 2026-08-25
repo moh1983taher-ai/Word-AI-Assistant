@@ -29004,9 +29004,7 @@ async function applyFootnoteSuggestions(
 
                 const candidates = [];
 
-                function addCandidate(
-                    value
-                ) {
+                function addCandidate(value) {
 
                     const text =
                         String(
@@ -29015,14 +29013,9 @@ async function applyFootnoteSuggestions(
 
                     if (
                         text &&
-                        !candidates.includes(
-                            text
-                        )
+                        !candidates.includes(text)
                     ) {
-
-                        candidates.push(
-                            text
-                        );
+                        candidates.push(text);
                     }
                 }
 
@@ -29032,286 +29025,12 @@ async function applyFootnoteSuggestions(
                         ""
                     ).trim();
 
-                const materialKey =
+                const author =
                     String(
-                        materialId ||
+                        reference?.author ||
                         ""
                     ).trim();
 
-                const occurrences =
-                    Array.isArray(
-                        reference?.occurrences
-                    )
-                        ? reference.occurrences
-                        : [];
-
-                /*
-                * جميع مواضع المرجع نفسه داخل المادة الحالية فقط.
-                */
-                const materialOccurrences =
-                    occurrences.filter(
-                        function (item) {
-
-                            return (
-                                String(
-                                    item?.materialId ||
-                                    ""
-                                ).trim() ===
-                                materialKey
-                            );
-
-                        }
-                    );
-
-                /*
-                * إزالة المواضع المتكررة.
-                */
-                const locations = [];
-
-                materialOccurrences.forEach(
-                    function (item) {
-
-                        const volume =
-                            String(
-                                item?.volume ||
-                                ""
-                            ).trim();
-
-                        const page =
-                            String(
-                                item?.page ||
-                                ""
-                            ).trim();
-
-                        const pageRange =
-                            String(
-                                item?.pageRange ||
-                                ""
-                            ).trim();
-
-                        const key =
-                            `${volume}|${page}|${pageRange}`;
-
-                        if (
-                            (
-                                volume ||
-                                page ||
-                                pageRange
-                            ) &&
-                            !locations.some(
-                                function (location) {
-
-                                    return (
-                                        location.key ===
-                                        key
-                                    );
-
-                                }
-                            )
-                        ) {
-
-                            locations.push({
-
-                                key:
-                                    key,
-
-                                volume:
-                                    volume,
-
-                                page:
-                                    page,
-
-                                pageRange:
-                                    pageRange
-
-                            });
-
-                        }
-
-                    }
-                );
-
-                /*
-                * بناء مواضع المرجع كلها في صيغة واحدة.
-                */
-                function buildCombinedLocationCandidates() {
-
-                    if (
-                        locations.length === 0
-                    ) {
-
-                        return [];
-
-                    }
-
-                    const result = [];
-
-                    const firstVolume =
-                        locations[0].volume;
-
-                    const sameVolume =
-                        firstVolume &&
-                        locations.every(
-                            function (location) {
-
-                                return (
-                                    location.volume ===
-                                    firstVolume
-                                );
-
-                            }
-                        );
-
-                    if (
-                        sameVolume
-                    ) {
-
-                        const parts = [];
-
-                        locations.forEach(
-                            function (
-                                location,
-                                index
-                            ) {
-
-                                if (
-                                    location.pageRange
-                                ) {
-
-                                    parts.push(
-                                        index === 0
-                                            ? `${firstVolume}/${location.pageRange}`
-                                            : location.pageRange
-                                    );
-
-                                }
-                                else if (
-                                    location.page
-                                ) {
-
-                                    parts.push(
-                                        index === 0
-                                            ? `${firstVolume}/${location.page}`
-                                            : location.page
-                                    );
-
-                                }
-
-                            }
-                        );
-
-                        if (
-                            parts.length
-                        ) {
-
-                            result.push(
-                                parts.join("، ")
-                            );
-
-                        }
-
-                    }
-                    else {
-
-                        const parts = [];
-
-                        locations.forEach(
-                            function (location) {
-
-                                if (
-                                    location.volume &&
-                                    location.page
-                                ) {
-
-                                    parts.push(
-                                        `${location.volume}/${location.page}`
-                                    );
-
-                                }
-                                else if (
-                                    location.volume &&
-                                    location.pageRange
-                                ) {
-
-                                    parts.push(
-                                        `${location.volume}/${location.pageRange}`
-                                    );
-
-                                }
-                                else if (
-                                    location.pageRange
-                                ) {
-
-                                    parts.push(
-                                        location.pageRange
-                                    );
-
-                                }
-                                else if (
-                                    location.page
-                                ) {
-
-                                    parts.push(
-                                        location.page
-                                    );
-
-                                }
-
-                            }
-                        );
-
-                        if (
-                            parts.length
-                        ) {
-
-                            result.push(
-                                parts.join("، ")
-                            );
-
-                        }
-
-                    }
-
-                    return result;
-                }
-
-                const combinedLocations =
-                    buildCombinedLocationCandidates();
-
-                /*
-                * المرشح الأساسي:
-                * عنوان المرجع + جميع مواضعه.
-                */
-                if (
-                    title &&
-                    combinedLocations.length
-                ) {
-
-                    combinedLocations.forEach(
-                        function (
-                            locationText
-                        ) {
-
-                            addCandidate(
-                                `${title}، ${locationText}`
-                            );
-
-                            addCandidate(
-                                `${title} ${locationText}`
-                            );
-
-                            addCandidate(
-                                `${title}${locationText}`
-                            );
-
-                        }
-                    );
-
-                }
-
-                /*
-                * variants كمرشح احتياطي فقط.
-                */
                 const variants =
                     Array.isArray(
                         reference?.variants
@@ -29319,10 +29038,11 @@ async function applyFootnoteSuggestions(
                         ? reference.variants
                         : [];
 
+                /*
+                * صيغ الذكاء الاصطناعي أولًا.
+                */
                 variants.forEach(
-                    function (
-                        variant
-                    ) {
+                    function (variant) {
 
                         addCandidate(
                             variant
@@ -29332,11 +29052,136 @@ async function applyFootnoteSuggestions(
                 );
 
                 /*
-                * العنوان وحده كاحتياط أخير.
+                * occurrence الخاص بهذه الحاشية فقط.
+                */
+                const occurrences =
+                    Array.isArray(
+                        reference?.occurrences
+                    )
+                        ? reference.occurrences
+                        : [];
+
+                const occurrence =
+                    occurrences.find(
+                        function (item) {
+
+                            return (
+                                String(
+                                    item?.materialId ||
+                                    ""
+                                ).trim() ===
+                                String(
+                                    materialId ||
+                                    ""
+                                ).trim()
+                            );
+
+                        }
+                    );
+
+                let location = "";
+
+                if (occurrence) {
+
+                    const volume =
+                        String(
+                            occurrence?.volume ||
+                            ""
+                        ).trim();
+
+                    const page =
+                        String(
+                            occurrence?.page ||
+                            ""
+                        ).trim();
+
+                    const pageRange =
+                        String(
+                            occurrence?.pageRange ||
+                            ""
+                        ).trim();
+
+                    if (
+                        volume &&
+                        page
+                    ) {
+
+                        location =
+                            `${volume}/${page}`;
+
+                    }
+                    else if (
+                        volume &&
+                        pageRange
+                    ) {
+
+                        location =
+                            `${volume}/${pageRange}`;
+
+                    }
+                    else if (
+                        pageRange
+                    ) {
+
+                        location =
+                            pageRange;
+
+                    }
+                    else if (
+                        page
+                    ) {
+
+                        location =
+                            page;
+
+                    }
+                }
+
+                /*
+                * العنوان + الموضع الحقيقي.
                 */
                 if (
-                    title
+                    title &&
+                    location
                 ) {
+
+                    addCandidate(
+                        `${title} ${location}`
+                    );
+
+                    addCandidate(
+                        `${title}${location}`
+                    );
+
+                    /*
+                    * معالجة الصيغة التي يكون فيها المؤلف
+                    * جزءًا من اسم المرجع في النص الأصلي.
+                    */
+                    if (author) {
+
+                        addCandidate(
+                            `${title} لل${author} ${location}`
+                        );
+
+                        addCandidate(
+                            `${title} لـ${author} ${location}`
+                        );
+
+                        addCandidate(
+                            `${author}، ${title} ${location}`
+                        );
+
+                        addCandidate(
+                            `${title}، ${author} ${location}`
+                        );
+
+                    }
+                }
+
+                /*
+                * العنوان وحده احتياط أخير.
+                */
+                if (title) {
 
                     addCandidate(
                         title
@@ -29344,14 +29189,8 @@ async function applyFootnoteSuggestions(
 
                 }
 
-                /*
-                * الأطول أولًا.
-                */
                 return candidates.sort(
-                    function (
-                        a,
-                        b
-                    ) {
+                    function (a, b) {
 
                         return (
                             b.length -
@@ -29703,18 +29542,24 @@ async function applyFootnoteSuggestions(
                             suggestion.suggestedTexts
                         )
                     ) {
+
                         continue;
+
                     }
 
                     /*
-                     * مهم:
-                     *
-                     * نبدأ من آخر مرجع في الحاشية
-                     * ثم نعود إلى الأول.
-                     *
-                     * وبهذا لا تؤثر عملية الاستبدال
-                     * في البحث عن المراجع السابقة.
-                     */
+                    * -------------------------------------------------
+                    * المرحلة الأولى:
+                    * العثور على جميع المراجع في الحاشية الحالية
+                    * دون إجراء أي تعديل عليها.
+                    *
+                    * هذا مهم جدًا حتى لا يؤثر تعديل مرجع
+                    * في البحث عن المرجع التالي.
+                    * -------------------------------------------------
+                    */
+
+                    const pendingReplacements = [];
+
                     for (
                         let i =
                             suggestion.references.length - 1;
@@ -29735,7 +29580,9 @@ async function applyFootnoteSuggestions(
                             !reference ||
                             !suggestedText
                         ) {
+
                             continue;
+
                         }
 
                         const materialId =
@@ -29750,17 +29597,6 @@ async function applyFootnoteSuggestions(
                         if (
                             candidates.length === 0
                         ) {
-                            skipped++;
-                            continue;
-                        }
-
-                        const range =
-                            await findLastMatch(
-                                note.body,
-                                candidates
-                            );
-
-                        if (!range) {
 
                             skipped++;
                             continue;
@@ -29768,18 +29604,65 @@ async function applyFootnoteSuggestions(
                         }
 
                         /*
-                         * استبدال الـRange نفسه فقط.
-                         *
-                         * لا نلمس note.body بالكامل.
-                         * لا نلمس note.reference.
-                         * لا نعيد إنشاء الحاشية.
-                         */
-                        range.insertText(
-                            suggestedText,
-                            Word.InsertLocation.replace
-                        );
+                        * نبحث عن Range المرجع في النص الحالي،
+                        * لكننا لا نعدله بعد.
+                        */
+                        const range =
+                            await findLastMatch(
+                                note.body,
+                                candidates
+                            );
 
-                        applied++;
+                        if (
+                            !range
+                        ) {
+
+                            skipped++;
+                            continue;
+
+                        }
+
+                        pendingReplacements.push({
+
+                            range:
+                                range,
+
+                            text:
+                                suggestedText
+
+                        });
+
+                    }
+
+                    /*
+                    * -------------------------------------------------
+                    * المرحلة الثانية:
+                    * بعد الانتهاء من العثور على جميع المراجع،
+                    * نطبق جميع الاستبدالات دفعة واحدة.
+                    * -------------------------------------------------
+                    */
+
+                    pendingReplacements.forEach(
+                        function (
+                            replacement
+                        ) {
+
+                            replacement.range.insertText(
+                                replacement.text,
+                                Word.InsertLocation.replace
+                            );
+
+                            applied++;
+
+                        }
+                    );
+
+                    /*
+                    * مزامنة واحدة فقط بعد جميع الاستبدالات.
+                    */
+                    if (
+                        pendingReplacements.length > 0
+                    ) {
 
                         await context.sync();
 
