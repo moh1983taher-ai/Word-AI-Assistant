@@ -29155,226 +29155,252 @@ async function applyFootnoteSuggestions(
 
                 function toWesternDigits(value) {
 
-                    return String(value || "")
+                    return String(
+                        value || ""
+                    )
                         .replace(
                             /[٠-٩]/g,
                             function (char) {
+
                                 return String(
                                     "٠١٢٣٤٥٦٧٨٩".indexOf(char)
                                 );
+
                             }
                         )
                         .replace(
                             /[۰-۹]/g,
                             function (char) {
+
                                 return String(
                                     "۰۱۲۳۴۵۶۷۸۹".indexOf(char)
                                 );
+
                             }
                         );
                 }
 
-                function normalizeForMatch(value) {
-
-                    return toWesternDigits(
-                        String(value || "")
-                    )
-                        .replace(
-                            /[\u064B-\u065F\u0670]/g,
-                            ""
-                        )
-                        .replace(
-                            /[\u200C-\u200F\u202A-\u202E]/g,
-                            ""
-                        )
-                        .replace(
-                            /[\u00A0\s]+/g,
-                            " "
-                        )
-                        .replace(
-                            /[\u00A0\s]*\/[\u00A0\s]*/g,
-                            "/"
-                        )
-                        .replace(
-                            /[\u00A0\s]*[-–—][\u00A0\s]*/g,
-                            "-"
-                        )
-                        .trim()
-                        .toLowerCase();
-                }
-
-                function buildNormalizedMap(text) {
-
-                    let normalized = "";
-                    const starts = [];
-                    const ends = [];
-
-                    let i = 0;
-
-                    while (i < text.length) {
-
-                        const char = text[i];
-
-                        if (
-                            /[\u064B-\u065F\u0670]/.test(char) ||
-                            /[\u200C-\u200F\u202A-\u202E]/.test(char)
-                        ) {
-                            i++;
-                            continue;
-                        }
-
-                        if (/[\u00A0\s]/.test(char)) {
-
-                            const start = i;
-
-                            while (
-                                i < text.length &&
-                                /[\u00A0\s]/.test(text[i])
-                            ) {
-                                i++;
-                            }
-
-                            normalized += " ";
-                            starts.push(start);
-                            ends.push(i);
-
-                            continue;
-                        }
-
-                        const western =
-                            toWesternDigits(char);
-
-                        normalized += western;
-
-                        for (
-                            let j = 0;
-                            j < western.length;
-                            j++
-                        ) {
-                            starts.push(i);
-                            ends.push(i + 1);
-                        }
-
-                        i++;
-                    }
-
-                    return {
-                        text: normalized,
-                        starts: starts,
-                        ends: ends
-                    };
-                }
-
-                function findLastNormalizedRange(
-                    originalText,
+                function buildSearchVariants(
                     candidate
                 ) {
 
-                    const normalizedOriginal =
-                        buildNormalizedMap(
-                            originalText
-                        );
+                    const original =
+                        String(
+                            candidate || ""
+                        ).trim();
 
-                    const normalizedCandidate =
-                        normalizeForMatch(
-                            candidate
-                        );
-
-                    if (
-                        !normalizedCandidate
-                    ) {
-                        return null;
+                    if (!original) {
+                        return [];
                     }
 
-                    let lastPosition = -1;
-                    let searchFrom = 0;
+                    const variants = [];
 
-                    while (true) {
+                    function add(value) {
 
-                        const position =
-                            normalizedOriginal.text.indexOf(
-                                normalizedCandidate,
-                                searchFrom
-                            );
+                        const text =
+                            String(
+                                value || ""
+                            ).trim();
 
-                        if (position === -1) {
-                            break;
+                        if (
+                            text &&
+                            !variants.includes(text)
+                        ) {
+
+                            variants.push(text);
+
                         }
-
-                        lastPosition = position;
-
-                        searchFrom =
-                            position +
-                            Math.max(
-                                1,
-                                normalizedCandidate.length
-                            );
                     }
 
-                    if (
-                        lastPosition === -1
-                    ) {
-                        return null;
-                    }
+                    /*
+                    * الصيغة الأصلية
+                    */
+                    add(original);
 
-                    const endPosition =
-                        lastPosition +
-                        normalizedCandidate.length;
-
-                    if (
-                        lastPosition >=
-                        normalizedOriginal.starts.length
-                    ) {
-                        return null;
-                    }
-
-                    const rawStart =
-                        normalizedOriginal.starts[
-                            lastPosition
-                        ];
-
-                    const rawEnd =
-                        normalizedOriginal.ends[
-                            Math.min(
-                                endPosition - 1,
-                                normalizedOriginal.ends.length - 1
-                            )
-                        ];
-
-                    if (
-                        rawEnd <= rawStart
-                    ) {
-                        return null;
-                    }
-
-                    return {
-                        start: rawStart,
-                        end: rawEnd
-                    };
-                }
-
-                /*
-                * نقرأ نص الحاشية الحالي مرة واحدة.
-                * هذا لا يغيّر الحاشية.
-                */
-                noteBody.load("text");
-
-                await context.sync();
-
-                const originalText =
-                    String(
-                        noteBody.text || ""
+                    /*
+                    * توحيد المسافات المتعددة
+                    */
+                    add(
+                        original.replace(
+                            /[\u00A0\s]+/g,
+                            " "
+                        )
                     );
 
-                if (
-                    !originalText.trim()
-                ) {
-                    return null;
+                    /*
+                    * إزالة المسافات حول /
+                    *
+                    * 2/220
+                    * 2/ 220
+                    * 2 /220
+                    * 2 / 220
+                    */
+                    add(
+                        original.replace(
+                            /[\u00A0\s]*\/[\u00A0\s]*/g,
+                            "/"
+                        )
+                    );
+
+                    /*
+                    * توحيد المسافات حول الفواصل
+                    */
+                    add(
+                        original
+                            .replace(
+                                /[\u00A0\s]*،[\u00A0\s]*/g,
+                                "، "
+                            )
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                    );
+
+                    /*
+                    * توحيد الشرطات في النطاقات
+                    */
+                    add(
+                        original
+                            .replace(
+                                /[\u00A0\s]*[-–—][\u00A0\s]*/g,
+                                "-"
+                            )
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                    );
+
+                    /*
+                    * نسخة بدون مسافات بين عناصر المرجع.
+                    *
+                    * تساعد في الحالات التي سقطت فيها المسافة
+                    * بين عنوان الكتاب ورقم الموضع.
+                    */
+                    add(
+                        original.replace(
+                            /[\u00A0\s]+/g,
+                            ""
+                        )
+                    );
+
+                    /*
+                    * تحويل الأرقام الهندية/الفارسية إلى غربية.
+                    */
+                    const western =
+                        toWesternDigits(
+                            original
+                        );
+
+                    add(western);
+
+                    add(
+                        western
+                            .replace(
+                                /[\u00A0\s]*\/[\u00A0\s]*/g,
+                                "/"
+                            )
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                    );
+
+                    add(
+                        western.replace(
+                            /[\u00A0\s]+/g,
+                            ""
+                        )
+                    );
+
+                    /*
+                    * الصيغ الأطول أولًا
+                    */
+                    return variants.sort(
+                        function (a, b) {
+
+                            return (
+                                b.length -
+                                a.length
+                            );
+
+                        }
+                    );
+
                 }
 
                 /*
-                * أولًا: البحث الحرفي العادي.
-                * هذا أسرع وأكثر أمانًا.
+                * نبدأ بالبحث العادي كما في النسخة التي كانت تعمل.
+                */
+                for (
+                    let i = 0;
+                    i < candidates.length;
+                    i++
+                ) {
+
+                    const searchVariants =
+                        buildSearchVariants(
+                            candidates[i]
+                        );
+
+                    for (
+                        let v = 0;
+                        v < searchVariants.length;
+                        v++
+                    ) {
+
+                        const candidate =
+                            searchVariants[v];
+
+                        if (!candidate) {
+                            continue;
+                        }
+
+                        /*
+                        * البحث العادي فقط.
+                        *
+                        * لا نستخدم Wildcards حتى لا يتوقف Word
+                        * بـ GeneralException.
+                        */
+                        let results =
+                            noteBody.search(
+                                candidate,
+                                {
+                                    matchCase: false,
+                                    matchWholeWord: false,
+                                    matchWildcards: false
+                                }
+                            );
+
+                        results.load(
+                            "items"
+                        );
+
+                        await context.sync();
+
+                        if (
+                            results.items.length > 0
+                        ) {
+
+                            /*
+                            * نأخذ آخر تطابق.
+                            */
+                            return results.items[
+                                results.items.length - 1
+                            ];
+
+                        }
+
+                    }
+
+                }
+
+                /*
+                * محاولة أخيرة للمطابقة المتسامحة مع المسافات فقط.
+                *
+                * هنا لا نرسل نمط Wildcard إلى Word.
+                * نبحث عن الصيغة المنظفة البسيطة فقط.
                 */
                 for (
                     let i = 0;
@@ -29391,79 +29417,35 @@ async function applyFootnoteSuggestions(
                         continue;
                     }
 
-                    let results =
-                        noteBody.search(
-                            candidate,
-                            {
-                                matchCase: false,
-                                matchWholeWord: false,
-                                matchWildcards: false
-                            }
-                        );
-
-                    results.load("items");
-
-                    await context.sync();
+                    const flexiblePattern =
+                        candidate
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                            .replace(
+                                /[\u00A0\s]*\/[\u00A0\s]*/g,
+                                "/"
+                            )
+                            .replace(
+                                /[\u00A0\s]*[-–—][\u00A0\s]*/g,
+                                "-"
+                            )
+                            .trim();
 
                     if (
-                        results.items.length > 0
+                        !flexiblePattern
                     ) {
-                        return results.items[
-                            results.items.length - 1
-                        ];
-                    }
-                }
-
-                /*
-                * ثانيًا: المطابقة المرنة محليًا.
-                *
-                * إذا كان المرشح:
-                * 2/220
-                * والحاشية:
-                * 2 / 220
-                *
-                * نحدد موقعه في النص المحلي،
-                * ثم نأخذ النص الحقيقي الموجود في Word،
-                * وبعدها نبحث عنه حرفيًا.
-                */
-                for (
-                    let i = 0;
-                    i < candidates.length;
-                    i++
-                ) {
-
-                    const candidate =
-                        String(
-                            candidates[i] || ""
-                        ).trim();
-
-                    if (!candidate) {
                         continue;
                     }
 
-                    const rangeInfo =
-                        findLastNormalizedRange(
-                            originalText,
-                            candidate
-                        );
-
-                    if (!rangeInfo) {
-                        continue;
-                    }
-
-                    const actualSourceText =
-                        originalText.substring(
-                            rangeInfo.start,
-                            rangeInfo.end
-                        );
-
-                    if (!actualSourceText.trim()) {
-                        continue;
-                    }
-
+                    /*
+                    * لا نستخدم matchWildcards هنا.
+                    * نستخدم البحث العادي فقط.
+                    */
                     const results =
                         noteBody.search(
-                            actualSourceText,
+                            flexiblePattern,
                             {
                                 matchCase: false,
                                 matchWholeWord: false,
@@ -29471,17 +29453,22 @@ async function applyFootnoteSuggestions(
                             }
                         );
 
-                    results.load("items");
+                    results.load(
+                        "items"
+                    );
 
                     await context.sync();
 
                     if (
                         results.items.length > 0
                     ) {
+
                         return results.items[
                             results.items.length - 1
                         ];
+
                     }
+
                 }
 
                 return null;
