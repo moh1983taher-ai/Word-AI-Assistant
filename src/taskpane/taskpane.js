@@ -29155,246 +29155,226 @@ async function applyFootnoteSuggestions(
 
                 function toWesternDigits(value) {
 
-                    return String(
-                        value || ""
-                    )
+                    return String(value || "")
                         .replace(
                             /[٠-٩]/g,
                             function (char) {
-
                                 return String(
-                                    "٠١٢٣٤٥٦٧٨٩".indexOf(
-                                        char
-                                    )
+                                    "٠١٢٣٤٥٦٧٨٩".indexOf(char)
                                 );
-
                             }
                         )
                         .replace(
                             /[۰-۹]/g,
                             function (char) {
-
                                 return String(
-                                    "۰۱۲۳۴۵۶۷۸۹".indexOf(
-                                        char
-                                    )
+                                    "۰۱۲۳۴۵۶۷۸۹".indexOf(char)
                                 );
-
                             }
                         );
-
                 }
 
-                function toIndianDigits(value) {
+                function normalizeForMatch(value) {
 
-                    return String(
-                        value || ""
-                    ).replace(
-                        /[0-9]/g,
-                        function (char) {
+                    return toWesternDigits(
+                        String(value || "")
+                    )
+                        .replace(
+                            /[\u064B-\u065F\u0670]/g,
+                            ""
+                        )
+                        .replace(
+                            /[\u200C-\u200F\u202A-\u202E]/g,
+                            ""
+                        )
+                        .replace(
+                            /[\u00A0\s]+/g,
+                            " "
+                        )
+                        .replace(
+                            /[\u00A0\s]*\/[\u00A0\s]*/g,
+                            "/"
+                        )
+                        .replace(
+                            /[\u00A0\s]*[-–—][\u00A0\s]*/g,
+                            "-"
+                        )
+                        .trim()
+                        .toLowerCase();
+                }
 
-                            return "٠١٢٣٤٥٦٧٨٩".charAt(
-                                Number(char)
-                            );
+                function buildNormalizedMap(text) {
 
+                    let normalized = "";
+                    const starts = [];
+                    const ends = [];
+
+                    let i = 0;
+
+                    while (i < text.length) {
+
+                        const char = text[i];
+
+                        if (
+                            /[\u064B-\u065F\u0670]/.test(char) ||
+                            /[\u200C-\u200F\u202A-\u202E]/.test(char)
+                        ) {
+                            i++;
+                            continue;
                         }
-                    );
 
-                }
+                        if (/[\u00A0\s]/.test(char)) {
 
-                /*
-                * تحويل المرشح إلى نمط Word Wildcards
-                * يسمح بوجود أو غياب المسافات بين عناصر المرجع.
-                *
-                * مثال:
-                * التذييل والتكميل 7/260
-                *
-                * يمكنه مطابقة:
-                * التذييل والتكميل7/260
-                * التذييل والتكميل 7/260
-                * التذييل  والتكميل  7 / 260
-                */
-                function buildWildcardPattern(
-                    value
-                ) {
+                            const start = i;
 
-                    const text =
-                        String(
-                            value || ""
-                        ).trim();
+                            while (
+                                i < text.length &&
+                                /[\u00A0\s]/.test(text[i])
+                            ) {
+                                i++;
+                            }
 
-                    if (!text) {
-                        return "";
+                            normalized += " ";
+                            starts.push(start);
+                            ends.push(i);
+
+                            continue;
+                        }
+
+                        const western =
+                            toWesternDigits(char);
+
+                        normalized += western;
+
+                        for (
+                            let j = 0;
+                            j < western.length;
+                            j++
+                        ) {
+                            starts.push(i);
+                            ends.push(i + 1);
+                        }
+
+                        i++;
                     }
 
-                    let pattern = "";
-
-                    for (
-                        let i = 0;
-                        i < text.length;
-                        i++
-                    ) {
-
-                        const char =
-                            text[i];
-
-                        /*
-                        * مسافة: صفر أو أكثر.
-                        */
-                        if (
-                            /[\s\u00A0]/.test(
-                                char
-                            )
-                        ) {
-
-                            pattern +=
-                                "[ ]{0,}";
-
-                            continue;
-                        }
-
-                        /*
-                        * الشرطة المائلة:
-                        * السماح بمسافات قبلها وبعدها.
-                        */
-                        if (
-                            char === "/"
-                        ) {
-
-                            pattern +=
-                                "[ ]{0,}/[ ]{0,}";
-
-                            continue;
-                        }
-
-                        /*
-                        * الفواصل:
-                        * السماح بمسافات حولها.
-                        */
-                        if (
-                            char === "،" ||
-                            char === ","
-                        ) {
-
-                            pattern +=
-                                "[ ]{0,}" +
-                                char +
-                                "[ ]{0,}";
-
-                            continue;
-                        }
-
-                        /*
-                        * الشرطات في نطاق الصفحات.
-                        */
-                        if (
-                            char === "-" ||
-                            char === "–" ||
-                            char === "—"
-                        ) {
-
-                            pattern +=
-                                "[ ]{0,}[-–—][ ]{0,}";
-
-                            continue;
-                        }
-
-                        /*
-                        * أحرف Word Wildcards الخاصة.
-                        * نهرب منها حتى لا تتحول إلى أوامر.
-                        */
-                        if (
-                            "\\[]{}()*?<>!@".includes(
-                                char
-                            )
-                        ) {
-
-                            pattern +=
-                                "\\" +
-                                char;
-
-                            continue;
-                        }
-
-                        pattern +=
-                            char;
-
-                    }
-
-                    return pattern;
-
+                    return {
+                        text: normalized,
+                        starts: starts,
+                        ends: ends
+                    };
                 }
 
-                function buildCandidateVariants(
+                function findLastNormalizedRange(
+                    originalText,
                     candidate
                 ) {
 
-                    const original =
-                        String(
-                            candidate || ""
-                        ).trim();
+                    const normalizedOriginal =
+                        buildNormalizedMap(
+                            originalText
+                        );
 
-                    if (!original) {
-                        return [];
+                    const normalizedCandidate =
+                        normalizeForMatch(
+                            candidate
+                        );
+
+                    if (
+                        !normalizedCandidate
+                    ) {
+                        return null;
                     }
 
-                    const variants = [];
+                    let lastPosition = -1;
+                    let searchFrom = 0;
 
-                    function add(
-                        value
-                    ) {
+                    while (true) {
 
-                        const text =
-                            String(
-                                value || ""
-                            ).trim();
-
-                        if (
-                            text &&
-                            !variants.includes(
-                                text
-                            )
-                        ) {
-
-                            variants.push(
-                                text
+                        const position =
+                            normalizedOriginal.text.indexOf(
+                                normalizedCandidate,
+                                searchFrom
                             );
 
+                        if (position === -1) {
+                            break;
                         }
 
+                        lastPosition = position;
+
+                        searchFrom =
+                            position +
+                            Math.max(
+                                1,
+                                normalizedCandidate.length
+                            );
                     }
 
-                    add(
-                        original
-                    );
+                    if (
+                        lastPosition === -1
+                    ) {
+                        return null;
+                    }
 
-                    /*
-                    * نسخة بأرقام غربية.
-                    */
-                    add(
-                        toWesternDigits(
-                            original
-                        )
-                    );
+                    const endPosition =
+                        lastPosition +
+                        normalizedCandidate.length;
 
-                    /*
-                    * نسخة بأرقام هندية.
-                    */
-                    add(
-                        toIndianDigits(
-                            toWesternDigits(
-                                original
+                    if (
+                        lastPosition >=
+                        normalizedOriginal.starts.length
+                    ) {
+                        return null;
+                    }
+
+                    const rawStart =
+                        normalizedOriginal.starts[
+                            lastPosition
+                        ];
+
+                    const rawEnd =
+                        normalizedOriginal.ends[
+                            Math.min(
+                                endPosition - 1,
+                                normalizedOriginal.ends.length - 1
                             )
-                        )
-                    );
+                        ];
 
-                    return variants;
+                    if (
+                        rawEnd <= rawStart
+                    ) {
+                        return null;
+                    }
 
+                    return {
+                        start: rawStart,
+                        end: rawEnd
+                    };
                 }
 
                 /*
-                * نبحث من آخر الحاشية إلى أولها.
-                * وهذا مهم لأن المرجع نفسه قد يتكرر.
+                * نقرأ نص الحاشية الحالي مرة واحدة.
+                * هذا لا يغيّر الحاشية.
+                */
+                noteBody.load("text");
+
+                await context.sync();
+
+                const originalText =
+                    String(
+                        noteBody.text || ""
+                    );
+
+                if (
+                    !originalText.trim()
+                ) {
+                    return null;
+                }
+
+                /*
+                * أولًا: البحث الحرفي العادي.
+                * هذا أسرع وأكثر أمانًا.
                 */
                 for (
                     let i = 0;
@@ -29402,95 +29382,106 @@ async function applyFootnoteSuggestions(
                     i++
                 ) {
 
-                    const candidateVariants =
-                        buildCandidateVariants(
-                            candidates[i]
-                        );
+                    const candidate =
+                        String(
+                            candidates[i] || ""
+                        ).trim();
 
-                    for (
-                        let v = 0;
-                        v < candidateVariants.length;
-                        v++
-                    ) {
-
-                        const candidate =
-                            candidateVariants[v];
-
-                        if (!candidate) {
-                            continue;
-                        }
-
-                        /*
-                        * 1. البحث العادي أولًا.
-                        */
-                        let results =
-                            noteBody.search(
-                                candidate,
-                                {
-                                    matchCase: false,
-                                    matchWholeWord: false,
-                                    matchWildcards: false
-                                }
-                            );
-
-                        results.load(
-                            "items"
-                        );
-
-                        await context.sync();
-
-                        if (
-                            results.items.length > 0
-                        ) {
-
-                            return results.items[
-                                results.items.length - 1
-                            ];
-
-                        }
-
-                        /*
-                        * 2. البحث المتسامح مع المسافات.
-                        */
-                        const wildcardPattern =
-                            buildWildcardPattern(
-                                candidate
-                            );
-
-                        if (
-                            !wildcardPattern
-                        ) {
-                            continue;
-                        }
-
-                        results =
-                            noteBody.search(
-                                wildcardPattern,
-                                {
-                                    matchCase: false,
-                                    matchWholeWord: false,
-                                    matchWildcards: true
-                                }
-                            );
-
-                        results.load(
-                            "items"
-                        );
-
-                        await context.sync();
-
-                        if (
-                            results.items.length > 0
-                        ) {
-
-                            return results.items[
-                                results.items.length - 1
-                            ];
-
-                        }
-
+                    if (!candidate) {
+                        continue;
                     }
 
+                    let results =
+                        noteBody.search(
+                            candidate,
+                            {
+                                matchCase: false,
+                                matchWholeWord: false,
+                                matchWildcards: false
+                            }
+                        );
+
+                    results.load("items");
+
+                    await context.sync();
+
+                    if (
+                        results.items.length > 0
+                    ) {
+                        return results.items[
+                            results.items.length - 1
+                        ];
+                    }
+                }
+
+                /*
+                * ثانيًا: المطابقة المرنة محليًا.
+                *
+                * إذا كان المرشح:
+                * 2/220
+                * والحاشية:
+                * 2 / 220
+                *
+                * نحدد موقعه في النص المحلي،
+                * ثم نأخذ النص الحقيقي الموجود في Word،
+                * وبعدها نبحث عنه حرفيًا.
+                */
+                for (
+                    let i = 0;
+                    i < candidates.length;
+                    i++
+                ) {
+
+                    const candidate =
+                        String(
+                            candidates[i] || ""
+                        ).trim();
+
+                    if (!candidate) {
+                        continue;
+                    }
+
+                    const rangeInfo =
+                        findLastNormalizedRange(
+                            originalText,
+                            candidate
+                        );
+
+                    if (!rangeInfo) {
+                        continue;
+                    }
+
+                    const actualSourceText =
+                        originalText.substring(
+                            rangeInfo.start,
+                            rangeInfo.end
+                        );
+
+                    if (!actualSourceText.trim()) {
+                        continue;
+                    }
+
+                    const results =
+                        noteBody.search(
+                            actualSourceText,
+                            {
+                                matchCase: false,
+                                matchWholeWord: false,
+                                matchWildcards: false
+                            }
+                        );
+
+                    results.load("items");
+
+                    await context.sync();
+
+                    if (
+                        results.items.length > 0
+                    ) {
+                        return results.items[
+                            results.items.length - 1
+                        ];
+                    }
                 }
 
                 return null;
