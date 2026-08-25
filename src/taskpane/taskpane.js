@@ -29023,19 +29023,12 @@ async function applyFootnoteSuggestions(
                         candidates.push(
                             text
                         );
-
                     }
                 }
 
                 const title =
                     String(
                         reference?.title ||
-                        ""
-                    ).trim();
-
-                const author =
-                    String(
-                        reference?.author ||
                         ""
                     ).trim();
 
@@ -29053,9 +29046,7 @@ async function applyFootnoteSuggestions(
                         : [];
 
                 /*
-                * -----------------------------------------------------
-                * جميع مواضع هذا المرجع داخل الحاشية الحالية فقط.
-                * -----------------------------------------------------
+                * جميع مواضع المرجع نفسه داخل المادة الحالية فقط.
                 */
                 const materialOccurrences =
                     occurrences.filter(
@@ -29073,7 +29064,7 @@ async function applyFootnoteSuggestions(
                     );
 
                 /*
-                * إزالة المواضع المكررة.
+                * إزالة المواضع المتكررة.
                 */
                 const locations = [];
 
@@ -29141,19 +29132,7 @@ async function applyFootnoteSuggestions(
                 );
 
                 /*
-                * -----------------------------------------------------
-                * بناء جميع مواضع المرجع في صيغة واحدة.
-                *
-                * إذا كان المجلد واحدًا:
-                *
-                * 1/222، 223، 253
-                *
-                * وليس:
-                *
-                * 1/222
-                *
-                * فقط.
-                * -----------------------------------------------------
+                * بناء مواضع المرجع كلها في صيغة واحدة.
                 */
                 function buildCombinedLocationCandidates() {
 
@@ -29167,10 +29146,6 @@ async function applyFootnoteSuggestions(
 
                     const result = [];
 
-                    /*
-                    * إذا كانت جميع المواضع في المجلد نفسه،
-                    * نستخدم المجلد مرة واحدة ثم بقية الصفحات.
-                    */
                     const firstVolume =
                         locations[0].volume;
 
@@ -29194,50 +29169,31 @@ async function applyFootnoteSuggestions(
                         const parts = [];
 
                         locations.forEach(
-                            function (location, index) {
+                            function (
+                                location,
+                                index
+                            ) {
 
                                 if (
                                     location.pageRange
                                 ) {
 
-                                    if (
+                                    parts.push(
                                         index === 0
-                                    ) {
-
-                                        parts.push(
-                                            `${firstVolume}/${location.pageRange}`
-                                        );
-
-                                    }
-                                    else {
-
-                                        parts.push(
-                                            location.pageRange
-                                        );
-
-                                    }
+                                            ? `${firstVolume}/${location.pageRange}`
+                                            : location.pageRange
+                                    );
 
                                 }
                                 else if (
                                     location.page
                                 ) {
 
-                                    if (
+                                    parts.push(
                                         index === 0
-                                    ) {
-
-                                        parts.push(
-                                            `${firstVolume}/${location.page}`
-                                        );
-
-                                    }
-                                    else {
-
-                                        parts.push(
-                                            location.page
-                                        );
-
-                                    }
+                                            ? `${firstVolume}/${location.page}`
+                                            : location.page
+                                    );
 
                                 }
 
@@ -29257,9 +29213,6 @@ async function applyFootnoteSuggestions(
                     }
                     else {
 
-                        /*
-                        * المجلدات مختلفة؛ نحتفظ بكل موضع كاملًا.
-                        */
                         const parts = [];
 
                         locations.forEach(
@@ -29320,19 +29273,14 @@ async function applyFootnoteSuggestions(
                     }
 
                     return result;
-
                 }
 
                 const combinedLocations =
                     buildCombinedLocationCandidates();
 
                 /*
-                * -----------------------------------------------------
                 * المرشح الأساسي:
-                * العنوان + جميع مواضعه في الحاشية الحالية.
-                *
-                * هذا هو المرشح الأهم، ولذلك يأتي قبل variants.
-                * -----------------------------------------------------
+                * عنوان المرجع + جميع مواضعه.
                 */
                 if (
                     title &&
@@ -29340,7 +29288,9 @@ async function applyFootnoteSuggestions(
                 ) {
 
                     combinedLocations.forEach(
-                        function (locationText) {
+                        function (
+                            locationText
+                        ) {
 
                             addCandidate(
                                 `${title}، ${locationText}`
@@ -29350,9 +29300,6 @@ async function applyFootnoteSuggestions(
                                 `${title} ${locationText}`
                             );
 
-                            /*
-                            * حالة سقوط المسافة بين العنوان والرقم.
-                            */
                             addCandidate(
                                 `${title}${locationText}`
                             );
@@ -29363,63 +29310,7 @@ async function applyFootnoteSuggestions(
                 }
 
                 /*
-                * -----------------------------------------------------
-                * صيغ ترتيب المؤلف والعنوان.
-                *
-                * تستخدم للمطابقة فقط.
-                * -----------------------------------------------------
-                */
-                if (
-                    author &&
-                    title &&
-                    combinedLocations.length
-                ) {
-
-                    combinedLocations.forEach(
-                        function (locationText) {
-
-                            /*
-                            * الصيغة التي يبدأ فيها العنوان
-                            * ثم يأتي المؤلف بصيغة النسبة.
-                            */
-                            addCandidate(
-                                `${title} لل${author} ${locationText}`
-                            );
-
-                            addCandidate(
-                                `${title} لـ${author} ${locationText}`
-                            );
-
-                            /*
-                            * الصيغ الأخرى التي قد ترد في الحاشية.
-                            */
-                            addCandidate(
-                                `${author}، ${title}، ${locationText}`
-                            );
-
-                            addCandidate(
-                                `${author}، ${title} ${locationText}`
-                            );
-
-                            addCandidate(
-                                `${title}، ${author}، ${locationText}`
-                            );
-
-                            addCandidate(
-                                `${title}، ${author} ${locationText}`
-                            );
-
-                        }
-                    );
-
-                }
-
-                /*
-                * -----------------------------------------------------
-                * variants كمرشح احتياطي.
-                *
-                * لا نعتمد عليها وحدها.
-                * -----------------------------------------------------
+                * variants كمرشح احتياطي فقط.
                 */
                 const variants =
                     Array.isArray(
@@ -29429,7 +29320,9 @@ async function applyFootnoteSuggestions(
                         : [];
 
                 variants.forEach(
-                    function (variant) {
+                    function (
+                        variant
+                    ) {
 
                         addCandidate(
                             variant
@@ -29439,9 +29332,7 @@ async function applyFootnoteSuggestions(
                 );
 
                 /*
-                * -----------------------------------------------------
                 * العنوان وحده كاحتياط أخير.
-                * -----------------------------------------------------
                 */
                 if (
                     title
@@ -29454,10 +29345,13 @@ async function applyFootnoteSuggestions(
                 }
 
                 /*
-                * الأطول والأكثر تحديدًا أولًا.
+                * الأطول أولًا.
                 */
                 return candidates.sort(
-                    function (a, b) {
+                    function (
+                        a,
+                        b
+                    ) {
 
                         return (
                             b.length -
