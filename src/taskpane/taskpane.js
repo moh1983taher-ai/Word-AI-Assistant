@@ -29004,6 +29004,33 @@ async function applyFootnoteSuggestions(
 
                 const candidates = [];
 
+                function addCandidate(
+                    value
+                ) {
+
+                    const text =
+                        String(
+                            value || ""
+                        ).trim();
+
+                    if (
+                        text &&
+                        !candidates.includes(
+                            text
+                        )
+                    ) {
+
+                        candidates.push(
+                            text
+                        );
+
+                    }
+
+                }
+
+                /*
+                * أولًا: الصيغ التي أعادها الذكاء الاصطناعي.
+                */
                 const variants =
                     Array.isArray(
                         reference?.variants
@@ -29012,39 +29039,31 @@ async function applyFootnoteSuggestions(
                         : [];
 
                 variants.forEach(
-                    function (variant) {
+                    function (
+                        variant
+                    ) {
 
-                        const value =
-                            String(
-                                variant || ""
-                            ).trim();
-
-                        if (
-                            value &&
-                            !candidates.includes(value)
-                        ) {
-                            candidates.push(value);
-                        }
+                        addCandidate(
+                            variant
+                        );
 
                     }
                 );
 
                 /*
-                 * احتياط فقط إذا لم توجد variants.
-                 */
-                if (
-                    candidates.length === 0
-                ) {
+                * ثانيًا: نبني دائمًا صيغة مستقلة
+                * من عنوان المرجع + موضع occurrence.
+                *
+                * هذه هي النقطة المهمة:
+                * لا نعتمد على variants وحدها.
+                */
+                const title =
+                    String(
+                        reference?.title ||
+                        ""
+                    ).trim();
 
-                    const title =
-                        String(
-                            reference?.title ||
-                            ""
-                        ).trim();
-
-                    if (!title) {
-                        return [];
-                    }
+                if (title) {
 
                     const occurrences =
                         Array.isArray(
@@ -29055,88 +29074,124 @@ async function applyFootnoteSuggestions(
 
                     const occurrence =
                         occurrences.find(
-                            function (item) {
+                            function (
+                                item
+                            ) {
 
                                 return (
                                     String(
                                         item?.materialId ||
                                         ""
                                     ).trim() ===
-                                    materialId
+                                    String(
+                                        materialId ||
+                                        ""
+                                    ).trim()
                                 );
 
                             }
                         );
 
-                    if (!occurrence) {
-                        return [title];
+                    if (occurrence) {
+
+                        const volume =
+                            String(
+                                occurrence?.volume ||
+                                ""
+                            ).trim();
+
+                        const page =
+                            String(
+                                occurrence?.page ||
+                                ""
+                            ).trim();
+
+                        const pageRange =
+                            String(
+                                occurrence?.pageRange ||
+                                ""
+                            ).trim();
+
+                        let location =
+                            "";
+
+                        if (
+                            volume &&
+                            page
+                        ) {
+
+                            location =
+                                `${volume}/${page}`;
+
+                        }
+                        else if (
+                            volume &&
+                            pageRange
+                        ) {
+
+                            location =
+                                `${volume}/${pageRange}`;
+
+                        }
+                        else if (
+                            pageRange
+                        ) {
+
+                            location =
+                                pageRange;
+
+                        }
+                        else if (
+                            page
+                        ) {
+
+                            location =
+                                page;
+
+                        }
+
+                        if (location) {
+
+                            addCandidate(
+                                `${title} ${location}`
+                            );
+
+                            /*
+                            * احتياط للحالات التي سقطت فيها
+                            * المسافة بين العنوان والموضع.
+                            */
+                            addCandidate(
+                                `${title}${location}`
+                            );
+
+                        }
+
                     }
 
-                    const volume =
-                        String(
-                            occurrence?.volume ||
-                            ""
-                        ).trim();
-
-                    const page =
-                        String(
-                            occurrence?.page ||
-                            ""
-                        ).trim();
-
-                    const pageRange =
-                        String(
-                            occurrence?.pageRange ||
-                            ""
-                        ).trim();
-
-                    let location = "";
-
+                    /*
+                    * إذا لم يوجد occurrence واضح،
+                    * نحتفظ بالعنوان كمرشح احتياطي.
+                    */
                     if (
-                        volume &&
-                        page
+                        candidates.length === 0
                     ) {
 
-                        location =
-                            `${volume}/${page}`;
+                        addCandidate(
+                            title
+                        );
 
                     }
-                    else if (
-                        volume &&
-                        pageRange
-                    ) {
-
-                        location =
-                            `${volume}/${pageRange}`;
-
-                    }
-                    else if (
-                        pageRange
-                    ) {
-
-                        location =
-                            pageRange;
-
-                    }
-                    else if (
-                        page
-                    ) {
-
-                        location =
-                            page;
-
-                    }
-
-                    candidates.push(
-                        location
-                            ? `${title} ${location}`
-                            : title
-                    );
 
                 }
 
+                /*
+                * الأطول أولًا.
+                */
                 return candidates.sort(
-                    function (a, b) {
+                    function (
+                        a,
+                        b
+                    ) {
 
                         return (
                             b.length -
@@ -29145,7 +29200,6 @@ async function applyFootnoteSuggestions(
 
                     }
                 );
-
             }
 
             async function findLastMatch(
