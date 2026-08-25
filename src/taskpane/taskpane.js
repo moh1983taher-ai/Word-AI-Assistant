@@ -28940,26 +28940,32 @@ async function applyFootnoteSuggestions(
 ) {
 
     if (
-        !Array.isArray(footnoteSuggestions) ||
+        !Array.isArray(
+            footnoteSuggestions
+        ) ||
         footnoteSuggestions.length === 0
     ) {
+
         return {
             applied: 0,
             skipped: 0
         };
+
     }
 
     if (
         typeof JSZip === "undefined"
     ) {
+
         throw new Error(
             "مكتبة JSZip غير محمّلة في الإضافة."
         );
+
     }
 
     /*
      * =========================================================
-     * 1. تحديد الحواشي التي تحتاج تعديلًا فقط
+     * 1. الحواشي التي تحتاج تعديلًا فقط
      * =========================================================
      */
 
@@ -28974,13 +28980,11 @@ async function applyFootnoteSuggestions(
                 !item.source ||
                 item.noteNumber == null
             ) {
+
                 return;
+
             }
 
-            /*
-             * لا نعتبر الحاشية مطلوبة إلا إذا كان لديها
-             * مراجع ونصوص مقترحة فعلًا.
-             */
             if (
                 !Array.isArray(
                     item.references
@@ -28990,10 +28994,12 @@ async function applyFootnoteSuggestions(
                 ) ||
                 item.references.length === 0
             ) {
+
                 return;
+
             }
 
-            const hasUsableReference =
+            const usable =
                 item.references.some(
                     function (
                         reference,
@@ -29012,9 +29018,11 @@ async function applyFootnoteSuggestions(
                 );
 
             if (
-                !hasUsableReference
+                !usable
             ) {
+
                 return;
+
             }
 
             requiredNotes.add(
@@ -29029,15 +29037,17 @@ async function applyFootnoteSuggestions(
     if (
         requiredNotes.size === 0
     ) {
+
         return {
             applied: 0,
             skipped: 0
         };
+
     }
 
     /*
      * =========================================================
-     * أدوات عامة
+     * 2. أدوات التطبيع
      * =========================================================
      */
 
@@ -29104,17 +29114,26 @@ async function applyFootnoteSuggestions(
                 /[-–—]/g,
                 "-"
             )
-            .trim()
             .toLowerCase();
 
     }
+
+    /*
+     * =========================================================
+     * هوية المرجع
+     * =========================================================
+     */
 
     function getReferenceKey(
         reference
     ) {
 
-        if (!reference) {
+        if (
+            !reference
+        ) {
+
             return "";
+
         }
 
         const id =
@@ -29123,8 +29142,12 @@ async function applyFootnoteSuggestions(
                 ""
             ).trim();
 
-        if (id) {
+        if (
+            id
+        ) {
+
             return `id:${id}`;
+
         }
 
         const author =
@@ -29151,7 +29174,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * مرشحات هوية المرجع فقط
+     * مرشحات الهوية فقط
      * =========================================================
      */
 
@@ -29161,7 +29184,7 @@ async function applyFootnoteSuggestions(
 
         const candidates = [];
 
-        function addCandidate(
+        function add(
             value
         ) {
 
@@ -29176,9 +29199,11 @@ async function applyFootnoteSuggestions(
                     text
                 )
             ) {
+
                 candidates.push(
                     text
                 );
+
             }
 
         }
@@ -29200,35 +29225,35 @@ async function applyFootnoteSuggestions(
             author
         ) {
 
-            addCandidate(
+            add(
                 `${author}، ${title}`
             );
 
-            addCandidate(
+            add(
                 `${author}, ${title}`
             );
 
-            addCandidate(
+            add(
                 `${title}، ${author}`
             );
 
-            addCandidate(
+            add(
                 `${title}, ${author}`
             );
 
-            addCandidate(
+            add(
                 `${title} لل${author}`
             );
 
-            addCandidate(
+            add(
                 `${title} لـ${author}`
             );
 
-            addCandidate(
+            add(
                 `${author} ${title}`
             );
 
-            addCandidate(
+            add(
                 `${title} ${author}`
             );
 
@@ -29238,7 +29263,7 @@ async function applyFootnoteSuggestions(
             title
         ) {
 
-            addCandidate(
+            add(
                 title
             );
 
@@ -29259,6 +29284,12 @@ async function applyFootnoteSuggestions(
         );
 
     }
+
+    /*
+     * =========================================================
+     * النص الذي سيحل محل الهوية فقط
+     * =========================================================
+     */
 
     function buildReplacementText(
         reference,
@@ -29340,7 +29371,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * الحصول على DOCX كاملًا
+     * 3. قراءة DOCX مرة واحدة
      * =========================================================
      */
 
@@ -29375,6 +29406,7 @@ async function applyFootnoteSuggestions(
                             );
 
                             return;
+
                         }
 
                         const file =
@@ -29415,6 +29447,7 @@ async function applyFootnoteSuggestions(
                                         );
 
                                         return;
+
                                     }
 
                                     slices[index] =
@@ -29504,6 +29537,7 @@ async function applyFootnoteSuggestions(
                                         );
 
                                         return;
+
                                     }
 
                                     readSlice(
@@ -29530,6 +29564,7 @@ async function applyFootnoteSuggestions(
                             );
 
                             return;
+
                         }
 
                         readSlice(
@@ -29546,7 +29581,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * تحديد الحواشي العادية فقط
+     * 4. تحديد الحواشي الحقيقية
      * =========================================================
      */
 
@@ -29591,15 +29626,89 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * خريطة النص المحلي
+     * 5. بناء النص الكامل للحاشية مع خريطة w:t
      * =========================================================
      */
 
-    function buildRawMap(
-        text
+    function getTextNodeMap(
+        noteElement
     ) {
 
-        const normalized =
+        const ns =
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+        const nodes =
+            Array.from(
+                noteElement.getElementsByTagNameNS(
+                    ns,
+                    "t"
+                )
+            );
+
+        let text =
+            "";
+
+        const starts =
+            [];
+
+        const ends =
+            [];
+
+        nodes.forEach(
+            function (
+                node,
+                index
+            ) {
+
+                const value =
+                    node.textContent ||
+                    "";
+
+                starts[index] =
+                    text.length;
+
+                text +=
+                    value;
+
+                ends[index] =
+                    text.length;
+
+            }
+        );
+
+        return {
+
+            nodes:
+                nodes,
+
+            text:
+                text,
+
+            starts:
+                starts,
+
+            ends:
+                ends
+
+        };
+
+    }
+
+    /*
+     * =========================================================
+     * 6. العثور على الهوية في النص الكامل
+     *
+     * لا نفقد التطابق عندما تكون الجملة موزعة
+     * على عدة w:t.
+     * =========================================================
+     */
+
+    function findIdentity(
+        text,
+        candidates
+    ) {
+
+        const normalizedText =
             normalizeLocal(
                 text
             );
@@ -29607,18 +29716,25 @@ async function applyFootnoteSuggestions(
         const rawMap =
             [];
 
-        let normalizedCounter =
+        let normalizedPosition =
             0;
 
+        /*
+         * خريطة تطبيع دقيقة:
+         * كل حرف مطبع يحمل موضعه الحقيقي.
+         */
         for (
             let i = 0;
             i < text.length;
             i++
         ) {
 
+            const originalChar =
+                text[i];
+
             const normalizedChar =
                 normalizeLocal(
-                    text[i]
+                    originalChar
                 );
 
             for (
@@ -29628,35 +29744,15 @@ async function applyFootnoteSuggestions(
             ) {
 
                 rawMap[
-                    normalizedCounter
+                    normalizedPosition
                 ] =
                     i;
 
-                normalizedCounter++;
+                normalizedPosition++;
 
             }
 
         }
-
-        return {
-            normalized:
-                normalized,
-
-            rawMap:
-                rawMap
-        };
-
-    }
-
-    function findLastIdentity(
-        fullText,
-        candidates
-    ) {
-
-        const map =
-            buildRawMap(
-                fullText
-            );
 
         let best =
             null;
@@ -29665,20 +29761,22 @@ async function applyFootnoteSuggestions(
             -1;
 
         for (
-            let i = 0;
-            i < candidates.length;
-            i++
+            let c = 0;
+            c < candidates.length;
+            c++
         ) {
 
             const target =
                 normalizeLocal(
-                    candidates[i]
+                    candidates[c]
                 );
 
             if (
                 !target
             ) {
+
                 continue;
+
             }
 
             let from =
@@ -29687,7 +29785,7 @@ async function applyFootnoteSuggestions(
             while (true) {
 
                 const position =
-                    map.normalized.indexOf(
+                    normalizedText.indexOf(
                         target,
                         from
                     );
@@ -29695,39 +29793,48 @@ async function applyFootnoteSuggestions(
                 if (
                     position === -1
                 ) {
+
                     break;
+
                 }
 
-                const end =
+                const normalizedEnd =
                     position +
                     target.length;
 
                 if (
-                    position < map.rawMap.length &&
-                    end - 1 < map.rawMap.length
+                    position <
+                        rawMap.length &&
+                    normalizedEnd - 1 <
+                        rawMap.length
                 ) {
 
                     const rawStart =
-                        map.rawMap[
+                        rawMap[
                             position
                         ];
 
                     const rawEnd =
-                        map.rawMap[
-                            end - 1
+                        rawMap[
+                            normalizedEnd - 1
                         ] + 1;
 
+                    /*
+                     * نفضل أطول هوية.
+                     */
                     if (
                         target.length >
                         bestLength
                     ) {
 
                         best = {
+
                             start:
                                 rawStart,
 
                             end:
                                 rawEnd
+
                         };
 
                         bestLength =
@@ -29749,90 +29856,56 @@ async function applyFootnoteSuggestions(
         }
 
         return best;
+
     }
 
     /*
      * =========================================================
-     * تعديل عقد النص في XML فقط
+     * 7. استبدال داخل عقد w:t مع الحفاظ على البنية
      * =========================================================
      */
 
-    function replaceXmlText(
+    function replaceInNote(
         noteElement,
-        rawStart,
-        rawEnd,
+        start,
+        end,
         replacement
     ) {
 
-        const ns =
-            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-
-        const textNodes =
-            Array.from(
-                noteElement.getElementsByTagNameNS(
-                    ns,
-                    "t"
-                )
+        const map =
+            getTextNodeMap(
+                noteElement
             );
 
-        let fullText =
-            "";
-
-        const starts =
-            [];
-
-        const ends =
-            [];
-
-        textNodes.forEach(
-            function (
-                node,
-                index
-            ) {
-
-                const value =
-                    node.textContent ||
-                    "";
-
-                starts[index] =
-                    fullText.length;
-
-                fullText +=
-                    value;
-
-                ends[index] =
-                    fullText.length;
-
-            }
-        );
-
-        let firstNode =
+        let first =
             -1;
 
-        let lastNode =
+        let last =
             -1;
 
         for (
             let i = 0;
-            i < textNodes.length;
+            i < map.nodes.length;
             i++
         ) {
 
             if (
-                rawStart < ends[i] &&
-                rawEnd > starts[i]
+                start <
+                    map.ends[i] &&
+                end >
+                    map.starts[i]
             ) {
 
                 if (
-                    firstNode === -1
+                    first === -1
                 ) {
 
-                    firstNode =
+                    first =
                         i;
 
                 }
 
-                lastNode =
+                last =
                     i;
 
             }
@@ -29840,82 +29913,83 @@ async function applyFootnoteSuggestions(
         }
 
         if (
-            firstNode === -1
+            first === -1
         ) {
 
             return false;
 
         }
 
-        const firstValue =
-            textNodes[
-                firstNode
+        const firstText =
+            map.nodes[
+                first
             ].textContent ||
             "";
 
-        const lastValue =
-            textNodes[
-                lastNode
+        const lastText =
+            map.nodes[
+                last
             ].textContent ||
             "";
 
         const firstOffset =
-            Math.max(
-                0,
-                rawStart -
-                starts[
-                    firstNode
-                ]
-            );
+            start -
+            map.starts[
+                first
+            ];
 
         const lastOffset =
-            Math.max(
-                0,
-                rawEnd -
-                starts[
-                    lastNode
-                ]
-            );
+            end -
+            map.starts[
+                last
+            ];
 
         const prefix =
-            firstValue.substring(
+            firstText.substring(
                 0,
                 firstOffset
             );
 
         const suffix =
-            lastValue.substring(
+            lastText.substring(
                 lastOffset
             );
 
-        textNodes[
-            firstNode
+        /*
+         * النص الجديد يوضع في أول عقدة فقط.
+         */
+        map.nodes[
+            first
         ].textContent =
             prefix +
             replacement +
             (
-                firstNode === lastNode
+                first === last
                     ? suffix
                     : ""
             );
 
+        /*
+         * تفريغ العقد الواقعة داخل الهوية.
+         */
         for (
             let i =
-                firstNode + 1;
-            i <= lastNode;
+                first + 1;
+            i <= last;
             i++
         ) {
 
             if (
-                i === lastNode
+                i === last
             ) {
 
                 if (
-                    lastNode !==
-                    firstNode
+                    first !== last
                 ) {
 
-                    textNodes[i].textContent =
+                    map.nodes[
+                        i
+                    ].textContent =
                         suffix;
 
                 }
@@ -29923,7 +29997,9 @@ async function applyFootnoteSuggestions(
             }
             else {
 
-                textNodes[i].textContent =
+                map.nodes[
+                    i
+                ].textContent =
                     "";
 
             }
@@ -29931,12 +30007,12 @@ async function applyFootnoteSuggestions(
         }
 
         return true;
+
     }
 
     /*
      * =========================================================
-     * معالجة جزء واحد فقط:
-     * footnotes.xml أو endnotes.xml
+     * 8. معالجة footnotes.xml / endnotes.xml
      * =========================================================
      */
 
@@ -29955,6 +30031,7 @@ async function applyFootnoteSuggestions(
         if (!file) {
 
             return {
+
                 modified:
                     false,
 
@@ -29963,6 +30040,7 @@ async function applyFootnoteSuggestions(
 
                 skipped:
                     0
+
             };
 
         }
@@ -29993,7 +30071,7 @@ async function applyFootnoteSuggestions(
 
         }
 
-        const noteElements =
+        const notes =
             getNoteElements(
                 xmlDoc,
                 localName
@@ -30008,37 +30086,25 @@ async function applyFootnoteSuggestions(
         let skipped =
             0;
 
-        /*
-         * هنا نتعامل فقط مع noteNumbers المطلوبة،
-         * ونتجاوز بقية الحواشي فورًا.
-         */
         for (
             let index = 0;
-            index < noteElements.length;
+            index < notes.length;
             index++
         ) {
 
             const noteNumber =
                 index + 1;
 
-            console.log(
-                source,
-                "XML index:",
-                index,
-                "noteNumber:",
-                noteNumber,
-                "required:",
-                requiredNotes.has(
-                    `${source}-${noteNumber}`
-                )
-            );
-
-            const requiredKey =
+            const key =
                 `${source}-${noteNumber}`;
 
+            /*
+             * لا نعالج هذه الحاشية أصلًا
+             * إن لم تكن ضمن الحواشي المطلوبة.
+             */
             if (
                 !requiredNotes.has(
-                    requiredKey
+                    key
                 )
             ) {
 
@@ -30077,50 +30143,33 @@ async function applyFootnoteSuggestions(
             }
 
             const noteElement =
-                noteElements[
+                notes[
                     index
                 ];
 
-            const ns =
-                "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-
-            const textNodes =
-                Array.from(
-                    noteElement.getElementsByTagNameNS(
-                        ns,
-                        "t"
-                    )
+            const textMap =
+                getTextNodeMap(
+                    noteElement
                 );
 
             if (
-                textNodes.length === 0
+                !textMap.text.trim()
             ) {
 
                 continue;
 
             }
 
-            let fullText =
-                "";
-
-            textNodes.forEach(
-                function (
-                    node
-                ) {
-
-                    fullText +=
-                        node.textContent ||
-                        "";
-
-                }
-            );
-
             /*
-             * المرجع نفسه يستبدل مرة واحدة فقط.
+             * المرجع نفسه يعالج مرة واحدة.
              */
             const processedReferences =
                 new Set();
 
+            /*
+             * نحدد كل الاستبدالات في النص الأصلي
+             * أولًا قبل تغيير XML.
+             */
             const replacements =
                 [];
 
@@ -30149,15 +30198,15 @@ async function applyFootnoteSuggestions(
 
                 }
 
-                const key =
+                const referenceKey =
                     getReferenceKey(
                         reference
                     );
 
                 if (
-                    key &&
+                    referenceKey &&
                     processedReferences.has(
-                        key
+                        referenceKey
                     )
                 ) {
 
@@ -30179,9 +30228,12 @@ async function applyFootnoteSuggestions(
 
                 }
 
+                /*
+                 * البحث في النص الكامل للحاشية.
+                 */
                 const match =
-                    findLastIdentity(
-                        fullText,
+                    findIdentity(
+                        textMap.text,
                         candidates
                     );
 
@@ -30223,11 +30275,11 @@ async function applyFootnoteSuggestions(
                 });
 
                 if (
-                    key
+                    referenceKey
                 ) {
 
                     processedReferences.add(
-                        key
+                        referenceKey
                     );
 
                 }
@@ -30235,7 +30287,7 @@ async function applyFootnoteSuggestions(
             }
 
             /*
-             * من اليمين إلى اليسار.
+             * الأبعد أولًا.
              */
             replacements.sort(
                 function (
@@ -30251,13 +30303,17 @@ async function applyFootnoteSuggestions(
                 }
             );
 
+            /*
+             * تنفيذ كل تعديلات هذه الحاشية
+             * محليًا داخل XML.
+             */
             replacements.forEach(
                 function (
                     replacement
                 ) {
 
                     if (
-                        replaceXmlText(
+                        replaceInNote(
                             noteElement,
                             replacement.start,
                             replacement.end,
@@ -30310,16 +30366,13 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * الحصول على DOCX مرة واحدة
+     * 9. الحصول على DOCX
      * =========================================================
      */
 
     const originalBase64 =
         await getDocumentBase64();
 
-    /*
-     * فتح الحزمة مرة واحدة.
-     */
     const zip =
         await JSZip.loadAsync(
             originalBase64,
@@ -30331,7 +30384,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * تعديل الحواشي المطلوبة فقط
+     * 10. معالجة الحواشي المطلوبة فقط
      * =========================================================
      */
 
@@ -30389,7 +30442,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * بناء DOCX المعدل مرة واحدة
+     * 11. بناء الملف المعدل
      * =========================================================
      */
 
@@ -30412,7 +30465,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * إعادة المستند المعدل مرة واحدة
+     * 12. إعادة الوثيقة مرة واحدة
      * =========================================================
      */
 
