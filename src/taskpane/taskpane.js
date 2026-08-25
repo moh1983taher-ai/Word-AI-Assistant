@@ -29039,6 +29039,12 @@ async function applyFootnoteSuggestions(
                         ""
                     ).trim();
 
+                const materialKey =
+                    String(
+                        materialId ||
+                        ""
+                    ).trim();
+
                 const occurrences =
                     Array.isArray(
                         reference?.occurrences
@@ -29046,8 +29052,13 @@ async function applyFootnoteSuggestions(
                         ? reference.occurrences
                         : [];
 
-                const occurrence =
-                    occurrences.find(
+                /*
+                * -----------------------------------------------------
+                * جميع مواضع هذا المرجع داخل الحاشية الحالية فقط.
+                * -----------------------------------------------------
+                */
+                const materialOccurrences =
+                    occurrences.filter(
                         function (item) {
 
                             return (
@@ -29055,142 +29066,346 @@ async function applyFootnoteSuggestions(
                                     item?.materialId ||
                                     ""
                                 ).trim() ===
-                                String(
-                                    materialId ||
-                                    ""
-                                ).trim()
+                                materialKey
                             );
 
                         }
                     );
 
-                let location =
-                    "";
+                /*
+                * إزالة المواضع المكررة.
+                */
+                const locations = [];
 
-                if (occurrence) {
+                materialOccurrences.forEach(
+                    function (item) {
 
-                    const volume =
-                        String(
-                            occurrence?.volume ||
-                            ""
-                        ).trim();
+                        const volume =
+                            String(
+                                item?.volume ||
+                                ""
+                            ).trim();
 
-                    const page =
-                        String(
-                            occurrence?.page ||
-                            ""
-                        ).trim();
+                        const page =
+                            String(
+                                item?.page ||
+                                ""
+                            ).trim();
 
-                    const pageRange =
-                        String(
-                            occurrence?.pageRange ||
-                            ""
-                        ).trim();
+                        const pageRange =
+                            String(
+                                item?.pageRange ||
+                                ""
+                            ).trim();
+
+                        const key =
+                            `${volume}|${page}|${pageRange}`;
+
+                        if (
+                            (
+                                volume ||
+                                page ||
+                                pageRange
+                            ) &&
+                            !locations.some(
+                                function (location) {
+
+                                    return (
+                                        location.key ===
+                                        key
+                                    );
+
+                                }
+                            )
+                        ) {
+
+                            locations.push({
+
+                                key:
+                                    key,
+
+                                volume:
+                                    volume,
+
+                                page:
+                                    page,
+
+                                pageRange:
+                                    pageRange
+
+                            });
+
+                        }
+
+                    }
+                );
+
+                /*
+                * -----------------------------------------------------
+                * بناء جميع مواضع المرجع في صيغة واحدة.
+                *
+                * إذا كان المجلد واحدًا:
+                *
+                * 1/222، 223، 253
+                *
+                * وليس:
+                *
+                * 1/222
+                *
+                * فقط.
+                * -----------------------------------------------------
+                */
+                function buildCombinedLocationCandidates() {
 
                     if (
-                        volume &&
-                        page
+                        locations.length === 0
                     ) {
 
-                        location =
-                            `${volume}/${page}`;
+                        return [];
 
                     }
-                    else if (
-                        volume &&
-                        pageRange
+
+                    const result = [];
+
+                    /*
+                    * إذا كانت جميع المواضع في المجلد نفسه،
+                    * نستخدم المجلد مرة واحدة ثم بقية الصفحات.
+                    */
+                    const firstVolume =
+                        locations[0].volume;
+
+                    const sameVolume =
+                        firstVolume &&
+                        locations.every(
+                            function (location) {
+
+                                return (
+                                    location.volume ===
+                                    firstVolume
+                                );
+
+                            }
+                        );
+
+                    if (
+                        sameVolume
                     ) {
 
-                        location =
-                            `${volume}/${pageRange}`;
+                        const parts = [];
+
+                        locations.forEach(
+                            function (location, index) {
+
+                                if (
+                                    location.pageRange
+                                ) {
+
+                                    if (
+                                        index === 0
+                                    ) {
+
+                                        parts.push(
+                                            `${firstVolume}/${location.pageRange}`
+                                        );
+
+                                    }
+                                    else {
+
+                                        parts.push(
+                                            location.pageRange
+                                        );
+
+                                    }
+
+                                }
+                                else if (
+                                    location.page
+                                ) {
+
+                                    if (
+                                        index === 0
+                                    ) {
+
+                                        parts.push(
+                                            `${firstVolume}/${location.page}`
+                                        );
+
+                                    }
+                                    else {
+
+                                        parts.push(
+                                            location.page
+                                        );
+
+                                    }
+
+                                }
+
+                            }
+                        );
+
+                        if (
+                            parts.length
+                        ) {
+
+                            result.push(
+                                parts.join("، ")
+                            );
+
+                        }
 
                     }
-                    else if (
-                        pageRange
-                    ) {
+                    else {
 
-                        location =
-                            pageRange;
+                        /*
+                        * المجلدات مختلفة؛ نحتفظ بكل موضع كاملًا.
+                        */
+                        const parts = [];
+
+                        locations.forEach(
+                            function (location) {
+
+                                if (
+                                    location.volume &&
+                                    location.page
+                                ) {
+
+                                    parts.push(
+                                        `${location.volume}/${location.page}`
+                                    );
+
+                                }
+                                else if (
+                                    location.volume &&
+                                    location.pageRange
+                                ) {
+
+                                    parts.push(
+                                        `${location.volume}/${location.pageRange}`
+                                    );
+
+                                }
+                                else if (
+                                    location.pageRange
+                                ) {
+
+                                    parts.push(
+                                        location.pageRange
+                                    );
+
+                                }
+                                else if (
+                                    location.page
+                                ) {
+
+                                    parts.push(
+                                        location.page
+                                    );
+
+                                }
+
+                            }
+                        );
+
+                        if (
+                            parts.length
+                        ) {
+
+                            result.push(
+                                parts.join("، ")
+                            );
+
+                        }
 
                     }
-                    else if (
-                        page
-                    ) {
 
-                        location =
-                            page;
+                    return result;
 
-                    }
                 }
 
-                /*
-                * =====================================================
-                * 1. المرشح الأكثر أهمية:
-                *    هوية المرجع + موضع occurrence.
-                *
-                *    نضعه قبل variants حتى لا يتم التقاط
-                *    رقم الصفحة وحده ثم استبداله بمرجع كامل.
-                * =====================================================
-                */
+                const combinedLocations =
+                    buildCombinedLocationCandidates();
 
+                /*
+                * -----------------------------------------------------
+                * المرشح الأساسي:
+                * العنوان + جميع مواضعه في الحاشية الحالية.
+                *
+                * هذا هو المرشح الأهم، ولذلك يأتي قبل variants.
+                * -----------------------------------------------------
+                */
                 if (
                     title &&
-                    location
+                    combinedLocations.length
                 ) {
 
-                    addCandidate(
-                        `${title} ${location}`
-                    );
+                    combinedLocations.forEach(
+                        function (locationText) {
 
-                    addCandidate(
-                        `${title}${location}`
+                            addCandidate(
+                                `${title}، ${locationText}`
+                            );
+
+                            addCandidate(
+                                `${title} ${locationText}`
+                            );
+
+                            /*
+                            * حالة سقوط المسافة بين العنوان والرقم.
+                            */
+                            addCandidate(
+                                `${title}${locationText}`
+                            );
+
+                        }
                     );
 
                 }
 
                 /*
-                * =====================================================
-                * 2. صيغ محتملة لترتيب المؤلف والعنوان.
+                * -----------------------------------------------------
+                * صيغ ترتيب المؤلف والعنوان.
                 *
-                * نستخدمها فقط للمطابقة، ولا نغيّر هوية المرجع.
-                * =====================================================
+                * تستخدم للمطابقة فقط.
+                * -----------------------------------------------------
                 */
-
                 if (
                     author &&
                     title &&
-                    location
+                    combinedLocations.length
                 ) {
 
-                    addCandidate(
-                        `${author}، ${title} ${location}`
-                    );
+                    combinedLocations.forEach(
+                        function (locationText) {
 
-                    addCandidate(
-                        `${author}, ${title} ${location}`
-                    );
+                            addCandidate(
+                                `${author}، ${title}، ${locationText}`
+                            );
 
-                    addCandidate(
-                        `${author} ${title} ${location}`
-                    );
+                            addCandidate(
+                                `${author}، ${title} ${locationText}`
+                            );
 
-                    addCandidate(
-                        `${title}، ${author} ${location}`
-                    );
+                            addCandidate(
+                                `${title}، ${author}، ${locationText}`
+                            );
 
-                    addCandidate(
-                        `${title}, ${author} ${location}`
+                            addCandidate(
+                                `${title}، ${author} ${locationText}`
+                            );
+
+                        }
                     );
 
                 }
 
                 /*
-                * =====================================================
-                * 3. variants تأتي بعد المرشحات المبنية من الهوية
-                *    لأنها قد تكون صيغة أعاد الذكاء الاصطناعي تركيبها.
-                * =====================================================
+                * -----------------------------------------------------
+                * variants كمرشح احتياطي.
+                *
+                * لا نعتمد عليها وحدها.
+                * -----------------------------------------------------
                 */
-
                 const variants =
                     Array.isArray(
                         reference?.variants
@@ -29199,9 +29414,7 @@ async function applyFootnoteSuggestions(
                         : [];
 
                 variants.forEach(
-                    function (
-                        variant
-                    ) {
+                    function (variant) {
 
                         addCandidate(
                             variant
@@ -29211,11 +29424,10 @@ async function applyFootnoteSuggestions(
                 );
 
                 /*
-                * =====================================================
-                * 4. احتياط أخير: العنوان وحده.
-                * =====================================================
+                * -----------------------------------------------------
+                * العنوان وحده كاحتياط أخير.
+                * -----------------------------------------------------
                 */
-
                 if (
                     title
                 ) {
@@ -29227,16 +29439,10 @@ async function applyFootnoteSuggestions(
                 }
 
                 /*
-                * =====================================================
                 * الأطول والأكثر تحديدًا أولًا.
-                * =====================================================
                 */
-
                 return candidates.sort(
-                    function (
-                        a,
-                        b
-                    ) {
+                    function (a, b) {
 
                         return (
                             b.length -
