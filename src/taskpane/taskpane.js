@@ -29378,6 +29378,21 @@ async function applyFootnoteSuggestions(
                     combinedLocations.forEach(
                         function (locationText) {
 
+                            /*
+                            * الصيغة التي يبدأ فيها العنوان
+                            * ثم يأتي المؤلف بصيغة النسبة.
+                            */
+                            addCandidate(
+                                `${title} لل${author} ${locationText}`
+                            );
+
+                            addCandidate(
+                                `${title} لـ${author} ${locationText}`
+                            );
+
+                            /*
+                            * الصيغ الأخرى التي قد ترد في الحاشية.
+                            */
                             addCandidate(
                                 `${author}، ${title}، ${locationText}`
                             );
