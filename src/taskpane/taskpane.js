@@ -29153,110 +29153,207 @@ async function applyFootnoteSuggestions(
                 candidates
             ) {
 
+                /*
+                * ننشئ صيغ بحث بديلة للمرجع نفسه،
+                * دون تغيير النص الأصلي في Word.
+                */
+                function buildSearchVariants(candidate) {
+
+                    const original =
+                        String(
+                            candidate || ""
+                        ).trim();
+
+                    if (!original) {
+                        return [];
+                    }
+
+                    const variants = [];
+
+                    function add(value) {
+
+                        const text =
+                            String(
+                                value || ""
+                            ).trim();
+
+                        if (
+                            text &&
+                            !variants.includes(text)
+                        ) {
+                            variants.push(text);
+                        }
+
+                    }
+
+                    /*
+                    * الصيغة الأصلية أولًا.
+                    */
+                    add(original);
+
+                    /*
+                    * توحيد المسافات المتعددة.
+                    */
+                    add(
+                        original.replace(
+                            /[\u00A0\s]+/g,
+                            " "
+                        )
+                    );
+
+                    /*
+                    * إزالة المسافات حول /.
+                    *
+                    * 1/ 220
+                    * 1 /220
+                    * 1 / 220
+                    *
+                    * تصبح جميعها:
+                    * 1/220
+                    */
+                    add(
+                        original
+                            .replace(
+                                /[\u00A0\s]*\/[\u00A0\s]*/g,
+                                "/"
+                            )
+                    );
+
+                    /*
+                    * توحيد المسافات حول الفواصل العربية
+                    * والعلامات القريبة منها.
+                    */
+                    add(
+                        original
+                            .replace(
+                                /[\u00A0\s]*،[\u00A0\s]*/g,
+                                "، "
+                            )
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                    );
+
+                    /*
+                    * السماح بالشكل الذي يستخدم الفاصلة الإنجليزية.
+                    */
+                    add(
+                        original
+                            .replace(
+                                /[\u00A0\s]*,[\u00A0\s]*/g,
+                                ", "
+                            )
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                    );
+
+                    /*
+                    * توحيد الشرطات في نطاق الصفحات.
+                    */
+                    add(
+                        original
+                            .replace(
+                                /[\u00A0\s]*[-–—][\u00A0\s]*/g,
+                                "-"
+                            )
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                    );
+
+                    /*
+                    * صيغة مركبة تعالج:
+                    * المسافات + / + الفواصل + نطاق الصفحات.
+                    */
+                    add(
+                        original
+                            .replace(
+                                /[\u00A0\s]*\/[\u00A0\s]*/g,
+                                "/"
+                            )
+                            .replace(
+                                /[\u00A0\s]*[،,][\u00A0\s]*/g,
+                                "، "
+                            )
+                            .replace(
+                                /[\u00A0\s]*[-–—][\u00A0\s]*/g,
+                                "-"
+                            )
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                    );
+
+                    return variants;
+                }
+
+                /*
+                * نبحث بكل صيغة ممكنة،
+                * ونأخذ آخر تطابق.
+                *
+                * أخذ آخر تطابق مهم عندما يتكرر المرجع
+                * داخل الحاشية نفسها.
+                */
                 for (
                     let i = 0;
                     i < candidates.length;
                     i++
                 ) {
 
-                    const candidate =
-                        String(
-                            candidates[i] || ""
-                        ).trim();
-
-                    if (!candidate) {
-                        continue;
-                    }
-
-                    /*
-                     * أولًا نحاول البحث بالنص نفسه.
-                     */
-                    let results =
-                        noteBody.search(
-                            candidate,
-                            {
-                                matchCase: false,
-                                matchWholeWord: false,
-                                matchWildcards: false
-                            }
+                    const searchVariants =
+                        buildSearchVariants(
+                            candidates[i]
                         );
 
-                    results.load(
-                        "items"
-                    );
-
-                    await context.sync();
-
-                    if (
-                        results.items.length > 0
+                    for (
+                        let v = 0;
+                        v < searchVariants.length;
+                        v++
                     ) {
 
-                        /*
-                         * نأخذ آخر تطابق.
-                         *
-                         * لأننا نعالج مراجع الحاشية
-                         * من الأخير إلى الأول.
-                         */
-                        return results.items[
-                            results.items.length - 1
-                        ];
+                        const candidate =
+                            searchVariants[v];
 
-                    }
+                        if (!candidate) {
+                            continue;
+                        }
 
-                    /*
-                     * محاولة مرنة للمسافات.
-                     */
-                    const normalizedCandidate =
-                        normalizeForSearch(
-                            candidate
+                        const results =
+                            noteBody.search(
+                                candidate,
+                                {
+                                    matchCase: false,
+                                    matchWholeWord: false,
+                                    matchWildcards: false
+                                }
+                            );
+
+                        results.load(
+                            "items"
                         );
 
-                    if (
-                        !normalizedCandidate
-                    ) {
-                        continue;
-                    }
+                        await context.sync();
 
-                    /*
-                     * لا نستخدم إعادة بناء جسم الحاشية.
-                     * نحاول فقط صيغ المسافات البسيطة.
-                     */
-                    const flexiblePattern =
-                        candidate.replace(
-                            /\s+/g,
-                            " "
-                        );
+                        if (
+                            results.items.length > 0
+                        ) {
 
-                    results =
-                        noteBody.search(
-                            flexiblePattern,
-                            {
-                                matchCase: false,
-                                matchWholeWord: false,
-                                matchWildcards: false
-                            }
-                        );
+                            return results.items[
+                                results.items.length - 1
+                            ];
 
-                    results.load(
-                        "items"
-                    );
-
-                    await context.sync();
-
-                    if (
-                        results.items.length > 0
-                    ) {
-
-                        return results.items[
-                            results.items.length - 1
-                        ];
+                        }
 
                     }
 
                 }
 
                 return null;
-
             }
 
             async function applyToNotes(
