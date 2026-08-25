@@ -28945,12 +28945,10 @@ async function applyFootnoteSuggestions(
         ) ||
         footnoteSuggestions.length === 0
     ) {
-
         return {
             applied: 0,
             skipped: 0
         };
-
     }
 
     return await Word.run(
@@ -28965,13 +28963,6 @@ async function applyFootnoteSuggestions(
             const endnotes =
                 body.endnotes;
 
-            /*
-             * =================================================
-             * 1. تحميل جميع الحواشي والحواشي الختامية
-             *    دفعة واحدة.
-             * =================================================
-             */
-
             footnotes.load(
                 "items"
             );
@@ -28980,12 +28971,18 @@ async function applyFootnoteSuggestions(
                 "items"
             );
 
+            /*
+             * =============================================
+             * 1. تحميل الحواشي مرة واحدة
+             * =============================================
+             */
+
             await context.sync();
 
             /*
-             * =================================================
-             * أدوات محلية للمطابقة.
-             * =================================================
+             * =============================================
+             * أدوات المطابقة
+             * =============================================
              */
 
             function toWesternDigits(
@@ -29023,7 +29020,6 @@ async function applyFootnoteSuggestions(
 
                         }
                     );
-
             }
 
             function normalizeLocal(
@@ -29057,7 +29053,6 @@ async function applyFootnoteSuggestions(
                     )
                     .trim()
                     .toLowerCase();
-
             }
 
             function buildLocalMap(
@@ -29087,9 +29082,7 @@ async function applyFootnoteSuggestions(
                             char
                         )
                     ) {
-
                         continue;
-
                     }
 
                     if (
@@ -29100,9 +29093,7 @@ async function applyFootnoteSuggestions(
                             char
                         )
                     ) {
-
                         continue;
-
                     }
 
                     const converted =
@@ -29127,9 +29118,7 @@ async function applyFootnoteSuggestions(
                         ends.push(
                             i + 1
                         );
-
                     }
-
                 }
 
                 return {
@@ -29142,7 +29131,6 @@ async function applyFootnoteSuggestions(
                     ends:
                         ends
                 };
-
             }
 
             function findLastLocalRange(
@@ -29176,9 +29164,7 @@ async function applyFootnoteSuggestions(
                     if (
                         !candidate
                     ) {
-
                         continue;
-
                     }
 
                     const target =
@@ -29189,17 +29175,13 @@ async function applyFootnoteSuggestions(
                     if (
                         !target
                     ) {
-
                         continue;
-
                     }
 
                     let from =
                         0;
 
-                    while (
-                        true
-                    ) {
+                    while (true) {
 
                         const position =
                             map.text.indexOf(
@@ -29210,9 +29192,7 @@ async function applyFootnoteSuggestions(
                         if (
                             position === -1
                         ) {
-
                             break;
-
                         }
 
                         const endPosition =
@@ -29261,9 +29241,7 @@ async function applyFootnoteSuggestions(
 
                                 bestLength =
                                     target.length;
-
                             }
-
                         }
 
                         from =
@@ -29272,148 +29250,174 @@ async function applyFootnoteSuggestions(
                                 1,
                                 target.length
                             );
-
                     }
-
                 }
 
                 return best;
-
-            }
-
-            function getReferenceKey(
-                reference
-            ) {
-
-                if (
-                    !reference
-                ) {
-
-                    return "";
-
-                }
-
-                const id =
-                    String(
-                        reference?.id ||
-                        ""
-                    ).trim();
-
-                if (
-                    id
-                ) {
-
-                    return `id:${id}`;
-
-                }
-
-                const author =
-                    String(
-                        reference?.author ||
-                        ""
-                    )
-                        .trim()
-                        .toLowerCase();
-
-                const title =
-                    String(
-                        reference?.title ||
-                        ""
-                    )
-                        .trim()
-                        .toLowerCase();
-
-                return (
-                    `ref:${author}|${title}`
-                );
-
-            }
-
-            function buildReplacementText(
-                reference,
-                suggestedText
-            ) {
-
-                const title =
-                    String(
-                        reference?.title ||
-                        ""
-                    ).trim();
-
-                const author =
-                    String(
-                        reference?.author ||
-                        ""
-                    ).trim();
-
-                const suggestedNormalized =
-                    normalizeLocal(
-                        suggestedText
-                    );
-
-                const authorNormalized =
-                    normalizeLocal(
-                        author
-                    );
-
-                const includeAuthor =
-                    Boolean(
-                        authorNormalized &&
-                        suggestedNormalized.includes(
-                            authorNormalized
-                        )
-                    );
-
-                switch (
-                    referenceStyle.format
-                ) {
-
-                    case "reference-only":
-
-                        return title;
-
-                    case "title-author":
-
-                        return [
-                            title,
-                            author
-                        ]
-                            .filter(Boolean)
-                            .join("، ");
-
-                    case "title-author-first":
-
-                        return [
-                            title,
-                            includeAuthor
-                                ? author
-                                : ""
-                        ]
-                            .filter(Boolean)
-                            .join("، ");
-
-                    case "author-title":
-
-                    default:
-
-                        return [
-                            author,
-                            title
-                        ]
-                            .filter(Boolean)
-                            .join("، ");
-
-                }
-
             }
 
             /*
-             * =================================================
-             * 2. تجهيز جميع الحواشي.
+             * =============================================
+             * getCandidates
              *
-             * نحمّل نص جسم كل حاشية، لكن لا نعمل sync
-             * داخل الحلقة.
-             * =================================================
+             * مهم:
+             * لا تدخل أرقام الصفحات في هوية المرجع.
+             * =============================================
+             */
+
+            function getCandidates(
+                reference,
+                materialId
+            ) {
+
+                const candidates = [];
+
+                function addCandidate(
+                    value
+                ) {
+
+                    const text =
+                        String(
+                            value || ""
+                        ).trim();
+
+                    if (
+                        text &&
+                        !candidates.includes(
+                            text
+                        )
+                    ) {
+                        candidates.push(
+                            text
+                        );
+                    }
+                }
+
+                const title =
+                    String(
+                        reference?.title ||
+                        ""
+                    ).trim();
+
+                const author =
+                    String(
+                        reference?.author ||
+                        ""
+                    ).trim();
+
+                /*
+                 * هوية المرجع فقط.
+                 *
+                 * لا نستخدم volume/page/pageRange.
+                 */
+
+                if (
+                    title &&
+                    author
+                ) {
+
+                    addCandidate(
+                        `${author}، ${title}`
+                    );
+
+                    addCandidate(
+                        `${author}, ${title}`
+                    );
+
+                    addCandidate(
+                        `${title}، ${author}`
+                    );
+
+                    addCandidate(
+                        `${title}, ${author}`
+                    );
+
+                    addCandidate(
+                        `${title} لل${author}`
+                    );
+
+                    addCandidate(
+                        `${title} لـ${author}`
+                    );
+
+                    addCandidate(
+                        `${author} ${title}`
+                    );
+
+                    addCandidate(
+                        `${title} ${author}`
+                    );
+                }
+
+                if (
+                    title
+                ) {
+
+                    addCandidate(
+                        title
+                    );
+                }
+
+                /*
+                 * لا نستخدم المؤلف وحده كمرشح.
+                 */
+
+                return candidates.sort(
+                    function (
+                        a,
+                        b
+                    ) {
+
+                        return (
+                            b.length -
+                            a.length
+                        );
+                    }
+                );
+            }
+
+            /*
+             * =============================================
+             * findLastMatch
+             *
+             * تعمل على النص الحقيقي الموجود في Word،
+             * ولا تغيّر الحاشية أثناء البحث.
+             * =============================================
+             */
+
+            async function findLastMatch(
+                noteBody,
+                candidates
+            ) {
+
+                /*
+                 * أولًا نأخذ نص الحاشية.
+                 * النص قد يكون محمّلًا مسبقًا،
+                 * لكن load هنا لا يسبب sync مستقلًا.
+                 */
+                noteBody.load(
+                    "text"
+                );
+
+                /*
+                 * لا نعمل sync هنا.
+                 * سيتم تنفيذ كل عمليات load/search
+                 * للوثيقة كلها قبل sync التالي.
+                 */
+
+                return {
+                    noteBody:
+                        noteBody,
+
+                    candidates:
+                        candidates
+                };
+            }
+
+            /*
+             * =============================================
+             * 2. تجهيز جميع الحواشي
+             * =============================================
              */
 
             const allNotes = [];
@@ -29423,6 +29427,10 @@ async function applyFootnoteSuggestions(
                     note,
                     index
                 ) {
+
+                    note.body.load(
+                        "text"
+                    );
 
                     allNotes.push({
 
@@ -29436,7 +29444,6 @@ async function applyFootnoteSuggestions(
                             index + 1
 
                     });
-
                 }
             );
 
@@ -29445,6 +29452,10 @@ async function applyFootnoteSuggestions(
                     note,
                     index
                 ) {
+
+                    note.body.load(
+                        "text"
+                    );
 
                     allNotes.push({
 
@@ -29458,40 +29469,30 @@ async function applyFootnoteSuggestions(
                             index + 1
 
                     });
-
-                }
-            );
-
-            allNotes.forEach(
-                function (
-                    item
-                ) {
-
-                    item.note.body.load(
-                        "text"
-                    );
-
                 }
             );
 
             /*
-             * =================================================
-             * 3. Sync واحد فقط لتحميل نصوص جميع الحواشي.
-             * =================================================
+             * تحميل نص جميع الحواشي دفعة واحدة.
              */
-
             await context.sync();
 
             /*
-             * =================================================
-             * 4. تجهيز جميع عمليات البحث في JavaScript.
-             * =================================================
+             * =============================================
+             * 3. إنشاء كل عمليات البحث دفعة واحدة
+             * =============================================
              */
 
             const pendingSearches = [];
 
-            let skipped = 0;
-            let applied = 0;
+            const processedNotes =
+                [];
+
+            let skipped =
+                0;
+
+            let applied =
+                0;
 
             allNotes.forEach(
                 function (
@@ -29512,7 +29513,6 @@ async function applyFootnoteSuggestions(
                                     ) ===
                                         noteInfo.noteNumber
                                 );
-
                             }
                         );
 
@@ -29525,9 +29525,7 @@ async function applyFootnoteSuggestions(
                             suggestion.suggestedTexts
                         )
                     ) {
-
                         return;
-
                     }
 
                     const originalText =
@@ -29539,22 +29537,16 @@ async function applyFootnoteSuggestions(
                     if (
                         !originalText.trim()
                     ) {
-
                         return;
-
                     }
 
                     /*
-                     * المرجع نفسه في الحاشية الحالية
-                     * يعالج مرة واحدة فقط.
+                     * منع تكرار اسم المرجع نفسه
+                     * عندما يكون له أكثر من موضع.
                      */
                     const appliedReferenceKeys =
                         new Set();
 
-                    /*
-                     * نبدأ من الأخير إلى الأول،
-                     * كما في النسخة المستقرة.
-                     */
                     for (
                         let i =
                             suggestion.references.length - 1;
@@ -29575,9 +29567,46 @@ async function applyFootnoteSuggestions(
                             !reference ||
                             !suggestedText
                         ) {
-
                             continue;
+                        }
 
+                        function getReferenceKey(
+                            ref
+                        ) {
+
+                            if (!ref) {
+                                return "";
+                            }
+
+                            const id =
+                                String(
+                                    ref?.id ||
+                                    ""
+                                ).trim();
+
+                            if (id) {
+                                return `id:${id}`;
+                            }
+
+                            const author =
+                                String(
+                                    ref?.author ||
+                                    ""
+                                )
+                                    .trim()
+                                    .toLowerCase();
+
+                            const title =
+                                String(
+                                    ref?.title ||
+                                    ""
+                                )
+                                    .trim()
+                                    .toLowerCase();
+
+                            return (
+                                `ref:${author}|${title}`
+                            );
                         }
 
                         const referenceKey =
@@ -29591,9 +29620,7 @@ async function applyFootnoteSuggestions(
                                 referenceKey
                             )
                         ) {
-
                             continue;
-
                         }
 
                         const materialId =
@@ -29608,16 +29635,10 @@ async function applyFootnoteSuggestions(
                         if (
                             candidates.length === 0
                         ) {
-
                             skipped++;
                             continue;
-
                         }
 
-                        /*
-                         * تحديد النص الأصلي محليًا
-                         * دون أي مخاطبة إضافية لـWord.
-                         */
                         const localRange =
                             findLastLocalRange(
                                 originalText,
@@ -29627,30 +29648,14 @@ async function applyFootnoteSuggestions(
                         if (
                             !localRange
                         ) {
-
                             skipped++;
                             continue;
-
-                        }
-
-                        const replacementText =
-                            buildReplacementText(
-                                reference,
-                                suggestedText
-                            );
-
-                        if (
-                            !replacementText
-                        ) {
-
-                            skipped++;
-                            continue;
-
                         }
 
                         /*
-                         * نرسل إلى Word عملية بحث واحدة
-                         * لكل مرجع، لكن بدون sync داخل الحلقة.
+                         * نطلب من Word إنشاء search result،
+                         * لكن لا نعمل sync حتى ننتهي من
+                         * جميع الحواشي.
                          */
                         const searchResults =
                             noteInfo.note.body.search(
@@ -29671,19 +29676,115 @@ async function applyFootnoteSuggestions(
                             "items"
                         );
 
+                        /*
+                         * تحديد النص الذي سيستبدل
+                         * اسم المرجع فقط.
+                         */
+                        const title =
+                            String(
+                                reference?.title ||
+                                ""
+                            ).trim();
+
+                        const author =
+                            String(
+                                reference?.author ||
+                                ""
+                            ).trim();
+
+                        const suggestedNormalized =
+                            normalizeLocal(
+                                suggestedText
+                            );
+
+                        const authorNormalized =
+                            normalizeLocal(
+                                author
+                            );
+
+                        const includeAuthor =
+                            Boolean(
+                                authorNormalized &&
+                                suggestedNormalized.includes(
+                                    authorNormalized
+                                )
+                            );
+
+                        let replacementText =
+                            "";
+
+                        switch (
+                            referenceStyle.format
+                        ) {
+
+                            case "reference-only":
+
+                                replacementText =
+                                    title;
+
+                                break;
+
+                            case "title-author":
+
+                                replacementText =
+                                    [
+                                        title,
+                                        author
+                                    ]
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+
+                            case "title-author-first":
+
+                                replacementText =
+                                    [
+                                        title,
+                                        includeAuthor
+                                            ? author
+                                            : ""
+                                    ]
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+
+                            case "author-title":
+
+                            default:
+
+                                replacementText =
+                                    [
+                                        author,
+                                        title
+                                    ]
+                                        .filter(Boolean)
+                                        .join("، ");
+
+                                break;
+                        }
+
+                        if (
+                            !replacementText
+                        ) {
+                            skipped++;
+                            continue;
+                        }
+
                         pendingSearches.push({
 
-                            noteInfo:
-                                noteInfo,
-
-                            referenceKey:
-                                referenceKey,
+                            note:
+                                noteInfo.note,
 
                             searchResults:
                                 searchResults,
 
                             replacementText:
-                                replacementText
+                                replacementText,
+
+                            referenceKey:
+                                referenceKey
 
                         });
 
@@ -29696,17 +29797,19 @@ async function applyFootnoteSuggestions(
                             );
 
                         }
-
                     }
+
+                    processedNotes.push(
+                        noteInfo
+                    );
 
                 }
             );
 
             /*
-             * =================================================
-             * 5. Sync واحد فقط لتنفيذ جميع عمليات البحث
-             *    لجميع الحواشي.
-             * =================================================
+             * =============================================
+             * 4. Sync واحد فقط لكل عمليات البحث
+             * =============================================
              */
 
             if (
@@ -29726,12 +29829,13 @@ async function applyFootnoteSuggestions(
             await context.sync();
 
             /*
-             * =================================================
-             * 6. تجهيز جميع الاستبدالات.
-             * =================================================
+             * =============================================
+             * 5. تجهيز الـRanges
+             * =============================================
              */
 
-            const replacements = [];
+            const replacements =
+                [];
 
             pendingSearches.forEach(
                 function (
@@ -29744,6 +29848,7 @@ async function applyFootnoteSuggestions(
                     ) {
 
                         skipped++;
+
                         return;
 
                     }
@@ -29767,9 +29872,9 @@ async function applyFootnoteSuggestions(
             );
 
             /*
-             * =================================================
-             * 7. تنفيذ جميع الاستبدالات في دفعة واحدة.
-             * =================================================
+             * =============================================
+             * 6. تنفيذ جميع الاستبدالات
+             * =============================================
              */
 
             replacements.forEach(
@@ -29788,9 +29893,9 @@ async function applyFootnoteSuggestions(
             );
 
             /*
-             * =================================================
-             * 8. Sync نهائي واحد فقط.
-             * =================================================
+             * =============================================
+             * 7. Sync نهائي واحد
+             * =============================================
              */
 
             if (
@@ -29813,7 +29918,6 @@ async function applyFootnoteSuggestions(
 
         }
     );
-
 }
 
 function mergeEquivalentReferences(references) {
