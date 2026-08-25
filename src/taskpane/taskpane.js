@@ -29472,13 +29472,342 @@ async function applyFootnoteSuggestions(
                     }
 
                     /*
-                    * المراجع التي تم توثيق اسمها بالفعل
-                    * داخل هذه الحاشية.
-                    *
-                    * المرجع نفسه قد يظهر أكثر من مرة
-                    * بسبب تعدد مواضعه، لكن الاسم يجب
-                    * أن يستبدل مرة واحدة فقط.
+                    * =================================================
+                    * 1. قراءة نص الحاشية مرة واحدة.
+                    * =================================================
                     */
+
+                    note.body.load(
+                        "text"
+                    );
+
+                    await context.sync();
+
+                    const originalText =
+                        String(
+                            note.body.text || ""
+                        );
+
+                    if (
+                        !originalText.trim()
+                    ) {
+
+                        continue;
+
+                    }
+
+                    /*
+                    * =================================================
+                    * أدوات المطابقة المحلية.
+                    *
+                    * لا نعدّل النص الأصلي.
+                    * =================================================
+                    */
+
+                    function toWesternDigits(
+                        value
+                    ) {
+
+                        return String(
+                            value || ""
+                        )
+                            .replace(
+                                /[٠-٩]/g,
+                                function (char) {
+
+                                    return String(
+                                        "٠١٢٣٤٥٦٧٨٩".indexOf(
+                                            char
+                                        )
+                                    );
+
+                                }
+                            )
+                            .replace(
+                                /[۰-۹]/g,
+                                function (char) {
+
+                                    return String(
+                                        "۰۱۲۳۴۵۶۷۸۹".indexOf(
+                                            char
+                                        )
+                                    );
+
+                                }
+                            );
+
+                    }
+
+                    function normalizeLocal(
+                        value
+                    ) {
+
+                        return toWesternDigits(
+                            String(
+                                value || ""
+                            )
+                        )
+                            .replace(
+                                /[\u064B-\u065F\u0670]/g,
+                                ""
+                            )
+                            .replace(
+                                /[\u200C-\u200F\u202A-\u202E]/g,
+                                ""
+                            )
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                ""
+                            )
+                            .replace(
+                                /[،,؛:()[\]{}"'`]/g,
+                                ""
+                            )
+                            .replace(
+                                /[-–—]/g,
+                                "-"
+                            )
+                            .toLowerCase();
+
+                    }
+
+                    /*
+                    * بناء خريطة بين النص المطبع والنص الأصلي.
+                    */
+                    function buildLocalMap(
+                        text
+                    ) {
+
+                        let normalized =
+                            "";
+
+                        const starts = [];
+                        const ends = [];
+
+                        for (
+                            let i = 0;
+                            i < text.length;
+                            i++
+                        ) {
+
+                            const char =
+                                text[i];
+
+                            if (
+                                /[\u064B-\u065F\u0670]/.test(
+                                    char
+                                ) ||
+                                /[\u200C-\u200F\u202A-\u202E]/.test(
+                                    char
+                                )
+                            ) {
+
+                                continue;
+
+                            }
+
+                            if (
+                                /[\u00A0\s]/.test(
+                                    char
+                                ) ||
+                                /[،,؛:()[\]{}"'`]/.test(
+                                    char
+                                )
+                            ) {
+
+                                continue;
+
+                            }
+
+                            const converted =
+                                toWesternDigits(
+                                    char
+                                );
+
+                            for (
+                                let j = 0;
+                                j < converted.length;
+                                j++
+                            ) {
+
+                                normalized +=
+                                    converted[j]
+                                        .toLowerCase();
+
+                                starts.push(
+                                    i
+                                );
+
+                                ends.push(
+                                    i + 1
+                                );
+
+                            }
+
+                        }
+
+                        return {
+                            text:
+                                normalized,
+
+                            starts:
+                                starts,
+
+                            ends:
+                                ends
+                        };
+
+                    }
+
+                    const localMap =
+                        buildLocalMap(
+                            originalText
+                        );
+
+                    /*
+                    * =================================================
+                    * تحديد آخر نطاق أصلي لكل مرجع.
+                    *
+                    * لا نستخدم Word في هذه المرحلة إطلاقًا.
+                    * =================================================
+                    */
+
+                    function findLastLocalRange(
+                        candidates
+                    ) {
+
+                        let best =
+                            null;
+
+                        let bestLength =
+                            -1;
+
+                        for (
+                            let i = 0;
+                            i < candidates.length;
+                            i++
+                        ) {
+
+                            const candidate =
+                                String(
+                                    candidates[i] ||
+                                    ""
+                                ).trim();
+
+                            if (
+                                !candidate
+                            ) {
+
+                                continue;
+
+                            }
+
+                            const target =
+                                normalizeLocal(
+                                    candidate
+                                );
+
+                            if (
+                                !target
+                            ) {
+
+                                continue;
+
+                            }
+
+                            let from =
+                                0;
+
+                            while (true) {
+
+                                const position =
+                                    localMap.text.indexOf(
+                                        target,
+                                        from
+                                    );
+
+                                if (
+                                    position === -1
+                                ) {
+
+                                    break;
+
+                                }
+
+                                const endPosition =
+                                    position +
+                                    target.length;
+
+                                if (
+                                    position <
+                                        localMap.starts.length &&
+                                    endPosition - 1 <
+                                        localMap.ends.length
+                                ) {
+
+                                    const rawStart =
+                                        localMap.starts[
+                                            position
+                                        ];
+
+                                    const rawEnd =
+                                        localMap.ends[
+                                            endPosition - 1
+                                        ];
+
+                                    if (
+                                        rawEnd >
+                                            rawStart &&
+                                        target.length >
+                                            bestLength
+                                    ) {
+
+                                        best = {
+
+                                            start:
+                                                rawStart,
+
+                                            end:
+                                                rawEnd,
+
+                                            text:
+                                                originalText.substring(
+                                                    rawStart,
+                                                    rawEnd
+                                                )
+
+                                        };
+
+                                        bestLength =
+                                            target.length;
+
+                                    }
+
+                                }
+
+                                from =
+                                    position +
+                                    Math.max(
+                                        1,
+                                        target.length
+                                    );
+
+                            }
+
+                        }
+
+                        return best;
+
+                    }
+
+                    /*
+                    * =================================================
+                    * 2. إعداد عمليات البحث في Word دفعة واحدة.
+                    * =================================================
+                    */
+
+                    const pendingSearches = [];
+
                     const appliedReferenceKeys =
                         new Set();
 
@@ -29523,8 +29852,8 @@ async function applyFootnoteSuggestions(
                     }
 
                     /*
-                    * نبدأ من آخر مرجع إلى الأول
-                    * كما في النسخة المستقرة.
+                    * نمر من الأخير إلى الأول كما في النسخة
+                    * المستقرة، لكن بدون أي استبدال أثناء البحث.
                     */
                     for (
                         let i =
@@ -29557,12 +29886,8 @@ async function applyFootnoteSuggestions(
                             );
 
                         /*
-                        * إذا كان المرجع نفسه قد عولج
-                        * سابقًا داخل الحاشية الحالية،
-                        * فلا نكرر اسمه.
-                        *
-                        * نترك الأرقام الموجودة في الحاشية
-                        * كما هي.
+                        * المرجع الواحد في الحاشية قد يملك
+                        * أكثر من موضع؛ نعدل الاسم مرة واحدة.
                         */
                         if (
                             referenceKey &&
@@ -29593,14 +29918,13 @@ async function applyFootnoteSuggestions(
 
                         }
 
-                        const range =
-                            await findLastMatch(
-                                note.body,
+                        const localRange =
+                            findLastLocalRange(
                                 candidates
                             );
 
                         if (
-                            !range
+                            !localRange
                         ) {
 
                             skipped++;
@@ -29609,10 +29933,32 @@ async function applyFootnoteSuggestions(
                         }
 
                         /*
-                        * نستخرج هوية المرجع فقط من
-                        * suggestedText، ونترك الأرقام.
+                        * نأخذ النص الحقيقي الموجود أصلًا في Word،
+                        * ثم نطلب من Word البحث عنه فقط.
                         *
-                        * لأن الأرقام ليست من مهمة هذه الدالة.
+                        * هذا يحافظ على الشوائب والأرقام خارج الهوية.
+                        */
+                        const searchResults =
+                            note.body.search(
+                                localRange.text,
+                                {
+                                    matchCase:
+                                        false,
+
+                                    matchWholeWord:
+                                        false,
+
+                                    matchWildcards:
+                                        false
+                                }
+                            );
+
+                        searchResults.load(
+                            "items"
+                        );
+
+                        /*
+                        * نحدد النص الذي سيستبدل الهوية فقط.
                         */
                         const title =
                             String(
@@ -29625,6 +29971,24 @@ async function applyFootnoteSuggestions(
                                 reference?.author ||
                                 ""
                             ).trim();
+
+                        const suggestedNormalized =
+                            normalizeLocal(
+                                suggestedText
+                            );
+
+                        const authorNormalized =
+                            normalizeLocal(
+                                author
+                            );
+
+                        const includeAuthor =
+                            Boolean(
+                                authorNormalized &&
+                                suggestedNormalized.includes(
+                                    authorNormalized
+                                )
+                            );
 
                         let replacementText =
                             "";
@@ -29657,7 +30021,9 @@ async function applyFootnoteSuggestions(
                                 replacementText =
                                     [
                                         title,
-                                        author
+                                        includeAuthor
+                                            ? author
+                                            : ""
                                     ]
                                         .filter(Boolean)
                                         .join("، ");
@@ -29677,6 +30043,7 @@ async function applyFootnoteSuggestions(
                                         .join("، ");
 
                                 break;
+
                         }
 
                         if (
@@ -29688,12 +30055,18 @@ async function applyFootnoteSuggestions(
 
                         }
 
-                        range.insertText(
-                            replacementText,
-                            Word.InsertLocation.replace
-                        );
+                        pendingSearches.push({
 
-                        applied++;
+                            referenceKey:
+                                referenceKey,
+
+                            searchResults:
+                                searchResults,
+
+                            replacementText:
+                                replacementText
+
+                        });
 
                         if (
                             referenceKey
@@ -29704,6 +30077,96 @@ async function applyFootnoteSuggestions(
                             );
 
                         }
+
+                    }
+
+                    /*
+                    * =================================================
+                    * 3. Sync واحد فقط لإكمال جميع عمليات البحث.
+                    * =================================================
+                    */
+
+                    if (
+                        pendingSearches.length === 0
+                    ) {
+
+                        continue;
+
+                    }
+
+                    await context.sync();
+
+                    /*
+                    * =================================================
+                    * 4. بعد أن أصبحت كل الـRanges جاهزة،
+                    *    نضع جميع الاستبدالات.
+                    *
+                    *    لا نبحث من جديد.
+                    * =================================================
+                    */
+
+                    const replacements = [];
+
+                    pendingSearches.forEach(
+                        function (
+                            pending
+                        ) {
+
+                            if (
+                                !pending.searchResults.items ||
+                                pending.searchResults.items.length === 0
+                            ) {
+
+                                skipped++;
+                                return;
+
+                            }
+
+                            /*
+                            * نأخذ آخر تطابق.
+                            */
+                            const range =
+                                pending.searchResults.items[
+                                    pending.searchResults.items.length - 1
+                                ];
+
+                            replacements.push({
+
+                                range:
+                                    range,
+
+                                text:
+                                    pending.replacementText
+
+                            });
+
+                        }
+                    );
+
+                    /*
+                    * تنفيذ كل الاستبدالات في الدفعة نفسها.
+                    */
+                    replacements.forEach(
+                        function (
+                            replacement
+                        ) {
+
+                            replacement.range.insertText(
+                                replacement.text,
+                                Word.InsertLocation.replace
+                            );
+
+                            applied++;
+
+                        }
+                    );
+
+                    /*
+                    * Sync واحد فقط بعد تنفيذ كل الاستبدالات.
+                    */
+                    if (
+                        replacements.length > 0
+                    ) {
 
                         await context.sync();
 
