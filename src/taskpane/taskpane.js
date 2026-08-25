@@ -29153,10 +29153,6 @@ async function applyFootnoteSuggestions(
                 candidates
             ) {
 
-                /*
-                * تحويل الأرقام الهندية/الفارسية إلى أرقام غربية
-                * لاستخدامها في المطابقة فقط.
-                */
                 function toWesternDigits(value) {
 
                     return String(
@@ -29189,11 +29185,147 @@ async function applyFootnoteSuggestions(
 
                 }
 
+                function toIndianDigits(value) {
+
+                    return String(
+                        value || ""
+                    ).replace(
+                        /[0-9]/g,
+                        function (char) {
+
+                            return "٠١٢٣٤٥٦٧٨٩".charAt(
+                                Number(char)
+                            );
+
+                        }
+                    );
+
+                }
+
                 /*
-                * إنشاء جميع الصيغ المحتملة للمرجع نفسه
-                * مع التسامح مع الشوائب الشكلية فقط.
+                * تحويل المرشح إلى نمط Word Wildcards
+                * يسمح بوجود أو غياب المسافات بين عناصر المرجع.
+                *
+                * مثال:
+                * التذييل والتكميل 7/260
+                *
+                * يمكنه مطابقة:
+                * التذييل والتكميل7/260
+                * التذييل والتكميل 7/260
+                * التذييل  والتكميل  7 / 260
                 */
-                function buildSearchVariants(
+                function buildWildcardPattern(
+                    value
+                ) {
+
+                    const text =
+                        String(
+                            value || ""
+                        ).trim();
+
+                    if (!text) {
+                        return "";
+                    }
+
+                    let pattern = "";
+
+                    for (
+                        let i = 0;
+                        i < text.length;
+                        i++
+                    ) {
+
+                        const char =
+                            text[i];
+
+                        /*
+                        * مسافة: صفر أو أكثر.
+                        */
+                        if (
+                            /[\s\u00A0]/.test(
+                                char
+                            )
+                        ) {
+
+                            pattern +=
+                                "[ ]{0,}";
+
+                            continue;
+                        }
+
+                        /*
+                        * الشرطة المائلة:
+                        * السماح بمسافات قبلها وبعدها.
+                        */
+                        if (
+                            char === "/"
+                        ) {
+
+                            pattern +=
+                                "[ ]{0,}/[ ]{0,}";
+
+                            continue;
+                        }
+
+                        /*
+                        * الفواصل:
+                        * السماح بمسافات حولها.
+                        */
+                        if (
+                            char === "،" ||
+                            char === ","
+                        ) {
+
+                            pattern +=
+                                "[ ]{0,}" +
+                                char +
+                                "[ ]{0,}";
+
+                            continue;
+                        }
+
+                        /*
+                        * الشرطات في نطاق الصفحات.
+                        */
+                        if (
+                            char === "-" ||
+                            char === "–" ||
+                            char === "—"
+                        ) {
+
+                            pattern +=
+                                "[ ]{0,}[-–—][ ]{0,}";
+
+                            continue;
+                        }
+
+                        /*
+                        * أحرف Word Wildcards الخاصة.
+                        * نهرب منها حتى لا تتحول إلى أوامر.
+                        */
+                        if (
+                            "\\[]{}()*?<>!@".includes(
+                                char
+                            )
+                        ) {
+
+                            pattern +=
+                                "\\" +
+                                char;
+
+                            continue;
+                        }
+
+                        pattern +=
+                            char;
+
+                    }
+
+                    return pattern;
+
+                }
+
+                function buildCandidateVariants(
                     candidate
                 ) {
 
@@ -29219,7 +29351,9 @@ async function applyFootnoteSuggestions(
 
                         if (
                             text &&
-                            !variants.includes(text)
+                            !variants.includes(
+                                text
+                            )
                         ) {
 
                             variants.push(
@@ -29230,182 +29364,37 @@ async function applyFootnoteSuggestions(
 
                     }
 
-                    /*
-                    * 1. الصيغة الأصلية.
-                    */
                     add(
                         original
                     );
 
                     /*
-                    * 2. توحيد المسافات المتعددة.
+                    * نسخة بأرقام غربية.
                     */
                     add(
-                        original
-                            .replace(
-                                /[\u00A0\s]+/g,
-                                " "
-                            )
-                    );
-
-                    /*
-                    * 3. إزالة المسافات حول الشرطة المائلة.
-                    *
-                    * 1/220
-                    * 1/ 220
-                    * 1 /220
-                    * 1 / 220
-                    */
-                    add(
-                        original
-                            .replace(
-                                /[\u00A0\s]*\/[\u00A0\s]*/g,
-                                "/"
-                            )
-                    );
-
-                    /*
-                    * 4. توحيد الفواصل.
-                    */
-                    add(
-                        original
-                            .replace(
-                                /[\u00A0\s]*،[\u00A0\s]*/g,
-                                "،"
-                            )
-                            .replace(
-                                /[\u00A0\s]+/g,
-                                " "
-                            )
-                    );
-
-                    /*
-                    * 5. توحيد الشرطات في نطاق الصفحات.
-                    */
-                    add(
-                        original
-                            .replace(
-                                /[\u00A0\s]*[-–—][\u00A0\s]*/g,
-                                "-"
-                            )
-                            .replace(
-                                /[\u00A0\s]+/g,
-                                " "
-                            )
-                    );
-
-                    /*
-                    * 6. الصيغة المضغوطة:
-                    * تستخدم لمواجهة سقوط المسافات داخل المرجع.
-                    *
-                    * مثال:
-                    * حاشية الصبان 2/188
-                    * حاشيةالصبان2/188
-                    */
-                    add(
-                        original.replace(
-                            /[\u00A0\s]+/g,
-                            ""
-                        )
-                    );
-
-                    /*
-                    * 7. الأرقام الغربية.
-                    */
-                    const western =
                         toWesternDigits(
                             original
-                        );
-
-                    add(
-                        western
-                    );
-
-                    add(
-                        western
-                            .replace(
-                                /[\u00A0\s]*\/[\u00A0\s]*/g,
-                                "/"
-                            )
-                            .replace(
-                                /[\u00A0\s]+/g,
-                                " "
-                            )
-                    );
-
-                    add(
-                        western.replace(
-                            /[\u00A0\s]+/g,
-                            ""
                         )
                     );
 
                     /*
-                    * 8. الأرقام الهندية.
-                    * نحتفظ بها أيضًا لأن النص الأصلي قد يكون بها.
+                    * نسخة بأرقام هندية.
                     */
-                    const indian =
-                        western
-                            .replace(
-                                /[0-9]/g,
-                                function (digit) {
-
-                                    return (
-                                        "٠١٢٣٤٥٦٧٨٩"
-                                            .charAt(
-                                                Number(
-                                                    digit
-                                                )
-                                            )
-                                    );
-
-                                }
-                            );
-
                     add(
-                        indian
-                    );
-
-                    add(
-                        indian
-                            .replace(
-                                /[\u00A0\s]*\/[\u00A0\s]*/g,
-                                "/"
+                        toIndianDigits(
+                            toWesternDigits(
+                                original
                             )
-                            .replace(
-                                /[\u00A0\s]+/g,
-                                " "
-                            )
-                    );
-
-                    /*
-                    * إزالة التكرار مع إعطاء الأولوية
-                    * للصيغ الأطول والأكثر تحديدًا.
-                    */
-                    return Array.from(
-                        new Set(
-                            variants
                         )
-                    ).sort(
-                        function (
-                            a,
-                            b
-                        ) {
-
-                            return (
-                                b.length -
-                                a.length
-                            );
-
-                        }
                     );
+
+                    return variants;
 
                 }
 
                 /*
-                * نختبر كل مرجع وكل صيغة ممكنة.
-                * نأخذ آخر تطابق حتى ينسجم ذلك مع معالجة
-                * المراجع من الأخير إلى الأول في الحاشية.
+                * نبحث من آخر الحاشية إلى أولها.
+                * وهذا مهم لأن المرجع نفسه قد يتكرر.
                 */
                 for (
                     let i = 0;
@@ -29413,31 +29402,74 @@ async function applyFootnoteSuggestions(
                     i++
                 ) {
 
-                    const searchVariants =
-                        buildSearchVariants(
+                    const candidateVariants =
+                        buildCandidateVariants(
                             candidates[i]
                         );
 
                     for (
                         let v = 0;
-                        v < searchVariants.length;
+                        v < candidateVariants.length;
                         v++
                     ) {
 
                         const candidate =
-                            searchVariants[v];
+                            candidateVariants[v];
 
                         if (!candidate) {
                             continue;
                         }
 
-                        const results =
+                        /*
+                        * 1. البحث العادي أولًا.
+                        */
+                        let results =
                             noteBody.search(
                                 candidate,
                                 {
                                     matchCase: false,
                                     matchWholeWord: false,
                                     matchWildcards: false
+                                }
+                            );
+
+                        results.load(
+                            "items"
+                        );
+
+                        await context.sync();
+
+                        if (
+                            results.items.length > 0
+                        ) {
+
+                            return results.items[
+                                results.items.length - 1
+                            ];
+
+                        }
+
+                        /*
+                        * 2. البحث المتسامح مع المسافات.
+                        */
+                        const wildcardPattern =
+                            buildWildcardPattern(
+                                candidate
+                            );
+
+                        if (
+                            !wildcardPattern
+                        ) {
+                            continue;
+                        }
+
+                        results =
+                            noteBody.search(
+                                wildcardPattern,
+                                {
+                                    matchCase: false,
+                                    matchWholeWord: false,
+                                    matchWildcards: true
                                 }
                             );
 
