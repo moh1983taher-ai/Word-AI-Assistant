@@ -29154,10 +29154,48 @@ async function applyFootnoteSuggestions(
             ) {
 
                 /*
-                * ننشئ صيغ بحث بديلة للمرجع نفسه،
-                * دون تغيير النص الأصلي في Word.
+                * تحويل الأرقام الهندية/الفارسية إلى أرقام غربية
+                * لاستخدامها في المطابقة فقط.
                 */
-                function buildSearchVariants(candidate) {
+                function toWesternDigits(value) {
+
+                    return String(
+                        value || ""
+                    )
+                        .replace(
+                            /[٠-٩]/g,
+                            function (char) {
+
+                                return String(
+                                    "٠١٢٣٤٥٦٧٨٩".indexOf(
+                                        char
+                                    )
+                                );
+
+                            }
+                        )
+                        .replace(
+                            /[۰-۹]/g,
+                            function (char) {
+
+                                return String(
+                                    "۰۱۲۳۴۵۶۷۸۹".indexOf(
+                                        char
+                                    )
+                                );
+
+                            }
+                        );
+
+                }
+
+                /*
+                * إنشاء جميع الصيغ المحتملة للمرجع نفسه
+                * مع التسامح مع الشوائب الشكلية فقط.
+                */
+                function buildSearchVariants(
+                    candidate
+                ) {
 
                     const original =
                         String(
@@ -29170,7 +29208,9 @@ async function applyFootnoteSuggestions(
 
                     const variants = [];
 
-                    function add(value) {
+                    function add(
+                        value
+                    ) {
 
                         const text =
                             String(
@@ -29181,35 +29221,40 @@ async function applyFootnoteSuggestions(
                             text &&
                             !variants.includes(text)
                         ) {
-                            variants.push(text);
+
+                            variants.push(
+                                text
+                            );
+
                         }
 
                     }
 
                     /*
-                    * الصيغة الأصلية أولًا.
-                    */
-                    add(original);
-
-                    /*
-                    * توحيد المسافات المتعددة.
+                    * 1. الصيغة الأصلية.
                     */
                     add(
-                        original.replace(
-                            /[\u00A0\s]+/g,
-                            " "
-                        )
+                        original
                     );
 
                     /*
-                    * إزالة المسافات حول /.
+                    * 2. توحيد المسافات المتعددة.
+                    */
+                    add(
+                        original
+                            .replace(
+                                /[\u00A0\s]+/g,
+                                " "
+                            )
+                    );
+
+                    /*
+                    * 3. إزالة المسافات حول الشرطة المائلة.
                     *
+                    * 1/220
                     * 1/ 220
                     * 1 /220
                     * 1 / 220
-                    *
-                    * تصبح جميعها:
-                    * 1/220
                     */
                     add(
                         original
@@ -29220,14 +29265,13 @@ async function applyFootnoteSuggestions(
                     );
 
                     /*
-                    * توحيد المسافات حول الفواصل العربية
-                    * والعلامات القريبة منها.
+                    * 4. توحيد الفواصل.
                     */
                     add(
                         original
                             .replace(
                                 /[\u00A0\s]*،[\u00A0\s]*/g,
-                                "، "
+                                "،"
                             )
                             .replace(
                                 /[\u00A0\s]+/g,
@@ -29236,22 +29280,7 @@ async function applyFootnoteSuggestions(
                     );
 
                     /*
-                    * السماح بالشكل الذي يستخدم الفاصلة الإنجليزية.
-                    */
-                    add(
-                        original
-                            .replace(
-                                /[\u00A0\s]*,[\u00A0\s]*/g,
-                                ", "
-                            )
-                            .replace(
-                                /[\u00A0\s]+/g,
-                                " "
-                            )
-                    );
-
-                    /*
-                    * توحيد الشرطات في نطاق الصفحات.
+                    * 5. توحيد الشرطات في نطاق الصفحات.
                     */
                     add(
                         original
@@ -29266,22 +29295,82 @@ async function applyFootnoteSuggestions(
                     );
 
                     /*
-                    * صيغة مركبة تعالج:
-                    * المسافات + / + الفواصل + نطاق الصفحات.
+                    * 6. الصيغة المضغوطة:
+                    * تستخدم لمواجهة سقوط المسافات داخل المرجع.
+                    *
+                    * مثال:
+                    * حاشية الصبان 2/188
+                    * حاشيةالصبان2/188
                     */
                     add(
-                        original
+                        original.replace(
+                            /[\u00A0\s]+/g,
+                            ""
+                        )
+                    );
+
+                    /*
+                    * 7. الأرقام الغربية.
+                    */
+                    const western =
+                        toWesternDigits(
+                            original
+                        );
+
+                    add(
+                        western
+                    );
+
+                    add(
+                        western
                             .replace(
                                 /[\u00A0\s]*\/[\u00A0\s]*/g,
                                 "/"
                             )
                             .replace(
-                                /[\u00A0\s]*[،,][\u00A0\s]*/g,
-                                "، "
+                                /[\u00A0\s]+/g,
+                                " "
                             )
+                    );
+
+                    add(
+                        western.replace(
+                            /[\u00A0\s]+/g,
+                            ""
+                        )
+                    );
+
+                    /*
+                    * 8. الأرقام الهندية.
+                    * نحتفظ بها أيضًا لأن النص الأصلي قد يكون بها.
+                    */
+                    const indian =
+                        western
                             .replace(
-                                /[\u00A0\s]*[-–—][\u00A0\s]*/g,
-                                "-"
+                                /[0-9]/g,
+                                function (digit) {
+
+                                    return (
+                                        "٠١٢٣٤٥٦٧٨٩"
+                                            .charAt(
+                                                Number(
+                                                    digit
+                                                )
+                                            )
+                                    );
+
+                                }
+                            );
+
+                    add(
+                        indian
+                    );
+
+                    add(
+                        indian
+                            .replace(
+                                /[\u00A0\s]*\/[\u00A0\s]*/g,
+                                "/"
                             )
                             .replace(
                                 /[\u00A0\s]+/g,
@@ -29289,15 +29378,34 @@ async function applyFootnoteSuggestions(
                             )
                     );
 
-                    return variants;
+                    /*
+                    * إزالة التكرار مع إعطاء الأولوية
+                    * للصيغ الأطول والأكثر تحديدًا.
+                    */
+                    return Array.from(
+                        new Set(
+                            variants
+                        )
+                    ).sort(
+                        function (
+                            a,
+                            b
+                        ) {
+
+                            return (
+                                b.length -
+                                a.length
+                            );
+
+                        }
+                    );
+
                 }
 
                 /*
-                * نبحث بكل صيغة ممكنة،
-                * ونأخذ آخر تطابق.
-                *
-                * أخذ آخر تطابق مهم عندما يتكرر المرجع
-                * داخل الحاشية نفسها.
+                * نختبر كل مرجع وكل صيغة ممكنة.
+                * نأخذ آخر تطابق حتى ينسجم ذلك مع معالجة
+                * المراجع من الأخير إلى الأول في الحاشية.
                 */
                 for (
                     let i = 0;
