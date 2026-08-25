@@ -29737,136 +29737,370 @@ function mergeEquivalentReferences(references) {
     const merged = [];
 
     function clean(value) {
-        return String(value ?? "")
+
+        return String(
+            value ?? ""
+        )
             .trim()
-            .replace(/\s+/g, " ")
-            .replace(/[.,،:؛]+$/g, "");
+            .replace(
+                /\s+/g,
+                " "
+            )
+            .replace(
+                /[.,،:؛]+$/g,
+                ""
+            );
+
     }
 
     function titleKey(title) {
-        return clean(title)
-            .replace(/^الـ/, "ال")
+
+        return clean(
+            title
+        )
+            .replace(
+                /^الـ/,
+                "ال"
+            )
             .toLowerCase();
+
     }
 
-    references.forEach(function (reference) {
+    /*
+     * أوصاف تدل على أن العنوان قد يكون
+     * شرحًا أو حاشية أو تعليقًا لكتاب آخر.
+     *
+     * لا نستعملها لخلق مراجع جديدة،
+     * وإنما لمنع دمج هويتين مختلفتين.
+     */
+    function isDerivedWorkTitle(
+        title
+    ) {
 
-        const author = clean(reference.author);
-        const title = clean(reference.title);
-
-        let existing = merged.find(function (item) {
-
-            if (
-                author &&
-                item.author &&
-                author !== clean(item.author)
-            ) {
-                return false;
-            }
-
-            const a = titleKey(title);
-            const b = titleKey(item.title);
-
-            return (
-                a === b ||
-                a.includes(b) ||
-                b.includes(a)
+        const value =
+            titleKey(
+                title
             );
 
-        });
+        return (
+            /^شرح\s+/.test(value) ||
+            /^حاشية\s+/.test(value) ||
+            /^تعليق\s+/.test(value) ||
+            /^التعليق\s+/.test(value) ||
+            /^مختصر\s+/.test(value) ||
+            /^تلخيص\s+/.test(value)
+        );
 
-        if (!existing) {
+    }
 
-            merged.push({
-                ...reference,
-                locations: Array.isArray(reference.locations)
-                    ? [...reference.locations]
-                    : [],
-                variants: Array.isArray(reference.variants)
-                    ? [...reference.variants]
-                    : [],
-                occurrences: Array.isArray(reference.occurrences)
-                    ? [...reference.occurrences]
-                    : []
-            });
-
-            return;
-        }
-
-        if (
-            title.length >
-            clean(existing.title).length
+    references.forEach(
+        function (
+            reference
         ) {
-            existing.title = title;
-        }
 
-        (reference.locations || []).forEach(function (location) {
+            const author =
+                clean(
+                    reference.author
+                );
 
-            const exists =
-                existing.locations.some(function (old) {
+            const title =
+                clean(
+                    reference.title
+                );
 
-                    return (
-                        String(old.volume ?? "") === String(location.volume ?? "") &&
-                        String(old.page ?? "") === String(location.page ?? "") &&
-                        String(old.pageRange ?? "") === String(location.pageRange ?? "")
-                    );
+            const currentTitleKey =
+                titleKey(
+                    title
+                );
 
-                });
+            let existing =
+                merged.find(
+                    function (
+                        item
+                    ) {
 
-            if (!exists) {
-                existing.locations.push(location);
-            }
+                        if (
+                            author &&
+                            item.author &&
+                            author !==
+                                clean(
+                                    item.author
+                                )
+                        ) {
 
-        });
+                            return false;
 
-        (reference.variants || []).forEach(function (variant) {
+                        }
 
-            const value = clean(variant);
+                        const existingTitleKey =
+                            titleKey(
+                                item.title
+                            );
+
+                        /*
+                         * -------------------------------------------------
+                         * إذا كان أحد العنوانين عملًا مشتقًا
+                         * مثل شرح/حاشية/تعليق، فلا ندمجه مع
+                         * العنوان الأصلي بمجرد التشابه.
+                         * -------------------------------------------------
+                         */
+                        if (
+                            currentTitleKey !==
+                                existingTitleKey &&
+                            (
+                                isDerivedWorkTitle(
+                                    title
+                                ) ||
+                                isDerivedWorkTitle(
+                                    item.title
+                                )
+                            )
+                        ) {
+
+                            return false;
+
+                        }
+
+                        /*
+                         * التوحيد يكون عند التطابق الحقيقي
+                         * بعد التنظيف، لا بمجرد احتواء عنوان
+                         * عنوانًا آخر.
+                         */
+                        return (
+                            currentTitleKey ===
+                            existingTitleKey
+                        );
+
+                    }
+                );
 
             if (
-                value &&
-                !existing.variants.some(function (item) {
-                    return clean(item) === value;
-                })
+                !existing
             ) {
-                existing.variants.push(value);
-            }
 
-        });
+                merged.push({
 
-        (reference.occurrences || []).forEach(function (occurrence) {
+                    ...reference,
 
-            const exists =
-                existing.occurrences.some(function (old) {
+                    locations:
+                        Array.isArray(
+                            reference.locations
+                        )
+                            ? [
+                                ...reference.locations
+                            ]
+                            : [],
 
-                    return (
-                        old.materialId === occurrence.materialId &&
-                        old.source === occurrence.source &&
-                        String(old.noteNumber ?? "") ===
-                        String(occurrence.noteNumber ?? "")
-                    );
+                    variants:
+                        Array.isArray(
+                            reference.variants
+                        )
+                            ? [
+                                ...reference.variants
+                            ]
+                            : [],
+
+                    occurrences:
+                        Array.isArray(
+                            reference.occurrences
+                        )
+                            ? [
+                                ...reference.occurrences
+                            ]
+                            : []
 
                 });
 
-            if (!exists) {
-                existing.occurrences.push(occurrence);
+                return;
+
             }
 
-        });
+            /*
+             * لا نغيّر عنوان المرجع الموجود
+             * إلى عنوان أطول لمجرد أنه أطول.
+             */
+            if (
+                !clean(
+                    existing.title
+                )
+            ) {
 
-        existing.confidence =
-            Math.max(
-                Number(existing.confidence ?? 0),
-                Number(reference.confidence ?? 0)
+                existing.title =
+                    title;
+
+            }
+
+            /*
+             * locations
+             */
+            (
+                reference.locations ||
+                []
+            ).forEach(
+                function (
+                    location
+                ) {
+
+                    const exists =
+                        existing.locations.some(
+                            function (
+                                old
+                            ) {
+
+                                return (
+                                    String(
+                                        old.volume ??
+                                        ""
+                                    ) ===
+                                    String(
+                                        location.volume ??
+                                        ""
+                                    ) &&
+                                    String(
+                                        old.page ??
+                                        ""
+                                    ) ===
+                                    String(
+                                        location.page ??
+                                        ""
+                                    ) &&
+                                    String(
+                                        old.pageRange ??
+                                        ""
+                                    ) ===
+                                    String(
+                                        location.pageRange ??
+                                        ""
+                                    )
+                                );
+
+                            }
+                        );
+
+                    if (
+                        !exists
+                    ) {
+
+                        existing.locations.push(
+                            location
+                        );
+
+                    }
+
+                }
             );
 
-        existing.needsReview =
-            Boolean(
-                existing.needsReview ||
-                reference.needsReview
+            /*
+             * variants
+             */
+            (
+                reference.variants ||
+                []
+            ).forEach(
+                function (
+                    variant
+                ) {
+
+                    const value =
+                        clean(
+                            variant
+                        );
+
+                    if (
+                        value &&
+                        !existing.variants.some(
+                            function (
+                                item
+                            ) {
+
+                                return (
+                                    clean(
+                                        item
+                                    ) ===
+                                    value
+                                );
+
+                            }
+                        )
+                    ) {
+
+                        existing.variants.push(
+                            value
+                        );
+
+                    }
+
+                }
             );
 
-    });
+            /*
+             * occurrences
+             */
+            (
+                reference.occurrences ||
+                []
+            ).forEach(
+                function (
+                    occurrence
+                ) {
+
+                    const exists =
+                        existing.occurrences.some(
+                            function (
+                                old
+                            ) {
+
+                                return (
+                                    old.materialId ===
+                                    occurrence.materialId &&
+                                    old.source ===
+                                    occurrence.source &&
+                                    String(
+                                        old.noteNumber ??
+                                        ""
+                                    ) ===
+                                    String(
+                                        occurrence.noteNumber ??
+                                        ""
+                                    )
+                                );
+
+                            }
+                        );
+
+                    if (
+                        !exists
+                    ) {
+
+                        existing.occurrences.push(
+                            occurrence
+                        );
+
+                    }
+
+                }
+            );
+
+            existing.confidence =
+                Math.max(
+                    Number(
+                        existing.confidence ??
+                        0
+                    ),
+                    Number(
+                        reference.confidence ??
+                        0
+                    )
+                );
+
+            existing.needsReview =
+                Boolean(
+                    existing.needsReview ||
+                    reference.needsReview
+                );
+
+        }
+    );
 
     return merged;
 }
