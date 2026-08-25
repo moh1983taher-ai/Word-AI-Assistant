@@ -30021,6 +30021,18 @@ async function applyFootnoteSuggestions(
             const noteNumber =
                 index + 1;
 
+            console.log(
+                source,
+                "XML index:",
+                index,
+                "noteNumber:",
+                noteNumber,
+                "required:",
+                requiredNotes.has(
+                    `${source}-${noteNumber}`
+                )
+            );
+
             const requiredKey =
                 `${source}-${noteNumber}`;
 
