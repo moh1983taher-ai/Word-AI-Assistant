@@ -28967,7 +28967,7 @@ async function applyFootnoteSuggestions(
 
             /*
              * =====================================================
-             * 1. تحميل الحواشي مرة واحدة
+             * 1. تحميل جميع الحواشي والحواشي الختامية
              * =====================================================
              */
 
@@ -28983,7 +28983,7 @@ async function applyFootnoteSuggestions(
 
             /*
              * =====================================================
-             * أدوات التطبيع والمطابقة المحلية
+             * أدوات المطابقة المحلية
              * =====================================================
              */
 
@@ -29056,52 +29056,240 @@ async function applyFootnoteSuggestions(
             }
 
             /*
-             * =====================================================
-             * هوية المرجع فقط
-             *
-             * الأرقام لا تدخل في المطابقة.
-             * =====================================================
+             * -----------------------------------------------------
+             * بناء خريطة النص المطبع إلى النص الأصلي.
+             * هذا كله JavaScript محلي ولا يخاطب Word.
+             * -----------------------------------------------------
              */
 
-            function getReferenceKey(
-                reference
+            function buildLocalMap(
+                text
             ) {
 
-                if (!reference) {
-                    return "";
+                let normalized =
+                    "";
+
+                const starts = [];
+                const ends = [];
+
+                for (
+                    let i = 0;
+                    i < text.length;
+                    i++
+                ) {
+
+                    const char =
+                        text[i];
+
+                    if (
+                        /[\u064B-\u065F\u0670]/.test(
+                            char
+                        ) ||
+                        /[\u200C-\u200F\u202A-\u202E]/.test(
+                            char
+                        )
+                    ) {
+
+                        continue;
+
+                    }
+
+                    if (
+                        /[\u00A0\s]/.test(
+                            char
+                        ) ||
+                        /[،,؛:()[\]{}"'`]/.test(
+                            char
+                        )
+                    ) {
+
+                        continue;
+
+                    }
+
+                    const converted =
+                        toWesternDigits(
+                            char
+                        );
+
+                    for (
+                        let j = 0;
+                        j < converted.length;
+                        j++
+                    ) {
+
+                        normalized +=
+                            converted[j]
+                                .toLowerCase();
+
+                        starts.push(
+                            i
+                        );
+
+                        ends.push(
+                            i + 1
+                        );
+
+                    }
+
                 }
 
-                const id =
-                    String(
-                        reference?.id ||
-                        ""
-                    ).trim();
+                return {
+                    text:
+                        normalized,
 
-                if (id) {
-                    return `id:${id}`;
-                }
+                    starts:
+                        starts,
 
-                const author =
-                    String(
-                        reference?.author ||
-                        ""
-                    )
-                        .trim()
-                        .toLowerCase();
-
-                const title =
-                    String(
-                        reference?.title ||
-                        ""
-                    )
-                        .trim()
-                        .toLowerCase();
-
-                return (
-                    `ref:${author}|${title}`
-                );
+                    ends:
+                        ends
+                };
 
             }
+
+            /*
+             * -----------------------------------------------------
+             * العثور محليًا على آخر تطابق.
+             * -----------------------------------------------------
+             */
+
+            function findLastLocalRange(
+                originalText,
+                candidates
+            ) {
+
+                const map =
+                    buildLocalMap(
+                        originalText
+                    );
+
+                let best =
+                    null;
+
+                let bestLength =
+                    -1;
+
+                for (
+                    let i = 0;
+                    i < candidates.length;
+                    i++
+                ) {
+
+                    const candidate =
+                        String(
+                            candidates[i] ||
+                            ""
+                        ).trim();
+
+                    if (
+                        !candidate
+                    ) {
+
+                        continue;
+
+                    }
+
+                    const target =
+                        normalizeLocal(
+                            candidate
+                        );
+
+                    if (
+                        !target
+                    ) {
+
+                        continue;
+
+                    }
+
+                    let from =
+                        0;
+
+                    while (
+                        true
+                    ) {
+
+                        const position =
+                            map.text.indexOf(
+                                target,
+                                from
+                            );
+
+                        if (
+                            position === -1
+                        ) {
+
+                            break;
+
+                        }
+
+                        const endPosition =
+                            position +
+                            target.length;
+
+                        if (
+                            position <
+                                map.starts.length &&
+                            endPosition - 1 <
+                                map.ends.length
+                        ) {
+
+                            const rawStart =
+                                map.starts[
+                                    position
+                                ];
+
+                            const rawEnd =
+                                map.ends[
+                                    endPosition - 1
+                                ];
+
+                            if (
+                                rawEnd >
+                                    rawStart &&
+                                target.length >
+                                    bestLength
+                            ) {
+
+                                best = {
+
+                                    text:
+                                        originalText.substring(
+                                            rawStart,
+                                            rawEnd
+                                        )
+
+                                };
+
+                                bestLength =
+                                    target.length;
+
+                            }
+
+                        }
+
+                        from =
+                            position +
+                            Math.max(
+                                1,
+                                target.length
+                            );
+
+                    }
+
+                }
+
+                return best;
+
+            }
+
+            /*
+             * =====================================================
+             * getCandidates
+             *
+             * الهوية فقط، بدون أرقام.
+             * =====================================================
+             */
 
             function getCandidates(
                 reference
@@ -29109,14 +29297,13 @@ async function applyFootnoteSuggestions(
 
                 const candidates = [];
 
-                function add(
+                function addCandidate(
                     value
                 ) {
 
                     const text =
                         String(
-                            value ||
-                            ""
+                            value || ""
                         ).trim();
 
                     if (
@@ -29151,35 +29338,35 @@ async function applyFootnoteSuggestions(
                     author
                 ) {
 
-                    add(
+                    addCandidate(
                         `${author}، ${title}`
                     );
 
-                    add(
+                    addCandidate(
                         `${author}, ${title}`
                     );
 
-                    add(
+                    addCandidate(
                         `${title}، ${author}`
                     );
 
-                    add(
+                    addCandidate(
                         `${title}, ${author}`
                     );
 
-                    add(
+                    addCandidate(
                         `${title} لل${author}`
                     );
 
-                    add(
+                    addCandidate(
                         `${title} لـ${author}`
                     );
 
-                    add(
+                    addCandidate(
                         `${author} ${title}`
                     );
 
-                    add(
+                    addCandidate(
                         `${title} ${author}`
                     );
 
@@ -29189,7 +29376,7 @@ async function applyFootnoteSuggestions(
                     title
                 ) {
 
-                    add(
+                    addCandidate(
                         title
                     );
 
@@ -29213,74 +29400,145 @@ async function applyFootnoteSuggestions(
 
             /*
              * =====================================================
-             * تقسيم كل حاشية إلى TextRanges.
-             *
-             * نضع الأرقام نفسها ضمن endingMarks حتى نستطيع
-             * فصل:
-             *
-             * التذييل والتكميل7/260
-             *
-             * إلى هوية المرجع + الأرقام،
-             * دون لمس الأرقام.
+             * هوية المرجع
              * =====================================================
              */
 
-            const endingMarks = [
+            function getReferenceKey(
+                reference
+            ) {
 
-                " ",
-                "،",
-                ",",
-                "؛",
-                ";",
-                ":",
-                ".",
-                "(",
-                ")",
-                "[",
-                "]",
-                "/",
-                "-",
-                "–",
-                "—",
+                if (
+                    !reference
+                ) {
 
-                "0",
-                "1",
-                "2",
-                "3",
-                "4",
-                "5",
-                "6",
-                "7",
-                "8",
-                "9",
+                    return "";
 
-                "٠",
-                "١",
-                "٢",
-                "٣",
-                "٤",
-                "٥",
-                "٦",
-                "٧",
-                "٨",
-                "٩",
+                }
 
-                "۰",
-                "۱",
-                "۲",
-                "۳",
-                "۴",
-                "۵",
-                "۶",
-                "۷",
-                "۸",
-                "۹"
+                const id =
+                    String(
+                        reference?.id ||
+                        ""
+                    ).trim();
 
-            ];
+                if (
+                    id
+                ) {
+
+                    return `id:${id}`;
+
+                }
+
+                const author =
+                    String(
+                        reference?.author ||
+                        ""
+                    )
+                        .trim()
+                        .toLowerCase();
+
+                const title =
+                    String(
+                        reference?.title ||
+                        ""
+                    )
+                        .trim()
+                        .toLowerCase();
+
+                return (
+                    `ref:${author}|${title}`
+                );
+
+            }
 
             /*
              * =====================================================
-             * 2. تجهيز جميع الحواشي المطلوبة
+             * بناء النص الجديد للهوية فقط
+             * =====================================================
+             */
+
+            function buildReplacementText(
+                reference,
+                suggestedText
+            ) {
+
+                const title =
+                    String(
+                        reference?.title ||
+                        ""
+                    ).trim();
+
+                const author =
+                    String(
+                        reference?.author ||
+                        ""
+                    ).trim();
+
+                const suggestedNormalized =
+                    normalizeLocal(
+                        suggestedText
+                    );
+
+                const authorNormalized =
+                    normalizeLocal(
+                        author
+                    );
+
+                const includeAuthor =
+                    Boolean(
+                        authorNormalized &&
+                        suggestedNormalized.includes(
+                            authorNormalized
+                        )
+                    );
+
+                switch (
+                    referenceStyle.format
+                ) {
+
+                    case "reference-only":
+
+                        return title;
+
+                    case "title-author":
+
+                        return [
+                            title,
+                            author
+                        ]
+                            .filter(Boolean)
+                            .join("، ");
+
+                    case "title-author-first":
+
+                        return [
+                            title,
+                            includeAuthor
+                                ? author
+                                : ""
+                        ]
+                            .filter(Boolean)
+                            .join("، ");
+
+                    case "author-title":
+
+                    default:
+
+                        return [
+                            author,
+                            title
+                        ]
+                            .filter(Boolean)
+                            .join("، ");
+
+                }
+
+            }
+
+            /*
+             * =====================================================
+             * 2. جمع كل الحواشي
              * =====================================================
              */
 
@@ -29332,7 +29590,7 @@ async function applyFootnoteSuggestions(
 
             /*
              * =====================================================
-             * 3. تجهيز TextRanges لجميع الحواشي مرة واحدة
+             * 3. تحميل نص جميع الحواشي مرة واحدة
              * =====================================================
              */
 
@@ -29341,501 +29599,330 @@ async function applyFootnoteSuggestions(
                     noteInfo
                 ) {
 
-                    noteInfo.bodyRange =
-                        noteInfo.note.body.getRange(
-                            Word.RangeLocation.content
-                        );
-
-                    noteInfo.textRanges =
-                        noteInfo.bodyRange.getTextRanges(
-                            endingMarks,
-                            false
-                        );
-
-                    noteInfo.textRanges.load(
-                        "items/text"
+                    noteInfo.note.body.load(
+                        "text"
                     );
 
                 }
             );
 
-            /*
-             * Sync واحد فقط
-             * لتحميل جميع TextRanges.
-             */
             await context.sync();
 
             /*
              * =====================================================
-             * 4. المطابقة المحلية
+             * 4. إنشاء جميع عمليات البحث دون sync
              * =====================================================
              */
 
-            function findReferenceRange(
-                noteInfo,
-                candidates
+            const pendingSearches = [];
+
+            let skipped =
+                0;
+
+            for (
+                let n = 0;
+                n < allNotes.length;
+                n++
             ) {
 
-                const ranges =
-                    noteInfo.textRanges.items;
+                const noteInfo =
+                    allNotes[n];
 
-                if (
-                    !ranges ||
-                    ranges.length === 0
-                ) {
-
-                    return null;
-
-                }
-
-                /*
-                 * نبني النسخة المطبعة لكل Range.
-                 */
-                const normalizedRanges =
-                    ranges.map(
+                const suggestion =
+                    footnoteSuggestions.find(
                         function (
-                            range
+                            item
                         ) {
 
-                            return normalizeLocal(
-                                range.text
+                            return (
+                                item?.source ===
+                                    noteInfo.source &&
+                                Number(
+                                    item?.noteNumber
+                                ) ===
+                                    noteInfo.noteNumber
                             );
 
                         }
                     );
 
-                let best =
-                    null;
-
-                let bestLength =
-                    -1;
-
-                /*
-                 * نبحث عن كل candidate.
-                 */
-                for (
-                    let c = 0;
-                    c < candidates.length;
-                    c++
+                if (
+                    !suggestion ||
+                    !Array.isArray(
+                        suggestion.references
+                    ) ||
+                    !Array.isArray(
+                        suggestion.suggestedTexts
+                    )
                 ) {
 
-                    const candidate =
-                        normalizeLocal(
-                            candidates[c]
+                    continue;
+
+                }
+
+                const originalText =
+                    String(
+                        noteInfo.note.body.text ||
+                        ""
+                    );
+
+                if (
+                    !originalText.trim()
+                ) {
+
+                    continue;
+
+                }
+
+                /*
+                 * المرجع نفسه يطبق مرة واحدة
+                 * مهما تعددت صفحاته.
+                 */
+                const processedReferences =
+                    new Set();
+
+                /*
+                 * البحث من الأخير إلى الأول
+                 * كما في النسخة التي نجحت.
+                 */
+                for (
+                    let i =
+                        suggestion.references.length - 1;
+                    i >= 0;
+                    i--
+                ) {
+
+                    const reference =
+                        suggestion.references[i];
+
+                    const suggestedText =
+                        String(
+                            suggestion.suggestedTexts[i] ||
+                            ""
+                        ).trim();
+
+                    if (
+                        !reference ||
+                        !suggestedText
+                    ) {
+
+                        continue;
+
+                    }
+
+                    const referenceKey =
+                        getReferenceKey(
+                            reference
                         );
 
-                    if (!candidate) {
+                    if (
+                        referenceKey &&
+                        processedReferences.has(
+                            referenceKey
+                        )
+                    ) {
+
                         continue;
+
+                    }
+
+                    const candidates =
+                        getCandidates(
+                            reference
+                        );
+
+                    if (
+                        candidates.length === 0
+                    ) {
+
+                        skipped++;
+                        continue;
+
                     }
 
                     /*
-                     * نبحث عن تسلسل متصل من TextRanges
-                     * يشكل هوية المرجع.
+                     * تحديد النص الحقيقي محليًا.
                      */
-                    for (
-                        let start = 0;
-                        start < normalizedRanges.length;
-                        start++
+                    const localRange =
+                        findLastLocalRange(
+                            originalText,
+                            candidates
+                        );
+
+                    if (
+                        !localRange
                     ) {
 
-                        let combined =
-                            "";
+                        skipped++;
+                        continue;
 
-                        for (
-                            let end = start;
-                            end < normalizedRanges.length;
-                            end++
-                        ) {
+                    }
 
-                            combined +=
-                                normalizedRanges[end];
+                    const replacementText =
+                        buildReplacementText(
+                            reference,
+                            suggestedText
+                        );
 
-                            if (!combined) {
-                                continue;
+                    if (
+                        !replacementText
+                    ) {
+
+                        skipped++;
+                        continue;
+
+                    }
+
+                    /*
+                     * نطلب من Word إنشاء البحث،
+                     * لكن لا sync حتى ننتهي من
+                     * جميع الحواشي وجميع المراجع.
+                     */
+                    const searchResults =
+                        noteInfo.note.body.search(
+                            localRange.text,
+                            {
+                                matchCase:
+                                    false,
+
+                                matchWholeWord:
+                                    false,
+
+                                matchWildcards:
+                                    false
                             }
+                        );
 
-                            /*
-                             * تطابق تام.
-                             */
-                            if (
-                                combined ===
-                                candidate
-                            ) {
+                    searchResults.load(
+                        "items"
+                    );
 
-                                const length =
-                                    combined.length;
+                    pendingSearches.push({
 
-                                if (
-                                    length >
-                                    bestLength
-                                ) {
+                        searchResults:
+                            searchResults,
 
-                                    best = {
+                        replacementText:
+                            replacementText,
 
-                                        start:
-                                            start,
+                        referenceKey:
+                            referenceKey
 
-                                        end:
-                                            end
+                    });
 
-                                    };
+                    if (
+                        referenceKey
+                    ) {
 
-                                    bestLength =
-                                        length;
-
-                                }
-
-                                break;
-                            }
-
-                            /*
-                             * إذا تجاوزنا طول المرشح
-                             * فلا فائدة من الاستمرار.
-                             */
-                            if (
-                                combined.length >
-                                candidate.length
-                            ) {
-
-                                break;
-
-                            }
-
-                        }
+                        processedReferences.add(
+                            referenceKey
+                        );
 
                     }
 
                 }
 
-                if (!best) {
-                    return null;
-                }
+            }
 
-                /*
-                 * نحول أول وآخر TextRange إلى Range واحد.
-                 *
-                 * expandTo() يعيد Range جديدًا يغطي الاثنين.
-                 */
-                return ranges[
-                    best.start
-                ]
-                    .expandTo(
-                        ranges[
-                            best.end
-                        ]
-                    );
+            if (
+                pendingSearches.length === 0
+            ) {
+
+                return {
+
+                    applied:
+                        0,
+
+                    skipped:
+                        skipped
+
+                };
 
             }
 
             /*
              * =====================================================
-             * 5. تجهيز جميع الاستبدالات
+             * 5. أهم Sync:
+             *
+             * جميع عمليات البحث في جميع الحواشي
+             * تنفذ هنا دفعة واحدة.
+             * =====================================================
+             */
+
+            await context.sync();
+
+            /*
+             * =====================================================
+             * 6. تجهيز جميع الـRanges
              * =====================================================
              */
 
             const replacements = [];
 
-            let skipped =
-                0;
-
-            const noteStates =
-                new Map();
-
-            allNotes.forEach(
-                function (
-                    noteInfo
-                ) {
-
-                    noteStates.set(
-                        `${noteInfo.source}-${noteInfo.noteNumber}`,
-                        new Set()
-                    );
-
-                }
-            );
-
-            allNotes.forEach(
-                function (
-                    noteInfo
-                ) {
-
-                    const suggestion =
-                        footnoteSuggestions.find(
-                            function (
-                                item
-                            ) {
-
-                                return (
-                                    item?.source ===
-                                        noteInfo.source &&
-                                    Number(
-                                        item?.noteNumber
-                                    ) ===
-                                        noteInfo.noteNumber
-                                );
-
-                            }
-                        );
-
-                    if (
-                        !suggestion ||
-                        !Array.isArray(
-                            suggestion.references
-                        ) ||
-                        !Array.isArray(
-                            suggestion.suggestedTexts
-                        )
-                    ) {
-
-                        return;
-
-                    }
-
-                    const appliedReferenceKeys =
-                        noteStates.get(
-                            `${noteInfo.source}-${noteInfo.noteNumber}`
-                        );
-
-                    /*
-                     * من الأخير إلى الأول،
-                     * كما في النسخة التي ثبت نجاحها.
-                     */
-                    for (
-                        let i =
-                            suggestion.references.length - 1;
-                        i >= 0;
-                        i--
-                    ) {
-
-                        const reference =
-                            suggestion.references[i];
-
-                        const suggestedText =
-                            String(
-                                suggestion.suggestedTexts[i] ||
-                                ""
-                            ).trim();
-
-                        if (
-                            !reference ||
-                            !suggestedText
-                        ) {
-
-                            continue;
-
-                        }
-
-                        const referenceKey =
-                            getReferenceKey(
-                                reference
-                            );
-
-                        /*
-                         * نفس المرجع له عدة مواضع:
-                         * الاسم يستبدل مرة واحدة فقط.
-                         */
-                        if (
-                            referenceKey &&
-                            appliedReferenceKeys.has(
-                                referenceKey
-                            )
-                        ) {
-
-                            continue;
-
-                        }
-
-                        const candidates =
-                            getCandidates(
-                                reference
-                            );
-
-                        if (
-                            candidates.length === 0
-                        ) {
-
-                            skipped++;
-                            continue;
-
-                        }
-
-                        /*
-                         * تحديد هوية المرجع محليًا.
-                         */
-                        const range =
-                            findReferenceRange(
-                                noteInfo,
-                                candidates
-                            );
-
-                        if (!range) {
-
-                            skipped++;
-                            continue;
-
-                        }
-
-                        const title =
-                            String(
-                                reference?.title ||
-                                ""
-                            ).trim();
-
-                        const author =
-                            String(
-                                reference?.author ||
-                                ""
-                            ).trim();
-
-                        const suggestedNormalized =
-                            normalizeLocal(
-                                suggestedText
-                            );
-
-                        const authorNormalized =
-                            normalizeLocal(
-                                author
-                            );
-
-                        const includeAuthor =
-                            Boolean(
-                                authorNormalized &&
-                                suggestedNormalized.includes(
-                                    authorNormalized
-                                )
-                            );
-
-                        let replacementText =
-                            "";
-
-                        switch (
-                            referenceStyle.format
-                        ) {
-
-                            case "reference-only":
-
-                                replacementText =
-                                    title;
-
-                                break;
-
-                            case "title-author":
-
-                                replacementText =
-                                    [
-                                        title,
-                                        author
-                                    ]
-                                        .filter(
-                                            Boolean
-                                        )
-                                        .join(
-                                            "، "
-                                        );
-
-                                break;
-
-                            case "title-author-first":
-
-                                replacementText =
-                                    [
-                                        title,
-                                        includeAuthor
-                                            ? author
-                                            : ""
-                                    ]
-                                        .filter(
-                                            Boolean
-                                        )
-                                        .join(
-                                            "، "
-                                        );
-
-                                break;
-
-                            case "author-title":
-
-                            default:
-
-                                replacementText =
-                                    [
-                                        author,
-                                        title
-                                    ]
-                                        .filter(
-                                            Boolean
-                                        )
-                                        .join(
-                                            "، "
-                                        );
-
-                                break;
-
-                        }
-
-                        if (
-                            !replacementText
-                        ) {
-
-                            skipped++;
-                            continue;
-
-                        }
-
-                        replacements.push({
-
-                            range:
-                                range,
-
-                            text:
-                                replacementText
-
-                        });
-
-                        if (
-                            referenceKey
-                        ) {
-
-                            appliedReferenceKeys.add(
-                                referenceKey
-                            );
-
-                        }
-
-                    }
-
-                }
-            );
-
-            /*
-             * =====================================================
-             * 6. تنفيذ جميع الاستبدالات دفعة واحدة
-             * =====================================================
-             */
-
-            replacements.forEach(
-                function (
-                    replacement
-                ) {
-
-                    replacement.range.insertText(
-                        replacement.text,
-                        Word.InsertLocation.replace
-                    );
-
-                }
-            );
-
-            /*
-             * Sync واحد فقط لتنفيذ كل شيء.
-             */
-            if (
-                replacements.length > 0
+            for (
+                let i = 0;
+                i < pendingSearches.length;
+                i++
             ) {
 
-                await context.sync();
+                const pending =
+                    pendingSearches[i];
+
+                if (
+                    !pending.searchResults.items ||
+                    pending.searchResults.items.length === 0
+                ) {
+
+                    skipped++;
+                    continue;
+
+                }
+
+                const range =
+                    pending.searchResults.items[
+                        pending.searchResults.items.length - 1
+                    ];
+
+                replacements.push({
+
+                    range:
+                        range,
+
+                    text:
+                        pending.replacementText
+
+                });
 
             }
+
+            /*
+             * =====================================================
+             * 7. تنفيذ كل الاستبدالات دفعة واحدة
+             *
+             * لا sync داخل الحلقة.
+             * =====================================================
+             */
+
+            for (
+                let i = 0;
+                i < replacements.length;
+                i++
+            ) {
+
+                replacements[i].range.insertText(
+                    replacements[i].text,
+                    Word.InsertLocation.replace
+                );
+
+            }
+
+            /*
+             * =====================================================
+             * 8. Sync أخير واحد فقط
+             * =====================================================
+             */
+
+            await context.sync();
 
             return {
 
