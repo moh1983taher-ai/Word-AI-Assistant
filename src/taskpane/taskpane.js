@@ -29025,12 +29025,172 @@ async function applyFootnoteSuggestions(
                         );
 
                     }
+                }
+
+                const title =
+                    String(
+                        reference?.title ||
+                        ""
+                    ).trim();
+
+                const author =
+                    String(
+                        reference?.author ||
+                        ""
+                    ).trim();
+
+                const occurrences =
+                    Array.isArray(
+                        reference?.occurrences
+                    )
+                        ? reference.occurrences
+                        : [];
+
+                const occurrence =
+                    occurrences.find(
+                        function (item) {
+
+                            return (
+                                String(
+                                    item?.materialId ||
+                                    ""
+                                ).trim() ===
+                                String(
+                                    materialId ||
+                                    ""
+                                ).trim()
+                            );
+
+                        }
+                    );
+
+                let location =
+                    "";
+
+                if (occurrence) {
+
+                    const volume =
+                        String(
+                            occurrence?.volume ||
+                            ""
+                        ).trim();
+
+                    const page =
+                        String(
+                            occurrence?.page ||
+                            ""
+                        ).trim();
+
+                    const pageRange =
+                        String(
+                            occurrence?.pageRange ||
+                            ""
+                        ).trim();
+
+                    if (
+                        volume &&
+                        page
+                    ) {
+
+                        location =
+                            `${volume}/${page}`;
+
+                    }
+                    else if (
+                        volume &&
+                        pageRange
+                    ) {
+
+                        location =
+                            `${volume}/${pageRange}`;
+
+                    }
+                    else if (
+                        pageRange
+                    ) {
+
+                        location =
+                            pageRange;
+
+                    }
+                    else if (
+                        page
+                    ) {
+
+                        location =
+                            page;
+
+                    }
+                }
+
+                /*
+                * =====================================================
+                * 1. المرشح الأكثر أهمية:
+                *    هوية المرجع + موضع occurrence.
+                *
+                *    نضعه قبل variants حتى لا يتم التقاط
+                *    رقم الصفحة وحده ثم استبداله بمرجع كامل.
+                * =====================================================
+                */
+
+                if (
+                    title &&
+                    location
+                ) {
+
+                    addCandidate(
+                        `${title} ${location}`
+                    );
+
+                    addCandidate(
+                        `${title}${location}`
+                    );
 
                 }
 
                 /*
-                * أولًا: الصيغ التي أعادها الذكاء الاصطناعي.
+                * =====================================================
+                * 2. صيغ محتملة لترتيب المؤلف والعنوان.
+                *
+                * نستخدمها فقط للمطابقة، ولا نغيّر هوية المرجع.
+                * =====================================================
                 */
+
+                if (
+                    author &&
+                    title &&
+                    location
+                ) {
+
+                    addCandidate(
+                        `${author}، ${title} ${location}`
+                    );
+
+                    addCandidate(
+                        `${author}, ${title} ${location}`
+                    );
+
+                    addCandidate(
+                        `${author} ${title} ${location}`
+                    );
+
+                    addCandidate(
+                        `${title}، ${author} ${location}`
+                    );
+
+                    addCandidate(
+                        `${title}, ${author} ${location}`
+                    );
+
+                }
+
+                /*
+                * =====================================================
+                * 3. variants تأتي بعد المرشحات المبنية من الهوية
+                *    لأنها قد تكون صيغة أعاد الذكاء الاصطناعي تركيبها.
+                * =====================================================
+                */
+
                 const variants =
                     Array.isArray(
                         reference?.variants
@@ -29051,142 +29211,27 @@ async function applyFootnoteSuggestions(
                 );
 
                 /*
-                * ثانيًا: نبني دائمًا صيغة مستقلة
-                * من عنوان المرجع + موضع occurrence.
-                *
-                * هذه هي النقطة المهمة:
-                * لا نعتمد على variants وحدها.
+                * =====================================================
+                * 4. احتياط أخير: العنوان وحده.
+                * =====================================================
                 */
-                const title =
-                    String(
-                        reference?.title ||
-                        ""
-                    ).trim();
 
-                if (title) {
+                if (
+                    title
+                ) {
 
-                    const occurrences =
-                        Array.isArray(
-                            reference?.occurrences
-                        )
-                            ? reference.occurrences
-                            : [];
-
-                    const occurrence =
-                        occurrences.find(
-                            function (
-                                item
-                            ) {
-
-                                return (
-                                    String(
-                                        item?.materialId ||
-                                        ""
-                                    ).trim() ===
-                                    String(
-                                        materialId ||
-                                        ""
-                                    ).trim()
-                                );
-
-                            }
-                        );
-
-                    if (occurrence) {
-
-                        const volume =
-                            String(
-                                occurrence?.volume ||
-                                ""
-                            ).trim();
-
-                        const page =
-                            String(
-                                occurrence?.page ||
-                                ""
-                            ).trim();
-
-                        const pageRange =
-                            String(
-                                occurrence?.pageRange ||
-                                ""
-                            ).trim();
-
-                        let location =
-                            "";
-
-                        if (
-                            volume &&
-                            page
-                        ) {
-
-                            location =
-                                `${volume}/${page}`;
-
-                        }
-                        else if (
-                            volume &&
-                            pageRange
-                        ) {
-
-                            location =
-                                `${volume}/${pageRange}`;
-
-                        }
-                        else if (
-                            pageRange
-                        ) {
-
-                            location =
-                                pageRange;
-
-                        }
-                        else if (
-                            page
-                        ) {
-
-                            location =
-                                page;
-
-                        }
-
-                        if (location) {
-
-                            addCandidate(
-                                `${title} ${location}`
-                            );
-
-                            /*
-                            * احتياط للحالات التي سقطت فيها
-                            * المسافة بين العنوان والموضع.
-                            */
-                            addCandidate(
-                                `${title}${location}`
-                            );
-
-                        }
-
-                    }
-
-                    /*
-                    * إذا لم يوجد occurrence واضح،
-                    * نحتفظ بالعنوان كمرشح احتياطي.
-                    */
-                    if (
-                        candidates.length === 0
-                    ) {
-
-                        addCandidate(
-                            title
-                        );
-
-                    }
+                    addCandidate(
+                        title
+                    );
 
                 }
 
                 /*
-                * الأطول أولًا.
+                * =====================================================
+                * الأطول والأكثر تحديدًا أولًا.
+                * =====================================================
                 */
+
                 return candidates.sort(
                     function (
                         a,
