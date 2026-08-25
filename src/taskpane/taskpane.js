@@ -29228,19 +29228,9 @@ async function applyFootnoteSuggestions(
                         );
                 }
 
-                /*
-                * نسخة للمطابقة فقط:
-                * - إزالة التشكيل والعلامات الخفية
-                * - تحويل الأرقام إلى صيغة موحدة
-                * - حذف المسافات كلها
-                *
-                * النص الأصلي في Word لا يتغير.
-                */
-                function normalizeCompact(value) {
+                function normalizeForMatch(value) {
 
-                    return toWesternDigits(
-                        String(value || "")
-                    )
+                    return toWesternDigits(value)
                         .replace(
                             /[\u064B-\u065F\u0670]/g,
                             ""
@@ -29253,23 +29243,30 @@ async function applyFootnoteSuggestions(
                             /[\u00A0\s]+/g,
                             ""
                         )
+                        .replace(
+                            /[،,؛:()[\]{}"'`]/g,
+                            ""
+                        )
+                        .replace(
+                            /[-–—]/g,
+                            "-"
+                        )
+                        .trim()
                         .toLowerCase();
                 }
 
-                /*
-                * يبني نصًا مطبعًا مع خريطة:
-                * كل حرف في النص المطبّع ↔ موضعه في النص الأصلي.
-                */
-                function buildCompactMap(text) {
+                function buildMap(text) {
 
                     let normalized = "";
 
                     const starts = [];
                     const ends = [];
 
-                    let i = 0;
-
-                    while (i < text.length) {
+                    for (
+                        let i = 0;
+                        i < text.length;
+                        i++
+                    ) {
 
                         const char = text[i];
 
@@ -29277,21 +29274,18 @@ async function applyFootnoteSuggestions(
                             /[\u064B-\u065F\u0670]/.test(char) ||
                             /[\u200C-\u200F\u202A-\u202E]/.test(char)
                         ) {
-                            i++;
                             continue;
                         }
 
-                        /*
-                        * الأرقام العربية والهندية تتحول إلى رقم واحد،
-                        * لذلك يبقى طول الحرف المكافئ = 1.
-                        */
+                        if (
+                            /[\u00A0\s]/.test(char) ||
+                            /[،,؛:()[\]{}"'`]/.test(char)
+                        ) {
+                            continue;
+                        }
+
                         const converted =
                             toWesternDigits(char);
-
-                        if (!converted) {
-                            i++;
-                            continue;
-                        }
 
                         for (
                             let j = 0;
@@ -29306,8 +29300,6 @@ async function applyFootnoteSuggestions(
                             ends.push(i + 1);
 
                         }
-
-                        i++;
                     }
 
                     return {
@@ -29317,88 +29309,70 @@ async function applyFootnoteSuggestions(
                     };
                 }
 
-                /*
-                * إيجاد آخر تطابق في النسخة المطبعة،
-                * ثم إرجاع النص الحقيقي المقابل له في Word.
-                */
-                function findSourceText(
+                function findLastLocalMatch(
                     originalText,
                     candidate
                 ) {
 
-                    const normalizedData =
-                        buildCompactMap(
+                    const map =
+                        buildMap(
                             originalText
                         );
 
-                    const normalizedCandidate =
-                        normalizeCompact(
+                    const target =
+                        normalizeForMatch(
                             candidate
                         );
 
-                    if (
-                        !normalizedCandidate
-                    ) {
+                    if (!target) {
                         return "";
                     }
 
-                    let lastPosition = -1;
-                    let searchFrom = 0;
+                    let last = -1;
+                    let from = 0;
 
                     while (true) {
 
                         const position =
-                            normalizedData.text.indexOf(
-                                normalizedCandidate,
-                                searchFrom
+                            map.text.indexOf(
+                                target,
+                                from
                             );
 
-                        if (
-                            position === -1
-                        ) {
+                        if (position === -1) {
                             break;
                         }
 
-                        lastPosition =
-                            position;
+                        last = position;
 
-                        searchFrom =
+                        from =
                             position +
                             Math.max(
                                 1,
-                                normalizedCandidate.length
+                                target.length
                             );
                     }
 
-                    if (
-                        lastPosition === -1
-                    ) {
+                    if (last === -1) {
                         return "";
                     }
 
-                    const endPosition =
-                        lastPosition +
-                        normalizedCandidate.length;
+                    const end =
+                        last +
+                        target.length;
 
                     if (
-                        lastPosition >=
-                        normalizedData.starts.length
+                        last >= map.starts.length ||
+                        end - 1 >= map.ends.length
                     ) {
                         return "";
                     }
 
                     const rawStart =
-                        normalizedData.starts[
-                            lastPosition
-                        ];
+                        map.starts[last];
 
                     const rawEnd =
-                        normalizedData.ends[
-                            Math.min(
-                                endPosition - 1,
-                                normalizedData.ends.length - 1
-                            )
-                        ];
+                        map.ends[end - 1];
 
                     if (
                         rawEnd <= rawStart
@@ -29412,9 +29386,6 @@ async function applyFootnoteSuggestions(
                     );
                 }
 
-                /*
-                * نقرأ جسم الحاشية مرة واحدة فقط.
-                */
                 noteBody.load("text");
 
                 await context.sync();
@@ -29424,15 +29395,10 @@ async function applyFootnoteSuggestions(
                         noteBody.text || ""
                     );
 
-                if (
-                    !originalText.trim()
-                ) {
+                if (!originalText.trim()) {
                     return null;
                 }
 
-                /*
-                * نجرّب جميع المرشحات من الأطول إلى الأقصر.
-                */
                 const orderedCandidates =
                     candidates
                         .map(
@@ -29446,15 +29412,14 @@ async function applyFootnoteSuggestions(
                         .sort(
                             function (a, b) {
                                 return (
-                                    normalizeCompact(b).length -
-                                    normalizeCompact(a).length
+                                    normalizeForMatch(b).length -
+                                    normalizeForMatch(a).length
                                 );
                             }
                         );
 
                 /*
-                * أولًا: بحث Word العادي.
-                * يحافظ على سرعة النسخة الأصلية التي كانت تعمل جيدًا.
+                * 1. البحث العادي.
                 */
                 for (
                     let i = 0;
@@ -29482,7 +29447,6 @@ async function applyFootnoteSuggestions(
                     if (
                         results.items.length > 0
                     ) {
-
                         return results.items[
                             results.items.length - 1
                         ];
@@ -29490,17 +29454,7 @@ async function applyFootnoteSuggestions(
                 }
 
                 /*
-                * ثانيًا: المطابقة المحلية المتسامحة.
-                *
-                * هنا نعالج:
-                *
-                * التذييل والتكميل7/260
-                * التذييل والتكميل 7 / 260
-                *
-                * و:
-                *
-                * الكشاف1/٤٥٤
-                * الكشاف 1/454
+                * 2. المطابقة المحلية المتسامحة.
                 */
                 for (
                     let i = 0;
@@ -29508,24 +29462,20 @@ async function applyFootnoteSuggestions(
                     i++
                 ) {
 
-                    const candidate =
-                        orderedCandidates[i];
-
                     const sourceText =
-                        findSourceText(
+                        findLastLocalMatch(
                             originalText,
-                            candidate
+                            orderedCandidates[i]
                         );
 
-                    if (
-                        !sourceText
-                    ) {
+                    if (!sourceText) {
                         continue;
                     }
 
                     /*
-                    * بعد أن عرفنا النص الحقيقي الموجود فعليًا
-                    * في الحاشية، نستخدم بحث Word العادي.
+                    * بعد معرفة النص الحقيقي الموجود
+                    * داخل الحاشية، نطلب من Word إيجاد
+                    * الـRange الحقيقي فقط.
                     */
                     const results =
                         noteBody.search(
@@ -29544,7 +29494,6 @@ async function applyFootnoteSuggestions(
                     if (
                         results.items.length > 0
                     ) {
-
                         return results.items[
                             results.items.length - 1
                         ];
