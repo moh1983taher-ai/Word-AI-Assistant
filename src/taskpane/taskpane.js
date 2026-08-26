@@ -29000,10 +29000,13 @@ async function applyFootnoteSuggestions(
 
             }
 
-            suggestionMap.set(
+            const key =
                 `${item.source}-${Number(
                     item.noteNumber
-                )}`,
+                )}`;
+
+            suggestionMap.set(
+                key,
                 item
             );
 
@@ -29154,7 +29157,9 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 4. مرشحات الهوية
+     * 4. مرشحات المرجع
+     *
+     * العنوان أولًا؛ لأنه غالبًا هو الموجود فعلًا في الحاشية.
      * =========================================================
      */
 
@@ -29162,7 +29167,8 @@ async function applyFootnoteSuggestions(
         reference
     ) {
 
-        const candidates = [];
+        const candidates =
+            [];
 
         function addCandidate(
             value
@@ -29201,13 +29207,8 @@ async function applyFootnoteSuggestions(
             ).trim();
 
         /*
-        * =========================================================
-        * الأولوية الأولى: عنوان المرجع نفسه
-        *
-        * هذا هو الشكل الذي يظهر عادة في الحاشية الأصلية.
-        * =========================================================
-        */
-
+         * الأولوية الأساسية.
+         */
         if (
             title
         ) {
@@ -29219,11 +29220,8 @@ async function applyFootnoteSuggestions(
         }
 
         /*
-        * =========================================================
-        * الصيغ المركبة تُستخدم كاحتياط فقط.
-        * =========================================================
-        */
-
+         * صيغ إضافية احتياطية.
+         */
         if (
             title &&
             author
@@ -29264,8 +29262,9 @@ async function applyFootnoteSuggestions(
         }
 
         /*
-        * الأطول أولًا، مع بقاء العنوان أولوية المطابقة.
-        */
+         * نرتب بحيث تكون الصيغ الأطول أفضل،
+         * مع بقاء العنوان أول مرشح في حال التساوي.
+         */
         return candidates.sort(
             function (
                 a,
@@ -29284,7 +29283,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 5. البحث المحلي عن الهوية
+     * 5. بناء خريطة النص الطبيعي ← النص الأصلي
      * =========================================================
      */
 
@@ -29343,120 +29342,11 @@ async function applyFootnoteSuggestions(
 
     }
 
-    function findLastIdentity(
-        text,
-        candidates
-    ) {
-
-        const map =
-            buildRawMap(
-                text
-            );
-
-        let best =
-            null;
-
-        let bestLength =
-            -1;
-
-        for (
-            let i = 0;
-            i < candidates.length;
-            i++
-        ) {
-
-            const target =
-                normalizeLocal(
-                    candidates[i]
-                );
-
-            if (
-                !target
-            ) {
-
-                continue;
-
-            }
-
-            let from =
-                0;
-
-            while (
-                true
-            ) {
-
-                const position =
-                    map.normalized.indexOf(
-                        target,
-                        from
-                    );
-
-                if (
-                    position === -1
-                ) {
-
-                    break;
-
-                }
-
-                const end =
-                    position +
-                    target.length;
-
-                if (
-                    position <
-                        map.rawMap.length &&
-                    end - 1 <
-                        map.rawMap.length
-                ) {
-
-                    const rawStart =
-                        map.rawMap[
-                            position
-                        ];
-
-                    const rawEnd =
-                        map.rawMap[
-                            end - 1
-                        ] + 1;
-
-                    if (
-                        target.length >
-                        bestLength
-                    ) {
-
-                        best = {
-
-                            start:
-                                rawStart,
-
-                            end:
-                                rawEnd
-
-                        };
-
-                        bestLength =
-                            target.length;
-
-                    }
-
-                }
-
-                from =
-                    position +
-                    Math.max(
-                        1,
-                        target.length
-                    );
-
-            }
-
-        }
-
-        return best;
-
-    }
-
+    /*
+     * =========================================================
+     * 6. العثور على جميع ظهورات هوية المرجع
+     * =========================================================
+     */
 
     function findAllIdentityMatches(
         text,
@@ -29552,11 +29442,11 @@ async function applyFootnoteSuggestions(
                             end:
                                 rawEnd,
 
-                            candidate:
-                                candidates[i],
+                            length:
+                                target.length,
 
-                            candidateLength:
-                                target.length
+                            candidate:
+                                candidates[i]
 
                         });
 
@@ -29580,8 +29470,13 @@ async function applyFootnoteSuggestions(
         }
 
         /*
-        * الأطول أولًا، ثم الموضع الأصلي.
-        */
+         * الأفضلية:
+         * 1. أطول تطابق.
+         * 2. ثم الظهور المتأخر.
+         *
+         * الظهور المتأخر يحافظ على السلوك القديم
+         * الذي كان يستخدم آخر ظهور للهوية.
+         */
         matches.sort(
             function (
                 a,
@@ -29589,20 +29484,20 @@ async function applyFootnoteSuggestions(
             ) {
 
                 if (
-                    b.candidateLength !==
-                    a.candidateLength
+                    b.length !==
+                    a.length
                 ) {
 
                     return (
-                        b.candidateLength -
-                        a.candidateLength
+                        b.length -
+                        a.length
                     );
 
                 }
 
                 return (
-                    a.start -
-                    b.start
+                    b.start -
+                    a.start
                 );
 
             }
@@ -29612,229 +29507,9 @@ async function applyFootnoteSuggestions(
 
     }
 
-    function getSuggestedLocation(
-        suggestedText
-    ) {
-
-        const value =
-            String(
-                suggestedText || ""
-            )
-                .trim();
-
-        if (
-            !value
-        ) {
-
-            return "";
-
-        }
-
-        /*
-        * نلتقط آخر جزء رقمي يمثل الموضع.
-        *
-        * أمثلة:
-        * 1/27
-        * 2/736
-        * ص 67
-        * 89-90
-        * 2/94-96
-        */
-
-        const match =
-            value.match(
-                /(?:^|[\s،,])((?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*)\s*$/
-            );
-
-        if (
-            !match
-        ) {
-
-            return "";
-
-        }
-
-        return String(
-            match[1] || ""
-        )
-            .trim()
-            .replace(
-                /[،,]+$/g,
-                ""
-            )
-            .trim();
-
-    }
-
-    function getSuggestedIdentityBase(
-        suggestedText
-    ) {
-
-        const value =
-            String(
-                suggestedText || ""
-            )
-                .trim();
-
-        if (
-            !value
-        ) {
-
-            return "";
-
-        }
-
-        const location =
-            getSuggestedLocation(
-                value
-            );
-
-        if (
-            !location
-        ) {
-
-            return value;
-
-        }
-
-        const index =
-            value.lastIndexOf(
-                location
-            );
-
-        if (
-            index <= 0
-        ) {
-
-            return value;
-
-        }
-
-        return value
-            .substring(
-                0,
-                index
-            )
-            .trim()
-            .replace(
-                /[،,]+$/g,
-                ""
-            )
-            .trim();
-
-    }
-
-    function mergeSuggestedTexts(
-        texts
-    ) {
-
-        const cleanTexts =
-            texts
-                .map(
-                    function (
-                        text
-                    ) {
-
-                        return String(
-                            text || ""
-                        )
-                            .trim();
-
-                    }
-                )
-                .filter(
-                    function (
-                        text
-                    ) {
-
-                        return !!text;
-
-                    }
-                );
-
-        if (
-            cleanTexts.length === 0
-        ) {
-
-            return "";
-
-        }
-
-        /*
-        * النص الأول هو الأساس؛ لأنه يحتوي على هوية المرجع
-        * كاملة كما أعادها الذكاء الاصطناعي.
-        */
-        const first =
-            cleanTexts[0];
-
-        const base =
-            getSuggestedIdentityBase(
-                first
-            );
-
-        const locations =
-            [];
-
-        cleanTexts.forEach(
-            function (
-                text
-            ) {
-
-                const location =
-                    getSuggestedLocation(
-                        text
-                    );
-
-                if (
-                    location &&
-                    !locations.includes(
-                        location
-                    )
-                ) {
-
-                    locations.push(
-                        location
-                    );
-
-                }
-
-            }
-        );
-
-        /*
-        * إذا لم نجد مواضع رقمية، نعيد النص الأول كما هو.
-        */
-        if (
-            locations.length === 0
-        ) {
-
-            return first;
-
-        }
-
-        /*
-        * إعادة بناء النص النهائي من:
-        * هوية المرجع في suggestedText
-        * +
-        * جميع المواضع دون تكرار.
-        */
-        return (
-            base +
-            "، " +
-            locations.join(
-                "، "
-            )
-        );
-
-    }
-
-
     /*
      * =========================================================
-     * 6. الحصول على النص النهائي من suggestedText
-     *
-     * نستخدمه كما أعاده التحليل، ولا نعيد بناء المؤلف
-     * والعنوان من حقول reference.
+     * 7. النص النهائي المقترح
      * =========================================================
      */
 
@@ -29851,12 +29526,9 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 7. استخراج هوية suggestedText فقط عند الحاجة
+     * 8. استخراج هوية المرجع من suggestedText
      *
-     * إذا تعذر استبدال المرجع كاملًا، نحتاج إلى الاحتفاظ
-     * بأرقام الموضع الموجودة أصلًا في الحاشية.
-     *
-     * نستفيد من أول موضع رقمي ظاهر في suggestedText.
+     * تستخدم فقط عند عدم العثور على النص المقترح كاملًا.
      * =========================================================
      */
 
@@ -29867,7 +29539,8 @@ async function applyFootnoteSuggestions(
         const value =
             String(
                 suggestedText || ""
-            ).trim();
+            )
+            .trim();
 
         if (
             !value
@@ -29877,16 +29550,6 @@ async function applyFootnoteSuggestions(
 
         }
 
-        /*
-         * نبحث عن أول موضع يشبه:
-         * 1/27
-         * 1 / 27
-         * 27
-         * ص 27
-         * 27-29
-         *
-         * ثم نأخذ ما قبل الموضع باعتباره هوية المرجع.
-         */
         const match =
             value.match(
                 /\s+(?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*\s*$/
@@ -29917,7 +29580,157 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 8. تعديل XML
+     * 9. تجميع النصوص المقترحة للمرجع نفسه
+     *
+     * مثال:
+     *
+     * المقتضب، 1/250
+     * المقتضب، 3/7
+     *
+     * يصبح:
+     *
+     * المقتضب، 1/250، 3/7
+     * =========================================================
+     */
+
+    function mergeSuggestedTexts(
+        texts
+    ) {
+
+        const clean =
+            texts
+                .map(
+                    function (
+                        value
+                    ) {
+
+                        return String(
+                            value || ""
+                        )
+                            .trim();
+
+                    }
+                )
+                .filter(
+                    function (
+                        value
+                    ) {
+
+                        return !!value;
+
+                    }
+                );
+
+        if (
+            clean.length === 0
+        ) {
+
+            return "";
+
+        }
+
+        /*
+         * إذا كان لدينا اقتراح واحد فقط،
+         * لا نعيد بناءه إطلاقًا.
+         */
+        if (
+            clean.length === 1
+        ) {
+
+            return clean[0];
+
+        }
+
+        const first =
+            clean[0];
+
+        const identity =
+            getSuggestedIdentity(
+                first
+            );
+
+        const locations =
+            [];
+
+        clean.forEach(
+            function (
+                text
+            ) {
+
+                const value =
+                    String(
+                        text || ""
+                    )
+                        .trim();
+
+                /*
+                 * الجزء الرقمي الأخير.
+                 */
+                const match =
+                    value.match(
+                        /\s+(?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*\s*$/
+                    );
+
+                if (
+                    match
+                ) {
+
+                    const location =
+                        value
+                            .substring(
+                                match.index
+                            )
+                            .trim();
+
+                    if (
+                        location &&
+                        !locations.includes(
+                            location
+                        )
+                    ) {
+
+                        locations.push(
+                            location
+                        );
+
+                    }
+
+                }
+
+            }
+        );
+
+        /*
+         * إذا تعذر استخراج المواضع،
+         * نعيد النص الأول كما هو.
+         */
+        if (
+            !identity ||
+            locations.length === 0
+        ) {
+
+            return first;
+
+        }
+
+        return (
+            identity +
+            "، " +
+            locations.join(
+                "، "
+            )
+        );
+
+    }
+
+    /*
+     * =========================================================
+     * 10. عناصر الحواشي
+     *
+     * مهم:
+     * نحتفظ بـ w:id الحقيقي، ولا نستخدم index + 1.
+     *
+     * العناصر الخاصة ذات id سالب تُستبعد.
      * =========================================================
      */
 
@@ -29937,28 +29750,70 @@ async function applyFootnoteSuggestions(
                 )
             );
 
-        return elements.filter(
-            function (
-                element
-            ) {
+        return elements
+            .map(
+                function (
+                    element
+                ) {
 
-                const id =
-                    Number(
+                    const idValue =
                         element.getAttributeNS(
                             ns,
                             "id"
-                        )
+                        );
+
+                    const id =
+                        Number(
+                            idValue
+                        );
+
+                    return {
+
+                        element:
+                            element,
+
+                        id:
+                            id
+
+                    };
+
+                }
+            )
+            .filter(
+                function (
+                    item
+                ) {
+
+                    return (
+                        Number.isFinite(
+                            item.id
+                        ) &&
+                        item.id > 0
                     );
 
-                return (
-                    Number.isFinite(id) &&
-                    id >= 0
-                );
+                }
+            )
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
 
-            }
-        );
+                    return (
+                        a.id -
+                        b.id
+                    );
+
+                }
+            );
 
     }
+
+    /*
+     * =========================================================
+     * 11. استخراج نص الحاشية
+     * =========================================================
+     */
 
     function getNoteText(
         noteElement
@@ -29995,9 +29850,9 @@ async function applyFootnoteSuggestions(
     }
 
     /*
-     * ---------------------------------------------------------
-     * تغيير النص داخل عقد w:t مع الحفاظ على بنية الحاشية.
-     * ---------------------------------------------------------
+     * =========================================================
+     * 12. خريطة w:t داخل الحاشية
+     * =========================================================
      */
 
     function replaceXmlText(
@@ -30178,7 +30033,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 9. معالجة جميع حواشي الجزء
+     * 13. معالجة جزء الحواشي
      * =========================================================
      */
 
@@ -30260,17 +30115,26 @@ async function applyFootnoteSuggestions(
             index++
         ) {
 
+            const note =
+                notes[
+                    index
+                ];
+
+            /*
+             * =================================================
+             * أهم تعديل:
+             * استخدام w:id الحقيقي.
+             * =================================================
+             */
+
             const noteNumber =
-                index + 1;
+                note.id;
 
             const suggestion =
                 suggestionMap.get(
                     `${source}-${noteNumber}`
                 );
 
-            /*
-            * لا نعالج إلا الحاشية المطلوبة.
-            */
             if (
                 !suggestion
             ) {
@@ -30280,9 +30144,7 @@ async function applyFootnoteSuggestions(
             }
 
             const noteElement =
-                notes[
-                    index
-                ];
+                note.element;
 
             const originalText =
                 getNoteText(
@@ -30298,23 +30160,23 @@ async function applyFootnoteSuggestions(
             }
 
             /*
-            * =====================================================
-            * 1. تجميع المرجع الواحد
-            *
-            * المرجع قد يظهر أكثر من مرة في references بسبب
-            * تعدد الصفحات/المواضع.
-            *
-            * نحتاج إلى معالجته مرة واحدة فقط، لكن بعد جمع
-            * جميع suggestedTexts الخاصة به.
-            * =====================================================
-            */
+             * =================================================
+             * تجميع المراجع المتكررة داخل الحاشية.
+             * =================================================
+             */
 
-            const referenceGroups =
+            const groups =
                 new Map();
+
+            const count =
+                Math.min(
+                    suggestion.references.length,
+                    suggestion.suggestedTexts.length
+                );
 
             for (
                 let i = 0;
-                i < suggestion.references.length;
+                i < count;
                 i++
             ) {
 
@@ -30339,13 +30201,13 @@ async function applyFootnoteSuggestions(
 
                 }
 
-                const referenceKey =
+                const key =
                     getReferenceKey(
                         reference
                     );
 
                 if (
-                    !referenceKey
+                    !key
                 ) {
 
                     continue;
@@ -30353,13 +30215,13 @@ async function applyFootnoteSuggestions(
                 }
 
                 if (
-                    !referenceGroups.has(
-                        referenceKey
+                    !groups.has(
+                        key
                     )
                 ) {
 
-                    referenceGroups.set(
-                        referenceKey,
+                    groups.set(
+                        key,
                         {
 
                             reference:
@@ -30374,8 +30236,8 @@ async function applyFootnoteSuggestions(
                 }
 
                 const group =
-                    referenceGroups.get(
-                        referenceKey
+                    groups.get(
+                        key
                     );
 
                 if (
@@ -30393,16 +30255,15 @@ async function applyFootnoteSuggestions(
             }
 
             /*
-            * =====================================================
-            * 2. الحصول على جميع المراجع الموجودة في الحاشية
-            *    قبل إجراء أي تعديل.
-            * =====================================================
-            */
+             * =================================================
+             * إنشاء الاستبدالات.
+             * =================================================
+             */
 
-            const allReferenceMatches =
+            const replacements =
                 [];
 
-            referenceGroups.forEach(
+            groups.forEach(
                 function (
                     group
                 ) {
@@ -30421,9 +30282,6 @@ async function applyFootnoteSuggestions(
 
                     }
 
-                    /*
-                    * نبحث عن جميع الظهورات، وليس آخر ظهور فقط.
-                    */
                     const matches =
                         findAllIdentityMatches(
                             originalText,
@@ -30440,48 +30298,18 @@ async function applyFootnoteSuggestions(
                     }
 
                     /*
-                    * نأخذ أفضل تطابق:
-                    * أولوية العنوان الأطول، ثم الموضع.
-                    *
-                    * لأننا لا نريد أن نستبدل عنوانًا عامًا
-                    * بتطابق جزئي إذا كان هناك تطابق أدق.
-                    */
-                    matches.sort(
-                        function (
-                            a,
-                            b
-                        ) {
-
-                            if (
-                                b.candidateLength !==
-                                a.candidateLength
-                            ) {
-
-                                return (
-                                    b.candidateLength -
-                                    a.candidateLength
-                                );
-
-                            }
-
-                            return (
-                                a.start -
-                                b.start
-                            );
-
-                        }
-                    );
-
-                    const bestMatch =
+                     * نأخذ أفضل تطابق.
+                     */
+                    const match =
                         matches[0];
 
-                    const suggestedText =
+                    const replacementText =
                         mergeSuggestedTexts(
                             group.texts
                         );
 
                     if (
-                        !suggestedText
+                        !replacementText
                     ) {
 
                         skipped++;
@@ -30489,24 +30317,123 @@ async function applyFootnoteSuggestions(
 
                     }
 
-                    allReferenceMatches.push({
+                    /*
+                     * =================================================
+                     * محاولة العثور على suggestedText كاملًا.
+                     *
+                     * هذا يفيد عندما يكون النص المقترح نفسه موجودًا
+                     * أصلًا في الحاشية.
+                     * =================================================
+                     */
+
+                    const normalizedOriginal =
+                        normalizeLocal(
+                            originalText
+                        );
+
+                    const normalizedSuggested =
+                        normalizeLocal(
+                            replacementText
+                        );
+
+                    let fullMatch =
+                        null;
+
+                    if (
+                        normalizedSuggested
+                    ) {
+
+                        const fullPosition =
+                            normalizedOriginal.indexOf(
+                                normalizedSuggested
+                            );
+
+                        if (
+                            fullPosition !== -1
+                        ) {
+
+                            const fullMap =
+                                buildRawMap(
+                                    originalText
+                                );
+
+                            const fullEnd =
+                                fullPosition +
+                                normalizedSuggested.length;
+
+                            if (
+                                fullPosition <
+                                    fullMap.rawMap.length &&
+                                fullEnd - 1 <
+                                    fullMap.rawMap.length
+                            ) {
+
+                                fullMatch = {
+
+                                    start:
+                                        fullMap.rawMap[
+                                            fullPosition
+                                        ],
+
+                                    end:
+                                        fullMap.rawMap[
+                                            fullEnd - 1
+                                        ] + 1
+
+                                };
+
+                            }
+
+                        }
+
+                    }
+
+                    if (
+                        fullMatch
+                    ) {
+
+                        replacements.push({
+
+                            start:
+                                fullMatch.start,
+
+                            end:
+                                fullMatch.end,
+
+                            text:
+                                replacementText
+
+                        });
+
+                        return;
+
+                    }
+
+                    /*
+                     * =================================================
+                     * في الحالة المعتادة:
+                     *
+                     * نستبدل هوية المرجع الموجودة فعليًا
+                     * بالنص النهائي الذي أعاده AI.
+                     *
+                     * ونبقي أرقام الموضع الموجودة في الحاشية
+                     * إذا لم تكن داخلة في التطابق الكامل.
+                     * =================================================
+                     */
+
+                    replacements.push({
 
                         start:
-                            bestMatch.start,
+                            match.start,
 
                         end:
-                            bestMatch.end,
+                            match.end,
 
                         text:
-                            suggestedText,
-
-                        reference:
-                            group.reference,
-
-                        key:
-                            getReferenceKey(
-                                group.reference
-                            )
+                            getSuggestedIdentity(
+                                replacementText
+                            ) ||
+                            replacementText
 
                     });
 
@@ -30514,56 +30441,55 @@ async function applyFootnoteSuggestions(
             );
 
             /*
-            * =====================================================
-            * 3. ترتيب المراجع من اليسار إلى اليمين
-            * =====================================================
-            */
+             * =================================================
+             * إزالة الاستبدالات المتداخلة.
+             * =================================================
+             */
 
-            allReferenceMatches.sort(
+            replacements.sort(
                 function (
                     a,
                     b
                 ) {
 
-                    return (
-                        a.start -
+                    if (
+                        a.start !==
                         b.start
+                    ) {
+
+                        return (
+                            a.start -
+                            b.start
+                        );
+
+                    }
+
+                    return (
+                        b.end -
+                        a.end
                     );
 
                 }
             );
 
-            /*
-            * =====================================================
-            * 4. حذف أي تطابق متداخل
-            *
-            * هذا مهم جدًا في حالات مثل:
-            *
-            * الكتاب
-            * شرح الكتاب
-            *
-            * حتى لا نستبدل جزءًا داخل مرجع آخر.
-            * =====================================================
-            */
-
-            const selectedMatches =
+            const selected =
                 [];
 
-            allReferenceMatches.forEach(
+            replacements.forEach(
                 function (
-                    current
+                    replacement
                 ) {
 
-                    const overlaps =
-                        selectedMatches.some(
+                    const overlap =
+                        selected.some(
                             function (
                                 existing
                             ) {
 
                                 return (
-                                    current.start <
+                                    replacement.start <
                                         existing.end &&
-                                    current.end >
+                                    replacement.end >
                                         existing.start
                                 );
 
@@ -30571,11 +30497,11 @@ async function applyFootnoteSuggestions(
                         );
 
                     if (
-                        !overlaps
+                        !overlap
                     ) {
 
-                        selectedMatches.push(
-                            current
+                        selected.push(
+                            replacement
                         );
 
                     }
@@ -30584,108 +30510,12 @@ async function applyFootnoteSuggestions(
             );
 
             /*
-            * =====================================================
-            * 5. توسيع نهاية كل مرجع حتى بداية المرجع التالي
-            *
-            * هذا يحافظ على أرقام الموضع الموجودة في النص الأصلي.
-            *
-            * مثال:
-            *
-            * الأصول 2/411، والإيضاح للزجاجي 89-90
-            *
-            * يصبح:
-            *
-            * الأصول، 2/411
-            * الزجاجي، الإيضاح للزجاجي، ص 89-90
-            *
-            * دون ترك "2/411" أو "89-90" خلف النص المستبدل.
-            * =====================================================
-            */
+             * =================================================
+             * التنفيذ من اليمين إلى اليسار.
+             * =================================================
+             */
 
-            const replacements =
-                [];
-
-            for (
-                let i = 0;
-                i < selectedMatches.length;
-                i++
-            ) {
-
-                const current =
-                    selectedMatches[
-                        i
-                    ];
-
-                let end =
-                    current.end;
-
-                if (
-                    i + 1 <
-                    selectedMatches.length
-                ) {
-
-                    const next =
-                        selectedMatches[
-                            i + 1
-                        ];
-
-                    end =
-                        next.start;
-
-                }
-                else {
-
-                    /*
-                    * المرجع الأخير:
-                    *
-                    * نمده فقط عبر بقية الجزء الرقمي/
-                    * علامات الفصل، ولا نأخذ نصًا خارج الحاشية.
-                    */
-
-                    const remainder =
-                        originalText.substring(
-                            current.end
-                        );
-
-                    const trailingMatch =
-                        remainder.match(
-                            /^\s*(?:ص|صفحة)?\s*\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*(?=\s*(?:و|،|,|$))/
-                        );
-
-                    if (
-                        trailingMatch
-                    ) {
-
-                        end =
-                            current.end +
-                            trailingMatch[0].length;
-
-                    }
-
-                }
-
-                replacements.push({
-
-                    start:
-                        current.start,
-
-                    end:
-                        end,
-
-                    text:
-                        current.text
-
-                });
-
-            }
-
-            /*
-            * =====================================================
-            * 6. تنفيذ الاستبدالات من اليمين إلى اليسار
-            * =====================================================
-            */
-
-            replacements.sort(
+            selected.sort(
                 function (
                     a,
                     b
@@ -30699,18 +30529,21 @@ async function applyFootnoteSuggestions(
                 }
             );
 
-            replacements.forEach(
+            selected.forEach(
                 function (
                     replacement
                 ) {
 
-                    if (
+                    const success =
                         replaceXmlText(
                             noteElement,
                             replacement.start,
                             replacement.end,
                             replacement.text
-                        )
+                        );
+
+                    if (
+                        success
                     ) {
 
                         modified =
@@ -30763,69 +30596,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * خريطة raw للنص الكامل
-     * =========================================================
-     */
-
-    function buildRawMapForRange(
-        text
-    ) {
-
-        const normalized =
-            normalizeLocal(
-                text
-            );
-
-        const rawMap =
-            [];
-
-        let counter =
-            0;
-
-        for (
-            let i = 0;
-            i < text.length;
-            i++
-        ) {
-
-            const piece =
-                normalizeLocal(
-                    text[i]
-                );
-
-            for (
-                let j = 0;
-                j < piece.length;
-                j++
-            ) {
-
-                rawMap[
-                    counter
-                ] =
-                    i;
-
-                counter++;
-
-            }
-
-        }
-
-        return {
-            normalized:
-                normalized,
-
-            rawMap:
-                rawMap
-        };
-
-    }
-
-    /*
-     * =========================================================
-     * 10. الحصول على DOCX
-     *
-     * نستخدم الآلية الأصلية مباشرة هنا:
-     * getFileAsync(Compressed) → getSliceAsync → Base64
+     * 14. الحصول على ملف DOCX
      * =========================================================
      */
 
@@ -30842,7 +30613,9 @@ async function applyFootnoteSuggestions(
                         sliceSize:
                             1024 * 1024
                     },
-                    function (result) {
+                    function (
+                        result
+                    ) {
 
                         if (
                             result.status !==
@@ -30857,6 +30630,7 @@ async function applyFootnoteSuggestions(
                             );
 
                             return;
+
                         }
 
                         const file =
@@ -30887,7 +30661,8 @@ async function applyFootnoteSuggestions(
 
                                         try {
                                             file.closeAsync();
-                                        } catch (_) {}
+                                        }
+                                        catch (_) {}
 
                                         reject(
                                             new Error(
@@ -30897,6 +30672,7 @@ async function applyFootnoteSuggestions(
                                         );
 
                                         return;
+
                                     }
 
                                     slices[index] =
@@ -30913,7 +30689,8 @@ async function applyFootnoteSuggestions(
 
                                         try {
                                             file.closeAsync();
-                                        } catch (_) {}
+                                        }
+                                        catch (_) {}
 
                                         let totalLength =
                                             0;
@@ -31004,7 +30781,8 @@ async function applyFootnoteSuggestions(
 
                             try {
                                 file.closeAsync();
-                            } catch (_) {}
+                            }
+                            catch (_) {}
 
                             reject(
                                 new Error(
@@ -31028,7 +30806,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 11. معالجة الحواشي كلها في الذاكرة
+     * 15. فتح DOCX بواسطة JSZip
      * =========================================================
      */
 
@@ -31040,6 +30818,12 @@ async function applyFootnoteSuggestions(
                     true
             }
         );
+
+    /*
+     * =========================================================
+     * 16. معالجة الحواشي السفلية والختامية
+     * =========================================================
+     */
 
     const footnoteResult =
         await processNotesPart(
@@ -31095,7 +30879,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 12. توليد DOCX المعدل مرة واحدة
+     * 17. إنشاء DOCX المعدل مرة واحدة
      * =========================================================
      */
 
@@ -31119,7 +30903,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 13. إعادة المستند مرة واحدة
+     * 18. إعادة المستند مرة واحدة
      * =========================================================
      */
 
