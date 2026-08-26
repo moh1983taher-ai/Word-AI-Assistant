@@ -29155,9 +29155,9 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 4. مرشحات الهوية الأصلية
+     * 4. مرشحات الهوية
      *
-     * نبقي هذا الجزء كما في النسخة العاملة.
+     * نبقي جميع المرشحات الموجودة في النسخة العاملة.
      * =========================================================
      */
 
@@ -29207,9 +29207,6 @@ async function applyFootnoteSuggestions(
             )
                 .trim();
 
-        /*
-         * العنوان هو المرشح الأساسي.
-         */
         if (
             title
         ) {
@@ -29220,9 +29217,6 @@ async function applyFootnoteSuggestions(
 
         }
 
-        /*
-         * صيغ احتياطية إذا كانت الحاشية تحتوي المؤلف أصلًا.
-         */
         if (
             title &&
             author
@@ -29262,9 +29256,6 @@ async function applyFootnoteSuggestions(
 
         }
 
-        /*
-         * الأطول أولًا.
-         */
         return candidates.sort(
             function (
                 a,
@@ -29283,7 +29274,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 5. خريطة النص الطبيعي إلى النص الخام
+     * 5. خريطة النص الطبيعي إلى الخام
      * =========================================================
      */
 
@@ -29344,12 +29335,21 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 6. البحث عن أفضل هوية للمرجع في النص الأصلي
+     * 6. البحث عن أفضل هوية
+     *
+     * التعديل هنا فقط:
+     *
+     * إذا كان النص يحتوي:
+     *
+     * المؤلف + العنوان
+     *
+     * نفضله على العنوان وحده.
      * =========================================================
      */
 
     function findBestIdentity(
         text,
+        reference,
         candidates
     ) {
 
@@ -29357,6 +29357,158 @@ async function applyFootnoteSuggestions(
             buildRawMap(
                 text
             );
+
+        const author =
+            String(
+                reference?.author ||
+                ""
+            )
+                .trim();
+
+        const title =
+            String(
+                reference?.title ||
+                ""
+            )
+                .trim();
+
+        /*
+         * -----------------------------------------------------
+         * أولًا: البحث عن المؤلف + العنوان
+         * -----------------------------------------------------
+         */
+
+        const combinedCandidates =
+            [];
+
+        if (
+            author &&
+            title
+        ) {
+
+            combinedCandidates.push(
+                `${author}، ${title}`
+            );
+
+            combinedCandidates.push(
+                `${author}, ${title}`
+            );
+
+            combinedCandidates.push(
+                `${author} ${title}`
+            );
+
+            combinedCandidates.push(
+                `${title}، ${author}`
+            );
+
+            combinedCandidates.push(
+                `${title}, ${author}`
+            );
+
+            combinedCandidates.push(
+                `${title} ${author}`
+            );
+
+        }
+
+        for (
+            let i = 0;
+            i < combinedCandidates.length;
+            i++
+        ) {
+
+            const candidate =
+                combinedCandidates[
+                    i
+                ];
+
+            const target =
+                normalizeLocal(
+                    candidate
+                );
+
+            if (
+                !target
+            ) {
+
+                continue;
+
+            }
+
+            let from =
+                0;
+
+            while (
+                true
+            ) {
+
+                const position =
+                    map.normalized.indexOf(
+                        target,
+                        from
+                    );
+
+                if (
+                    position === -1
+                ) {
+
+                    break;
+
+                }
+
+                const end =
+                    position +
+                    target.length;
+
+                if (
+                    position <
+                        map.rawMap.length &&
+                    end - 1 <
+                        map.rawMap.length
+                ) {
+
+                    return {
+
+                        start:
+                            map.rawMap[
+                                position
+                            ],
+
+                        end:
+                            map.rawMap[
+                                end - 1
+                            ] + 1,
+
+                        length:
+                            target.length,
+
+                        candidate:
+                            candidate,
+
+                        containsAuthor:
+                            true
+
+                    };
+
+                }
+
+                from =
+                    position +
+                    Math.max(
+                        1,
+                        target.length
+                    );
+
+            }
+
+        }
+
+        /*
+         * -----------------------------------------------------
+         * ثانيًا: البحث بالطريقة القديمة.
+         * -----------------------------------------------------
+         */
 
         let best =
             null;
@@ -29412,37 +29564,35 @@ async function applyFootnoteSuggestions(
                         map.rawMap.length
                 ) {
 
-                    const rawStart =
-                        map.rawMap[
-                            position
-                        ];
-
-                    const rawEnd =
-                        map.rawMap[
-                            end - 1
-                        ] + 1;
-
                     const current = {
 
                         start:
-                            rawStart,
+                            map.rawMap[
+                                position
+                            ],
 
                         end:
-                            rawEnd,
+                            map.rawMap[
+                                end - 1
+                            ] + 1,
 
                         length:
                             target.length,
 
                         candidate:
-                            candidates[i]
+                            candidates[i],
+
+                        containsAuthor:
+                            normalizeLocal(
+                                candidates[i]
+                            ).includes(
+                                normalizeLocal(
+                                    author
+                                )
+                            )
 
                     };
 
-                    /*
-                     * الأولوية:
-                     * 1. المطابقة الأطول.
-                     * 2. عند التساوي: الظهور الأخير.
-                     */
                     if (
                         !best ||
                         current.length >
@@ -29479,9 +29629,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 7. استخراج هوية المرجع من suggestedText
-     *
-     * لا نستخدم أرقام الصفحات.
+     * 7. استخراج الهوية الجديدة
      * =========================================================
      */
 
@@ -29533,159 +29681,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 8. توسيع المطابقة لتشمل المؤلف إذا كان خارجها
-     *
-     * هذه هي الإضافة الوحيدة.
-     *
-     * مثال:
-     *
-     * النووي، المجموع 11/417
-     *
-     * إذا كانت المطابقة = المجموع
-     *
-     * تصبح:
-     *
-     * النووي، المجموع
-     *
-     * أما إذا كانت المطابقة أصلًا:
-     *
-     * النووي، المجموع
-     *
-     * فلا نغيرها.
-     * =========================================================
-     */
-
-    function expandMatchToAuthor(
-        text,
-        match,
-        author
-    ) {
-
-        if (
-            !match ||
-            !author
-        ) {
-
-            return match;
-
-        }
-
-        const authorNormalized =
-            normalizeLocal(
-                author
-            );
-
-        if (
-            !authorNormalized
-        ) {
-
-            return match;
-
-        }
-
-        /*
-         * إذا كانت المطابقة نفسها تحتوي المؤلف،
-         * فلا نوسعها ولا نغيرها.
-         */
-        if (
-            normalizeLocal(
-                text.substring(
-                    match.start,
-                    match.end
-                )
-            ).includes(
-                authorNormalized
-            )
-        ) {
-
-            return match;
-
-        }
-
-        /*
-         * النص الموجود قبل بداية المطابقة.
-         */
-        const before =
-            text.substring(
-                0,
-                match.start
-            );
-
-        const beforeMap =
-            buildRawMap(
-                before
-            );
-
-        /*
-         * المؤلف يجب أن يكون في نهاية الجزء السابق
-         * مباشرة، بعد حذف المسافات وعلامات الترقيم
-         * بالتطبيع.
-         */
-        if (
-            !beforeMap.normalized.endsWith(
-                authorNormalized
-            )
-        ) {
-
-            return match;
-
-        }
-
-        const authorStartNormalized =
-            beforeMap.normalized.length -
-            authorNormalized.length;
-
-        if (
-            authorStartNormalized < 0 ||
-            authorStartNormalized >=
-                beforeMap.rawMap.length
-        ) {
-
-            return match;
-
-        }
-
-        const rawAuthorStart =
-            beforeMap.rawMap[
-                authorStartNormalized
-            ];
-
-        if (
-            !Number.isFinite(
-                rawAuthorStart
-            )
-        ) {
-
-            return match;
-
-        }
-
-        /*
-         * لا نغيّر النهاية.
-         * لذلك تبقى أرقام الموضع خارج الاستبدال.
-         */
-        return {
-
-            start:
-                rawAuthorStart,
-
-            end:
-                match.end,
-
-            length:
-                match.end -
-                rawAuthorStart,
-
-            candidate:
-                match.candidate
-
-        };
-
-    }
-
-    /*
-     * =========================================================
-     * 9. الحصول على عناصر الحواشي باستخدام w:id الحقيقي
+     * 8. الحصول على عناصر الحواشي
      * =========================================================
      */
 
@@ -29708,21 +29704,18 @@ async function applyFootnoteSuggestions(
                     element
                 ) {
 
-                    const id =
-                        Number(
-                            element.getAttributeNS(
-                                ns,
-                                "id"
-                            )
-                        );
-
                     return {
 
                         element:
                             element,
 
                         id:
-                            id
+                            Number(
+                                element.getAttributeNS(
+                                    ns,
+                                    "id"
+                                )
+                            )
 
                     };
 
@@ -29760,7 +29753,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 10. استخراج النص المرئي للحاشية
+     * 9. نص الحاشية
      * =========================================================
      */
 
@@ -29771,36 +29764,33 @@ async function applyFootnoteSuggestions(
         const ns =
             "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
-        const nodes =
-            Array.from(
-                noteElement.getElementsByTagNameNS(
-                    ns,
-                    "t"
-                )
+        return Array.from(
+            noteElement.getElementsByTagNameNS(
+                ns,
+                "t"
+            )
+        )
+            .map(
+                function (
+                    node
+                ) {
+
+                    return (
+                        node.textContent ||
+                        ""
+                    );
+
+                }
+            )
+            .join(
+                ""
             );
-
-        let text =
-            "";
-
-        nodes.forEach(
-            function (
-                node
-            ) {
-
-                text +=
-                    node.textContent ||
-                    "";
-
-            }
-        );
-
-        return text;
 
     }
 
     /*
      * =========================================================
-     * 11. استبدال جزء من النص مع الحفاظ على بنية XML
+     * 10. استبدال النص
      * =========================================================
      */
 
@@ -29982,7 +29972,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 12. معالجة footnotes.xml / endnotes.xml
+     * 11. معالجة XML
      * =========================================================
      */
 
@@ -30003,16 +29993,9 @@ async function applyFootnoteSuggestions(
         ) {
 
             return {
-
-                modified:
-                    false,
-
-                applied:
-                    0,
-
-                skipped:
-                    0
-
+                modified: false,
+                applied: 0,
+                skipped: 0
             };
 
         }
@@ -30022,14 +30005,12 @@ async function applyFootnoteSuggestions(
                 "text"
             );
 
-        const parser =
-            new DOMParser();
-
         const xmlDoc =
-            parser.parseFromString(
-                xmlText,
-                "application/xml"
-            );
+            new DOMParser()
+                .parseFromString(
+                    xmlText,
+                    "application/xml"
+                );
 
         if (
             xmlDoc.getElementsByTagName(
@@ -30049,14 +30030,14 @@ async function applyFootnoteSuggestions(
                 localName
             );
 
-        let modified =
-            false;
-
         let applied =
             0;
 
         let skipped =
             0;
+
+        let modified =
+            false;
 
         for (
             let index = 0;
@@ -30069,15 +30050,9 @@ async function applyFootnoteSuggestions(
                     index
                 ];
 
-            /*
-             * نستخدم w:id الحقيقي.
-             */
-            const noteNumber =
-                noteEntry.id;
-
             const suggestion =
                 suggestionMap.get(
-                    `${source}-${noteNumber}`
+                    `${source}-${noteEntry.id}`
                 );
 
             if (
@@ -30104,12 +30079,6 @@ async function applyFootnoteSuggestions(
 
             }
 
-            /*
-             * =================================================
-             * تجميع المراجع.
-             * =================================================
-             */
-
             const referenceGroups =
                 new Map();
 
@@ -30130,14 +30099,6 @@ async function applyFootnoteSuggestions(
                         i
                     ];
 
-                if (
-                    !reference
-                ) {
-
-                    continue;
-
-                }
-
                 const suggestedIdentity =
                     getSuggestedIdentity(
                         suggestion.suggestedTexts[
@@ -30146,6 +30107,7 @@ async function applyFootnoteSuggestions(
                     );
 
                 if (
+                    !reference ||
                     !suggestedIdentity
                 ) {
 
@@ -30153,50 +30115,36 @@ async function applyFootnoteSuggestions(
 
                 }
 
-                const referenceKey =
+                const key =
                     getReferenceKey(
                         reference
                     );
 
                 if (
-                    !referenceKey
+                    !key ||
+                    referenceGroups.has(
+                        key
+                    )
                 ) {
 
                     continue;
 
                 }
 
-                /*
-                 * المرجع نفسه يعالج مرة واحدة.
-                 */
-                if (
-                    !referenceGroups.has(
-                        referenceKey
-                    )
-                ) {
+                referenceGroups.set(
+                    key,
+                    {
 
-                    referenceGroups.set(
-                        referenceKey,
-                        {
+                        reference:
+                            reference,
 
-                            reference:
-                                reference,
+                        suggestedIdentity:
+                            suggestedIdentity
 
-                            suggestedIdentity:
-                                suggestedIdentity
-
-                        }
-                    );
-
-                }
+                    }
+                );
 
             }
-
-            /*
-             * =================================================
-             * تحديد الاستبدالات.
-             * =================================================
-             */
 
             const replacements =
                 [];
@@ -30216,142 +30164,179 @@ async function applyFootnoteSuggestions(
                     ) {
 
                         skipped++;
-
                         return;
 
                     }
 
-                    let identityMatch =
+                    const match =
                         findBestIdentity(
                             originalText,
+                            group.reference,
                             candidates
                         );
 
                     if (
-                        !identityMatch
+                        !match
                     ) {
 
                         skipped++;
-
                         return;
 
                     }
 
                     /*
-                     * فقط إذا كان المؤلف خارج المطابقة،
-                     * نوسّع البداية إليه.
+                     * إذا كانت المطابقة نفسها تحتوي المؤلف،
+                     * نستبدلها بالجزء المقابل من الهوية الجديدة
+                     * دون تكرار المؤلف.
                      *
-                     * إذا كانت المطابقة أصلًا تشمل المؤلف،
-                     * تبقى كما هي.
+                     * مثال:
+                     *
+                     * النووي، المجموع
+                     *
+                     * تصبح:
+                     *
+                     * المجموع شرح المهذب
+                     *
+                     * لأن "النووي" موجود أصلًا.
                      */
-                    identityMatch =
-                        expandMatchToAuthor(
-                            originalText,
-                            identityMatch,
+
+                    let replacement =
+                        group.suggestedIdentity;
+
+                    if (
+                        match.containsAuthor
+                    ) {
+
+                        const author =
                             String(
                                 group.reference?.author ||
                                 ""
-                            ).trim()
-                        );
+                            )
+                                .trim();
 
-                    /*
-                     * نستبدل الجزء القديم كله بالهوية الجديدة.
-                     *
-                     * بما أن identityMatch.end لا يمتد إلى الأرقام،
-                     * تبقى الأرقام الأصلية كما هي.
-                     */
+                        const authorNormalized =
+                            normalizeLocal(
+                                author
+                            );
+
+                        const newNormalized =
+                            normalizeLocal(
+                                replacement
+                            );
+
+                        if (
+                            authorNormalized &&
+                            newNormalized.startsWith(
+                                authorNormalized
+                            )
+                        ) {
+
+                            const pos =
+                                replacement.indexOf(
+                                    author
+                                );
+
+                            if (
+                                pos === 0
+                            ) {
+
+                                replacement =
+                                    replacement
+                                        .substring(
+                                            author.length
+                                        )
+                                        .replace(
+                                            /^[،,\s]+/,
+                                            ""
+                                        )
+                                        .trim();
+
+                            }
+
+                        }
+
+                    }
+                    else {
+
+                        /*
+                         * إذا لم تكن المطابقة تحتوي المؤلف،
+                         * وكان المؤلف موجودًا مباشرة قبل العنوان،
+                         * نضم المؤلف إلى نطاق الاستبدال.
+                         */
+
+                        const author =
+                            String(
+                                group.reference?.author ||
+                                ""
+                            )
+                                .trim();
+
+                        if (
+                            author
+                        ) {
+
+                            const before =
+                                originalText.substring(
+                                    0,
+                                    match.start
+                                );
+
+                            const beforeMap =
+                                buildRawMap(
+                                    before
+                                );
+
+                            const authorNormalized =
+                                normalizeLocal(
+                                    author
+                                );
+
+                            if (
+                                beforeMap.normalized.endsWith(
+                                    authorNormalized
+                                )
+                            ) {
+
+                                const pos =
+                                    beforeMap.normalized.length -
+                                    authorNormalized.length;
+
+                                if (
+                                    pos >= 0 &&
+                                    pos <
+                                        beforeMap.rawMap.length
+                                ) {
+
+                                    match.start =
+                                        beforeMap.rawMap[
+                                            pos
+                                        ];
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
                     replacements.push({
 
                         start:
-                            identityMatch.start,
+                            match.start,
 
                         end:
-                            identityMatch.end,
+                            match.end,
 
                         text:
-                            group.suggestedIdentity
+                            replacement
 
                     });
 
                 }
             );
 
-            /*
-             * =================================================
-             * إزالة التداخل
-             * =================================================
-             */
-
             replacements.sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    if (
-                        a.start !==
-                        b.start
-                    ) {
-
-                        return (
-                            a.start -
-                            b.start
-                        );
-
-                    }
-
-                    return (
-                        b.end -
-                        a.end
-                    );
-
-                }
-            );
-
-            const selected =
-                [];
-
-            replacements.forEach(
-                function (
-                    replacement
-                ) {
-
-                    const overlaps =
-                        selected.some(
-                            function (
-                                existing
-                            ) {
-
-                                return (
-                                    replacement.start <
-                                        existing.end &&
-                                    replacement.end >
-                                        existing.start
-                                );
-
-                            }
-                        );
-
-                    if (
-                        !overlaps
-                    ) {
-
-                        selected.push(
-                            replacement
-                        );
-
-                    }
-
-                }
-            );
-
-            /*
-             * =================================================
-             * التنفيذ من اليمين إلى اليسار
-             * =================================================
-             */
-
-            selected.sort(
                 function (
                     a,
                     b
@@ -30365,29 +30350,22 @@ async function applyFootnoteSuggestions(
                 }
             );
 
-            selected.forEach(
+            replacements.forEach(
                 function (
-                    replacement
+                    item
                 ) {
 
                     if (
                         replaceXmlText(
                             noteElement,
-                            replacement.start,
-                            replacement.end,
-                            replacement.text
+                            item.start,
+                            item.end,
+                            item.text
                         )
                     ) {
 
-                        modified =
-                            true;
-
                         applied++;
-
-                    }
-                    else {
-
-                        skipped++;
+                        modified = true;
 
                     }
 
@@ -30400,14 +30378,12 @@ async function applyFootnoteSuggestions(
             modified
         ) {
 
-            const serializer =
-                new XMLSerializer();
-
             zip.file(
                 path,
-                serializer.serializeToString(
-                    xmlDoc
-                )
+                new XMLSerializer()
+                    .serializeToString(
+                        xmlDoc
+                    )
             );
 
         }
@@ -30429,7 +30405,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 13. الحصول على DOCX
+     * 12. الحصول على DOCX
      * =========================================================
      */
 
@@ -30639,7 +30615,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 14. JSZip
+     * 13. JSZip
      * =========================================================
      */
 
@@ -30651,12 +30627,6 @@ async function applyFootnoteSuggestions(
                     true
             }
         );
-
-    /*
-     * =========================================================
-     * 15. معالجة الحواشي
-     * =========================================================
-     */
 
     const footnoteResult =
         await processNotesPart(
@@ -30712,7 +30682,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 16. توليد DOCX المعدل مرة واحدة
+     * 14. إنشاء DOCX المعدل
      * =========================================================
      */
 
@@ -30736,7 +30706,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 17. إعادة المستند مرة واحدة
+     * 15. إعادة المستند
      * =========================================================
      */
 
