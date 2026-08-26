@@ -29155,11 +29155,25 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 4. مرشحات الهوية الأصلية
+     * 4. مرشحات هوية المرجع
      *
-     * العنوان الكامل يبقى المرشح الأول.
-     * variants تُستخدم عندما يكون الاسم الموجود في الحاشية
-     * مختصرًا عن العنوان الكامل.
+     * الأولوية:
+     *
+     * 1) variants
+     * 2) title
+     * 3) author + title والصيغ الأخرى
+     *
+     * السبب:
+     *
+     * قد يكون عنوان المرجع في نتيجة التحليل:
+     *
+     *     المجموع شرح المهذب
+     *
+     * بينما يظهر في الحاشية:
+     *
+     *     المجموع
+     *
+     * وهنا تكون variants هي الطريق الصحيح للمطابقة.
      * =========================================================
      */
 
@@ -29171,7 +29185,8 @@ async function applyFootnoteSuggestions(
             [];
 
         function addCandidate(
-            value
+            value,
+            priority
         ) {
 
             const text =
@@ -29181,17 +29196,59 @@ async function applyFootnoteSuggestions(
                     .trim();
 
             if (
-                text &&
-                !candidates.includes(
-                    text
-                )
+                !text
             ) {
 
-                candidates.push(
+                return;
+
+            }
+
+            const normalized =
+                normalizeLocal(
                     text
                 );
 
+            if (
+                !normalized
+            ) {
+
+                return;
+
             }
+
+            const duplicate =
+                candidates.some(
+                    function (
+                        item
+                    ) {
+
+                        return (
+                            normalizeLocal(
+                                item.text
+                            ) ===
+                            normalized
+                        );
+
+                    }
+                );
+
+            if (
+                duplicate
+            ) {
+
+                return;
+
+            }
+
+            candidates.push({
+
+                text:
+                    text,
+
+                priority:
+                    priority
+
+            });
 
         }
 
@@ -29211,79 +29268,7 @@ async function applyFootnoteSuggestions(
 
         /*
          * -----------------------------------------------------
-         * 1. العنوان الكامل
-         * -----------------------------------------------------
-         */
-
-        if (
-            title
-        ) {
-
-            addCandidate(
-                title
-            );
-
-        }
-
-        /*
-         * -----------------------------------------------------
-         * 2. صيغ المؤلف + العنوان
-         *
-         * نبقيها قبل variants حتى لا يتغير السلوك
-         * الذي أثبت كفاءته.
-         * -----------------------------------------------------
-         */
-
-        if (
-            title &&
-            author
-        ) {
-
-            addCandidate(
-                `${author}، ${title}`
-            );
-
-            addCandidate(
-                `${author}, ${title}`
-            );
-
-            addCandidate(
-                `${title}، ${author}`
-            );
-
-            addCandidate(
-                `${title}, ${author}`
-            );
-
-            addCandidate(
-                `${author} ${title}`
-            );
-
-            addCandidate(
-                `${title} ${author}`
-            );
-
-            addCandidate(
-                `${title} لل${author}`
-            );
-
-            addCandidate(
-                `${title} لـ${author}`
-            );
-
-        }
-
-        /*
-         * -----------------------------------------------------
-         * 3. variants
-         *
-         * مثال:
-         *
-         * title   = المجموع شرح المهذب
-         * variant = المجموع
-         *
-         * إذا لم يوجد العنوان الكامل، يمكن العثور على
-         * المجموع في النص الأصلي.
+         * variants
          * -----------------------------------------------------
          */
 
@@ -29304,7 +29289,8 @@ async function applyFootnoteSuggestions(
                     ) {
 
                         addCandidate(
-                            variant
+                            variant,
+                            1
                         );
 
                     }
@@ -29319,7 +29305,8 @@ async function applyFootnoteSuggestions(
                             variant.value ||
                             variant.title ||
                             variant.name ||
-                            ""
+                            "",
+                            1
                         );
 
                     }
@@ -29330,29 +29317,119 @@ async function applyFootnoteSuggestions(
         }
 
         /*
-         * الأطول أولًا.
-         *
-         * هذا يحافظ على السلوك الأصلي.
+         * -----------------------------------------------------
+         * العنوان الكامل
+         * -----------------------------------------------------
          */
-        return candidates.sort(
+
+        if (
+            title
+        ) {
+
+            addCandidate(
+                title,
+                2
+            );
+
+        }
+
+        /*
+         * -----------------------------------------------------
+         * المؤلف + العنوان
+         * -----------------------------------------------------
+         */
+
+        if (
+            title &&
+            author
+        ) {
+
+            addCandidate(
+                `${author}، ${title}`,
+                3
+            );
+
+            addCandidate(
+                `${author}, ${title}`,
+                3
+            );
+
+            addCandidate(
+                `${title}، ${author}`,
+                3
+            );
+
+            addCandidate(
+                `${title}, ${author}`,
+                3
+            );
+
+            addCandidate(
+                `${author} ${title}`,
+                3
+            );
+
+            addCandidate(
+                `${title} ${author}`,
+                3
+            );
+
+            addCandidate(
+                `${title} لل${author}`,
+                3
+            );
+
+            addCandidate(
+                `${title} لـ${author}`,
+                3
+            );
+
+        }
+
+        /*
+         * -----------------------------------------------------
+         * الأفضلية:
+         * الأولوية أولًا، ثم طول المرشح.
+         * -----------------------------------------------------
+         */
+
+        candidates.sort(
             function (
                 a,
                 b
             ) {
 
+                if (
+                    a.priority !==
+                    b.priority
+                ) {
+
+                    return (
+                        a.priority -
+                        b.priority
+                    );
+
+                }
+
                 return (
-                    normalizeLocal(b).length -
-                    normalizeLocal(a).length
+                    normalizeLocal(
+                        b.text
+                    ).length -
+                    normalizeLocal(
+                        a.text
+                    ).length
                 );
 
             }
         );
 
+        return candidates;
+
     }
 
     /*
      * =========================================================
-     * 5. خريطة النص الطبيعي إلى النص الخام
+     * 5. خريطة النص الخام والنص المطبع
      * =========================================================
      */
 
@@ -29413,7 +29490,13 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 6. البحث عن أفضل هوية للمرجع في النص الأصلي
+     * 6. العثور على أفضل هوية
+     *
+     * الأولوية للمطابق:
+     *
+     * 1) priority الأقل
+     * 2) التطابق الأطول
+     * 3) الظهور الأخير
      * =========================================================
      */
 
@@ -29436,9 +29519,14 @@ async function applyFootnoteSuggestions(
             i++
         ) {
 
+            const candidate =
+                candidates[
+                    i
+                ];
+
             const target =
                 normalizeLocal(
-                    candidates[i]
+                    candidate.text
                 );
 
             if (
@@ -29502,25 +29590,31 @@ async function applyFootnoteSuggestions(
                         length:
                             target.length,
 
+                        priority:
+                            candidate.priority,
+
                         candidate:
-                            candidates[i]
+                            candidate.text
 
                     };
 
-                    /*
-                     * الأولوية:
-                     * 1. المطابقة الأطول.
-                     * 2. عند التساوي: الظهور الأخير.
-                     */
                     if (
                         !best ||
-                        current.length >
-                            best.length ||
+                        current.priority <
+                            best.priority ||
                         (
-                            current.length ===
-                            best.length &&
-                            current.start >
-                                best.start
+                            current.priority ===
+                            best.priority &&
+                            (
+                                current.length >
+                                    best.length ||
+                                (
+                                    current.length ===
+                                    best.length &&
+                                    current.start >
+                                        best.start
+                                )
+                            )
                         )
                     ) {
 
@@ -29549,6 +29643,20 @@ async function applyFootnoteSuggestions(
     /*
      * =========================================================
      * 7. استخراج هوية المرجع من suggestedText
+     *
+     * نستخرج فقط:
+     *
+     * المؤلف + اسم المرجع
+     *
+     * ولا نستخرج أرقام المجلد/الصفحة.
+     *
+     * مثال:
+     *
+     * "النووي، المجموع شرح المهذب، 11/417"
+     *
+     * يصبح:
+     *
+     * "النووي، المجموع شرح المهذب"
      * =========================================================
      */
 
@@ -29570,6 +29678,9 @@ async function applyFootnoteSuggestions(
 
         }
 
+        /*
+         * الموضع الرقمي إذا كان في نهاية النص.
+         */
         const match =
             value.match(
                 /\s+(?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*(?:\s*،\s*\d+)*\s*$/
@@ -29600,261 +29711,9 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 8. توسيع نطاق الهوية لتشمل المؤلف الموجود أصلًا
+     * 8. عناصر الحواشي
      *
-     * الحالات التي نعالجها:
-     *
-     * 1) المؤلف قبل العنوان:
-     *
-     *    النووي، المجموع
-     *
-     * 2) المؤلف بعد العنوان:
-     *
-     *    المجموع، النووي
-     *
-     * 3) المؤلف ملتصق بالعنوان دون مسافة:
-     *
-     *    النووي،المجموع
-     *
-     * 4) المؤلف يفصل بينه وبين العنوان اختلاف في المسافات
-     *    أو علامات الترقيم.
-     *
-     * لا نمتد إطلاقًا إلى أرقام الصفحات.
-     * =========================================================
-     */
-
-    function expandIdentityRange(
-        text,
-        match,
-        author
-    ) {
-
-        if (
-            !match ||
-            !author
-        ) {
-
-            return match;
-
-        }
-
-        const authorText =
-            String(
-                author
-            )
-                .trim();
-
-        const normalizedAuthor =
-            normalizeLocal(
-                authorText
-            );
-
-        if (
-            !normalizedAuthor
-        ) {
-
-            return match;
-
-        }
-
-        let result = {
-
-            start:
-                match.start,
-
-            end:
-                match.end,
-
-            length:
-                match.end -
-                match.start,
-
-            candidate:
-                match.candidate
-
-        };
-
-        /*
-         * -----------------------------------------------------
-         * أ. المؤلف قبل العنوان
-         * -----------------------------------------------------
-         */
-
-        const before =
-            text.substring(
-                0,
-                result.start
-            );
-
-        const beforeMap =
-            buildRawMap(
-                before
-            );
-
-        const beforeNormalized =
-            beforeMap.normalized;
-
-        const authorPosition =
-            beforeNormalized.lastIndexOf(
-                normalizedAuthor
-            );
-
-        if (
-            authorPosition !== -1 &&
-            authorPosition +
-                normalizedAuthor.length ===
-                beforeNormalized.length
-        ) {
-
-            /*
-             * نتأكد أن ما بين المؤلف والعنوان مجرد فواصل
-             * ومسافات، لا نص آخر.
-             */
-            const rawAuthorStart =
-                beforeMap.rawMap[
-                    authorPosition
-                ];
-
-            if (
-                Number.isFinite(
-                    rawAuthorStart
-                )
-            ) {
-
-                const between =
-                    text.substring(
-                        rawAuthorStart +
-                        authorText.length,
-                        result.start
-                    );
-
-                const normalizedBetween =
-                    normalizeLocal(
-                        between
-                    );
-
-                /*
-                 * إذا كان الفاصل بعد التطبيع فارغًا،
-                 * أو عبارة عن علامات ترقيم فقط، نضم المؤلف.
-                 */
-                if (
-                    normalizedBetween === ""
-                ) {
-
-                    result.start =
-                        rawAuthorStart;
-
-                }
-
-            }
-
-        }
-
-        /*
-         * -----------------------------------------------------
-         * ب. المؤلف بعد العنوان
-         *
-         * مثال:
-         *
-         * المجموع، النووي 11/417
-         * -----------------------------------------------------
-         */
-
-        const after =
-            text.substring(
-                result.end
-            );
-
-        const afterMap =
-            buildRawMap(
-                after
-            );
-
-        const afterNormalized =
-            afterMap.normalized;
-
-        const authorAfterPosition =
-            afterNormalized.indexOf(
-                normalizedAuthor
-            );
-
-        if (
-            authorAfterPosition === 0
-        ) {
-
-            /*
-             * نحصل على النص الخام بين نهاية العنوان
-             * وبداية المؤلف.
-             */
-            const rawAuthorStartAfter =
-                afterMap.rawMap[
-                    0
-                ];
-
-            if (
-                Number.isFinite(
-                    rawAuthorStartAfter
-                )
-            ) {
-
-                /*
-                 * نحدد نهاية المؤلف الخام.
-                 */
-                const normalizedAuthorEnd =
-                    normalizedAuthor.length - 1;
-
-                if (
-                    normalizedAuthorEnd <
-                    afterMap.rawMap.length
-                ) {
-
-                    const rawAuthorEnd =
-                        afterMap.rawMap[
-                            normalizedAuthorEnd
-                        ] + 1;
-
-                    const betweenAfter =
-                        after.substring(
-                            0,
-                            rawAuthorStartAfter
-                        );
-
-                    const normalizedBetweenAfter =
-                        normalizeLocal(
-                            betweenAfter
-                        );
-
-                    /*
-                     * لا نمتد إلى المؤلف إذا وجدنا نصًا حقيقيًا
-                     * بين العنوان والمؤلف.
-                     */
-                    if (
-                        normalizedBetweenAfter === ""
-                    ) {
-
-                        result.end =
-                            result.end +
-                            rawAuthorEnd;
-
-                    }
-
-                }
-
-            }
-
-        }
-
-        result.length =
-            result.end -
-            result.start;
-
-        return result;
-
-    }
-
-    /*
-     * =========================================================
-     * 9. الحصول على عناصر الحواشي باستخدام w:id الحقيقي
+     * نستخدم w:id الحقيقي.
      * =========================================================
      */
 
@@ -29929,7 +29788,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 10. استخراج النص المرئي للحاشية
+     * 9. استخراج نص الحاشية
      * =========================================================
      */
 
@@ -29969,7 +29828,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 11. استبدال جزء من النص مع الحفاظ على بنية XML
+     * 10. استبدال النص داخل w:t
      * =========================================================
      */
 
@@ -30151,7 +30010,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 12. معالجة footnotes.xml / endnotes.xml
+     * 11. معالجة footnotes.xml / endnotes.xml
      * =========================================================
      */
 
@@ -30239,7 +30098,7 @@ async function applyFootnoteSuggestions(
                 ];
 
             /*
-             * استخدام w:id الحقيقي.
+             * نستخدم w:id الحقيقي، لا ترتيب العنصر.
              */
             const noteNumber =
                 noteEntry.id;
@@ -30276,6 +30135,9 @@ async function applyFootnoteSuggestions(
             /*
              * =================================================
              * تجميع المرجع نفسه داخل الحاشية.
+             *
+             * نستخدم suggestedText الأول الصالح بوصفه النص
+             * النهائي لهوية المرجع.
              * =================================================
              */
 
@@ -30299,8 +30161,14 @@ async function applyFootnoteSuggestions(
                         i
                     ];
 
+                const suggestedText =
+                    suggestion.suggestedTexts[
+                        i
+                    ];
+
                 if (
-                    !reference
+                    !reference ||
+                    suggestedText == null
                 ) {
 
                     continue;
@@ -30309,9 +30177,7 @@ async function applyFootnoteSuggestions(
 
                 const suggestedIdentity =
                     getSuggestedIdentity(
-                        suggestion.suggestedTexts[
-                            i
-                        ]
+                        suggestedText
                     );
 
                 if (
@@ -30360,7 +30226,7 @@ async function applyFootnoteSuggestions(
 
             /*
              * =================================================
-             * تحديد الاستبدالات.
+             * تحديد مواضع الاستبدال.
              * =================================================
              */
 
@@ -30387,7 +30253,7 @@ async function applyFootnoteSuggestions(
 
                     }
 
-                    let identityMatch =
+                    const identityMatch =
                         findBestIdentity(
                             originalText,
                             candidates
@@ -30404,46 +30270,10 @@ async function applyFootnoteSuggestions(
                     }
 
                     /*
-                     * =================================================
-                     * التعديل الخاص بالمشكلة الحالية:
+                     * نستبدل الهوية فقط.
                      *
-                     * إذا وجدنا title أو variant مختصرًا،
-                     * نتحقق من وجود المؤلف مباشرة قبله أو بعده.
-                     *
-                     * مثال:
-                     *
-                     * النووي، المجموع 11/417
-                     *
-                     * المطابقة:
-                     * المجموع
-                     *
-                     * تصبح منطقة الاستبدال:
-                     * النووي، المجموع
-                     *
-                     * وليس:
-                     * المجموع
-                     *
-                     * وفي المقابل:
-                     *
-                     * المجموع، النووي 11/417
-                     *
-                     * تصبح أيضًا:
-                     * المجموع، النووي
-                     *
-                     * والأرقام لا تدخل في النطاق.
-                     * =================================================
+                     * لا نمد end إلى أرقام الموضع.
                      */
-
-                    identityMatch =
-                        expandIdentityRange(
-                            originalText,
-                            identityMatch,
-                            String(
-                                group.reference?.author ||
-                                ""
-                            ).trim()
-                        );
-
                     replacements.push({
 
                         start:
@@ -30462,7 +30292,7 @@ async function applyFootnoteSuggestions(
 
             /*
              * =================================================
-             * إزالة التطابقات المتداخلة.
+             * منع تداخل الاستبدالات.
              * =================================================
              */
 
@@ -30500,7 +30330,7 @@ async function applyFootnoteSuggestions(
                     replacement
                 ) {
 
-                    const overlaps =
+                    const overlap =
                         selected.some(
                             function (
                                 existing
@@ -30517,7 +30347,7 @@ async function applyFootnoteSuggestions(
                         );
 
                     if (
-                        !overlaps
+                        !overlap
                     ) {
 
                         selected.push(
@@ -30613,7 +30443,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 13. الحصول على DOCX
+     * 12. الحصول على DOCX
      * =========================================================
      */
 
@@ -30823,7 +30653,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 14. فتح DOCX بواسطة JSZip
+     * 13. فتح DOCX بواسطة JSZip
      * =========================================================
      */
 
@@ -30838,7 +30668,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 15. معالجة الحواشي
+     * 14. معالجة الحواشي
      * =========================================================
      */
 
@@ -30896,7 +30726,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 16. توليد DOCX المعدل مرة واحدة
+     * 15. توليد DOCX المعدل مرة واحدة
      * =========================================================
      */
 
@@ -30920,7 +30750,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 17. إعادة المستند مرة واحدة
+     * 16. إعادة المستند مرة واحدة
      * =========================================================
      */
 
