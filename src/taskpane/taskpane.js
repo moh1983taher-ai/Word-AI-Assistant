@@ -28940,92 +28940,140 @@ async function applyFootnoteSuggestions(
 ) {
 
     if (
-        !Array.isArray(footnoteSuggestions) ||
+        !Array.isArray(
+            footnoteSuggestions
+        ) ||
         footnoteSuggestions.length === 0
     ) {
+
         return {
             applied: 0,
             skipped: 0
         };
+
     }
 
     if (
         typeof JSZip === "undefined"
     ) {
+
         throw new Error(
             "مكتبة JSZip غير محمّلة في الإضافة."
         );
+
     }
 
     /*
      * =========================================================
-     * فهرس اقتراحات الحواشي
+     * 1. فهرس الاقتراحات
      * =========================================================
      */
 
-    const suggestionMap = new Map();
+    const suggestionMap =
+        new Map();
 
-    footnoteSuggestions.forEach(function (item) {
-
-        if (
-            !item ||
-            !item.source ||
-            item.noteNumber == null
-        ) {
-            return;
-        }
-
-        if (
-            !Array.isArray(item.references) ||
-            !Array.isArray(item.suggestedTexts)
-        ) {
-            return;
-        }
-
-        suggestionMap.set(
-            `${item.source}-${Number(item.noteNumber)}`,
+    footnoteSuggestions.forEach(
+        function (
             item
-        );
+        ) {
 
-    });
+            if (
+                !item ||
+                !item.source ||
+                item.noteNumber == null
+            ) {
 
-    if (suggestionMap.size === 0) {
+                return;
+
+            }
+
+            if (
+                !Array.isArray(
+                    item.references
+                ) ||
+                !Array.isArray(
+                    item.suggestedTexts
+                )
+            ) {
+
+                return;
+
+            }
+
+            suggestionMap.set(
+                `${item.source}-${Number(
+                    item.noteNumber
+                )}`,
+                item
+            );
+
+        }
+    );
+
+    if (
+        suggestionMap.size === 0
+    ) {
+
         return {
             applied: 0,
             skipped: 0
         };
+
     }
 
     /*
      * =========================================================
-     * أدوات التطبيع
+     * 2. التطبيع
      * =========================================================
      */
 
-    function toWesternDigits(value) {
+    function toWesternDigits(
+        value
+    ) {
 
-        return String(value || "")
+        return String(
+            value || ""
+        )
             .replace(
                 /[٠-٩]/g,
-                function (char) {
+                function (
+                    char
+                ) {
+
                     return String(
-                        "٠١٢٣٤٥٦٧٨٩".indexOf(char)
+                        "٠١٢٣٤٥٦٧٨٩".indexOf(
+                            char
+                        )
                     );
+
                 }
             )
             .replace(
                 /[۰-۹]/g,
-                function (char) {
+                function (
+                    char
+                ) {
+
                     return String(
-                        "۰۱۲۳۴۵۶۷۸۹".indexOf(char)
+                        "۰۱۲۳۴۵۶۷۸۹".indexOf(
+                            char
+                        )
                     );
+
                 }
             );
+
     }
 
-    function normalizeLocal(value) {
+    function normalizeLocal(
+        value
+    ) {
 
-        return toWesternDigits(value)
+        return toWesternDigits(
+            String(
+                value || ""
+            )
+        )
             .replace(
                 /[\u064B-\u065F\u0670]/g,
                 ""
@@ -29046,115 +29094,197 @@ async function applyFootnoteSuggestions(
                 /[-–—]/g,
                 "-"
             )
-            .trim()
             .toLowerCase();
+
     }
 
-    function getReferenceKey(reference) {
+    /*
+     * =========================================================
+     * 3. هوية المرجع
+     * =========================================================
+     */
 
-        if (!reference) {
+    function getReferenceKey(
+        reference
+    ) {
+
+        if (
+            !reference
+        ) {
+
             return "";
+
         }
 
         const id =
             String(
-                reference?.id || ""
+                reference?.id ||
+                ""
             ).trim();
 
-        if (id) {
+        if (
+            id
+        ) {
+
             return `id:${id}`;
+
         }
 
         const author =
             String(
-                reference?.author || ""
+                reference?.author ||
+                ""
             )
                 .trim()
                 .toLowerCase();
 
         const title =
             String(
-                reference?.title || ""
+                reference?.title ||
+                ""
             )
                 .trim()
                 .toLowerCase();
 
-        return `ref:${author}|${title}`;
+        return (
+            `ref:${author}|${title}`
+        );
+
     }
 
     /*
      * =========================================================
-     * مرشحات هوية المرجع فقط
+     * 4. مرشحات الهوية
      * =========================================================
      */
 
-    function getCandidates(reference) {
+    function getCandidates(
+        reference
+    ) {
 
         const candidates = [];
 
-        function add(value) {
+        function addCandidate(
+            value
+        ) {
 
             const text =
-                String(value || "").trim();
+                String(
+                    value || ""
+                ).trim();
 
             if (
                 text &&
-                !candidates.includes(text)
+                !candidates.includes(
+                    text
+                )
             ) {
-                candidates.push(text);
+
+                candidates.push(
+                    text
+                );
+
             }
+
         }
 
         const title =
             String(
-                reference?.title || ""
+                reference?.title ||
+                ""
             ).trim();
 
         const author =
             String(
-                reference?.author || ""
+                reference?.author ||
+                ""
             ).trim();
 
-        if (title && author) {
+        if (
+            title &&
+            author
+        ) {
 
-            add(`${author}، ${title}`);
-            add(`${author}, ${title}`);
-            add(`${title}، ${author}`);
-            add(`${title}, ${author}`);
-            add(`${title} لل${author}`);
-            add(`${title} لـ${author}`);
-            add(`${author} ${title}`);
-            add(`${title} ${author}`);
-        }
-
-        if (title) {
-            add(title);
-        }
-
-        return candidates.sort(function (a, b) {
-
-            return (
-                normalizeLocal(b).length -
-                normalizeLocal(a).length
+            addCandidate(
+                `${author}، ${title}`
             );
 
-        });
+            addCandidate(
+                `${author}, ${title}`
+            );
+
+            addCandidate(
+                `${title}، ${author}`
+            );
+
+            addCandidate(
+                `${title}, ${author}`
+            );
+
+            addCandidate(
+                `${title} لل${author}`
+            );
+
+            addCandidate(
+                `${title} لـ${author}`
+            );
+
+            addCandidate(
+                `${author} ${title}`
+            );
+
+            addCandidate(
+                `${title} ${author}`
+            );
+
+        }
+
+        if (
+            title
+        ) {
+
+            addCandidate(
+                title
+            );
+
+        }
+
+        return candidates.sort(
+            function (
+                a,
+                b
+            ) {
+
+                return (
+                    normalizeLocal(b).length -
+                    normalizeLocal(a).length
+                );
+
+            }
+        );
+
     }
 
     /*
      * =========================================================
-     * خريطة النص المطبع
+     * 5. البحث المحلي عن الهوية
      * =========================================================
      */
 
-    function buildMap(text) {
+    function buildRawMap(
+        text
+    ) {
 
         const normalized =
-            normalizeLocal(text);
+            normalizeLocal(
+                text
+            );
 
-        const rawMap = [];
+        const rawMap =
+            [];
 
-        let counter = 0;
+        let counter =
+            0;
 
         for (
             let i = 0;
@@ -29162,43 +29292,55 @@ async function applyFootnoteSuggestions(
             i++
         ) {
 
-            const piece =
-                normalizeLocal(text[i]);
+            const normalizedChar =
+                normalizeLocal(
+                    text[i]
+                );
 
             for (
                 let j = 0;
-                j < piece.length;
+                j < normalizedChar.length;
                 j++
             ) {
 
-                rawMap[counter] = i;
+                rawMap[
+                    counter
+                ] =
+                    i;
+
                 counter++;
 
             }
+
         }
 
         return {
-            normalized,
-            rawMap
+
+            normalized:
+                normalized,
+
+            rawMap:
+                rawMap
+
         };
+
     }
 
-    /*
-     * =========================================================
-     * آخر موضع لهوية المرجع
-     * =========================================================
-     */
-
     function findLastIdentity(
-        originalText,
+        text,
         candidates
     ) {
 
         const map =
-            buildMap(originalText);
+            buildRawMap(
+                text
+            );
 
-        let best = null;
-        let bestLength = -1;
+        let best =
+            null;
+
+        let bestLength =
+            -1;
 
         for (
             let i = 0;
@@ -29207,15 +29349,24 @@ async function applyFootnoteSuggestions(
         ) {
 
             const target =
-                normalizeLocal(candidates[i]);
+                normalizeLocal(
+                    candidates[i]
+                );
 
-            if (!target) {
+            if (
+                !target
+            ) {
+
                 continue;
+
             }
 
-            let from = 0;
+            let from =
+                0;
 
-            while (true) {
+            while (
+                true
+            ) {
 
                 const position =
                     map.normalized.indexOf(
@@ -29223,23 +29374,34 @@ async function applyFootnoteSuggestions(
                         from
                     );
 
-                if (position === -1) {
+                if (
+                    position === -1
+                ) {
+
                     break;
+
                 }
 
                 const end =
-                    position + target.length;
+                    position +
+                    target.length;
 
                 if (
-                    position < map.rawMap.length &&
-                    end - 1 < map.rawMap.length
+                    position <
+                        map.rawMap.length &&
+                    end - 1 <
+                        map.rawMap.length
                 ) {
 
                     const rawStart =
-                        map.rawMap[position];
+                        map.rawMap[
+                            position
+                        ];
 
                     const rawEnd =
-                        map.rawMap[end - 1] + 1;
+                        map.rawMap[
+                            end - 1
+                        ] + 1;
 
                     if (
                         target.length >
@@ -29247,13 +29409,20 @@ async function applyFootnoteSuggestions(
                     ) {
 
                         best = {
-                            start: rawStart,
-                            end: rawEnd
+
+                            start:
+                                rawStart,
+
+                            end:
+                                rawEnd
+
                         };
 
                         bestLength =
                             target.length;
+
                     }
+
                 }
 
                 from =
@@ -29262,193 +29431,104 @@ async function applyFootnoteSuggestions(
                         1,
                         target.length
                     );
+
             }
+
         }
 
         return best;
+
     }
 
     /*
      * =========================================================
-     * قراءة المستند
+     * 6. الحصول على النص النهائي من suggestedText
+     *
+     * نستخدمه كما أعاده التحليل، ولا نعيد بناء المؤلف
+     * والعنوان من حقول reference.
      * =========================================================
      */
 
-    function getDocumentBase64() {
+    function getSuggestedReferenceText(
+        suggestedText
+    ) {
 
-        return new Promise(function (
-            resolve,
-            reject
-        ) {
+        return String(
+            suggestedText || ""
+        )
+            .trim();
 
-            Office.context.document.getFileAsync(
-                Office.FileType.Compressed,
-                {
-                    sliceSize:
-                        1024 * 1024
-                },
-                function (result) {
-
-                    if (
-                        result.status !==
-                        Office.AsyncResultStatus.Succeeded
-                    ) {
-
-                        reject(
-                            new Error(
-                                result.error?.message ||
-                                "تعذر قراءة ملف Word."
-                            )
-                        );
-
-                        return;
-                    }
-
-                    const file =
-                        result.value;
-
-                    const slices =
-                        new Array(
-                            file.sliceCount
-                        );
-
-                    let completed = 0;
-
-                    function readSlice(index) {
-
-                        file.getSliceAsync(
-                            index,
-                            function (sliceResult) {
-
-                                if (
-                                    sliceResult.status !==
-                                    Office.AsyncResultStatus.Succeeded
-                                ) {
-
-                                    try {
-                                        file.closeAsync();
-                                    } catch (_) {}
-
-                                    reject(
-                                        new Error(
-                                            sliceResult.error?.message ||
-                                            "تعذر قراءة جزء من ملف Word."
-                                        )
-                                    );
-
-                                    return;
-                                }
-
-                                slices[index] =
-                                    new Uint8Array(
-                                        sliceResult.value.data
-                                    );
-
-                                completed++;
-
-                                if (
-                                    completed ===
-                                    file.sliceCount
-                                ) {
-
-                                    try {
-                                        file.closeAsync();
-                                    } catch (_) {}
-
-                                    let totalLength = 0;
-
-                                    slices.forEach(
-                                        function (slice) {
-                                            totalLength +=
-                                                slice.length;
-                                        }
-                                    );
-
-                                    const allData =
-                                        new Uint8Array(
-                                            totalLength
-                                        );
-
-                                    let offset = 0;
-
-                                    slices.forEach(
-                                        function (slice) {
-
-                                            allData.set(
-                                                slice,
-                                                offset
-                                            );
-
-                                            offset +=
-                                                slice.length;
-
-                                        }
-                                    );
-
-                                    let binary = "";
-
-                                    const chunk =
-                                        0x8000;
-
-                                    for (
-                                        let i = 0;
-                                        i < allData.length;
-                                        i += chunk
-                                    ) {
-
-                                        binary +=
-                                            String.fromCharCode.apply(
-                                                null,
-                                                allData.subarray(
-                                                    i,
-                                                    Math.min(
-                                                        i + chunk,
-                                                        allData.length
-                                                    )
-                                                )
-                                            );
-                                    }
-
-                                    resolve(
-                                        btoa(binary)
-                                    );
-
-                                    return;
-                                }
-
-                                readSlice(
-                                    index + 1
-                                );
-                            }
-                        );
-                    }
-
-                    if (
-                        file.sliceCount <= 0
-                    ) {
-
-                        try {
-                            file.closeAsync();
-                        } catch (_) {}
-
-                        reject(
-                            new Error(
-                                "ملف Word لا يحتوي على أجزاء."
-                            )
-                        );
-
-                        return;
-                    }
-
-                    readSlice(0);
-                }
-            );
-        });
     }
 
     /*
      * =========================================================
-     * عناصر الحواشي
+     * 7. استخراج هوية suggestedText فقط عند الحاجة
+     *
+     * إذا تعذر استبدال المرجع كاملًا، نحتاج إلى الاحتفاظ
+     * بأرقام الموضع الموجودة أصلًا في الحاشية.
+     *
+     * نستفيد من أول موضع رقمي ظاهر في suggestedText.
+     * =========================================================
+     */
+
+    function getSuggestedIdentity(
+        suggestedText
+    ) {
+
+        const value =
+            String(
+                suggestedText || ""
+            ).trim();
+
+        if (
+            !value
+        ) {
+
+            return "";
+
+        }
+
+        /*
+         * نبحث عن أول موضع يشبه:
+         * 1/27
+         * 1 / 27
+         * 27
+         * ص 27
+         * 27-29
+         *
+         * ثم نأخذ ما قبل الموضع باعتباره هوية المرجع.
+         */
+        const match =
+            value.match(
+                /\s+(?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*\s*$/
+            );
+
+        if (
+            match &&
+            match.index > 0
+        ) {
+
+            return value
+                .substring(
+                    0,
+                    match.index
+                )
+                .trim()
+                .replace(
+                    /[،,]+$/g,
+                    ""
+                )
+                .trim();
+
+        }
+
+        return value;
+
+    }
+
+    /*
+     * =========================================================
+     * 8. تعديل XML
      * =========================================================
      */
 
@@ -29460,13 +29540,18 @@ async function applyFootnoteSuggestions(
         const ns =
             "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
-        return Array.from(
-            xmlDoc.getElementsByTagNameNS(
-                ns,
-                localName
-            )
-        ).filter(
-            function (element) {
+        const elements =
+            Array.from(
+                xmlDoc.getElementsByTagNameNS(
+                    ns,
+                    localName
+                )
+            );
+
+        return elements.filter(
+            function (
+                element
+            ) {
 
                 const id =
                     Number(
@@ -29480,51 +29565,14 @@ async function applyFootnoteSuggestions(
                     Number.isFinite(id) &&
                     id >= 0
                 );
+
             }
         );
+
     }
 
-    /*
-     * =========================================================
-     * النص الكامل للحاشية
-     * =========================================================
-     */
-
-    function getNoteText(noteElement) {
-
-        const ns =
-            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-
-        const nodes =
-            Array.from(
-                noteElement.getElementsByTagNameNS(
-                    ns,
-                    "t"
-                )
-            );
-
-        let text = "";
-
-        nodes.forEach(function (node) {
-            text +=
-                node.textContent || "";
-        });
-
-        return text;
-    }
-
-    /*
-     * =========================================================
-     * كتابة النص النهائي للحاشية كلها
-     *
-     * نحافظ على عناصر الحاشية نفسها،
-     * ونضع النص النهائي في عقدة النص الأولى.
-     * =========================================================
-     */
-
-    function replaceWholeNoteText(
-        noteElement,
-        newText
+    function getNoteText(
+        noteElement
     ) {
 
         const ns =
@@ -29538,34 +29586,210 @@ async function applyFootnoteSuggestions(
                 )
             );
 
-        if (!nodes.length) {
-            return false;
-        }
+        let text =
+            "";
 
-        /*
-         * لا نحذف footnote ولا w:id ولا الفقرة.
-         * نغيّر النص فقط.
-         */
-        nodes[0].textContent =
-            newText;
+        nodes.forEach(
+            function (
+                node
+            ) {
+
+                text +=
+                    node.textContent ||
+                    "";
+
+            }
+        );
+
+        return text;
+
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * تغيير النص داخل عقد w:t مع الحفاظ على بنية الحاشية.
+     * ---------------------------------------------------------
+     */
+
+    function replaceXmlText(
+        noteElement,
+        rawStart,
+        rawEnd,
+        replacement
+    ) {
+
+        const ns =
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+        const textNodes =
+            Array.from(
+                noteElement.getElementsByTagNameNS(
+                    ns,
+                    "t"
+                )
+            );
+
+        let fullText =
+            "";
+
+        const starts =
+            [];
+
+        const ends =
+            [];
+
+        textNodes.forEach(
+            function (
+                node,
+                index
+            ) {
+
+                const value =
+                    node.textContent ||
+                    "";
+
+                starts[index] =
+                    fullText.length;
+
+                fullText +=
+                    value;
+
+                ends[index] =
+                    fullText.length;
+
+            }
+        );
+
+        let firstNode =
+            -1;
+
+        let lastNode =
+            -1;
 
         for (
-            let i = 1;
-            i < nodes.length;
+            let i = 0;
+            i < textNodes.length;
             i++
         ) {
 
-            nodes[i].textContent =
-                "";
+            if (
+                rawStart < ends[i] &&
+                rawEnd > starts[i]
+            ) {
+
+                if (
+                    firstNode === -1
+                ) {
+
+                    firstNode =
+                        i;
+
+                }
+
+                lastNode =
+                    i;
+
+            }
+
+        }
+
+        if (
+            firstNode === -1
+        ) {
+
+            return false;
+
+        }
+
+        const firstText =
+            textNodes[
+                firstNode
+            ].textContent ||
+            "";
+
+        const lastText =
+            textNodes[
+                lastNode
+            ].textContent ||
+            "";
+
+        const firstOffset =
+            rawStart -
+            starts[
+                firstNode
+            ];
+
+        const lastOffset =
+            rawEnd -
+            starts[
+                lastNode
+            ];
+
+        const prefix =
+            firstText.substring(
+                0,
+                firstOffset
+            );
+
+        const suffix =
+            lastText.substring(
+                lastOffset
+            );
+
+        textNodes[
+            firstNode
+        ].textContent =
+            prefix +
+            replacement +
+            (
+                firstNode ===
+                lastNode
+                    ? suffix
+                    : ""
+            );
+
+        for (
+            let i =
+                firstNode + 1;
+            i <= lastNode;
+            i++
+        ) {
+
+            if (
+                i === lastNode
+            ) {
+
+                if (
+                    firstNode !==
+                    lastNode
+                ) {
+
+                    textNodes[
+                        i
+                    ].textContent =
+                        suffix;
+
+                }
+
+            }
+            else {
+
+                textNodes[
+                    i
+                ].textContent =
+                    "";
+
+            }
 
         }
 
         return true;
+
     }
 
     /*
      * =========================================================
-     * تعديل جزء الحواشي كاملًا في الذاكرة
+     * 9. معالجة جميع حواشي الجزء
      * =========================================================
      */
 
@@ -29577,19 +29801,33 @@ async function applyFootnoteSuggestions(
     ) {
 
         const file =
-            zip.file(path);
+            zip.file(
+                path
+            );
 
-        if (!file) {
+        if (
+            !file
+        ) {
 
             return {
-                modified: false,
-                applied: 0,
-                skipped: 0
+
+                modified:
+                    false,
+
+                applied:
+                    0,
+
+                skipped:
+                    0
+
             };
+
         }
 
         const xmlText =
-            await file.async("text");
+            await file.async(
+                "text"
+            );
 
         const parser =
             new DOMParser();
@@ -29609,6 +29847,7 @@ async function applyFootnoteSuggestions(
             throw new Error(
                 `تعذر تحليل ${path}`
             );
+
         }
 
         const notes =
@@ -29617,9 +29856,14 @@ async function applyFootnoteSuggestions(
                 localName
             );
 
-        let modified = false;
-        let applied = 0;
-        let skipped = 0;
+        let modified =
+            false;
+
+        let applied =
+            0;
+
+        let skipped =
+            0;
 
         for (
             let index = 0;
@@ -29636,33 +29880,42 @@ async function applyFootnoteSuggestions(
                 );
 
             /*
-             * لا نعالج الحاشية إن لم يكن لها اقتراح.
+             * لا نعالج إلا الحاشية المطلوبة.
              */
-            if (!suggestion) {
+            if (
+                !suggestion
+            ) {
+
                 continue;
+
             }
 
             const noteElement =
-                notes[index];
+                notes[
+                    index
+                ];
 
             const originalText =
                 getNoteText(
                     noteElement
                 );
 
-            if (!originalText.trim()) {
+            if (
+                !originalText.trim()
+            ) {
+
                 continue;
+
             }
 
             /*
-             * -----------------------------------------------------
-             * نبني قائمة الاستبدالات على النص الأصلي فقط.
-             * -----------------------------------------------------
+             * نحدد جميع الاستبدالات في النص الأصلي
+             * أولًا، ثم نطبقها من اليمين إلى اليسار.
              */
+            const replacements =
+                [];
 
-            const replacements = [];
-
-            const processed =
+            const processedReferences =
                 new Set();
 
             for (
@@ -29676,15 +29929,17 @@ async function applyFootnoteSuggestions(
                     suggestion.references[i];
 
                 const suggestedText =
-                    String(
-                        suggestion.suggestedTexts[i] || ""
-                    ).trim();
+                    getSuggestedReferenceText(
+                        suggestion.suggestedTexts[i]
+                    );
 
                 if (
                     !reference ||
                     !suggestedText
                 ) {
+
                     continue;
+
                 }
 
                 const referenceKey =
@@ -29692,14 +29947,19 @@ async function applyFootnoteSuggestions(
                         reference
                     );
 
+                /*
+                 * نفس المرجع في الحاشية نفسها
+                 * يستبدل مرة واحدة.
+                 */
                 if (
                     referenceKey &&
-                    processed.has(
+                    processedReferences.has(
                         referenceKey
                     )
                 ) {
 
                     continue;
+
                 }
 
                 const candidates =
@@ -29707,109 +29967,220 @@ async function applyFootnoteSuggestions(
                         reference
                     );
 
-                if (!candidates.length) {
+                if (
+                    candidates.length === 0
+                ) {
+
                     skipped++;
                     continue;
+
                 }
 
-                const match =
+                const identityMatch =
                     findLastIdentity(
                         originalText,
                         candidates
                     );
 
-                if (!match) {
+                if (
+                    !identityMatch
+                ) {
+
                     skipped++;
                     continue;
+
                 }
 
-                replacements.push({
-                    start:
-                        match.start,
+                /*
+                 * نحاول أولًا العثور على النص المقترح كاملًا
+                 * داخل النص الأصلي.
+                 *
+                 * إذا وجدناه، نستبدل المرجع كاملًا:
+                 * العنوان + المؤلف + الموضع.
+                 */
+                const normalizedOriginal =
+                    normalizeLocal(
+                        originalText
+                    );
 
-                    end:
-                        match.end,
-
-                    text:
+                const normalizedSuggested =
+                    normalizeLocal(
                         suggestedText
-                });
+                    );
+
+                let fullMatch =
+                    null;
+
+                if (
+                    normalizedSuggested
+                ) {
+
+                    const fullPosition =
+                        normalizedOriginal.indexOf(
+                            normalizedSuggested
+                        );
+
+                    if (
+                        fullPosition !== -1
+                    ) {
+
+                        /*
+                         * في هذه الحالة نحدد الموضع الخام
+                         * للنص المقترح كاملًا.
+                         */
+                        const map =
+                            buildRawMapForRange(
+                                originalText
+                            );
+
+                        const end =
+                            fullPosition +
+                            normalizedSuggested.length;
+
+                        if (
+                            fullPosition <
+                                map.rawMap.length &&
+                            end - 1 <
+                                map.rawMap.length
+                        ) {
+
+                            fullMatch = {
+
+                                start:
+                                    map.rawMap[
+                                        fullPosition
+                                    ],
+
+                                end:
+                                    map.rawMap[
+                                        end - 1
+                                    ] + 1
+
+                            };
+
+                        }
+
+                    }
+
+                }
+
+                /*
+                 * إذا لم يوجد التطابق الكامل،
+                 * نستبدل هوية المرجع فقط بالنص
+                 * النهائي قبل أرقام الموضع.
+                 *
+                 * وبذلك لا نكرر الأرقام الموجودة أصلًا.
+                 */
+                if (
+                    fullMatch
+                ) {
+
+                    replacements.push({
+
+                        start:
+                            fullMatch.start,
+
+                        end:
+                            fullMatch.end,
+
+                        text:
+                            suggestedText
+
+                    });
+
+                }
+                else {
+
+                    const suggestedIdentity =
+                        getSuggestedIdentity(
+                            suggestedText
+                        );
+
+                    if (
+                        !suggestedIdentity
+                    ) {
+
+                        skipped++;
+                        continue;
+
+                    }
+
+                    replacements.push({
+
+                        start:
+                            identityMatch.start,
+
+                        end:
+                            identityMatch.end,
+
+                        text:
+                            suggestedIdentity
+
+                    });
+
+                }
 
                 if (
                     referenceKey
                 ) {
 
-                    processed.add(
+                    processedReferences.add(
                         referenceKey
                     );
+
                 }
+
             }
 
             /*
-             * -----------------------------------------------------
-             * نطبق جميع الاستبدالات على نسخة نصية كاملة
-             * للحاشية، من اليمين إلى اليسار.
-             * -----------------------------------------------------
+             * من اليمين إلى اليسار.
              */
-
-            if (!replacements.length) {
-                continue;
-            }
-
             replacements.sort(
-                function (a, b) {
-                    return b.start - a.start;
-                }
-            );
-
-            let finalText =
-                originalText;
-
-            replacements.forEach(
-                function (replacement) {
-
-                    finalText =
-                        finalText.substring(
-                            0,
-                            replacement.start
-                        ) +
-                        replacement.text +
-                        finalText.substring(
-                            replacement.end
-                        );
-
-                }
-            );
-
-            /*
-             * -----------------------------------------------------
-             * استبدال نص الحاشية كاملًا مرة واحدة.
-             * -----------------------------------------------------
-             */
-
-            if (
-                finalText !==
-                originalText
-            ) {
-
-                if (
-                    replaceWholeNoteText(
-                        noteElement,
-                        finalText
-                    )
+                function (
+                    a,
+                    b
                 ) {
 
-                    modified = true;
+                    return (
+                        b.start -
+                        a.start
+                    );
 
-                    applied +=
-                        replacements.length;
                 }
-            }
+            );
+
+            /*
+             * تنفيذ كل تعديلات الحاشية محليًا.
+             */
+            replacements.forEach(
+                function (
+                    replacement
+                ) {
+
+                    if (
+                        replaceXmlText(
+                            noteElement,
+                            replacement.start,
+                            replacement.end,
+                            replacement.text
+                        )
+                    ) {
+
+                        modified =
+                            true;
+
+                        applied++;
+
+                    }
+
+                }
+            );
+
         }
 
-        /*
-         * كتابة XML كامل الحواشي مرة واحدة.
-         */
-        if (modified) {
+        if (
+            modified
+        ) {
 
             const serializer =
                 new XMLSerializer();
@@ -29820,29 +30191,301 @@ async function applyFootnoteSuggestions(
                     xmlDoc
                 )
             );
+
         }
 
         return {
-            modified,
-            applied,
-            skipped
+
+            modified:
+                modified,
+
+            applied:
+                applied,
+
+            skipped:
+                skipped
+
         };
+
     }
 
     /*
      * =========================================================
-     * تنفيذ العملية
+     * خريطة raw للنص الكامل
+     * =========================================================
+     */
+
+    function buildRawMapForRange(
+        text
+    ) {
+
+        const normalized =
+            normalizeLocal(
+                text
+            );
+
+        const rawMap =
+            [];
+
+        let counter =
+            0;
+
+        for (
+            let i = 0;
+            i < text.length;
+            i++
+        ) {
+
+            const piece =
+                normalizeLocal(
+                    text[i]
+                );
+
+            for (
+                let j = 0;
+                j < piece.length;
+                j++
+            ) {
+
+                rawMap[
+                    counter
+                ] =
+                    i;
+
+                counter++;
+
+            }
+
+        }
+
+        return {
+            normalized:
+                normalized,
+
+            rawMap:
+                rawMap
+        };
+
+    }
+
+    /*
+     * =========================================================
+     * 10. الحصول على DOCX
+     *
+     * نستخدم الآلية الأصلية مباشرة هنا:
+     * getFileAsync(Compressed) → getSliceAsync → Base64
      * =========================================================
      */
 
     const originalBase64 =
-        await getDocumentBase64();
+        await new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                Office.context.document.getFileAsync(
+                    Office.FileType.Compressed,
+                    {
+                        sliceSize:
+                            1024 * 1024
+                    },
+                    function (result) {
+
+                        if (
+                            result.status !==
+                            Office.AsyncResultStatus.Succeeded
+                        ) {
+
+                            reject(
+                                new Error(
+                                    result.error?.message ||
+                                    "تعذر قراءة ملف Word."
+                                )
+                            );
+
+                            return;
+                        }
+
+                        const file =
+                            result.value;
+
+                        const slices =
+                            new Array(
+                                file.sliceCount
+                            );
+
+                        let completed =
+                            0;
+
+                        function readSlice(
+                            index
+                        ) {
+
+                            file.getSliceAsync(
+                                index,
+                                function (
+                                    sliceResult
+                                ) {
+
+                                    if (
+                                        sliceResult.status !==
+                                        Office.AsyncResultStatus.Succeeded
+                                    ) {
+
+                                        try {
+                                            file.closeAsync();
+                                        } catch (_) {}
+
+                                        reject(
+                                            new Error(
+                                                sliceResult.error?.message ||
+                                                "تعذر قراءة جزء من ملف Word."
+                                            )
+                                        );
+
+                                        return;
+                                    }
+
+                                    slices[index] =
+                                        new Uint8Array(
+                                            sliceResult.value.data
+                                        );
+
+                                    completed++;
+
+                                    if (
+                                        completed ===
+                                        file.sliceCount
+                                    ) {
+
+                                        try {
+                                            file.closeAsync();
+                                        } catch (_) {}
+
+                                        let totalLength =
+                                            0;
+
+                                        slices.forEach(
+                                            function (
+                                                slice
+                                            ) {
+
+                                                totalLength +=
+                                                    slice.length;
+
+                                            }
+                                        );
+
+                                        const allData =
+                                            new Uint8Array(
+                                                totalLength
+                                            );
+
+                                        let offset =
+                                            0;
+
+                                        slices.forEach(
+                                            function (
+                                                slice
+                                            ) {
+
+                                                allData.set(
+                                                    slice,
+                                                    offset
+                                                );
+
+                                                offset +=
+                                                    slice.length;
+
+                                            }
+                                        );
+
+                                        let binary =
+                                            "";
+
+                                        const chunk =
+                                            0x8000;
+
+                                        for (
+                                            let i = 0;
+                                            i < allData.length;
+                                            i += chunk
+                                        ) {
+
+                                            binary +=
+                                                String.fromCharCode.apply(
+                                                    null,
+                                                    allData.subarray(
+                                                        i,
+                                                        Math.min(
+                                                            i + chunk,
+                                                            allData.length
+                                                        )
+                                                    )
+                                                );
+
+                                        }
+
+                                        resolve(
+                                            btoa(
+                                                binary
+                                            )
+                                        );
+
+                                        return;
+
+                                    }
+
+                                    readSlice(
+                                        index + 1
+                                    );
+
+                                }
+                            );
+
+                        }
+
+                        if (
+                            file.sliceCount <= 0
+                        ) {
+
+                            try {
+                                file.closeAsync();
+                            } catch (_) {}
+
+                            reject(
+                                new Error(
+                                    "ملف Word لا يحتوي على أجزاء."
+                                )
+                            );
+
+                            return;
+
+                        }
+
+                        readSlice(
+                            0
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+    /*
+     * =========================================================
+     * 11. معالجة الحواشي كلها في الذاكرة
+     * =========================================================
+     */
 
     const zip =
         await JSZip.loadAsync(
             originalBase64,
             {
-                base64: true
+                base64:
+                    true
             }
         );
 
@@ -29864,74 +30507,120 @@ async function applyFootnoteSuggestions(
 
     const totalApplied =
         Number(
-            footnoteResult.applied || 0
+            footnoteResult?.applied ||
+            0
         ) +
         Number(
-            endnoteResult.applied || 0
+            endnoteResult?.applied ||
+            0
         );
 
     const totalSkipped =
         Number(
-            footnoteResult.skipped || 0
+            footnoteResult?.skipped ||
+            0
         ) +
         Number(
-            endnoteResult.skipped || 0
+            endnoteResult?.skipped ||
+            0
         );
 
-    if (!totalApplied) {
+    if (
+        totalApplied === 0
+    ) {
 
         return {
-            applied: 0,
-            skipped: totalSkipped
+
+            applied:
+                0,
+
+            skipped:
+                totalSkipped
+
         };
+
     }
 
     /*
-     * إنشاء DOCX المعدل مرة واحدة.
+     * =========================================================
+     * 12. توليد DOCX المعدل مرة واحدة
+     * =========================================================
      */
+
     const modifiedBase64 =
         await zip.generateAsync(
             {
-                type: "base64",
-                compression: "DEFLATE",
-                compressionOptions: {
-                    level: 6
-                }
+                type:
+                    "base64",
+
+                compression:
+                    "DEFLATE",
+
+                compressionOptions:
+                    {
+                        level:
+                            6
+                    }
+
             }
         );
 
     /*
-     * إعادة المستند المعدل مرة واحدة.
+     * =========================================================
+     * 13. إعادة المستند مرة واحدة
+     * =========================================================
      */
+
     await Word.run(
-        async function (context) {
+        async function (
+            context
+        ) {
 
             context.document.insertFileFromBase64(
                 modifiedBase64,
                 Word.InsertLocation.replace,
                 {
-                    importTheme: true,
-                    importStyles: true,
-                    importParagraphSpacing: true,
-                    importPageColor: true,
-                    importChangeTrackingMode: true,
-                    importCustomProperties: true,
-                    importCustomXmlParts: true,
-                    importDifferentOddEvenPages: true
+                    importTheme:
+                        true,
+
+                    importStyles:
+                        true,
+
+                    importParagraphSpacing:
+                        true,
+
+                    importPageColor:
+                        true,
+
+                    importChangeTrackingMode:
+                        true,
+
+                    importCustomProperties:
+                        true,
+
+                    importCustomXmlParts:
+                        true,
+
+                    importDifferentOddEvenPages:
+                        true
                 }
             );
 
             await context.sync();
+
         }
     );
 
     return {
+
         applied:
             totalApplied,
 
         skipped:
             totalSkipped
+
     };
+
 }
 
 function mergeEquivalentReferences(references) {
