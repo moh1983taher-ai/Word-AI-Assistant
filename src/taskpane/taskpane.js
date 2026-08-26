@@ -28940,9 +28940,7 @@ async function applyFootnoteSuggestions(
 ) {
 
     if (
-        !Array.isArray(
-            footnoteSuggestions
-        ) ||
+        !Array.isArray(footnoteSuggestions) ||
         footnoteSuggestions.length === 0
     ) {
 
@@ -28965,7 +28963,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 1. فهرس الاقتراحات
+     * 1. فهرس جميع اقتراحات الحواشي
      * =========================================================
      */
 
@@ -28973,9 +28971,7 @@ async function applyFootnoteSuggestions(
         new Map();
 
     footnoteSuggestions.forEach(
-        function (
-            item
-        ) {
+        function (item) {
 
             if (
                 !item ||
@@ -28988,22 +28984,21 @@ async function applyFootnoteSuggestions(
             }
 
             if (
-                !Array.isArray(
-                    item.references
-                ) ||
-                !Array.isArray(
-                    item.suggestedTexts
-                )
+                !Array.isArray(item.references) ||
+                !Array.isArray(item.suggestedTexts)
             ) {
 
                 return;
 
             }
 
-            suggestionMap.set(
+            const key =
                 `${item.source}-${Number(
                     item.noteNumber
-                )}`,
+                )}`;
+
+            suggestionMap.set(
+                key,
                 item
             );
 
@@ -29023,7 +29018,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 2. التطبيع
+     * 2. أدوات التطبيع
      * =========================================================
      */
 
@@ -29036,9 +29031,7 @@ async function applyFootnoteSuggestions(
         )
             .replace(
                 /[٠-٩]/g,
-                function (
-                    char
-                ) {
+                function (char) {
 
                     return String(
                         "٠١٢٣٤٥٦٧٨٩".indexOf(
@@ -29050,9 +29043,7 @@ async function applyFootnoteSuggestions(
             )
             .replace(
                 /[۰-۹]/g,
-                function (
-                    char
-                ) {
+                function (char) {
 
                     return String(
                         "۰۱۲۳۴۵۶۷۸۹".indexOf(
@@ -29094,6 +29085,7 @@ async function applyFootnoteSuggestions(
                 /[-–—]/g,
                 "-"
             )
+            .trim()
             .toLowerCase();
 
     }
@@ -29154,7 +29146,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 4. مرشحات الهوية
+     * 4. مرشحات هوية المرجع فقط
      * =========================================================
      */
 
@@ -29267,7 +29259,325 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 5. البحث المحلي عن الهوية
+     * 5. النص النهائي الذي أعاده الذكاء الاصطناعي
+     * =========================================================
+     */
+
+    function getSuggestedReferenceText(
+        suggestedText
+    ) {
+
+        return String(
+            suggestedText || ""
+        )
+            .trim();
+
+    }
+
+    /*
+     * =========================================================
+     * 6. الحصول على ملف DOCX كاملًا
+     * =========================================================
+     */
+
+    function getDocumentBase64() {
+
+        return new Promise(
+            function (
+                resolve,
+                reject
+            ) {
+
+                Office.context.document.getFileAsync(
+                    Office.FileType.Compressed,
+                    {
+                        sliceSize:
+                            1024 * 1024
+                    },
+                    function (
+                        result
+                    ) {
+
+                        if (
+                            result.status !==
+                            Office.AsyncResultStatus.Succeeded
+                        ) {
+
+                            reject(
+                                new Error(
+                                    result.error?.message ||
+                                    "تعذر قراءة ملف Word."
+                                )
+                            );
+
+                            return;
+
+                        }
+
+                        const file =
+                            result.value;
+
+                        const sliceCount =
+                            file.sliceCount;
+
+                        const slices =
+                            new Array(
+                                sliceCount
+                            );
+
+                        let completed =
+                            0;
+
+                        function readSlice(
+                            index
+                        ) {
+
+                            file.getSliceAsync(
+                                index,
+                                function (
+                                    sliceResult
+                                ) {
+
+                                    if (
+                                        sliceResult.status !==
+                                        Office.AsyncResultStatus.Succeeded
+                                    ) {
+
+                                        try {
+                                            file.closeAsync();
+                                        } catch (_) {}
+
+                                        reject(
+                                            new Error(
+                                                sliceResult.error?.message ||
+                                                `تعذر قراءة الجزء ${index + 1} من ملف Word.`
+                                            )
+                                        );
+
+                                        return;
+
+                                    }
+
+                                    slices[index] =
+                                        new Uint8Array(
+                                            sliceResult.value.data
+                                        );
+
+                                    completed++;
+
+                                    if (
+                                        completed ===
+                                        sliceCount
+                                    ) {
+
+                                        try {
+                                            file.closeAsync();
+                                        } catch (_) {}
+
+                                        let totalLength =
+                                            0;
+
+                                        slices.forEach(
+                                            function (
+                                                slice
+                                            ) {
+
+                                                totalLength +=
+                                                    slice.length;
+
+                                            }
+                                        );
+
+                                        const allData =
+                                            new Uint8Array(
+                                                totalLength
+                                            );
+
+                                        let offset =
+                                            0;
+
+                                        slices.forEach(
+                                            function (
+                                                slice
+                                            ) {
+
+                                                allData.set(
+                                                    slice,
+                                                    offset
+                                                );
+
+                                                offset +=
+                                                    slice.length;
+
+                                            }
+                                        );
+
+                                        /*
+                                         * تحويل bytes إلى Base64
+                                         */
+                                        let binary =
+                                            "";
+
+                                        const chunkSize =
+                                            0x8000;
+
+                                        for (
+                                            let i = 0;
+                                            i < allData.length;
+                                            i += chunkSize
+                                        ) {
+
+                                            binary +=
+                                                String.fromCharCode.apply(
+                                                    null,
+                                                    allData.subarray(
+                                                        i,
+                                                        Math.min(
+                                                            i + chunkSize,
+                                                            allData.length
+                                                        )
+                                                    )
+                                                );
+
+                                        }
+
+                                        resolve(
+                                            btoa(
+                                                binary
+                                            )
+                                        );
+
+                                        return;
+
+                                    }
+
+                                    readSlice(
+                                        index + 1
+                                    );
+
+                                }
+                            );
+
+                        }
+
+                        if (
+                            sliceCount <= 0
+                        ) {
+
+                            try {
+                                file.closeAsync();
+                            } catch (_) {}
+
+                            reject(
+                                new Error(
+                                    "ملف Word لا يحتوي على أجزاء."
+                                )
+                            );
+
+                            return;
+
+                        }
+
+                        readSlice(
+                            0
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+    }
+
+    /*
+     * =========================================================
+     * 7. تحديد عناصر الحواشي العادية
+     * =========================================================
+     */
+
+    function getNoteElements(
+        xmlDoc,
+        localName
+    ) {
+
+        const ns =
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+        const elements =
+            Array.from(
+                xmlDoc.getElementsByTagNameNS(
+                    ns,
+                    localName
+                )
+            );
+
+        return elements.filter(
+            function (
+                element
+            ) {
+
+                const id =
+                    Number(
+                        element.getAttributeNS(
+                            ns,
+                            "id"
+                        )
+                    );
+
+                return (
+                    Number.isFinite(id) &&
+                    id >= 0
+                );
+
+            }
+        );
+
+    }
+
+    /*
+     * =========================================================
+     * 8. النص الكامل للحاشية
+     * =========================================================
+     */
+
+    function getNoteText(
+        noteElement
+    ) {
+
+        const ns =
+            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+        const textNodes =
+            Array.from(
+                noteElement.getElementsByTagNameNS(
+                    ns,
+                    "t"
+                )
+            );
+
+        let text =
+            "";
+
+        textNodes.forEach(
+            function (
+                node
+            ) {
+
+                text +=
+                    node.textContent ||
+                    "";
+
+            }
+        );
+
+        return text;
+
+    }
+
+    /*
+     * =========================================================
+     * 9. خريطة النص المطبع
      * =========================================================
      */
 
@@ -29325,6 +29635,12 @@ async function applyFootnoteSuggestions(
         };
 
     }
+
+    /*
+     * =========================================================
+     * 10. العثور على آخر ظهور لهوية المرجع
+     * =========================================================
+     */
 
     function findLastIdentity(
         text,
@@ -29442,136 +29758,11 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 6. الحصول على النص النهائي من suggestedText
-     *
-     * نستخدمه كما أعاده التحليل، ولا نعيد بناء المؤلف
-     * والعنوان من حقول reference.
+     * 11. بناء خريطة دقيقة لعقد w:t
      * =========================================================
      */
 
-    function getSuggestedReferenceText(
-        suggestedText
-    ) {
-
-        return String(
-            suggestedText || ""
-        )
-            .trim();
-
-    }
-
-    /*
-     * =========================================================
-     * 7. استخراج هوية suggestedText فقط عند الحاجة
-     *
-     * إذا تعذر استبدال المرجع كاملًا، نحتاج إلى الاحتفاظ
-     * بأرقام الموضع الموجودة أصلًا في الحاشية.
-     *
-     * نستفيد من أول موضع رقمي ظاهر في suggestedText.
-     * =========================================================
-     */
-
-    function getSuggestedIdentity(
-        suggestedText
-    ) {
-
-        const value =
-            String(
-                suggestedText || ""
-            ).trim();
-
-        if (
-            !value
-        ) {
-
-            return "";
-
-        }
-
-        /*
-         * نبحث عن أول موضع يشبه:
-         * 1/27
-         * 1 / 27
-         * 27
-         * ص 27
-         * 27-29
-         *
-         * ثم نأخذ ما قبل الموضع باعتباره هوية المرجع.
-         */
-        const match =
-            value.match(
-                /\s+(?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*\s*$/
-            );
-
-        if (
-            match &&
-            match.index > 0
-        ) {
-
-            return value
-                .substring(
-                    0,
-                    match.index
-                )
-                .trim()
-                .replace(
-                    /[،,]+$/g,
-                    ""
-                )
-                .trim();
-
-        }
-
-        return value;
-
-    }
-
-    /*
-     * =========================================================
-     * 8. تعديل XML
-     * =========================================================
-     */
-
-    function getNoteElements(
-        xmlDoc,
-        localName
-    ) {
-
-        const ns =
-            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-
-        const elements =
-            Array.from(
-                xmlDoc.getElementsByTagNameNS(
-                    ns,
-                    localName
-                )
-            );
-
-        return elements.filter(
-            function (
-                element
-            ) {
-
-                const id =
-                    Number(
-                        element.getAttributeNS(
-                            ns,
-                            "id"
-                        )
-                    );
-
-                return (
-                    Number.isFinite(id) &&
-                    id >= 0
-                );
-
-            }
-        );
-
-    }
-
-    function getNoteText(
+    function getTextNodeMap(
         noteElement
     ) {
 
@@ -29589,56 +29780,13 @@ async function applyFootnoteSuggestions(
         let text =
             "";
 
-        nodes.forEach(
-            function (
-                node
-            ) {
-
-                text +=
-                    node.textContent ||
-                    "";
-
-            }
-        );
-
-        return text;
-
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * تغيير النص داخل عقد w:t مع الحفاظ على بنية الحاشية.
-     * ---------------------------------------------------------
-     */
-
-    function replaceXmlText(
-        noteElement,
-        rawStart,
-        rawEnd,
-        replacement
-    ) {
-
-        const ns =
-            "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-
-        const textNodes =
-            Array.from(
-                noteElement.getElementsByTagNameNS(
-                    ns,
-                    "t"
-                )
-            );
-
-        let fullText =
-            "";
-
         const starts =
             [];
 
         const ends =
             [];
 
-        textNodes.forEach(
+        nodes.forEach(
             function (
                 node,
                 index
@@ -29649,16 +29797,52 @@ async function applyFootnoteSuggestions(
                     "";
 
                 starts[index] =
-                    fullText.length;
+                    text.length;
 
-                fullText +=
+                text +=
                     value;
 
                 ends[index] =
-                    fullText.length;
+                    text.length;
 
             }
         );
+
+        return {
+
+            nodes:
+                nodes,
+
+            text:
+                text,
+
+            starts:
+                starts,
+
+            ends:
+                ends
+
+        };
+
+    }
+
+    /*
+     * =========================================================
+     * 12. استبدال جزء من النص داخل عقد w:t
+     * =========================================================
+     */
+
+    function replaceXmlText(
+        noteElement,
+        rawStart,
+        rawEnd,
+        replacement
+    ) {
+
+        const map =
+            getTextNodeMap(
+                noteElement
+            );
 
         let firstNode =
             -1;
@@ -29668,13 +29852,15 @@ async function applyFootnoteSuggestions(
 
         for (
             let i = 0;
-            i < textNodes.length;
+            i < map.nodes.length;
             i++
         ) {
 
             if (
-                rawStart < ends[i] &&
-                rawEnd > starts[i]
+                rawStart <
+                    map.ends[i] &&
+                rawEnd >
+                    map.starts[i]
             ) {
 
                 if (
@@ -29702,26 +29888,26 @@ async function applyFootnoteSuggestions(
         }
 
         const firstText =
-            textNodes[
+            map.nodes[
                 firstNode
             ].textContent ||
             "";
 
         const lastText =
-            textNodes[
+            map.nodes[
                 lastNode
             ].textContent ||
             "";
 
         const firstOffset =
             rawStart -
-            starts[
+            map.starts[
                 firstNode
             ];
 
         const lastOffset =
             rawEnd -
-            starts[
+            map.starts[
                 lastNode
             ];
 
@@ -29736,7 +29922,7 @@ async function applyFootnoteSuggestions(
                 lastOffset
             );
 
-        textNodes[
+        map.nodes[
             firstNode
         ].textContent =
             prefix +
@@ -29764,7 +29950,7 @@ async function applyFootnoteSuggestions(
                     lastNode
                 ) {
 
-                    textNodes[
+                    map.nodes[
                         i
                     ].textContent =
                         suffix;
@@ -29774,7 +29960,7 @@ async function applyFootnoteSuggestions(
             }
             else {
 
-                textNodes[
+                map.nodes[
                     i
                 ].textContent =
                     "";
@@ -29789,7 +29975,87 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 9. معالجة جميع حواشي الجزء
+     * 13. العثور على التطابق الكامل لـ suggestedText
+     *
+     * في حالة وجوده، نستخدم النص المقترح كاملًا.
+     * =========================================================
+     */
+
+    function findFullSuggestedText(
+        originalText,
+        suggestedText
+    ) {
+
+        const target =
+            normalizeLocal(
+                suggestedText
+            );
+
+        if (
+            !target
+        ) {
+
+            return null;
+
+        }
+
+        const normalizedOriginal =
+            normalizeLocal(
+                originalText
+            );
+
+        const position =
+            normalizedOriginal.indexOf(
+                target
+            );
+
+        if (
+            position === -1
+        ) {
+
+            return null;
+
+        }
+
+        const rawMap =
+            buildRawMap(
+                originalText
+            ).rawMap;
+
+        const end =
+            position +
+            target.length;
+
+        if (
+            position >=
+                rawMap.length ||
+            end - 1 >=
+                rawMap.length
+        ) {
+
+            return null;
+
+        }
+
+        return {
+
+            start:
+                rawMap[
+                    position
+                ],
+
+            end:
+                rawMap[
+                    end - 1
+                ] + 1
+
+        };
+
+    }
+
+    /*
+     * =========================================================
+     * 14. معالجة جزء حواشي كامل في الذاكرة
      * =========================================================
      */
 
@@ -29865,6 +30131,10 @@ async function applyFootnoteSuggestions(
         let skipped =
             0;
 
+        /*
+         * جميع الحواشي التي لها اقتراحات،
+         * واحدة تلو الأخرى داخل الذاكرة فقط.
+         */
         for (
             let index = 0;
             index < notes.length;
@@ -29909,14 +30179,19 @@ async function applyFootnoteSuggestions(
             }
 
             /*
-             * نحدد جميع الاستبدالات في النص الأصلي
-             * أولًا، ثم نطبقها من اليمين لليسار.
+             * هذا Set خاص بهذه الحاشية فقط.
+             * إذا ظهر المرجع نفسه في حاشية أخرى،
+             * يبدأ Set جديد وبالتالي يعالج هناك أيضًا.
+             */
+            const processedReferences =
+                new Set();
+
+            /*
+             * جميع الاستبدالات لهذه الحاشية
+             * نحسبها قبل تعديل XML.
              */
             const replacements =
                 [];
-
-            const processedReferences =
-                new Set();
 
             for (
                 let i =
@@ -29947,10 +30222,6 @@ async function applyFootnoteSuggestions(
                         reference
                     );
 
-                /*
-                 * نفس المرجع في الحاشية نفسها
-                 * يستبدل مرة واحدة.
-                 */
                 if (
                     referenceKey &&
                     processedReferences.has(
@@ -29976,128 +30247,31 @@ async function applyFootnoteSuggestions(
 
                 }
 
-                const identityMatch =
-                    findLastIdentity(
-                        originalText,
-                        candidates
-                    );
-
-                if (
-                    !identityMatch
-                ) {
-
-                    skipped++;
-                    continue;
-
-                }
-
                 /*
-                 * نحاول أولًا العثور على النص المقترح كاملًا
-                 * داخل النص الأصلي.
-                 *
-                 * إذا وجدناه، نستبدل المرجع كاملًا:
-                 * العنوان + المؤلف + الموضع.
+                 * أولًا نبحث عن النص المقترح كاملًا.
                  */
-                const normalizedOriginal =
-                    normalizeLocal(
-                        originalText
-                    );
-
-                const normalizedSuggested =
-                    normalizeLocal(
+                let match =
+                    findFullSuggestedText(
+                        originalText,
                         suggestedText
                     );
 
-                let fullMatch =
-                    null;
-
-                if (
-                    normalizedSuggested
-                ) {
-
-                    const fullPosition =
-                        normalizedOriginal.indexOf(
-                            normalizedSuggested
-                        );
-
-                    if (
-                        fullPosition !== -1
-                    ) {
-
-                        /*
-                         * في هذه الحالة نحدد الموضع الخام
-                         * للنص المقترح كاملًا.
-                         */
-                        const map =
-                            buildRawMapForRange(
-                                originalText
-                            );
-
-                        const end =
-                            fullPosition +
-                            normalizedSuggested.length;
-
-                        if (
-                            fullPosition <
-                                map.rawMap.length &&
-                            end - 1 <
-                                map.rawMap.length
-                        ) {
-
-                            fullMatch = {
-
-                                start:
-                                    map.rawMap[
-                                        fullPosition
-                                    ],
-
-                                end:
-                                    map.rawMap[
-                                        end - 1
-                                    ] + 1
-
-                            };
-
-                        }
-
-                    }
-
-                }
-
                 /*
-                 * إذا لم يوجد التطابق الكامل،
-                 * نستبدل هوية المرجع فقط بالنص
-                 * النهائي قبل أرقام الموضع.
-                 *
-                 * وبذلك لا نكرر الأرقام الموجودة أصلًا.
+                 * إذا لم يوجد، نبحث عن هوية المرجع
+                 * فقط داخل الحاشية الأصلية.
                  */
                 if (
-                    fullMatch
+                    !match
                 ) {
 
-                    replacements.push({
-
-                        start:
-                            fullMatch.start,
-
-                        end:
-                            fullMatch.end,
-
-                        text:
-                            suggestedText
-
-                    });
-
-                }
-                else {
-
-                    const suggestedIdentity =
-                        getSuggestedIdentity(
-                            suggestedText
+                    match =
+                        findLastIdentity(
+                            originalText,
+                            candidates
                         );
 
                     if (
-                        !suggestedIdentity
+                        !match
                     ) {
 
                         skipped++;
@@ -30105,16 +30279,106 @@ async function applyFootnoteSuggestions(
 
                     }
 
+                    /*
+                     * في هذه الحالة نستبدل الهوية فقط.
+                     *
+                     * أي أن أرقام الصفحات الأصلية
+                     * لا نلمسها.
+                     */
+                    const title =
+                        String(
+                            reference?.title ||
+                            ""
+                        ).trim();
+
+                    const author =
+                        String(
+                            reference?.author ||
+                            ""
+                        ).trim();
+
+                    let identityText =
+                        suggestedText;
+
+                    /*
+                     * إذا كان suggestedText يحتوي على
+                     * موضع رقمي في نهايته، نحاول استخراج
+                     * الهوية التي تسبقه فقط.
+                     */
+                    const identityMatch =
+                        suggestedText.match(
+                            /^(.*?)(?:\s+)(?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*\s*$/
+                        );
+
+                    if (
+                        identityMatch &&
+                        identityMatch[1]
+                    ) {
+
+                        identityText =
+                            identityMatch[1]
+                                .trim()
+                                .replace(
+                                    /[،,]+$/g,
+                                    ""
+                                )
+                                .trim();
+
+                    }
+
+                    /*
+                     * حماية أخيرة:
+                     * إذا فشل استخراج الهوية، نستخدم
+                     * title/author فقط كما في النهج السابق.
+                     */
+                    if (
+                        !identityText
+                    ) {
+
+                        identityText =
+                            [
+                                author,
+                                title
+                            ]
+                                .filter(
+                                    Boolean
+                                )
+                                .join(
+                                    "، "
+                                );
+
+                    }
+
                     replacements.push({
 
                         start:
-                            identityMatch.start,
+                            match.start,
 
                         end:
-                            identityMatch.end,
+                            match.end,
 
                         text:
-                            suggestedIdentity
+                            identityText
+
+                    });
+
+                }
+                else {
+
+                    /*
+                     * التطابق الكامل:
+                     * نستبدل المرجع كاملًا بـ suggestedText.
+                     */
+                    replacements.push({
+
+                        start:
+                            match.start,
+
+                        end:
+                            match.end,
+
+                        text:
+                            suggestedText
 
                     });
 
@@ -30150,7 +30414,7 @@ async function applyFootnoteSuggestions(
             );
 
             /*
-             * تنفيذ كل تعديلات الحاشية محليًا.
+             * الآن فقط نكتب التعديلات داخل XML.
              */
             replacements.forEach(
                 function (
@@ -30178,6 +30442,9 @@ async function applyFootnoteSuggestions(
 
         }
 
+        /*
+         * كتابة XML المعدل مرة واحدة فقط.
+         */
         if (
             modified
         ) {
@@ -30211,71 +30478,18 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * خريطة raw للنص الكامل
-     * =========================================================
-     */
-
-    function buildRawMapForRange(
-        text
-    ) {
-
-        const normalized =
-            normalizeLocal(
-                text
-            );
-
-        const rawMap =
-            [];
-
-        let counter =
-            0;
-
-        for (
-            let i = 0;
-            i < text.length;
-            i++
-        ) {
-
-            const piece =
-                normalizeLocal(
-                    text[i]
-                );
-
-            for (
-                let j = 0;
-                j < piece.length;
-                j++
-            ) {
-
-                rawMap[
-                    counter
-                ] =
-                    i;
-
-                counter++;
-
-            }
-
-        }
-
-        return {
-            normalized:
-                normalized,
-
-            rawMap:
-                rawMap
-        };
-
-    }
-
-    /*
-     * =========================================================
-     * 10. الحصول على DOCX
+     * 15. الحصول على DOCX
      * =========================================================
      */
 
     const originalBase64 =
         await getDocumentBase64();
+
+    /*
+     * =========================================================
+     * 16. فتح DOCX في الذاكرة
+     * =========================================================
+     */
 
     const zip =
         await JSZip.loadAsync(
@@ -30288,7 +30502,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 11. معالجة الحواشي كلها في الذاكرة
+     * 17. معالجة footnotes.xml كاملًا
      * =========================================================
      */
 
@@ -30299,6 +30513,12 @@ async function applyFootnoteSuggestions(
             "footnote",
             "footnote"
         );
+
+    /*
+     * =========================================================
+     * 18. معالجة endnotes.xml كاملًا
+     * =========================================================
+     */
 
     const endnoteResult =
         await processNotesPart(
@@ -30346,7 +30566,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 12. توليد DOCX المعدل مرة واحدة
+     * 19. إنشاء DOCX معدل مرة واحدة
      * =========================================================
      */
 
@@ -30370,7 +30590,7 @@ async function applyFootnoteSuggestions(
 
     /*
      * =========================================================
-     * 13. إعادة المستند مرة واحدة
+     * 20. إعادة الوثيقة إلى Word مرة واحدة
      * =========================================================
      */
 
