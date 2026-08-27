@@ -1015,7 +1015,7 @@ function renderProjectReferenceDocuments() {
                 </div>
 
                 <div class="references-selected-name">
-                    اختر المستندات التي تريد استخراج مراجعها
+                    حدد المستندات
                 </div>
 
             </div>
