@@ -6676,7 +6676,47 @@ body.sidebar-is-pinned .message-box {
     border-radius: 10px;
     background: #fafafa;
 }
+.references-selected-source {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 10px;
+}
 
+.references-selected-icon {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    flex: 0 0 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    box-sizing: border-box;
+}
+
+.references-selected-icon svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+.references-selected-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.references-selected-title {
+    font-size: 14px;
+}
+
+.references-selected-name {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .project-reference-documents-actions {
     display: flex;
     align-items: center;
