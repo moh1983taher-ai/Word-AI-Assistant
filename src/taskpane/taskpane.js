@@ -22176,7 +22176,10 @@ function escapeHTML(value) {
 // محلل المراجع بالذكاء الاصطناعي
 // =====================================================
 
-async function analyzeReferencesWithAI(materials) {
+async function analyzeReferencesWithAI(
+    materials,
+    addMissingAuthors = false
+) {
 
     if (
         !Array.isArray(materials) ||
@@ -22570,6 +22573,31 @@ needsReview = true
 
 لكن يجب الاحتفاظ بالمرجع وعدم حذفه.
 
+${addMissingAuthors
+    ? `
+=====================================================
+3.1 سياسة إضافة المؤلف
+=====================================================
+
+إذا كان اسم المؤلف غير مذكور في المادة الأصلية،
+ولكن نسبة المرجع إلى مؤلفه معلومة بدرجة موثوقة،
+فاسمح باستخدام اسم المؤلف في بيانات المرجع النهائية.
+
+لا تخمّن المؤلف.
+لا تعتمد على التشابه في العنوان وحده.
+لا تنشئ نسبة غير موثوقة.
+`
+    : `
+=====================================================
+3.1 سياسة إضافة المؤلف
+=====================================================
+
+إذا كان اسم المؤلف غير مذكور في المادة الأصلية،
+فلا تضفه من معرفة خارجية إلى التوثيق.
+اترك author فارغًا ما لم يكن المؤلف مذكورًا أو ثابتًا
+في بيانات المرجع بصورة موثوقة وفق قواعد التحليل السابقة.
+`
+}
 =====================================================
 4. المراجع المتعددة داخل المادة
 =====================================================
@@ -26554,6 +26582,32 @@ if (referencesContent) {
 
                                 </div>
 
+                                <div class="reference-style-row">
+
+                                    <label>
+                                        أسماء المؤلفين
+                                    </label>
+
+                                    <label
+                                        style="
+                                            display:flex;
+                                            align-items:center;
+                                            gap:6px;
+                                            cursor:pointer;
+                                        "
+                                    >
+
+                                        <input
+                                            type="checkbox"
+                                            id="reference-add-missing-authors"
+                                        >
+
+                                        إضافة اسم المؤلف إذا لم يذكر في الحاشية
+
+                                    </label>
+
+                                </div>
+
                             </div>
 
                             <button
@@ -26615,6 +26669,11 @@ if (referencesContent) {
                                 "reference-format-select"
                             );
 
+                        const referenceAddMissingAuthors =
+                            document.getElementById(
+                                "reference-add-missing-authors"
+                            );
+
                         if (referenceOrderSelect) {
 
                             referenceOrderSelect.value =
@@ -26647,6 +26706,30 @@ if (referencesContent) {
 
                                     referenceStyle.format =
                                         this.value;
+
+                                    localStorage.setItem(
+                                        "REFERENCE_STYLE",
+                                        JSON.stringify(
+                                            referenceStyle
+                                        )
+                                    );
+
+                                };
+
+                        }
+
+                        if (
+                            referenceAddMissingAuthors
+                        ) {
+
+                            referenceAddMissingAuthors.checked =
+                                referenceStyle.addMissingAuthors === true;
+
+                            referenceAddMissingAuthors.onchange =
+                                function () {
+
+                                    referenceStyle.addMissingAuthors =
+                                        this.checked;
 
                                     localStorage.setItem(
                                         "REFERENCE_STYLE",
@@ -26940,9 +27023,15 @@ if (referencesContent) {
                                     analyzeReferencesBtn.textContent =
                                         "جارٍ تحليل وتوحيد المراجع بالذكاء الاصطناعي...";
 
+                                    const addMissingAuthors =
+                                        referenceAddMissingAuthors
+                                            ? referenceAddMissingAuthors.checked
+                                            : false;
+
                                     const aiAnalysisResult =
                                         await analyzeReferencesWithAI(
-                                            processedReferences
+                                            processedReferences,
+                                            addMissingAuthors
                                         );
 
                                     if (
@@ -27553,9 +27642,14 @@ if (referencesContent) {
                                                 unifiedFootnoteMap
                                             );
 
+                                    
+
                                             const footnoteSuggestions =
                                                 await buildFootnoteSuggestions(
-                                                    unifiedFootnoteMap
+                                                    unifiedFootnoteMap,
+                                                    referenceAddMissingAuthors
+                                                        ? referenceAddMissingAuthors.checked
+                                                        : false
                                                 );
 
                                             console.log(
@@ -28584,7 +28678,8 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
 }
 
 async function buildFootnoteSuggestions(
-    unifiedFootnoteMap
+    unifiedFootnoteMap,
+    addMissingAuthors = false
 ) {
 
     return await Word.run(
@@ -28604,27 +28699,35 @@ async function buildFootnoteSuggestions(
 
             await context.sync();
 
-            footnotes.items.forEach(function (note) {
+            footnotes.items.forEach(
+                function (note) {
 
-                note.reference.load("text");
-                note.body.load("text");
+                    note.reference.load("text");
+                    note.body.load("text");
 
-            });
+                }
+            );
 
-            endnotes.items.forEach(function (note) {
+            endnotes.items.forEach(
+                function (note) {
 
-                note.reference.load("text");
-                note.body.load("text");
+                    note.reference.load("text");
+                    note.body.load("text");
 
-            });
+                }
+            );
 
             await context.sync();
 
-            const suggestions = [];
+            const suggestions =
+                [];
 
             /*
+             * =====================================================
              * المراجع التي سبق ظهورها في التوثيق.
+             * =====================================================
              */
+
             const seenReferences =
                 new Set();
 
@@ -28632,18 +28735,27 @@ async function buildFootnoteSuggestions(
                 reference
             ) {
 
-                if (!reference) {
+                if (
+                    !reference
+                ) {
+
                     return "";
+
                 }
 
                 const id =
                     String(
                         reference?.id ||
                         ""
-                    ).trim();
+                    )
+                        .trim();
 
-                if (id) {
+                if (
+                    id
+                ) {
+
                     return `id:${id}`;
+
                 }
 
                 const author =
@@ -28662,13 +28774,18 @@ async function buildFootnoteSuggestions(
                         .trim()
                         .toLowerCase();
 
-                return `ref:${author}|${title}`;
+                return (
+                    `ref:${author}|${title}`
+                );
+
             }
 
             /*
+             * =====================================================
              * تطبيع النص للمقارنة فقط.
-             * لا نستخدم النص المطبع في الاستبدال.
+             * =====================================================
              */
+
             function normalizeSearchText(
                 value
             ) {
@@ -28690,11 +28807,15 @@ async function buildFootnoteSuggestions(
                     )
                     .trim()
                     .toLowerCase();
+
             }
 
             /*
-             * البحث أولًا عن الصيغة الأصلية الكاملة للمرجع.
+             * =====================================================
+             * البحث عن الصيغة الأصلية الكاملة للمرجع.
+             * =====================================================
              */
+
             function findSourceText(
                 originalText,
                 reference,
@@ -28706,8 +28827,12 @@ async function buildFootnoteSuggestions(
                         originalText || ""
                     );
 
-                if (!text.trim()) {
+                if (
+                    !text.trim()
+                ) {
+
                     return "";
+
                 }
 
                 const variants =
@@ -28717,10 +28842,6 @@ async function buildFootnoteSuggestions(
                         ? reference.variants
                         : [];
 
-                /*
-                * نبحث عن الصيغة الأصلية الكاملة للمرجع،
-                * مع السماح باختلاف المسافات فقط.
-                */
                 for (
                     let i = 0;
                     i < variants.length;
@@ -28730,10 +28851,15 @@ async function buildFootnoteSuggestions(
                     const candidate =
                         String(
                             variants[i] || ""
-                        ).trim();
+                        )
+                            .trim();
 
-                    if (!candidate) {
+                    if (
+                        !candidate
+                    ) {
+
                         continue;
+
                     }
 
                     const escaped =
@@ -28758,7 +28884,9 @@ async function buildFootnoteSuggestions(
                             text
                         );
 
-                    if (match) {
+                    if (
+                        match
+                    ) {
 
                         return match[0];
 
@@ -28767,153 +28895,259 @@ async function buildFootnoteSuggestions(
                 }
 
                 return "";
+
             }
+
+            /*
+             * =====================================================
+             * هل المؤلف موجود أصلًا في الحاشية؟
+             *
+             * هذا هو الضابط الجديد الوحيد.
+             * =====================================================
+             */
+
+            function authorExistsInSource(
+                originalText,
+                reference
+            ) {
+
+                const author =
+                    String(
+                        reference?.author ||
+                        ""
+                    )
+                        .trim();
+
+                if (
+                    !author
+                ) {
+
+                    return false;
+
+                }
+
+                const source =
+                    normalizeSearchText(
+                        originalText
+                    );
+
+                const normalizedAuthor =
+                    normalizeSearchText(
+                        author
+                    );
+
+                if (
+                    !source ||
+                    !normalizedAuthor
+                ) {
+
+                    return false;
+
+                }
+
+                return source.includes(
+                    normalizedAuthor
+                );
+
+            }
+
+            /*
+             * =====================================================
+             * معالجة الحواشي
+             * =====================================================
+             */
 
             function addNotes(
                 notes,
                 source
             ) {
 
-                notes.forEach(function (
-                    note,
-                    index
-                ) {
-
-                    const noteNumber =
-                        index + 1;
-
-                    const materialId =
-                        `${source}-${index + 1}`;
-
-                    const originalText =
-                        String(
-                            note.body?.text ||
-                            ""
-                        ).trim();
-
-                    const matches =
-                        unifiedFootnoteMap.get(
-                            materialId
-                        ) || [];
-
-                    if (
-                        matches.length === 0
+                notes.forEach(
+                    function (
+                        note,
+                        index
                     ) {
 
-                        return;
+                        const noteNumber =
+                            index + 1;
 
-                    }
+                        const materialId =
+                            `${source}-${index + 1}`;
 
-                    const references =
-                        matches.map(
-                            function (item) {
+                        const originalText =
+                            String(
+                                note.body?.text ||
+                                ""
+                            )
+                                .trim();
 
-                                return item.reference;
+                        const matches =
+                            unifiedFootnoteMap.get(
+                                materialId
+                            ) || [];
 
-                            }
-                        );
+                        if (
+                            matches.length === 0
+                        ) {
 
-                    const sourceTexts =
-                        matches.map(
-                            function (
-                                item
-                            ) {
+                            return;
 
-                                return findSourceText(
-                                    originalText,
-                                    item.reference,
-                                    item.occurrence
-                                );
+                        }
 
-                            }
-                        );
-
-                    const suggestedTexts =
-                        matches.map(
-                            function (
-                                item
-                            ) {
-
-                                const reference =
-                                    item.reference;
-
-                                const referenceKey =
-                                    getReferenceKey(
-                                        reference
-                                    );
-
-                                let includeAuthor =
-                                    true;
-
-                                if (
-                                    referenceStyle.format ===
-                                    "title-author-first"
+                        const references =
+                            matches.map(
+                                function (
+                                    item
                                 ) {
 
-                                    includeAuthor =
-                                        !seenReferences.has(
-                                            referenceKey
+                                    return item.reference;
+
+                                }
+                            );
+
+                        const sourceTexts =
+                            matches.map(
+                                function (
+                                    item
+                                ) {
+
+                                    return findSourceText(
+                                        originalText,
+                                        item.reference,
+                                        item.occurrence
+                                    );
+
+                                }
+                            );
+
+                        const suggestedTexts =
+                            matches.map(
+                                function (
+                                    item
+                                ) {
+
+                                    const reference =
+                                        item.reference;
+
+                                    const referenceKey =
+                                        getReferenceKey(
+                                            reference
                                         );
 
+                                    /*
+                                     * هل المؤلف موجود أصلًا في الحاشية؟
+                                     */
+                                    const authorExists =
+                                        authorExistsInSource(
+                                            originalText,
+                                            reference
+                                        );
+
+                                    let includeAuthor =
+                                        true;
+
+                                    /*
+                                     * نمط:
+                                     * الكتاب والمؤلف عند أول ذكر فقط
+                                     */
                                     if (
-                                        referenceKey
+                                        referenceStyle.format ===
+                                        "title-author-first"
                                     ) {
 
-                                        seenReferences.add(
+                                        includeAuthor =
+                                            !seenReferences.has(
+                                                referenceKey
+                                            );
+
+                                        if (
                                             referenceKey
-                                        );
+                                        ) {
+
+                                            seenReferences.add(
+                                                referenceKey
+                                            );
+
+                                        }
 
                                     }
+
+                                    /*
+                                     * =================================================
+                                     * الضابط الجديد:
+                                     *
+                                     * إذا كان المؤلف غير موجود في الحاشية،
+                                     * فلا نضيفه إلا إذا اختار المستخدم ذلك.
+                                     * =================================================
+                                     */
+
+                                    if (
+                                        !authorExists &&
+                                        !addMissingAuthors
+                                    ) {
+
+                                        includeAuthor =
+                                            false;
+
+                                    }
+
+                                    /*
+                                     * إذا لم يوجد مؤلف أصلًا في بيانات المرجع،
+                                     * فلا يوجد ما يمكن إضافته.
+                                     */
+                                    if (
+                                        !reference?.author
+                                    ) {
+
+                                        includeAuthor =
+                                            false;
+
+                                    }
+
+                                    return formatFootnoteReference(
+                                        reference,
+                                        item.occurrence,
+                                        includeAuthor
+                                    );
+
                                 }
+                            );
 
-                                return formatFootnoteReference(
-                                    reference,
-                                    item.occurrence,
-                                    includeAuthor
-                                );
+                        suggestions.push({
 
-                            }
-                        );
+                            source:
+                                source,
 
-                    suggestions.push({
+                            noteNumber:
+                                noteNumber,
 
-                        source:
-                            source,
+                            materialId:
+                                materialId,
 
-                        noteNumber:
-                            noteNumber,
+                            originalText:
+                                originalText,
 
-                        materialId:
-                            materialId,
+                            reference:
+                                references[0] ||
+                                null,
 
-                        originalText:
-                            originalText,
+                            suggestedText:
+                                suggestedTexts[0] ||
+                                "",
 
-                        reference:
-                            references[0] ||
-                            null,
+                            references:
+                                references,
 
-                        suggestedText:
-                            suggestedTexts[0] ||
-                            "",
+                            suggestedTexts:
+                                suggestedTexts,
 
-                        references:
-                            references,
+                            sourceTexts:
+                                sourceTexts
 
-                        suggestedTexts:
-                            suggestedTexts,
+                        });
 
-                        /*
-                         * النص الأصلي لكل مرجع داخل الحاشية.
-                         * هذا هو المفتاح الذي سيستخدمه التطبيق
-                         * لاستبدال المرجع فقط.
-                         */
-                        sourceTexts:
-                            sourceTexts
-
-                    });
-
-                });
+                    }
+                );
 
             }
 
