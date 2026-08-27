@@ -26630,7 +26630,7 @@ if (referencesContent) {
                                         >
 
                                         <span class="reference-author-toggle-text">
-                                            تقصّي أسماء المؤلفين غير المذكورين
+                                            تقصّي أسماء المؤلفين
                                         </span>
 
                                     </label>
