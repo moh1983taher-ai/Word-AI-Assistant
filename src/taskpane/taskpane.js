@@ -26612,16 +26612,12 @@ if (referencesContent) {
                                 <div class="reference-style-row">
 
                                     <label>
-                                        أسماء المؤلفين
+                                        المؤلفون
                                     </label>
 
                                     <label
-                                        style="
-                                            display:flex;
-                                            align-items:center;
-                                            gap:6px;
-                                            cursor:pointer;
-                                        "
+                                        class="reference-author-toggle"
+                                        for="reference-add-missing-authors"
                                     >
 
                                         <input
@@ -26629,7 +26625,9 @@ if (referencesContent) {
                                             id="reference-add-missing-authors"
                                         >
 
-                                        إضافة اسم المؤلف إذا لم يذكر في الحاشية
+                                        <span class="reference-author-toggle-text">
+                                            تقصّي أسماء المؤلفين غير المذكورين
+                                        </span>
 
                                     </label>
 
