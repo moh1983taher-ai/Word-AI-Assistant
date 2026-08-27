@@ -6665,6 +6665,89 @@ body.sidebar-is-pinned .message-box {
     white-space: nowrap;
 }
 
+/* =====================================================
+   مستندات المشروع - مساحة المراجع
+   ===================================================== */
+
+.project-reference-documents-box {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fafafa;
+}
+
+.project-reference-documents-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.project-reference-documents-actions button {
+    border: 1px solid #d9dde3;
+    background: #ffffff;
+    color: #333333;
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.project-reference-documents-actions button:hover {
+    background: #f3f4f6;
+}
+
+.project-reference-documents-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.project-reference-document-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 38px;
+    padding: 7px 9px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: background-color 0.15s ease,
+                border-color 0.15s ease;
+}
+
+.project-reference-document-item:hover {
+    background: #f7f8fa;
+    border-color: #e1e5ea;
+}
+
+.project-reference-document-checkbox {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex: 0 0 auto;
+    cursor: pointer;
+}
+
+.project-reference-document-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #222222;
+}
+
+.references-source-icon svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+    flex: 0 0 20px;
+}
 /* =========================================================
    END
    ========================================================= */
