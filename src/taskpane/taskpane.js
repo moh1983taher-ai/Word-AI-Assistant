@@ -1113,9 +1113,7 @@ function renderProjectReferenceDocuments() {
 
             <div class="reference-style-row">
 
-                <label>
-                    المؤلفون
-                </label>
+                
 
                 <label
                     class="reference-author-toggle"
