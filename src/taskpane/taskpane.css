@@ -6788,6 +6788,23 @@ body.sidebar-is-pinned .message-box {
     display: block;
     flex: 0 0 20px;
 }
+
+.references-selected-source .references-selected-info {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+}
+
+.references-selected-source .references-selected-title {
+    font-size: 13px !important;
+    white-space: nowrap !important;
+}
+
+.references-selected-source .references-selected-name {
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
 /* =========================================================
    END
    ========================================================= */
