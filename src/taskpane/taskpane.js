@@ -1090,7 +1090,7 @@ function renderProjectReferenceDocuments() {
             <div class="reference-style-row">
 
                 <label>
-                    ترتيب المراجع
+                    المراجع
                 </label>
 
                 <select id="project-reference-order-select">
@@ -1113,7 +1113,9 @@ function renderProjectReferenceDocuments() {
 
             <div class="reference-style-row">
 
-                
+                <label>
+                    المؤلفون
+                </label>
 
                 <label
                     class="reference-author-toggle"
