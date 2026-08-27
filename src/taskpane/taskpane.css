@@ -6658,18 +6658,13 @@ body.sidebar-is-pinned .message-box {
     gap: 8px;
     cursor: pointer;
     user-select: none;
-}
-
-.reference-author-toggle input {
-    width: 16px;
-    height: 16px;
-    margin: 0;
-    cursor: pointer;
+    white-space: nowrap;
 }
 
 .reference-author-toggle-text {
-    line-height: 1.4;
+    white-space: nowrap;
 }
+
 /* =========================================================
    END
    ========================================================= */
