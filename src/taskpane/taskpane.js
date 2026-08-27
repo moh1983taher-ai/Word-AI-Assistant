@@ -816,7 +816,936 @@ async function getWorkingWordFile(
 
 }
 
+// =====================================================
+// استخراج النص من مستند Word محفوظ في مستندات المشروع
+// =====================================================
 
+async function extractMainTextFromProjectDocument(
+    file
+) {
+
+    if (
+        !file
+    ) {
+
+        throw new Error(
+            "لم يتم العثور على ملف المستند."
+        );
+
+    }
+
+
+    const zip =
+        await JSZip.loadAsync(
+            file
+        );
+
+
+    const documentEntry =
+        zip.file(
+            "word/document.xml"
+        );
+
+
+    if (
+        !documentEntry
+    ) {
+
+        throw new Error(
+            "تعذر العثور على محتوى مستند Word."
+        );
+
+    }
+
+
+    const xml =
+        await documentEntry.async(
+            "string"
+        );
+
+
+    const parser =
+        new DOMParser();
+
+
+    const xmlDocument =
+        parser.parseFromString(
+            xml,
+            "application/xml"
+        );
+
+
+    const parserError =
+        xmlDocument.querySelector(
+            "parsererror"
+        );
+
+
+    if (
+        parserError
+    ) {
+
+        throw new Error(
+            "تعذر قراءة بنية مستند Word."
+        );
+
+    }
+
+
+    const textNodes =
+        Array.from(
+            xmlDocument.getElementsByTagName(
+                "w:t"
+            )
+        );
+
+
+    return textNodes
+        .map(
+            function (
+                node
+            ) {
+
+                return String(
+                    node.textContent ||
+                    ""
+                );
+
+            }
+        )
+        .join(" ")
+        .replace(
+            /\s+/g,
+            " "
+        )
+        .trim();
+
+}
+
+function renderProjectReferenceDocuments() {
+
+    if (
+        !referencesSourceWorkspace
+    ) {
+
+        return;
+
+    }
+
+
+    referencesSourceWorkspace.innerHTML =
+        "";
+
+
+    if (
+        !currentProject ||
+        !currentProject.id
+    ) {
+
+        referencesSourceWorkspace.innerHTML =
+            `
+            <div class="references-analysis-result">
+
+                <div class="references-analysis-status error">
+                    ⚠ يجب اختيار مشروع أولًا
+                </div>
+
+            </div>
+            `;
+
+        return;
+
+    }
+
+
+    const projectDocuments =
+        getProjectDocuments(
+            currentProject.id
+        );
+
+
+    if (
+        !Array.isArray(
+            projectDocuments
+        ) ||
+        projectDocuments.length === 0
+    ) {
+
+        referencesSourceWorkspace.innerHTML =
+            `
+            <div class="references-analysis-result">
+
+                <div class="references-analysis-status">
+                    لا توجد مستندات في هذا المشروع
+                </div>
+
+            </div>
+            `;
+
+        return;
+
+    }
+
+
+    referencesSourceWorkspace.innerHTML =
+        `
+        <div class="references-selected-source">
+
+            <div class="references-selected-icon">
+
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#000000"
+                    stroke-width="1"
+                    stroke-linecap="round"
+                    stroke-linejoin="round">
+
+                    <path d="M22 19a2 2 0 0 1-2 2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+
+                </svg>
+
+            </div>
+
+            <div class="references-selected-info">
+
+                <div class="references-selected-title">
+                    مستندات المشروع
+                </div>
+
+                <div class="references-selected-name">
+                    اختر المستندات التي تريد استخراج مراجعها
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="project-reference-documents-box">
+
+            <div class="project-reference-documents-actions">
+
+                <button
+                    type="button"
+                    id="select-all-project-reference-documents">
+                    تحديد الكل
+                </button>
+
+                <button
+                    type="button"
+                    id="clear-all-project-reference-documents">
+                    إلغاء التحديد
+                </button>
+
+            </div>
+
+            <div
+                id="project-reference-documents-list"
+                class="project-reference-documents-list">
+
+                ${
+                    projectDocuments
+                        .map(
+                            function (
+                                documentItem
+                            ) {
+
+                                return `
+                                    <label class="project-reference-document-item">
+
+                                        <input
+                                            type="checkbox"
+                                            class="project-reference-document-checkbox"
+                                            value="${escapeReferenceHTML(
+                                                documentItem.id
+                                            )}">
+
+                                        <span class="project-reference-document-name">
+                                            ${escapeReferenceHTML(
+                                                documentItem.name ||
+                                                documentItem.fileName ||
+                                                "مستند بلا اسم"
+                                            )}
+                                        </span>
+
+                                    </label>
+                                `;
+
+                            }
+                        )
+                        .join("")
+                }
+
+            </div>
+
+        </div>
+
+        <div class="reference-style-options">
+
+            <div class="reference-style-title">
+                نمط قائمة المراجع
+            </div>
+
+            <div class="reference-style-row">
+
+                <label>
+                    ترتيب المراجع
+                </label>
+
+                <select id="project-reference-order-select">
+
+                    <option value="appearance">
+                        حسب ترتيب الظهور
+                    </option>
+
+                    <option value="author">
+                        حسب المؤلف
+                    </option>
+
+                    <option value="title">
+                        حسب عنوان الكتاب
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div class="reference-style-row">
+
+                <label>
+                    المؤلفون
+                </label>
+
+                <label
+                    class="reference-author-toggle"
+                    for="project-reference-add-missing-authors">
+
+                    <input
+                        type="checkbox"
+                        id="project-reference-add-missing-authors">
+
+                    <span class="reference-author-toggle-text">
+                        تقصّي أسماء المؤلفين
+                    </span>
+
+                </label>
+
+            </div>
+
+        </div>
+
+        <button
+            type="button"
+            id="analyze-project-references-btn"
+            class="analyze-references-btn">
+
+            استخراج المراجع
+
+        </button>
+
+        <div
+            id="project-references-analysis-container"
+            class="reference-result-container">
+        </div>
+        `;
+
+
+    const orderSelect =
+        document.getElementById(
+            "project-reference-order-select"
+        );
+
+
+    if (
+        orderSelect
+    ) {
+
+        orderSelect.value =
+            referenceStyle.order;
+
+        orderSelect.onchange =
+            function () {
+
+                referenceStyle.order =
+                    this.value;
+
+                localStorage.setItem(
+                    "REFERENCE_STYLE",
+                    JSON.stringify(
+                        referenceStyle
+                    )
+                );
+
+            };
+
+    }
+
+
+    const addAuthors =
+        document.getElementById(
+            "project-reference-add-missing-authors"
+        );
+
+
+    if (
+        addAuthors
+    ) {
+
+        addAuthors.checked =
+            referenceStyle.addMissingAuthors === true;
+
+        addAuthors.onchange =
+            function () {
+
+                referenceStyle.addMissingAuthors =
+                    this.checked;
+
+                localStorage.setItem(
+                    "REFERENCE_STYLE",
+                    JSON.stringify(
+                        referenceStyle
+                    )
+                );
+
+            };
+
+    }
+
+
+    const checkboxes =
+        referencesSourceWorkspace
+            .querySelectorAll(
+                ".project-reference-document-checkbox"
+            );
+
+
+    const selectAllButton =
+        document.getElementById(
+            "select-all-project-reference-documents"
+        );
+
+
+    const clearAllButton =
+        document.getElementById(
+            "clear-all-project-reference-documents"
+        );
+
+
+    if (
+        selectAllButton
+    ) {
+
+        selectAllButton.onclick =
+            function () {
+
+                checkboxes.forEach(
+                    function (
+                        checkbox
+                    ) {
+
+                        checkbox.checked =
+                            true;
+
+                    }
+                );
+
+            };
+
+    }
+
+
+    if (
+        clearAllButton
+    ) {
+
+        clearAllButton.onclick =
+            function () {
+
+                checkboxes.forEach(
+                    function (
+                        checkbox
+                    ) {
+
+                        checkbox.checked =
+                            false;
+
+                    }
+                );
+
+            };
+
+    }
+
+
+    const analyzeProjectReferencesBtn =
+        document.getElementById(
+            "analyze-project-references-btn"
+        );
+
+
+    if (
+        !analyzeProjectReferencesBtn
+    ) {
+
+        return;
+
+    }
+
+
+    analyzeProjectReferencesBtn.onclick =
+        async function () {
+
+            const selectedIds =
+                Array.from(
+                    referencesSourceWorkspace
+                        .querySelectorAll(
+                            ".project-reference-document-checkbox:checked"
+                        )
+                )
+                .map(
+                    function (
+                        checkbox
+                    ) {
+
+                        return checkbox.value;
+
+                    }
+                );
+
+
+            if (
+                selectedIds.length === 0
+            ) {
+
+                return;
+
+            }
+
+
+            analyzeProjectReferencesBtn.disabled =
+                true;
+
+            analyzeProjectReferencesBtn.textContent =
+                "جارٍ قراءة المستندات...";
+
+
+            try {
+
+                const projectText =
+                    await readSelectedProjectReferenceDocuments(
+                        selectedIds
+                    );
+
+
+                if (
+                    !projectText.trim()
+                ) {
+
+                    throw new Error(
+                        "تعذر استخراج نص المستندات المختارة."
+                    );
+
+                }
+
+
+                analyzeProjectReferencesBtn.textContent =
+                    "جارٍ تجهيز مواد المراجع...";
+
+
+                const processedReferences =
+                    processReferenceSources(
+                        {
+                            mainText:
+                                projectText
+                        }
+                    );
+
+
+                if (
+                    !Array.isArray(
+                        processedReferences
+                    ) ||
+                    processedReferences.length === 0
+                ) {
+
+                    throw new Error(
+                        "لم يتم العثور على مواد قابلة للتحليل في المستندات المختارة."
+                    );
+
+                }
+
+
+                analyzeProjectReferencesBtn.textContent =
+                    "جارٍ تحليل وتوحيد المراجع بالذكاء الاصطناعي...";
+
+
+                const addMissingAuthors =
+                    addAuthors
+                        ? addAuthors.checked
+                        : false;
+
+
+                const aiAnalysisResult =
+                    await analyzeReferencesWithAI(
+                        processedReferences,
+                        addMissingAuthors
+                    );
+
+
+                if (
+                    !aiAnalysisResult ||
+                    typeof aiAnalysisResult !==
+                        "object"
+                ) {
+
+                    throw new Error(
+                        "لم تصل نتيجة منظمة من الذكاء الاصطناعي."
+                    );
+
+                }
+
+
+                const finalReferenceResults =
+                    Array.isArray(
+                        aiAnalysisResult.references
+                    )
+                        ? mergeEquivalentReferences(
+                            aiAnalysisResult.references
+                        )
+                        : [];
+
+
+                latestUnifiedReferences =
+                    finalReferenceResults;
+
+
+                const container =
+                    document.getElementById(
+                        "project-references-analysis-container"
+                    );
+
+
+                if (
+                    container
+                ) {
+
+                    container.innerHTML =
+                        `
+                        <div class="references-analysis-result">
+
+                            <div
+                                class="references-analysis-status success">
+
+                                ✓ تم استخراج وتوحيد المراجع
+
+                            </div>
+
+                            <div class="references-analysis-info">
+
+                                المستندات المختارة:
+                                <strong>
+                                    ${selectedIds.length}
+                                </strong>
+
+                                <br>
+
+                                المواد المرسلة للتحليل:
+                                <strong>
+                                    ${processedReferences.length}
+                                </strong>
+
+                                <br>
+
+                                المراجع الموحدة:
+                                <strong>
+                                    ${finalReferenceResults.length}
+                                </strong>
+
+                            </div>
+
+                            <div class="references-final-results">
+
+                                <div class="references-final-results-title">
+
+                                    المراجع الموحدة
+
+                                    <strong>
+                                        ${finalReferenceResults.length}
+                                    </strong>
+
+                                </div>
+
+                                <div class="references-final-list">
+
+                                    ${
+                                        finalReferenceResults
+                                            .map(
+                                                function (
+                                                    reference,
+                                                    index
+                                                ) {
+
+                                                    const author =
+                                                        escapeReferenceHTML(
+                                                            reference?.author ||
+                                                            "مؤلف غير محدد"
+                                                        );
+
+                                                    const title =
+                                                        escapeReferenceHTML(
+                                                            reference?.title ||
+                                                            "عنوان غير محدد"
+                                                        );
+
+                                                    return `
+                                                        <div class="ai-reference-row">
+
+                                                            <div class="ai-reference-index">
+                                                                ${String(
+                                                                    index + 1
+                                                                ).padStart(
+                                                                    2,
+                                                                    "0"
+                                                                )}
+                                                            </div>
+
+                                                            <div class="ai-reference-main">
+
+                                                                <div class="ai-reference-heading">
+
+                                                                    <span class="ai-reference-author">
+                                                                        ${author}
+                                                                    </span>
+
+                                                                </div>
+
+                                                                <div class="ai-reference-title">
+                                                                    ${title}
+                                                                </div>
+
+                                                            </div>
+
+                                                        </div>
+                                                    `;
+
+                                                }
+                                            )
+                                            .join("")
+                                    }
+
+                                </div>
+
+                            </div>
+
+                        </div>
+                        `;
+
+                }
+
+
+                analyzeProjectReferencesBtn.textContent =
+                    "✓ تم استخراج المراجع";
+
+
+            }
+            catch (
+                error
+            ) {
+
+                console.error(
+                    "فشل استخراج مراجع مستندات المشروع:",
+                    error
+                );
+
+
+                const container =
+                    document.getElementById(
+                        "project-references-analysis-container"
+                    );
+
+
+                if (
+                    container
+                ) {
+
+                    container.innerHTML =
+                        `
+                        <div class="references-analysis-result">
+
+                            <div class="references-analysis-status error">
+
+                                ⚠ تعذر استخراج المراجع
+
+                            </div>
+
+                            <div class="references-analysis-info">
+
+                                ${escapeReferenceHTML(
+                                    error?.message ||
+                                    "حدث خطأ غير معروف."
+                                )}
+
+                            </div>
+
+                        </div>
+                        `;
+
+                }
+
+
+                analyzeProjectReferencesBtn.textContent =
+                    "استخراج المراجع";
+
+            }
+            finally {
+
+                analyzeProjectReferencesBtn.disabled =
+                    false;
+
+            }
+
+        };
+
+}
+
+// =====================================================
+// قراءة مستندات المشروع المحددة واستخراج نصوصها
+// =====================================================
+
+async function readSelectedProjectReferenceDocuments(
+    documentIds
+) {
+
+    if (
+        !Array.isArray(
+            documentIds
+        ) ||
+        documentIds.length === 0
+    ) {
+
+        throw new Error(
+            "لم يتم اختيار أي مستند."
+        );
+
+    }
+
+
+    const projectDocuments =
+        getProjectDocuments(
+            currentProject?.id
+        );
+
+
+    if (
+        !Array.isArray(
+            projectDocuments
+        )
+    ) {
+
+        throw new Error(
+            "تعذر الحصول على مستندات المشروع."
+        );
+
+    }
+
+
+    const selectedDocuments =
+        projectDocuments.filter(
+            function (
+                documentItem
+            ) {
+
+                return documentIds.some(
+                    function (
+                        id
+                    ) {
+
+                        return (
+                            String(
+                                id
+                            ) ===
+                            String(
+                                documentItem.id
+                            )
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    if (
+        selectedDocuments.length === 0
+    ) {
+
+        throw new Error(
+            "لم يتم العثور على المستندات المختارة."
+        );
+
+    }
+
+
+    const texts = [];
+
+
+    for (
+        const documentItem of
+        selectedDocuments
+    ) {
+
+        const file =
+            await getWorkingWordFile(
+                documentItem.storageId
+            );
+
+
+        if (
+            !file
+        ) {
+
+            continue;
+
+        }
+
+
+        const text =
+            await extractMainTextFromProjectDocument(
+                file
+            );
+
+
+        if (
+            text
+        ) {
+
+            texts.push(
+                text
+            );
+
+        }
+
+    }
+
+
+    if (
+        texts.length === 0
+    ) {
+
+        throw new Error(
+            "تعذر استخراج نص من المستندات المختارة."
+        );
+
+    }
+
+
+    return texts.join(
+        "\n\n"
+    );
+
+}
 // ======================================
 // Delete Working Word File
 // ======================================
@@ -26443,7 +27372,23 @@ if (referencesContent) {
                             );
 
                         // =====================================================
-                        // لا نعالج إلا المستند الحالي
+                        // مستندات المشروع
+                        // =====================================================
+
+                        if (
+                            source ===
+                            "project-documents"
+                        ) {
+
+                            renderProjectReferenceDocuments();
+
+                            return;
+
+                        }
+
+
+                        // =====================================================
+                        // المستند الحالي
                         // =====================================================
 
                         if (
