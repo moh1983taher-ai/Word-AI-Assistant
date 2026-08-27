@@ -27310,6 +27310,40 @@ if (closeReferences) {
 }
 
 // =====================================================
+// دالة حماية HTML محلية ومضمونة
+// لا تعتمد على escapeHTML خارجية
+// =====================================================
+
+function escapeReferenceHTML(
+    value
+) {
+
+    return String(
+        value ?? ""
+    )
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
+// =====================================================
 // References Source
 // المستند الحالي
 // =====================================================
@@ -27688,40 +27722,7 @@ if (referencesContent) {
                         analyzeReferencesBtn.onclick =
                             null;
 
-                        // =====================================================
-                        // دالة حماية HTML محلية ومضمونة
-                        // لا تعتمد على escapeHTML خارجية
-                        // =====================================================
-
-                        function escapeReferenceHTML(
-                            value
-                        ) {
-
-                            return String(
-                                value ?? ""
-                            )
-                                .replace(
-                                    /&/g,
-                                    "&amp;"
-                                )
-                                .replace(
-                                    /</g,
-                                    "&lt;"
-                                )
-                                .replace(
-                                    />/g,
-                                    "&gt;"
-                                )
-                                .replace(
-                                    /"/g,
-                                    "&quot;"
-                                )
-                                .replace(
-                                    /'/g,
-                                    "&#039;"
-                                );
-
-                        }
+                        
 
                         (function bindReferenceResultCollapse() {
 
