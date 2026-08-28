@@ -2214,9 +2214,86 @@ function renderProjectReferenceDocuments() {
                                 </div>
 
                                 <div>
+                                    المستندات المختارة:
+                                    <strong>
+                                        ${selectedIds.length}
+                                    </strong>
+                                </div>
+
+                                <div>
                                     المواد المرسلة للتحليل:
                                     <strong>
-                                        ${processedReferences.length}
+                                        ${totalMaterials}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    المراجع:
+                                    <strong>
+                                        ${referenceCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    مواد تحتوي عدة مراجع:
+                                    <strong>
+                                        ${multipleReferenceCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    المصدر نفسه:
+                                    <strong>
+                                        ${ibidCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    إحالات داخلية:
+                                    <strong>
+                                        ${internalReferenceCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    تخريج أحاديث:
+                                    <strong>
+                                        ${hadithCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    شرح فقط:
+                                    <strong>
+                                        ${explanatoryCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    شرح + مرجع:
+                                    <strong>
+                                        ${mixedCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    تحتاج مراجعة:
+                                    <strong>
+                                        ${reviewCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    المراجع الموحدة:
+                                    <strong>
+                                        ${finalReferenceResults.length}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    مرات الاستشهاد:
+                                    <strong>
+                                        ${totalOccurrences}
                                     </strong>
                                 </div>
 
