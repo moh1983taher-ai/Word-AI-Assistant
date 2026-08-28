@@ -27182,7 +27182,52 @@ async function buildStreamingContext(
 
 }
 
+// ============================================================
+// البحث في المكتبة الخارجية
+// ============================================================
 
+const LIBRARY_API =
+    "https://research-tools-library.moh1983taher.workers.dev";
+
+async function searchLibrary(query, books = 100, results = 10) {
+    const text = String(query || "").trim();
+
+    if (!text) {
+        throw new Error("أدخل عبارة البحث في المكتبة.");
+    }
+
+    const apiURL =
+        `${LIBRARY_API}/library-search` +
+        `?q=${encodeURIComponent(text)}` +
+        `&books=${encodeURIComponent(books)}` +
+        `&results=${encodeURIComponent(results)}`;
+
+    const response = await fetch(apiURL, {
+        method: "GET",
+        headers: {
+            "Accept": "application/json"
+        }
+    });
+
+    let data;
+
+    try {
+        data = await response.json();
+    } catch {
+        throw new Error(
+            `استجابة المكتبة غير صالحة: HTTP ${response.status}`
+        );
+    }
+
+    if (!response.ok || data?.ok === false) {
+        throw new Error(
+            data?.error ||
+            `فشل البحث في المكتبة: HTTP ${response.status}`
+        );
+    }
+
+    return data;
+}
 
 async function searchAcrossDocuments(
     documentItems,
@@ -30287,165 +30332,6 @@ function renderStreamingText(
 // إرسال الرسالة
 // =====================================================
 
-const LIBRARY_API =
-    "https://research-tools-library.moh1983taher.workers.dev";
-
-
-// ============================================================
-// البحث في المكتبة
-// ============================================================
-async function searchLibrary(
-    query,
-    books = 100,
-    results = 10
-) {
-
-    const text =
-        String(
-            query || ""
-        ).trim();
-
-    if (!text) {
-
-        throw new Error(
-            "أدخل عبارة البحث في المكتبة."
-        );
-
-    }
-
-
-    const apiURL =
-        `${LIBRARY_API}/library-search` +
-        `?q=${encodeURIComponent(text)}` +
-        `&books=${encodeURIComponent(books)}` +
-        `&results=${encodeURIComponent(results)}`;
-
-
-    const response =
-        await fetch(
-            apiURL,
-            {
-                method: "GET",
-                headers: {
-                    "Accept":
-                        "application/json"
-                }
-            }
-        );
-
-
-    let data;
-
-
-    try {
-
-        data =
-            await response.json();
-
-    }
-    catch {
-
-        throw new Error(
-            `استجابة المكتبة غير صالحة: HTTP ${response.status}`
-        );
-
-    }
-
-
-    if (
-        !response.ok ||
-        data?.ok === false
-    ) {
-
-        throw new Error(
-            data?.error ||
-            `فشل البحث في المكتبة: HTTP ${response.status}`
-        );
-
-    }
-
-
-    return data;
-
-}
-
-
-// ============================================================
-// تنسيق نتائج المكتبة داخل المحادثة
-// ============================================================
-function formatLibraryResults(data) {
-
-    if (
-        !data ||
-        !Array.isArray(data.results) ||
-        data.results.length === 0
-    ) {
-
-        return (
-            "لم يتم العثور على مواضع مناسبة " +
-            "لعبارة البحث في المكتبة."
-        );
-
-    }
-
-
-    let output =
-        "نتائج البحث في المكتبة:\n\n";
-
-
-    data.results.forEach(
-        function (
-            item,
-            index
-        ) {
-
-            output +=
-                `${index + 1}. ${item.title || "بدون عنوان"}\n`;
-
-            if (
-                item.author
-            ) {
-
-                output +=
-                    `المؤلف: ${item.author}\n`;
-
-            }
-
-
-            if (
-                item.page !== undefined &&
-                item.page !== null
-            ) {
-
-                output +=
-                    `الصفحة: ${item.page}\n`;
-
-            }
-
-
-            output +=
-                `${item.text || ""}\n`;
-
-
-            output +=
-                `درجة الصلة: ${item.score || 0}`;
-
-
-            output +=
-                "\n\n";
-
-        }
-    );
-
-
-    return output.trim();
-
-}
-
-
-// ============================================================
-// إرسال الرسالة
-// ============================================================
 async function sendMessage() {
 
     if (!input) {
@@ -30534,6 +30420,8 @@ async function sendMessage() {
 
     renderChat();
 
+   
+
     renderSidebarChats();
 
     renderRecentChats();
@@ -30565,7 +30453,7 @@ async function sendMessage() {
 
 
     loading.innerHTML =
-        "⏳ جاري البحث...";
+        "⏳ جاري التفكير...";
 
 
     if (chatArea) {
@@ -30588,8 +30476,10 @@ async function sendMessage() {
     let pendingRenderText =
         "";
 
+
     let renderTimer =
         null;
+
 
     let requestFinished =
         false;
@@ -30659,120 +30549,10 @@ async function sendMessage() {
 
 
     // =================================================
-    // بدء التنفيذ
+    // بدء البث
     // =================================================
 
     try {
-
-        // =================================================
-        // البحث في المكتبة
-        // =================================================
-
-        if (
-            researchScope &&
-            researchScope.type ===
-            "library"
-        ) {
-
-            const libraryData =
-                await searchLibrary(
-                    text,
-                    100,
-                    10
-                );
-
-
-            requestFinished =
-                true;
-
-
-            // ---------------------------------------------
-            // إلغاء التحديث المؤجل
-            // ---------------------------------------------
-
-            if (
-                renderTimer !==
-                null
-            ) {
-
-                clearTimeout(
-                    renderTimer
-                );
-
-
-                renderTimer =
-                    null;
-
-            }
-
-
-            // ---------------------------------------------
-            // بناء جواب المكتبة
-            // ---------------------------------------------
-
-            const libraryAnswer =
-                formatLibraryResults(
-                    libraryData
-                );
-
-
-            pendingRenderText =
-                libraryAnswer;
-
-
-            renderPendingText();
-
-
-            // ---------------------------------------------
-            // إزالة فقاعة التحميل
-            // ---------------------------------------------
-
-            if (
-                loading &&
-                loading.parentNode
-            ) {
-
-                loading.remove();
-
-            }
-
-
-            // ---------------------------------------------
-            // حفظ نتيجة المكتبة
-            // ---------------------------------------------
-
-            addAIMessage(
-                currentChat,
-                libraryAnswer,
-                []
-            );
-
-
-            // ---------------------------------------------
-            // تحديث الواجهة
-            // ---------------------------------------------
-
-            renderChat();
-
-            renderSidebarChats();
-
-            renderRecentChats();
-
-
-            console.log(
-                "نتائج البحث في المكتبة:",
-                libraryData
-            );
-
-
-            return;
-
-        }
-
-
-        // =================================================
-        // المسار القديم للذكاء الاصطناعي
-        // =================================================
 
         const settings =
             getActiveAISettings();
@@ -30895,12 +30675,14 @@ async function sendMessage() {
 
         renderChat();
 
+        
+
         renderSidebarChats();
 
         renderRecentChats();
 
-    }
 
+    }
     catch (error) {
 
         requestFinished =
@@ -30943,7 +30725,7 @@ async function sendMessage() {
 
 
         // =================================================
-        // حفظ الخطأ
+        // حفظ الخطأ كرسالة AI
         // =================================================
 
         addAIMessage(
@@ -30956,6 +30738,8 @@ async function sendMessage() {
 
         renderChat();
 
+        
+
         renderSidebarChats();
 
         renderRecentChats();
@@ -30967,7 +30751,6 @@ async function sendMessage() {
         );
 
     }
-
     finally {
 
         if (
@@ -36570,137 +36353,850 @@ if (scopeBtn && scopePanel) {
 // التنقل داخل لوحة نطاق البحث
 // =====================================================
 
-function showLibraryScopePicker() {
+if (
+    scopePanel
+) {
 
-    scopePanelTitle.innerHTML =
-        `
-        <button
-            type="button"
-            class="scope-back-btn"
-            aria-label="رجوع">
-            ←
-        </button>
-
-        <span>
-            اختيار المكتبة
-        </span>
-        `;
-
-
-    scopePanelContent.innerHTML =
-        "";
-
-
-    const backButton =
+    const scopePanelContent =
         scopePanel.querySelector(
-            ".scope-back-btn"
+            ".scope-panel-content"
+        );
+
+    const scopePanelTitle =
+        scopePanel.querySelector(
+            ".scope-panel-title"
         );
 
 
-    if (
-        backButton
-    ) {
+    function showScopeHome() {
 
-        backButton.onclick =
-            function (
-                e
-            ) {
+        scopePanelTitle.textContent =
+            "نطاق البحث";
 
-                e.preventDefault();
-                e.stopPropagation();
 
-                showScopeType(
-                    "library"
-                );
+        scopePanelContent.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-option"
+                data-scope-type="project">
 
-            };
+                <span class="scope-option-icon">
+                    ▱
+                </span>
+
+                <span class="scope-option-text">
+                    المشاريع
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-option"
+                data-scope-type="document">
+
+                <span class="scope-option-icon">
+                    ▤
+                </span>
+
+                <span class="scope-option-text">
+                    المستندات
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-option"
+                data-scope-type="reference">
+
+                <span class="scope-option-icon">
+                    ≡
+                </span>
+
+                <span class="scope-option-text">
+                    المراجع
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-option"
+                data-scope-type="library">
+
+                <span class="scope-option-icon">
+                    ▥
+                </span>
+
+                <span class="scope-option-text">
+                    المكتبة
+                </span>
+
+            </button>
+            `;
+
+
+        bindScopeOptions();
 
     }
 
 
-    // =====================================================
-    // المكتبة المتاحة حاليًا
-    // =====================================================
+    function showScopeType(
+        type
+    ) {
 
-    const libraryItem =
-        document.createElement(
-            "button"
-        );
+        const titles = {
 
+            project:
+                "المشاريع",
 
-    libraryItem.type =
-        "button";
+            document:
+                "المستندات",
 
+            reference:
+                "المراجع",
 
-    libraryItem.className =
-        "scope-project-item";
-
-
-    libraryItem.innerHTML =
-        `
-        <span
-            class="scope-project-icon">
-            ▥
-        </span>
-
-        <span
-            class="scope-project-name">
-            المكتبة الإلكترونية
-        </span>
-        `;
-
-
-    libraryItem.onclick =
-        function (
-            e
-        ) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-
-            researchScope = {
-
-                type:
-                    "library",
-
-                scope:
-                    "specific",
-
-                id:
-                    "ketabonline",
-
-                name:
-                    "المكتبة الإلكترونية"
-
-            };
-
-
-            updateScopeStatus();
-
-
-            scopePanel.classList.remove(
-                "open"
-            );
-
-
-            scopePanel.setAttribute(
-                "aria-hidden",
-                "true"
-            );
-
-
-            console.log(
-                "نطاق البحث الحالي:",
-                researchScope
-            );
+            library:
+                "المكتبة"
 
         };
 
 
-    scopePanelContent.appendChild(
-        libraryItem
-    );
+        const labels = {
+
+            project:
+                "مشروع",
+
+            document:
+                "مستند",
+
+            reference:
+                "مرجع",
+
+            library:
+                "مكتبة"
+
+        };
+
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                ${titles[type] || "نطاق البحث"}
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-mode-option"
+                data-scope-mode="all">
+
+                <span class="scope-mode-mark">
+                    ◉
+                </span>
+
+                <span>
+                    جميع ${labels[type] || ""}
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-mode-option"
+                data-scope-mode="specific"
+                data-scope-type="${type}">
+
+                <span class="scope-mode-mark">
+                    ⊙
+                </span>
+
+                <span>
+                    ${labels[type] || ""} محدد
+                </span>
+
+            </button>
+            `;
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeHome();
+
+                };
+
+        }
+
+
+        scopePanelContent
+            .querySelectorAll(
+                ".scope-mode-option"
+            )
+            .forEach(
+                function (
+                    button
+                ) {
+
+                    button.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+                            e.stopPropagation();
+
+
+                            const mode =
+                                button.getAttribute(
+                                    "data-scope-mode"
+                                );
+
+
+                            // =========================================
+                            // جميع
+                            // =========================================
+
+                            if (
+                                mode ===
+                                "all"
+                            ) {
+
+                                const scopeNames = {
+
+                                    project:
+                                        "جميع المشاريع",
+
+                                    document:
+                                        "جميع المستندات",
+
+                                    reference:
+                                        "جميع المراجع",
+
+                                    library:
+                                        "جميع المكتبة"
+
+                                };
+
+
+                                researchScope = {
+
+                                    type:
+                                        type,
+
+                                    scope:
+                                        "all",
+
+                                    id:
+                                        null,
+
+                                    name:
+                                        scopeNames[type] ||
+                                        "نطاق البحث"
+
+                                };
+
+                                updateScopeStatus();
+
+
+                                scopePanel.classList.remove(
+                                    "open"
+                                );
+
+
+                                scopePanel.setAttribute(
+                                    "aria-hidden",
+                                    "true"
+                                );
+
+
+                                console.log(
+                                    "نطاق البحث الحالي:",
+                                    researchScope
+                                );
+
+
+                                return;
+
+                            }
+
+
+                            // =========================================
+                            // محدد
+                            // =========================================
+
+                            if (
+                                mode ===
+                                "specific"
+                            ) {
+
+                                if (
+                                    type ===
+                                    "project"
+                                ) {
+
+                                    showProjectScopePicker();
+
+                                }
+
+                                else if (
+                                    type ===
+                                    "document"
+                                ) {
+
+                                    showDocumentScopePicker();
+
+                                }
+
+                                else if (
+                                    type ===
+                                    "reference"
+                                ) {
+
+                                    showReferenceScopePicker();
+
+                                }
+
+                                else if (
+                                    type ===
+                                    "library"
+                                ) {
+
+                                    showLibraryScopePicker();
+
+                                }
+
+                            }
+
+                        };
+
+                }
+            );
+
+    }
+
+    function showProjectScopePicker() {
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                اختيار المشروع
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            "";
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeType(
+                        "project"
+                    );
+
+                };
+
+        }
+
+
+        if (
+            !Array.isArray(
+                projects
+            ) ||
+            projects.length ===
+                0
+        ) {
+
+            scopePanelContent.innerHTML =
+                `
+                <div class="scope-empty">
+                    لا توجد مشاريع
+                </div>
+                `;
+
+            return;
+
+        }
+
+
+        projects.forEach(
+            function (
+                project
+            ) {
+
+                if (
+                    !project
+                ) {
+
+                    return;
+
+                }
+
+
+                const button =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                button.type =
+                    "button";
+
+
+                button.className =
+                    "scope-project-item";
+
+
+                button.innerHTML =
+                    `
+                    <span
+                        class="scope-project-icon">
+                        ▱
+                    </span>
+
+                    <span
+                        class="scope-project-name">
+                        ${project.name}
+                    </span>
+                    `;
+
+
+                button.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        researchScope = {
+
+                            type:
+                                "project",
+
+                            scope:
+                                "specific",
+
+                            id:
+                                project.id,
+
+                            name:
+                                project.name
+
+                        };
+
+                        updateScopeStatus();
+
+
+                        scopePanel.classList.remove(
+                            "open"
+                        );
+
+                        scopePanel.setAttribute(
+                            "aria-hidden",
+                            "true"
+                        );
+
+
+                        console.log(
+                            "نطاق البحث الحالي:",
+                            researchScope
+                        );
+
+                    };
+
+
+                scopePanelContent.appendChild(
+                    button
+                );
+
+            }
+        );
+
+    }
+
+    function showDocumentScopePicker() {
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                اختيار المستند
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            "";
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeType(
+                        "document"
+                    );
+
+                };
+
+        }
+
+
+        if (
+            !Array.isArray(
+                documents
+            ) ||
+            documents.length ===
+                0
+        ) {
+
+            scopePanelContent.innerHTML =
+                `
+                <div class="scope-empty">
+                    لا توجد مستندات
+                </div>
+                `;
+
+            return;
+
+        }
+
+
+        documents.forEach(
+            function (
+                documentItem
+            ) {
+
+                if (
+                    !documentItem
+                ) {
+
+                    return;
+
+                }
+
+
+                const button =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                button.type =
+                    "button";
+
+
+                button.className =
+                    "scope-project-item";
+
+
+                button.innerHTML =
+                    `
+                    <span
+                        class="scope-project-icon">
+                        ▤
+                    </span>
+
+                    <span
+                        class="scope-project-name">
+                        ${documentItem.name}
+                    </span>
+                    `;
+
+
+                button.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        researchScope = {
+
+                            type:
+                                "document",
+
+                            scope:
+                                "specific",
+
+                            id:
+                                documentItem.id,
+
+                            name:
+                                documentItem.name
+
+                        };
+
+                        updateScopeStatus();
+
+
+                        setCurrentDocument(
+                            documentItem
+                        );
+
+
+                        scopePanel.classList.remove(
+                            "open"
+                        );
+
+                        scopePanel.setAttribute(
+                            "aria-hidden",
+                            "true"
+                        );
+
+
+                        console.log(
+                            "نطاق البحث الحالي:",
+                            researchScope
+                        );
+
+                    };
+
+
+                scopePanelContent.appendChild(
+                    button
+                );
+
+            }
+        );
+
+    }
+
+    function showReferenceScopePicker() {
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                اختيار المرجع
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            "";
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeType(
+                        "reference"
+                    );
+
+                };
+
+        }
+
+
+        // المراجع غير مبنية بعد في النظام الحالي
+        scopePanelContent.innerHTML =
+            `
+            <div class="scope-empty">
+                لا توجد مراجع متاحة حاليًا
+            </div>
+            `;
+
+    }
+
+    function showLibraryScopePicker() {
+
+        scopePanelTitle.innerHTML =
+            `
+            <button
+                type="button"
+                class="scope-back-btn"
+                aria-label="رجوع">
+                ←
+            </button>
+
+            <span>
+                اختيار المكتبة
+            </span>
+            `;
+
+
+        scopePanelContent.innerHTML =
+            "";
+
+
+        const backButton =
+            scopePanel.querySelector(
+                ".scope-back-btn"
+            );
+
+
+        if (
+            backButton
+        ) {
+
+            backButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    showScopeType(
+                        "library"
+                    );
+
+                };
+
+        }
+
+
+        // المكتبات غير مبنية بعد في النظام الحالي
+        scopePanelContent.innerHTML =
+            `
+            <div class="scope-empty">
+                لا توجد مكتبات متاحة حاليًا
+            </div>
+            `;
+
+    }
+
+
+    function bindScopeOptions() {
+
+        scopePanelContent
+            .querySelectorAll(
+                ".scope-option"
+            )
+            .forEach(
+                function (
+                    button
+                ) {
+
+                    button.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+                            e.stopPropagation();
+
+
+                            const type =
+                                button.getAttribute(
+                                    "data-scope-type"
+                                );
+
+
+                            showScopeType(
+                                type
+                            );
+
+                        };
+
+                }
+            );
+
+    }
+
+
+    bindScopeOptions();
 
 }
 // =====================================================
