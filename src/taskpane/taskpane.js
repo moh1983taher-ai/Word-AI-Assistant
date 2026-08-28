@@ -1601,7 +1601,7 @@ function renderProjectReferenceDocuments() {
             try {
 
                 // =====================================================
-                // قراءة وتجهيز كل مستند على حدة
+                // 1. قراءة وتجهيز المستندات
                 // =====================================================
 
                 const projectInputs =
@@ -1625,7 +1625,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // تحليل كل مستند في طلب مستقل
+                // 2. المتغيرات النهائية
                 // =====================================================
 
                 const allReferences = [];
@@ -1648,6 +1648,10 @@ function renderProjectReferenceDocuments() {
 
                 let reviewCount = 0;
 
+
+                // =====================================================
+                // 3. تحليل كل مستند في طلب مستقل
+                // =====================================================
 
                 for (
                     let documentIndex = 0;
@@ -1690,7 +1694,7 @@ function renderProjectReferenceDocuments() {
                             ? addAuthors.checked
                             : false;
 
-                    
+
                     console.log(
                         "تحليل مستند المشروع:",
                         {
@@ -1704,6 +1708,11 @@ function renderProjectReferenceDocuments() {
                                 processedReferences.length
                         }
                     );
+
+
+                    // =================================================
+                    // تحليل المستند الحالي فقط
+                    // =================================================
 
                     const aiAnalysisResult =
                         await analyzeReferencesWithAI(
@@ -1725,13 +1734,29 @@ function renderProjectReferenceDocuments() {
                     }
 
 
+                    console.log(
+                        "نتيجة تحليل مستند المشروع:",
+                        {
+                            documentName:
+                                projectInput.documentName,
+
+                            documentId:
+                                projectInput.documentId,
+
+                            result:
+                                aiAnalysisResult
+                        }
+                    );
+
+
                     // =================================================
                     // إحصاءات المستند
                     // =================================================
 
                     const documentStats =
                         aiAnalysisResult.stats &&
-                        typeof aiAnalysisResult.stats === "object"
+                        typeof aiAnalysisResult.stats ===
+                            "object"
                             ? aiAnalysisResult.stats
                             : {};
 
@@ -1797,7 +1822,7 @@ function renderProjectReferenceDocuments() {
 
 
                     // =================================================
-                    // تجميع مراجع المستند
+                    // إضافة مراجع المستند إلى المجموعة العامة
                     // =================================================
 
                     if (
@@ -1835,7 +1860,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // لا توجد نتائج
+                // 4. التحقق من وجود نتائج
                 // =====================================================
 
                 if (
@@ -1850,7 +1875,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // توحيد نتائج جميع المستندات
+                // 5. التوحيد النهائي بين جميع المستندات
                 // =====================================================
 
                 let finalReferenceResults =
@@ -1860,7 +1885,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // ترتيب المراجع
+                // 6. ترتيب المراجع
                 // =====================================================
 
                 finalReferenceResults =
@@ -1875,8 +1900,35 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // بناء HTML للمراجع النهائية
-                // نفس قالب المستند الحالي
+                // 7. إجمالي مرات الاستشهاد
+                // =====================================================
+
+                const totalOccurrences =
+                    finalReferenceResults.reduce(
+                        function (
+                            total,
+                            reference
+                        ) {
+
+                            const occurrences =
+                                Array.isArray(
+                                    reference?.occurrences
+                                )
+                                    ? reference.occurrences.length
+                                    : 0;
+
+                            return (
+                                total +
+                                occurrences
+                            );
+
+                        },
+                        0
+                    );
+
+
+                // =====================================================
+                // 8. بناء HTML للمراجع
                 // =====================================================
 
                 const finalReferenceHTML =
@@ -1895,6 +1947,7 @@ function renderProjectReferenceDocuments() {
                                         .trim()
                                         .toLowerCase();
 
+
                                 const typeLabel =
                                     type === "hadith"
                                         ? "تخريج حديث"
@@ -1908,17 +1961,20 @@ function renderProjectReferenceDocuments() {
                                                         ? "موقع إلكتروني"
                                                         : "كتاب";
 
+
                                 const author =
                                     escapeReferenceHTML(
                                         reference?.author ||
                                         "مؤلف غير محدد"
                                     );
 
+
                                 const title =
                                     escapeReferenceHTML(
                                         reference?.title ||
                                         "عنوان غير محدد"
                                     );
+
 
                                 const locations =
                                     Array.isArray(
@@ -1927,12 +1983,14 @@ function renderProjectReferenceDocuments() {
                                         ? reference.locations
                                         : [];
 
+
                                 const variants =
                                     Array.isArray(
                                         reference?.variants
                                     )
                                         ? reference.variants
                                         : [];
+
 
                                 const occurrences =
                                     Array.isArray(
@@ -1941,10 +1999,12 @@ function renderProjectReferenceDocuments() {
                                         ? reference.occurrences
                                         : [];
 
+
                                 const confidenceValue =
                                     Number(
                                         reference?.confidence ?? 0
                                     );
+
 
                                 const confidence =
                                     Math.max(
@@ -1959,6 +2019,7 @@ function renderProjectReferenceDocuments() {
                                         )
                                     );
 
+
                                 const locationParts =
                                     locations
                                         .map(
@@ -1971,15 +2032,18 @@ function renderProjectReferenceDocuments() {
                                                         location?.volume || ""
                                                     );
 
+
                                                 const page =
                                                     escapeReferenceHTML(
                                                         location?.page || ""
                                                     );
 
+
                                                 const pageRange =
                                                     escapeReferenceHTML(
                                                         location?.pageRange || ""
                                                     );
+
 
                                                 if (
                                                     volume &&
@@ -1992,6 +2056,7 @@ function renderProjectReferenceDocuments() {
 
                                                 }
 
+
                                                 if (
                                                     pageRange
                                                 ) {
@@ -2001,6 +2066,7 @@ function renderProjectReferenceDocuments() {
                                                     );
 
                                                 }
+
 
                                                 if (
                                                     page
@@ -2012,6 +2078,7 @@ function renderProjectReferenceDocuments() {
 
                                                 }
 
+
                                                 return "";
 
                                             }
@@ -2019,6 +2086,7 @@ function renderProjectReferenceDocuments() {
                                         .filter(
                                             Boolean
                                         );
+
 
                                 const locationHTML =
                                     locationParts.length
@@ -2044,6 +2112,7 @@ function renderProjectReferenceDocuments() {
                                             </div>
                                         `
                                         : "";
+
 
                                 const variantHTML =
                                     variants.length
@@ -2083,6 +2152,7 @@ function renderProjectReferenceDocuments() {
                                         `
                                         : "";
 
+
                                 const reviewHTML =
                                     reference?.needsReview
                                         ? `
@@ -2092,11 +2162,13 @@ function renderProjectReferenceDocuments() {
                                         `
                                         : "";
 
+
                                 const referenceId =
                                     escapeReferenceHTML(
                                         reference?.id ||
                                         `reference-${index + 1}`
                                     );
+
 
                                 return `
                                     <div
@@ -2169,13 +2241,14 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // عرض النتيجة
+                // 9. عرض النتيجة
                 // =====================================================
 
                 const container =
                     document.getElementById(
                         "project-references-analysis-container"
                     );
+
 
                 if (
                     container
@@ -2201,6 +2274,7 @@ function renderProjectReferenceDocuments() {
 
                             </div>
 
+
                             <div
                                 id="project-references-analysis-content"
                                 class="references-analysis-info
@@ -2214,9 +2288,9 @@ function renderProjectReferenceDocuments() {
                                 </div>
 
                                 <div>
-                                    المستندات المختارة:
+                                    المستندات التي تم تحليلها:
                                     <strong>
-                                        ${selectedIds.length}
+                                        ${projectInputs.length}
                                     </strong>
                                 </div>
 
@@ -2297,75 +2371,6 @@ function renderProjectReferenceDocuments() {
                                     </strong>
                                 </div>
 
-                                <div>
-                                    المراجع:
-                                    <strong>
-                                        ${referenceCount}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    مواد تحتوي عدة مراجع:
-                                    <strong>
-                                        ${multipleReferenceCount}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    المصدر نفسه:
-                                    <strong>
-                                        ${ibidCount}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    إحالات داخلية:
-                                    <strong>
-                                        ${internalReferenceCount}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    تخريج أحاديث:
-                                    <strong>
-                                        ${hadithCount}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    شرح فقط:
-                                    <strong>
-                                        ${explanatoryCount}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    شرح + مرجع:
-                                    <strong>
-                                        ${mixedCount}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    تحتاج مراجعة:
-                                    <strong>
-                                        ${reviewCount}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    المراجع الموحدة:
-                                    <strong>
-                                        ${finalReferenceResults.length}
-                                    </strong>
-                                </div>
-
-                                <div>
-                                    مرات الاستشهاد:
-                                    <strong>
-                                        ${totalOccurrences}
-                                    </strong>
-                                </div>
 
                                 <div class="references-final-results">
 
@@ -2378,6 +2383,7 @@ function renderProjectReferenceDocuments() {
                                         </strong>
 
                                     </div>
+
 
                                     <div class="references-final-list">
 
@@ -2393,6 +2399,7 @@ function renderProjectReferenceDocuments() {
                         `;
 
                 }
+
 
                 analyzeProjectReferencesBtn.textContent =
                     "✓ تم استخراج المراجع";
@@ -28970,6 +28977,8 @@ if (referencesContent) {
                                             aiStats.reviewCount ||
                                             0
                                         );
+
+                                        
 
                                     // =================================================
                                     // 7. إجمالي مرات الظهور
