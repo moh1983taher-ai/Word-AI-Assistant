@@ -2176,7 +2176,7 @@ function renderProjectReferenceDocuments() {
                     targetProject
                 ) {
 
-                    targetProject.unifiedReferences =
+                    targetProject.references =
                         JSON.parse(
                             JSON.stringify(
                                 finalReferenceResults
@@ -36648,9 +36648,9 @@ function renderProjects() {
 
         let projectReferences =
             Array.isArray(
-                project.unifiedReferences
+                project.references
             )
-                ? project.unifiedReferences
+                ? project.references
                 : [];
 
 
