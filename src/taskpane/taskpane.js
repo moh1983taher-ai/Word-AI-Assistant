@@ -30326,6 +30326,103 @@ function renderStreamingText(
 
 }
 
+// ============================================================
+// مكتبة البحث
+// ============================================================
+
+const LIBRARY_API =
+    "https://research-tools-library.moh1983taher.workers.dev";
+
+
+async function searchLibrary(
+    query,
+    books = 100,
+    results = 10
+) {
+
+    const text =
+        String(
+            query || ""
+        ).trim();
+
+
+    if (!text) {
+
+        throw new Error(
+            "أدخل عبارة البحث في المكتبة."
+        );
+
+    }
+
+
+    const apiURL =
+        `${LIBRARY_API}/library-search` +
+        `?q=${encodeURIComponent(text)}` +
+        `&books=${encodeURIComponent(books)}` +
+        `&results=${encodeURIComponent(results)}`;
+
+
+    const response =
+        await fetch(
+            apiURL,
+            {
+                method:
+                    "GET",
+
+                headers: {
+                    "Accept":
+                        "application/json"
+                }
+            }
+        );
+
+
+    let data;
+
+
+    try {
+
+        data =
+            await response.json();
+
+    }
+    catch {
+
+        throw new Error(
+            `استجابة المكتبة غير صالحة: HTTP ${response.status}`
+        );
+
+    }
+
+
+    if (
+        !response.ok
+    ) {
+
+        throw new Error(
+            data?.error ||
+            data?.message ||
+            `فشل الاتصال بالمكتبة: HTTP ${response.status}`
+        );
+
+    }
+
+
+    if (
+        data?.ok === false
+    ) {
+
+        throw new Error(
+            data.error ||
+            "فشل البحث في المكتبة."
+        );
+
+    }
+
+
+    return data;
+
+}
 
 // =====================================================
 // Send Message
@@ -37147,13 +37244,85 @@ if (
         }
 
 
-        // المكتبات غير مبنية بعد في النظام الحالي
-        scopePanelContent.innerHTML =
+        const libraryButton =
+            document.createElement(
+                "button"
+            );
+
+
+        libraryButton.type =
+            "button";
+
+
+        libraryButton.className =
+            "scope-project-item";
+
+
+        libraryButton.innerHTML =
             `
-            <div class="scope-empty">
-                لا توجد مكتبات متاحة حاليًا
-            </div>
+            <span
+                class="scope-project-icon">
+                ▥
+            </span>
+
+            <span
+                class="scope-project-name">
+                المكتبة الإلكترونية
+            </span>
             `;
+
+
+        libraryButton.onclick =
+            function (
+                e
+            ) {
+
+                e.preventDefault();
+                e.stopPropagation();
+
+
+                researchScope = {
+
+                    type:
+                        "library",
+
+                    scope:
+                        "specific",
+
+                    id:
+                        "ketabonline",
+
+                    name:
+                        "المكتبة الإلكترونية"
+
+                };
+
+
+                updateScopeStatus();
+
+
+                scopePanel.classList.remove(
+                    "open"
+                );
+
+
+                scopePanel.setAttribute(
+                    "aria-hidden",
+                    "true"
+                );
+
+
+                console.log(
+                    "نطاق البحث الحالي:",
+                    researchScope
+                );
+
+            };
+
+
+        scopePanelContent.appendChild(
+            libraryButton
+        );
 
     }
 
