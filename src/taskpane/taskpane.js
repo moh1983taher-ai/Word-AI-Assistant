@@ -2119,6 +2119,113 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
+                // حفظ المراجع الموحدة داخل المشروع
+                // =====================================================
+
+                const targetProject =
+                    projects.find(
+                        function (
+                            project
+                        ) {
+
+                            return (
+                                project &&
+                                String(
+                                    project.id
+                                ) ===
+                                String(
+                                    currentProject?.id
+                                )
+                            );
+
+                        }
+                    );
+
+
+                if (
+                    targetProject
+                ) {
+
+                    targetProject.unifiedReferences =
+                        JSON.parse(
+                            JSON.stringify(
+                                finalReferenceResults
+                            )
+                        );
+
+
+                    targetProject.referenceAnalysis =
+                        {
+                            analyzedDocumentIds:
+                                selectedIds.map(
+                                    function (
+                                        id
+                                    ) {
+
+                                        return String(
+                                            id
+                                        );
+
+                                    }
+                                ),
+
+                            stats:
+                                {
+                                    totalMaterials:
+                                        totalMaterials,
+
+                                    referenceCount:
+                                        referenceCount,
+
+                                    multipleReferenceCount:
+                                        multipleReferenceCount,
+
+                                    ibidCount:
+                                        ibidCount,
+
+                                    internalReferenceCount:
+                                        internalReferenceCount,
+
+                                    hadithCount:
+                                        hadithCount,
+
+                                    explanatoryCount:
+                                        explanatoryCount,
+
+                                    mixedCount:
+                                        mixedCount,
+
+                                    reviewCount:
+                                        reviewCount,
+
+                                    unifiedReferenceCount:
+                                        finalReferenceResults.length,
+
+                                    totalOccurrences:
+                                        totalOccurrences
+                                },
+
+                            updatedAt:
+                                new Date()
+                                    .toISOString()
+                        };
+
+
+                    targetProject.updatedAt =
+                        new Date()
+                            .toISOString();
+
+
+                    currentProject =
+                        targetProject;
+
+
+                    saveProjects();
+
+                }
+
+
+                // =====================================================
                 // 8. إجمالي مرات الاستشهاد
                 // =====================================================
 
@@ -36511,7 +36618,179 @@ function renderProjects() {
 
     }
 
+    // =====================================================
+    // مراجع المشروع
+    // =====================================================
 
+    function renderProjectReferences(
+        container,
+        project
+    ) {
+
+        if (
+            !container ||
+            !project
+        ) {
+
+            return;
+
+        }
+
+
+        container.innerHTML =
+            "";
+
+
+        const projectReferences =
+            Array.isArray(
+                project.unifiedReferences
+            )
+                ? project.unifiedReferences
+                : [];
+
+
+        if (
+            projectReferences.length === 0
+        ) {
+
+            const empty =
+                document.createElement(
+                    "div"
+                );
+
+
+            empty.className =
+                "empty-reference";
+
+
+            empty.textContent =
+                "لا توجد مراجع لهذا المشروع حاليًا";
+
+
+            container.appendChild(
+                empty
+            );
+
+
+            return;
+
+        }
+
+
+        const list =
+            document.createElement(
+                "div"
+            );
+
+
+        list.className =
+            "project-reference-list";
+
+
+        projectReferences.forEach(
+            function (
+                reference,
+                index
+            ) {
+
+                if (
+                    !reference
+                ) {
+
+                    return;
+
+                }
+
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                item.className =
+                    "project-reference-item";
+
+
+                const author =
+                    String(
+                        reference.author ||
+                        "مؤلف غير محدد"
+                    )
+                        .trim();
+
+
+                const title =
+                    String(
+                        reference.title ||
+                        "عنوان غير محدد"
+                    )
+                        .trim();
+
+
+                const occurrences =
+                    Array.isArray(
+                        reference.occurrences
+                    )
+                        ? reference.occurrences.length
+                        : 0;
+
+
+                item.innerHTML =
+                    `
+                    <div class="project-reference-index">
+                        ${String(
+                            index + 1
+                        ).padStart(
+                            2,
+                            "0"
+                        )}
+                    </div>
+
+                    <div class="project-reference-content">
+
+                        <div class="project-reference-heading">
+
+                            <span class="project-reference-author">
+                                ${escapeReferenceHTML(
+                                    author
+                                )}
+                            </span>
+
+                        </div>
+
+                        <div class="project-reference-title">
+                            ${escapeReferenceHTML(
+                                title
+                            )}
+                        </div>
+
+                        <div class="project-reference-meta">
+
+                            ظهور
+                            <strong>
+                                ${occurrences}
+                            </strong>
+
+                        </div>
+
+                    </div>
+                    `;
+
+
+                list.appendChild(
+                    item
+                );
+
+            }
+        );
+
+
+        container.appendChild(
+            list
+        );
+
+    }
     // =====================================================
     // بناء المشاريع
     // =====================================================
@@ -36948,12 +37227,10 @@ function renderProjects() {
                                 2
                             ) {
 
-                                content.innerHTML =
-                                    `
-                                    <div class="empty-reference">
-                                        لا توجد مراجع لهذا المشروع حاليًا
-                                    </div>
-                                    `;
+                                renderProjectReferences(
+                                    content,
+                                    project
+                                );
 
                             }
 
