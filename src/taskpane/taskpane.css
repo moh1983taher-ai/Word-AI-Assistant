@@ -6943,31 +6943,39 @@ body.sidebar-is-pinned .message-box {
 
     display: flex;
 
-    align-items: center;
+    flex-direction: column;
 
-    justify-content: space-between;
+    align-items: stretch;
 
-    gap: 8px;
+    gap: 7px;
 
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 
 }
 
 
 .project-references-count {
 
-    font-size: 11px;
+    display: flex;
 
-    color: #747b84;
+    align-items: center;
+
+    justify-content: space-between;
+
+    font-size: 12px;
+
+    line-height: 1.5;
+
+    color: #555b63;
 
 }
 
 
 .project-references-count strong {
 
-    margin-inline-start: 4px;
+    margin-inline-start: 5px;
 
-    color: #444a52;
+    color: #222222;
 
     font-weight: 600;
 
@@ -6976,26 +6984,34 @@ body.sidebar-is-pinned .message-box {
 
 .project-references-transfer-btn {
 
-    border: 1px solid #e1e4e8;
+    width: 100%;
 
-    background: #ffffff;
+    border: 1px solid #000000;
 
-    color: #444a52;
+    background: #000000;
+
+    color: #ffffff;
 
     border-radius: 7px;
 
-    padding: 5px 9px;
+    padding: 7px 10px;
 
-    font-size: 10px;
+    font-size: 11px;
+
+    line-height: 1.4;
 
     cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        opacity 0.15s ease;
 
 }
 
 
 .project-references-transfer-btn:hover {
 
-    background: #f7f8fa;
+    background: #222222;
 
 }
 
