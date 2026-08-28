@@ -6805,6 +6805,155 @@ body.sidebar-is-pinned .message-box {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
 }
+
+/* =====================================================
+   مراجع المشروع
+   ===================================================== */
+
+.project-reference-list {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+
+    margin-top: 6px;
+
+}
+
+
+.project-reference-item {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    padding: 6px 8px;
+
+    border: 1px solid transparent;
+
+    border-radius: 7px;
+
+    background: #ffffff;
+
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+
+}
+
+
+.project-reference-item:hover {
+
+    background: #f7f8fa;
+
+    border-color: #e5e7eb;
+
+}
+
+
+.project-reference-index {
+
+    flex: 0 0 22px;
+
+    font-size: 10px;
+
+    line-height: 1.4;
+
+    color: #9aa1aa;
+
+    text-align: center;
+
+}
+
+
+.project-reference-content {
+
+    flex: 1;
+
+    min-width: 0;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 5px;
+
+}
+
+
+.project-reference-author {
+
+    flex: 0 0 auto;
+
+    font-size: 11px;
+
+    line-height: 1.4;
+
+    color: #747b84;
+
+    white-space: nowrap;
+
+}
+
+
+.project-reference-author::after {
+
+    content: " — ";
+
+    color: #b7bcc3;
+
+}
+
+
+.project-reference-title {
+
+    flex: 1;
+
+    min-width: 0;
+
+    font-size: 12px;
+
+    line-height: 1.5;
+
+    color: #222222;
+
+    font-weight: 500;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+}
+
+
+.project-reference-meta {
+
+    flex: 0 0 auto;
+
+    font-size: 10px;
+
+    line-height: 1.4;
+
+    color: #9298a1;
+
+    white-space: nowrap;
+
+}
+
+
+.project-reference-meta strong {
+
+    font-weight: 600;
+
+    color: #666c75;
+
+}
 /* =========================================================
    END
    ========================================================= */
