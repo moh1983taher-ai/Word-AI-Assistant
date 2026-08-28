@@ -36642,13 +36642,98 @@ function renderProjects() {
             "";
 
 
-        const projectReferences =
+        // =====================================================
+        // قراءة المراجع من كائن المشروع الحالي
+        // =====================================================
+
+        let projectReferences =
             Array.isArray(
                 project.unifiedReferences
             )
                 ? project.unifiedReferences
                 : [];
 
+
+        // =====================================================
+        // مصدر احتياطي:
+        // قراءة المشروع المحفوظ مباشرة من localStorage
+        // =====================================================
+
+        if (
+            projectReferences.length === 0
+        ) {
+
+            try {
+
+                const savedProjects =
+                    JSON.parse(
+                        localStorage.getItem(
+                            "WORD_AI_PROJECTS"
+                        ) || "[]"
+                    );
+
+
+                const savedProject =
+                    Array.isArray(
+                        savedProjects
+                    )
+                        ? savedProjects.find(
+                            function (
+                                item
+                            ) {
+
+                                return (
+                                    item &&
+                                    String(
+                                        item.id
+                                    ) ===
+                                    String(
+                                        project.id
+                                    )
+                                );
+
+                            }
+                        )
+                        : null;
+
+
+                if (
+                    savedProject &&
+                    Array.isArray(
+                        savedProject.unifiedReferences
+                    )
+                ) {
+
+                    projectReferences =
+                        savedProject.unifiedReferences;
+
+
+                    // إعادة المراجع إلى الكائن الحالي
+                    // حتى تبقى الذاكرة الحالية متزامنة مع التخزين
+
+                    project.unifiedReferences =
+                        projectReferences;
+
+                }
+
+            }
+            catch (
+                error
+            ) {
+
+                console.warn(
+                    "تعذر قراءة مراجع المشروع المحفوظة:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        // =====================================================
+        // لا توجد مراجع
+        // =====================================================
 
         if (
             projectReferences.length === 0
@@ -36677,6 +36762,10 @@ function renderProjects() {
 
         }
 
+
+        // =====================================================
+        // بناء قائمة المراجع
+        // =====================================================
 
         const list =
             document.createElement(
@@ -36750,30 +36839,24 @@ function renderProjects() {
 
                     <div class="project-reference-content">
 
-                        <div class="project-reference-heading">
+                        <span class="project-reference-author">
+                            ${escapeReferenceHTML(
+                                author
+                            )}
+                        </span>
 
-                            <span class="project-reference-author">
-                                ${escapeReferenceHTML(
-                                    author
-                                )}
-                            </span>
-
-                        </div>
-
-                        <div class="project-reference-title">
+                        <span class="project-reference-title">
                             ${escapeReferenceHTML(
                                 title
                             )}
-                        </div>
+                        </span>
 
-                        <div class="project-reference-meta">
-
+                        <span class="project-reference-meta">
                             ظهور
                             <strong>
                                 ${occurrences}
                             </strong>
-
-                        </div>
+                        </span>
 
                     </div>
                     `;
