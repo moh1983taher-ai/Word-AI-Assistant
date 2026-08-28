@@ -26574,22 +26574,442 @@ async function buildStreamingContext(
     text
 ) {
 
-    // ==================================
-    // استرجاع سياق المستند النشط
-    //
-    // buildAIDocumentContext() نفسها
-    // تتعامل مع حالة عدم وجود currentDocument.
-    // ==================================
+    const scope =
+        (
+            researchScope &&
+            typeof researchScope ===
+                "object"
+        )
+            ? researchScope
+            : {
 
-    const documentContext =
-        await buildAIDocumentContext(
-            text
-        );
+                type:
+                    "document",
+
+                scope:
+                    "specific",
+
+                id:
+                    currentDocument
+                        ? currentDocument.id
+                        : null,
+
+                name:
+                    currentDocument
+                        ? currentDocument.name
+                        : "المستند الحالي"
+
+            };
 
 
-    // ==================================
-    // تاريخ المحادثة
-    // ==================================
+    let documentContext =
+        null;
+
+
+    let scopeDocuments =
+        [];
+
+
+    // =================================================
+    // 1. تحديد مستندات نطاق البحث
+    // =================================================
+
+    if (
+        scope.type ===
+        "document"
+    ) {
+
+        if (
+            scope.scope ===
+            "specific"
+        ) {
+
+            const selectedDocument =
+                documents.find(
+                    function (
+                        documentItem
+                    ) {
+
+                        return (
+                            documentItem &&
+                            String(
+                                documentItem.id
+                            ) ===
+                            String(
+                                scope.id
+                            )
+                        );
+
+                    }
+                );
+
+
+            if (
+                selectedDocument
+            ) {
+
+                scopeDocuments =
+                    [
+                        selectedDocument
+                    ];
+
+            }
+
+        }
+        else {
+
+            scopeDocuments =
+                Array.isArray(
+                    documents
+                )
+                    ? documents.filter(
+                        function (
+                            documentItem
+                        ) {
+
+                            return (
+                                documentItem &&
+                                documentItem.id !==
+                                    undefined
+                            );
+
+                        }
+                    )
+                    : [];
+
+        }
+
+    }
+    else if (
+        scope.type ===
+        "project"
+    ) {
+
+        if (
+            scope.scope ===
+            "specific"
+        ) {
+
+            const project =
+                projects.find(
+                    function (
+                        projectItem
+                    ) {
+
+                        return (
+                            projectItem &&
+                            String(
+                                projectItem.id
+                            ) ===
+                            String(
+                                scope.id
+                            )
+                        );
+
+                    }
+                );
+
+
+            if (
+                project
+            ) {
+
+                scopeDocuments =
+                    getProjectDocuments(
+                        project.id
+                    );
+
+            }
+
+        }
+        else {
+
+            const projectDocumentIds =
+                new Set();
+
+
+            if (
+                Array.isArray(
+                    projects
+                )
+            ) {
+
+                projects.forEach(
+                    function (
+                        projectItem
+                    ) {
+
+                        if (
+                            !projectItem
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const projectDocs =
+                            getProjectDocuments(
+                                projectItem.id
+                            );
+
+
+                        if (
+                            !Array.isArray(
+                                projectDocs
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        projectDocs.forEach(
+                            function (
+                                documentItem
+                            ) {
+
+                                if (
+                                    !documentItem ||
+                                    documentItem.id ===
+                                        undefined
+                                ) {
+
+                                    return;
+
+                                }
+
+
+                                projectDocumentIds.add(
+                                    String(
+                                        documentItem.id
+                                    )
+                                );
+
+                            }
+                        );
+
+                    }
+                );
+
+            }
+
+
+            scopeDocuments =
+                Array.isArray(
+                    documents
+                )
+                    ? documents.filter(
+                        function (
+                            documentItem
+                        ) {
+
+                            return (
+                                documentItem &&
+                                projectDocumentIds.has(
+                                    String(
+                                        documentItem.id
+                                    )
+                                )
+                            );
+
+                        }
+                    )
+                    : [];
+
+        }
+
+    }
+    else if (
+        scope.type ===
+        "reference"
+    ) {
+
+        currentCitationSources =
+            [];
+
+
+        documentContext = {
+
+            found:
+                false,
+
+            unsupportedScope:
+                true,
+
+            scopeType:
+                "reference",
+
+            query:
+                text,
+
+            profile:
+                "general",
+
+            resultCount:
+                0,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                0,
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            contexts:
+                [],
+
+            text:
+                "",
+
+            citations:
+                []
+
+        };
+
+    }
+    else if (
+        scope.type ===
+        "library"
+    ) {
+
+        currentCitationSources =
+            [];
+
+
+        documentContext = {
+
+            found:
+                false,
+
+            unsupportedScope:
+                true,
+
+            scopeType:
+                "library",
+
+            query:
+                text,
+
+            profile:
+                "general",
+
+            resultCount:
+                0,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                0,
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            contexts:
+                [],
+
+            text:
+                "",
+
+            citations:
+                []
+
+        };
+
+    }
+
+
+    // =================================================
+    // 2. البحث في مستند واحد
+    // =================================================
+
+    if (
+        (
+            scope.type ===
+            "document" &&
+            scopeDocuments.length ===
+            1
+        )
+    ) {
+
+        const selectedDocument =
+            scopeDocuments[0];
+
+
+        const originalCurrentDocument =
+            currentDocument;
+
+
+        try {
+
+            currentDocument =
+                selectedDocument;
+
+
+            documentContext =
+                await buildAIDocumentContext(
+                    text
+                );
+
+        }
+        finally {
+
+            currentDocument =
+                originalCurrentDocument;
+
+        }
+
+    }
+
+
+    // =================================================
+    // 3. البحث في مجموعة مستندات
+    // =================================================
+
+    else if (
+        !documentContext &&
+        (
+            scope.type ===
+                "document" ||
+            scope.type ===
+                "project"
+        )
+    ) {
+
+        documentContext =
+            await buildAIMultiDocumentContext(
+                text,
+                scopeDocuments
+            );
+
+        documentContext.scopeType =
+            scope.type;
+
+        documentContext.scopeName =
+            scope.name ||
+            (
+                scope.type ===
+                "project"
+                    ? "المشاريع"
+                    : "المستندات"
+            );
+
+    }
+
+
+    // =================================================
+    // 4. تاريخ المحادثة
+    // =================================================
 
     const history =
         buildStreamingHistory(
@@ -26597,9 +27017,9 @@ async function buildStreamingContext(
         );
 
 
-    // ==================================
-    // السؤال الأصلي
-    // ==================================
+    // =================================================
+    // 5. السؤال الأصلي
+    // =================================================
 
     let userContent =
         String(
@@ -26608,14 +27028,40 @@ async function buildStreamingContext(
         );
 
 
-    // ==================================
-    // إذا وجد مستند نشط وسياق صالح
-    // ==================================
+    // =================================================
+    // 6. وجود سياق بحث صالح
+    // =================================================
 
     if (
         documentContext &&
         documentContext.found
     ) {
+
+        const isMultiDocument =
+            Array.isArray(
+                documentContext.documents
+            ) &&
+            documentContext.documents.length >
+                1;
+
+
+        const scopeLabel =
+            documentContext.scopeName ||
+            (
+                isMultiDocument
+                    ? (
+                        scope.type ===
+                        "project"
+                            ? "المشاريع"
+                            : "المستندات"
+                    )
+                    : (
+                        currentDocument
+                            ? currentDocument.name
+                            : "المستند"
+                    )
+            );
+
 
         userContent =
             [
@@ -26630,41 +27076,13 @@ async function buildStreamingContext(
 
                 "",
 
-                "=== بيانات المستند ===",
+                "=== نطاق البحث ===",
 
-                "اسم المستند: " +
-                    (
-                        currentDocument
-                            ? currentDocument.name
-                            : ""
-                    ),
-
-                "نوع الاسترجاع: " +
-                    (
-                        documentContext.profile ||
-                        "general"
-                    ),
-
-                "العائلات المطابقة: " +
-                    (
-                        Array.isArray(
-                            documentContext.matchedFamilies
-                        ) &&
-                        documentContext.matchedFamilies.length >
-                            0
-
-                            ? documentContext
-                                .matchedFamilies
-                                .join(
-                                    "، "
-                                )
-
-                            : "لا توجد"
-                    ),
+                scopeLabel,
 
                 "",
 
-                "=== المادة المستخرجة من المستند ===",
+                "=== المادة المستخرجة ===",
 
                 documentContext.text,
 
@@ -26672,23 +27090,23 @@ async function buildStreamingContext(
 
                 "=== قواعد الإجابة ===",
 
-                "أجب عن سؤال المستخدم اعتمادًا على المادة المستخرجة من المستند بوصفها المصدر الأساسي.",
+                "أجب اعتمادًا على المادة المستخرجة بوصفها المصدر الأساسي.",
 
-                "استخرج الأفكار المرتبطة بالسؤال فقط.",
+                "استخرج المعلومات المرتبطة بالسؤال فقط.",
 
                 "ادمج الأفكار المتشابهة في فكرة واحدة.",
 
                 "رتب الإجابة وفق محاور السؤال.",
 
-                "إذا كان السؤال يتضمن أكثر من جانب، أجب عن الجوانب التي تدعمها المادة.",
+                "إذا كان السؤال يتضمن أكثر من جانب، فأجب عن الجوانب التي تدعمها المادة المستخرجة.",
 
-                "لا تضف معلومة أو حكمًا أو نسبة قول إلى المستند غير موجودة في المادة المستخرجة.",
+                "لا تضف معلومة أو حكمًا أو نسبة قول غير مدعومة بالمادة المستخرجة.",
 
                 "إذا لم تكف المادة المستخرجة للإجابة عن جزء من السؤال، صرّح بذلك بوضوح.",
 
-                "لا تستخدم المعرفة العامة لسد نقص المستند إلا إذا طلب المستخدم ذلك صراحة.",
+                "لا تستخدم المعرفة العامة لسد نقص المادة إلا إذا طلب المستخدم ذلك صراحة.",
 
-                "حافظ على لغة السؤال ولغة المستند.",
+                "حافظ على لغة السؤال ولغة المادة المستخرجة.",
 
                 "لا تبدأ باعتذار أو تمهيد غير ضروري.",
 
@@ -26708,6 +27126,8 @@ async function buildStreamingContext(
 
                 "وجود كلمات السؤال داخل المقطع لا يعني أن المقطع صالح للإجابة.",
 
+                "عند تعدد المستندات، اذكر اسم المستند فقط عندما يكون ذلك مفيدًا لتحديد مصدر المعلومة.",
+
                 "قدّم خلاصة تركيبية للمادة المستخرجة."
 
             ].join(
@@ -26717,12 +27137,9 @@ async function buildStreamingContext(
     }
 
 
-    // ==================================
-    // لا يوجد مستند نشط
-    //
-    // لا نضيف أي تعليمات بحثية.
-    // يبقى السؤال كما كتبه المستخدم.
-    // ==================================
+    // =================================================
+    // 7. لا يوجد سياق بحث
+    // =================================================
 
     else {
 
@@ -26735,9 +27152,9 @@ async function buildStreamingContext(
     }
 
 
-    // ==================================
-    // السؤال الحالي
-    // ==================================
+    // =================================================
+    // 8. السؤال الحالي
+    // =================================================
 
     history.push({
 
@@ -26765,6 +27182,1552 @@ async function buildStreamingContext(
 
 }
 
+async function searchAcrossDocuments(
+    documentItems,
+    query,
+    options
+) {
+
+    const settings =
+        options || {};
+
+
+    const retrievalProfile =
+        settings.profile ||
+        (
+            getRetrievalProfile(query)?.type ||
+            "general"
+        );
+
+
+    const candidateLimit =
+        Number.isFinite(
+            Number(
+                settings.candidateLimit
+            )
+        )
+            ? Number(
+                settings.candidateLimit
+            )
+            : 50;
+
+
+    const validDocuments =
+        Array.isArray(
+            documentItems
+        )
+            ? documentItems.filter(
+                function (
+                    documentItem
+                ) {
+
+                    return (
+                        documentItem &&
+                        documentItem.id !==
+                            undefined &&
+                        documentItem.id !==
+                            null
+                    );
+
+                }
+            )
+            : [];
+
+
+    const allResults =
+        [];
+
+
+    const matchedTermsSet =
+        new Set();
+
+
+    const matchedFamiliesSet =
+        new Set();
+
+
+    const phraseCandidates =
+        [];
+
+
+    let totalIndexedOccurrences =
+        0;
+
+
+    let totalQueryTerms =
+        0;
+
+
+    let contentTermCount =
+        0;
+
+
+    let functionTermCount =
+        0;
+
+
+    let indexTokenCount =
+        0;
+
+
+    let indexUniqueTerms =
+        0;
+
+
+    let indexUniqueFamilies =
+        0;
+
+
+    let queryAnalysis =
+        null;
+
+
+    for (
+        let i = 0;
+        i < validDocuments.length;
+        i++
+    ) {
+
+        const documentItem =
+            validDocuments[i];
+
+
+        try {
+
+            const result =
+                await searchIndexedDocument(
+                    documentItem.id,
+                    query,
+                    {
+
+                        profile:
+                            retrievalProfile,
+
+                        candidateLimit:
+                            candidateLimit
+
+                    }
+                );
+
+
+            if (
+                !result ||
+                !Array.isArray(
+                    result.results
+                )
+            ) {
+
+                continue;
+
+            }
+
+
+            totalIndexedOccurrences +=
+                Number(
+                    result.indexedOccurrences ||
+                    0
+                );
+
+
+            totalQueryTerms =
+                Math.max(
+                    totalQueryTerms,
+                    Number(
+                        result.totalQueryTerms ||
+                        0
+                    )
+                );
+
+
+            contentTermCount =
+                Math.max(
+                    contentTermCount,
+                    Number(
+                        result.contentTermCount ||
+                        0
+                    )
+                );
+
+
+            functionTermCount =
+                Math.max(
+                    functionTermCount,
+                    Number(
+                        result.functionTermCount ||
+                        0
+                    )
+                );
+
+
+            indexTokenCount =
+                Math.max(
+                    indexTokenCount,
+                    Number(
+                        documentItem.indexTokenCount ||
+                        result.indexTokenCount ||
+                        0
+                    )
+                );
+
+
+            indexUniqueTerms =
+                Math.max(
+                    indexUniqueTerms,
+                    Number(
+                        documentItem.indexUniqueTerms ||
+                        result.indexUniqueTerms ||
+                        0
+                    )
+                );
+
+
+            indexUniqueFamilies =
+                Math.max(
+                    indexUniqueFamilies,
+                    Number(
+                        documentItem.indexUniqueFamilies ||
+                        result.indexUniqueFamilies ||
+                        0
+                    )
+                );
+
+
+            if (
+                !queryAnalysis &&
+                result.queryAnalysis
+            ) {
+
+                queryAnalysis =
+                    result.queryAnalysis;
+
+            }
+
+
+            (
+                Array.isArray(
+                    result.matchedTerms
+                )
+                    ? result.matchedTerms
+                    : []
+            ).forEach(
+                function (
+                    term
+                ) {
+
+                    const value =
+                        String(
+                            term ||
+                            ""
+                        ).trim();
+
+
+                    if (
+                        value
+                    ) {
+
+                        matchedTermsSet.add(
+                            value
+                        );
+
+                    }
+
+                }
+            );
+
+
+            (
+                Array.isArray(
+                    result.matchedFamilies
+                )
+                    ? result.matchedFamilies
+                    : []
+            ).forEach(
+                function (
+                    family
+                ) {
+
+                    const value =
+                        String(
+                            family ||
+                            ""
+                        ).trim();
+
+
+                    if (
+                        value
+                    ) {
+
+                        matchedFamiliesSet.add(
+                            value
+                        );
+
+                    }
+
+                }
+            );
+
+
+            (
+                Array.isArray(
+                    result.phraseCandidates
+                )
+                    ? result.phraseCandidates
+                    : []
+            ).forEach(
+                function (
+                    phraseItem
+                ) {
+
+                    if (
+                        !phraseItem ||
+                        !phraseItem.phrase
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    const exists =
+                        phraseCandidates.some(
+                            function (
+                                existing
+                            ) {
+
+                                return (
+                                    String(
+                                        existing.phrase ||
+                                        ""
+                                    ).trim() ===
+                                    String(
+                                        phraseItem.phrase ||
+                                        ""
+                                    ).trim()
+                                );
+
+                            }
+                        );
+
+
+                    if (
+                        !exists
+                    ) {
+
+                        phraseCandidates.push(
+                            phraseItem
+                        );
+
+                    }
+
+                }
+            );
+
+
+            result.results.forEach(
+                function (
+                    searchItem
+                ) {
+
+                    if (
+                        !searchItem ||
+                        typeof searchItem !==
+                            "object"
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    allResults.push({
+
+                        ...searchItem,
+
+                        documentId:
+                            String(
+                                documentItem.id
+                            ),
+
+                        documentName:
+                            String(
+                                documentItem.name ||
+                                documentItem.fileName ||
+                                "مستند بلا اسم"
+                            ),
+
+                        projectId:
+                            documentItem.projectId !==
+                                undefined &&
+                            documentItem.projectId !==
+                                null
+
+                                ? String(
+                                    documentItem.projectId
+                                )
+
+                                : null
+
+                    });
+
+                }
+            );
+
+        }
+        catch (
+            error
+        ) {
+
+            console.warn(
+                "تعذر البحث في المستند:",
+                documentItem.name ||
+                documentItem.id,
+                error
+            );
+
+        }
+
+    }
+
+
+    allResults.sort(
+        function (
+            a,
+            b
+        ) {
+
+            const scoreDifference =
+                Number(
+                    b.score ||
+                    0
+                ) -
+                Number(
+                    a.score ||
+                    0
+                );
+
+
+            if (
+                scoreDifference !==
+                0
+            ) {
+
+                return scoreDifference;
+
+            }
+
+
+            return (
+                Number(
+                    a.paragraphIndex ||
+                    0
+                ) -
+                Number(
+                    b.paragraphIndex ||
+                    0
+                )
+            );
+
+        }
+    );
+
+
+    const limitedResults =
+        allResults.slice(
+            0,
+            candidateLimit
+        );
+
+
+    return {
+
+        query:
+            normalizeSearchText(
+                query ||
+                ""
+            ),
+
+        profile:
+            retrievalProfile,
+
+        count:
+            limitedResults.length,
+
+        results:
+            limitedResults,
+
+        matchedTerms:
+            Array.from(
+                matchedTermsSet
+            ),
+
+        matchedFamilies:
+            Array.from(
+                matchedFamiliesSet
+            ),
+
+        phraseCandidates:
+            phraseCandidates,
+
+        queryAnalysis:
+            queryAnalysis,
+
+        totalQueryTerms:
+            totalQueryTerms,
+
+        contentTermCount:
+            contentTermCount,
+
+        functionTermCount:
+            functionTermCount,
+
+        indexTokenCount:
+            indexTokenCount,
+
+        indexUniqueTerms:
+            indexUniqueTerms,
+
+        indexUniqueFamilies:
+            indexUniqueFamilies,
+
+        indexedOccurrences:
+            totalIndexedOccurrences,
+
+        documentsSearched:
+            validDocuments.length
+
+    };
+
+}
+
+async function buildAIMultiDocumentContext(
+    query,
+    documentItems
+) {
+
+    const validDocuments =
+        Array.isArray(
+            documentItems
+        )
+            ? documentItems.filter(
+                function (
+                    documentItem
+                ) {
+
+                    return (
+                        documentItem &&
+                        documentItem.id !==
+                            undefined &&
+                        documentItem.id !==
+                            null
+                    );
+
+                }
+            )
+            : [];
+
+
+    if (
+        validDocuments.length ===
+        0
+    ) {
+
+        currentCitationSources =
+            [];
+
+
+        return {
+
+            found:
+                false,
+
+            query:
+                query,
+
+            profile:
+                "general",
+
+            resultCount:
+                0,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                0,
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            contexts:
+                [],
+
+            text:
+                "",
+
+            citations:
+                [],
+
+            documents:
+                []
+
+        };
+
+    }
+
+
+    const retrievalProfile =
+        getRetrievalProfile(
+            query
+        );
+
+
+    const profileType =
+        retrievalProfile &&
+        retrievalProfile.type
+            ? retrievalProfile.type
+            : "general";
+
+
+    const settings =
+        getSavedSettings();
+
+
+    const provider =
+        settings &&
+        settings.provider
+            ? settings.provider
+            : "";
+
+
+    const model =
+        settings &&
+        settings.model
+            ? settings.model
+            : "";
+
+
+    const retrievalLimits =
+        getRetrievalLimits(
+            provider,
+            model
+        );
+
+
+    let maxResults =
+        Math.min(
+            Number(
+                retrievalLimits.maxResults ||
+                6
+            ),
+            Number(
+                retrievalProfile.maxResults ||
+                6
+            )
+        );
+
+
+    let maxChars =
+        Math.min(
+            Number(
+                retrievalLimits.maxChars ||
+                6000
+            ),
+            Number(
+                retrievalProfile.maxChars ||
+                6000
+            )
+        );
+
+
+    if (
+        !Number.isFinite(
+            maxResults
+        ) ||
+        maxResults <=
+            0
+    ) {
+
+        maxResults =
+            6;
+
+    }
+
+
+    if (
+        !Number.isFinite(
+            maxChars
+        ) ||
+        maxChars <=
+            0
+    ) {
+
+        maxChars =
+            6000;
+
+    }
+
+
+    if (
+        profileType ===
+        "comparison"
+    ) {
+
+        maxResults =
+            Math.min(
+                maxResults + 1,
+                6
+            );
+
+
+        maxChars =
+            Math.min(
+                maxChars + 1000,
+                6500
+            );
+
+    }
+
+
+    const originalCurrentDocument =
+        currentDocument;
+
+
+    const documentContexts =
+        [];
+
+
+    try {
+
+        for (
+            let i = 0;
+            i < validDocuments.length;
+            i++
+        ) {
+
+            const documentItem =
+                validDocuments[i];
+
+
+            currentDocument =
+                documentItem;
+
+
+            const searchResult =
+                await searchIndexedDocument(
+                    documentItem.id,
+                    query,
+                    {
+
+                        profile:
+                            profileType,
+
+                        candidateLimit:
+                            50
+
+                    }
+                );
+
+
+            if (
+                !searchResult ||
+                !Array.isArray(
+                    searchResult.results
+                ) ||
+                searchResult.results.length ===
+                    0
+            ) {
+
+                continue;
+
+            }
+
+
+            const retrieval =
+                await buildRetrievalContext(
+                    searchResult,
+                    {
+
+                        maxResults:
+                            maxResults,
+
+                        maxChars:
+                            maxChars,
+
+                        includeNeighbors:
+                            true
+
+                    }
+                );
+
+
+            if (
+                !retrieval ||
+                !Array.isArray(
+                    retrieval.contexts
+                ) ||
+                retrieval.contexts.length ===
+                    0
+            ) {
+
+                continue;
+
+            }
+
+
+            retrieval.contexts.forEach(
+                function (
+                    contextItem
+                ) {
+
+                    if (
+                        !contextItem
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    documentContexts.push({
+
+                        ...contextItem,
+
+                        documentId:
+                            String(
+                                documentItem.id
+                            ),
+
+                        documentName:
+                            String(
+                                documentItem.name ||
+                                documentItem.fileName ||
+                                "مستند بلا اسم"
+                            ),
+
+                        projectId:
+                            documentItem.projectId !==
+                                undefined &&
+                            documentItem.projectId !==
+                                null
+
+                                ? String(
+                                    documentItem.projectId
+                                )
+
+                                : null
+
+                    });
+
+                }
+            );
+
+        }
+
+    }
+    finally {
+
+        currentDocument =
+            originalCurrentDocument;
+
+    }
+
+
+    if (
+        documentContexts.length ===
+        0
+    ) {
+
+        currentCitationSources =
+            [];
+
+
+        return {
+
+            found:
+                false,
+
+            query:
+                query,
+
+            profile:
+                profileType,
+
+            resultCount:
+                0,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                0,
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            contexts:
+                [],
+
+            text:
+                "",
+
+            citations:
+                [],
+
+            documents:
+                validDocuments.map(
+                    function (
+                        documentItem
+                    ) {
+
+                        return {
+
+                            id:
+                                String(
+                                    documentItem.id
+                                ),
+
+                            name:
+                                String(
+                                    documentItem.name ||
+                                    documentItem.fileName ||
+                                    "مستند بلا اسم"
+                                )
+
+                        };
+
+                    }
+                )
+
+        };
+
+    }
+
+
+    documentContexts.sort(
+        function (
+            a,
+            b
+        ) {
+
+            return (
+                Number(
+                    b.score ||
+                    0
+                ) -
+                Number(
+                    a.score ||
+                    0
+                )
+            );
+
+        }
+    );
+
+
+    const selected =
+        [];
+
+
+    const selectedTexts =
+        [];
+
+
+    let totalChars =
+        0;
+
+
+    for (
+        let i = 0;
+
+        i <
+        documentContexts.length;
+
+        i++
+    ) {
+
+        const item =
+            documentContexts[i];
+
+
+        const mainText =
+            String(
+                item.context ||
+                item.mainParagraph ||
+                ""
+            )
+                .replace(
+                    /\s+/g,
+                    " "
+                )
+                .trim();
+
+
+        if (
+            !mainText
+        ) {
+
+            continue;
+
+        }
+
+
+        let similar =
+            false;
+
+
+        for (
+            let j = 0;
+
+            j <
+            selectedTexts.length;
+
+            j++
+        ) {
+
+            const shorterLength =
+                Math.min(
+                    mainText.length,
+                    selectedTexts[j].length
+                );
+
+
+            if (
+                shorterLength <=
+                0
+            ) {
+
+                continue;
+
+            }
+
+
+            const overlap =
+                getCommonTextLength(
+                    selectedTexts[j],
+                    mainText
+                ) /
+                shorterLength;
+
+
+            if (
+                overlap >=
+                0.75
+            ) {
+
+                similar =
+                    true;
+
+                break;
+
+            }
+
+        }
+
+
+        if (
+            similar
+        ) {
+
+            continue;
+
+        }
+
+
+        const available =
+            Math.max(
+                300,
+                maxChars -
+                totalChars -
+                250
+            );
+
+
+        let contextText =
+            mainText.substring(
+                0,
+                available
+            );
+
+
+        if (
+            item.previousParagraph &&
+            contextText.length <
+                available - 150
+        ) {
+
+            contextText =
+                String(
+                    item.previousParagraph
+                )
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim()
+                    .substring(
+                        0,
+                        Math.max(
+                            120,
+                            available -
+                            contextText.length -
+                            1
+                        )
+                    ) +
+                " " +
+                contextText;
+
+        }
+
+
+        if (
+            item.nextParagraph &&
+            contextText.length <
+                available - 150
+        ) {
+
+            contextText +=
+                " " +
+                String(
+                    item.nextParagraph
+                )
+                    .replace(
+                        /\s+/g,
+                        " "
+                    )
+                    .trim()
+                    .substring(
+                        0,
+                        Math.max(
+                            120,
+                            available -
+                            contextText.length -
+                            1
+                        )
+                    );
+
+        }
+
+
+        const selectedItem = {
+
+            ...item,
+
+            context:
+                contextText
+
+        };
+
+
+        selected.push(
+            selectedItem
+        );
+
+
+        selectedTexts.push(
+            mainText
+        );
+
+
+        totalChars +=
+            contextText.length;
+
+
+        if (
+            selected.length >=
+                maxResults ||
+            totalChars >=
+                maxChars
+        ) {
+
+            break;
+
+        }
+
+    }
+
+
+    if (
+        selected.length ===
+        0
+    ) {
+
+        currentCitationSources =
+            [];
+
+
+        return {
+
+            found:
+                false,
+
+            query:
+                query,
+
+            profile:
+                profileType,
+
+            resultCount:
+                documentContexts.length,
+
+            selectedCount:
+                0,
+
+            totalOccurrences:
+                0,
+
+            matchedTerms:
+                [],
+
+            matchedFamilies:
+                [],
+
+            contexts:
+                [],
+
+            text:
+                "",
+
+            citations:
+                [],
+
+            documents:
+                []
+
+        };
+
+    }
+
+
+    selected.sort(
+        function (
+            a,
+            b
+        ) {
+
+            return (
+                Number(
+                    b.score ||
+                    0
+                ) -
+                Number(
+                    a.score ||
+                    0
+                )
+            );
+
+        }
+    );
+
+
+    const contexts =
+        selected.map(
+            function (
+                item,
+                index
+            ) {
+
+                return {
+
+                    rank:
+                        index + 1,
+
+                    paragraphIndex:
+                        item.paragraphIndex,
+
+                    paragraphId:
+                        item.paragraphId,
+
+                    heading:
+                        String(
+                            item.heading ||
+                            ""
+                        ).trim(),
+
+                    headingScore:
+                        Number(
+                            item.headingScore ||
+                            0
+                        ),
+
+                    sectionAnchorScore:
+                        Number(
+                            item.sectionAnchorScore ||
+                            0
+                        ),
+
+                    matchType:
+                        item.matchType ||
+                        "orama",
+
+                    previousParagraph:
+                        String(
+                            item.previousParagraph ||
+                            ""
+                        ).trim(),
+
+                    mainParagraph:
+                        String(
+                            item.mainParagraph ||
+                            item.text ||
+                            ""
+                        ).trim(),
+
+                    nextParagraph:
+                        String(
+                            item.nextParagraph ||
+                            ""
+                        ).trim(),
+
+                    context:
+                        String(
+                            item.context ||
+                            item.mainParagraph ||
+                            item.text ||
+                            ""
+                        ).trim(),
+
+                    score:
+                        Number(
+                            item.score ||
+                            0
+                        ),
+
+                    documentId:
+                        String(
+                            item.documentId
+                        ),
+
+                    documentName:
+                        String(
+                            item.documentName ||
+                            "مستند بلا اسم"
+                        ),
+
+                    projectId:
+                        item.projectId !==
+                            undefined &&
+                        item.projectId !==
+                            null
+                            ? String(
+                                item.projectId
+                            )
+                            : null
+
+                };
+
+            }
+        );
+
+
+    currentCitationSources =
+        contexts.map(
+            function (
+                item,
+                index
+            ) {
+
+                return {
+
+                    citationIndex:
+                        index + 1,
+
+                    rank:
+                        index + 1,
+
+                    paragraphIndex:
+                        Number.isFinite(
+                            Number(
+                                item.paragraphIndex
+                            )
+                        )
+                            ? Number(
+                                item.paragraphIndex
+                            )
+                            : null,
+
+                    paragraphId:
+                        item.paragraphId !==
+                            undefined &&
+                        item.paragraphId !==
+                            null
+
+                            ? String(
+                                item.paragraphId
+                            )
+
+                            : "",
+
+                    heading:
+                        item.heading,
+
+                    mainParagraph:
+                        item.mainParagraph,
+
+                    text:
+                        item.context,
+
+                    score:
+                        Number(
+                            item.score ||
+                            0
+                        ),
+
+                    matchType:
+                        item.matchType ||
+                        "word",
+
+                    documentId:
+                        item.documentId,
+
+                    documentName:
+                        item.documentName,
+
+                    projectId:
+                        item.projectId
+
+                };
+
+            }
+        );
+
+
+    const text =
+        contexts
+            .map(
+                function (
+                    item
+                ) {
+
+                    let block =
+                        "[مقطع " +
+                        item.rank +
+                        "]\n";
+
+
+                    block +=
+                        "المستند: " +
+                        item.documentName +
+                        "\n";
+
+
+                    if (
+                        item.heading
+                    ) {
+
+                        block +=
+                            "العنوان: " +
+                            item.heading +
+                            "\n";
+
+                    }
+
+
+                    if (
+                        item.previousParagraph
+                    ) {
+
+                        block +=
+                            "السياق السابق: " +
+                            item.previousParagraph +
+                            "\n";
+
+                    }
+
+
+                    block +=
+                        "المقطع المطابق: " +
+                        item.mainParagraph;
+
+
+                    if (
+                        item.nextParagraph
+                    ) {
+
+                        block +=
+                            "\nالسياق التالي: " +
+                        item.nextParagraph;
+
+                    }
+
+
+                    return block;
+
+                }
+            )
+            .join(
+                "\n\n---\n\n"
+            );
+
+
+    return {
+
+        found:
+            true,
+
+        query:
+            query,
+
+        profile:
+            profileType,
+
+        resultCount:
+            documentContexts.length,
+
+        selectedCount:
+            contexts.length,
+
+        totalOccurrences:
+            contexts.length,
+
+        matchedTerms:
+            [],
+
+        matchedFamilies:
+            [],
+
+        contexts:
+            contexts,
+
+        text:
+            text,
+
+        citations:
+            currentCitationSources,
+
+        documents:
+            validDocuments.map(
+                function (
+                    documentItem
+                ) {
+
+                    return {
+
+                        id:
+                            String(
+                                documentItem.id
+                            ),
+
+                        name:
+                            String(
+                                documentItem.name ||
+                                documentItem.fileName ||
+                                "مستند بلا اسم"
+                            )
+
+                    };
+
+                }
+            )
+
+    };
+
+}
 
 // =====================================================
 // Process OpenAI-Compatible SSE
