@@ -1600,9 +1600,15 @@ function renderProjectReferenceDocuments() {
 
             try {
 
-                const processedReferences =
+                const referenceSources =
                     await readSelectedProjectReferenceDocuments(
                         selectedIds
+                    );
+
+
+                const processedReferences =
+                    processReferenceSources(
+                        referenceSources
                     );
 
 
@@ -1614,7 +1620,7 @@ function renderProjectReferenceDocuments() {
                 ) {
 
                     throw new Error(
-                        "لم يتم العثور على مواد قابلة للتحليل في المستندات المختارة."
+                        "لم يتم العثور على مواد قابلة للتحليل."
                     );
 
                 }
@@ -1664,7 +1670,7 @@ function renderProjectReferenceDocuments() {
                 }
 
 
-                const finalReferenceResults =
+                let finalReferenceResults =
                     Array.isArray(
                         aiAnalysisResult.references
                     )
@@ -1674,15 +1680,392 @@ function renderProjectReferenceDocuments() {
                         : [];
 
 
+                finalReferenceResults =
+                    sortUnifiedReferences(
+                        finalReferenceResults,
+                        referenceStyle.order
+                    );
+
+
                 latestUnifiedReferences =
                     finalReferenceResults;
 
+                // =====================================================
+                // إحصاءات النتيجة
+                // =====================================================
+
+                const aiStats =
+                    aiAnalysisResult.stats &&
+                    typeof aiAnalysisResult.stats === "object"
+                        ? aiAnalysisResult.stats
+                        : {};
+
+                const referenceCount =
+                    Number(
+                        aiStats.referenceCount || 0
+                    );
+
+                const multipleReferenceCount =
+                    Number(
+                        aiStats.multipleReferenceCount || 0
+                    );
+
+                const ibidCount =
+                    Number(
+                        aiStats.ibidCount || 0
+                    );
+
+                const internalReferenceCount =
+                    Number(
+                        aiStats.internalReferenceCount || 0
+                    );
+
+                const hadithCount =
+                    Number(
+                        aiStats.hadithCount || 0
+                    );
+
+                const explanatoryCount =
+                    Number(
+                        aiStats.explanatoryCount || 0
+                    );
+
+                const mixedCount =
+                    Number(
+                        aiStats.mixedCount || 0
+                    );
+
+                const reviewCount =
+                    Number(
+                        aiStats.reviewCount || 0
+                    );
+
+                const totalOccurrences =
+                    finalReferenceResults.reduce(
+                        function (
+                            total,
+                            reference
+                        ) {
+
+                            const occurrences =
+                                Array.isArray(
+                                    reference?.occurrences
+                                )
+                                    ? reference.occurrences.length
+                                    : 0;
+
+                            return (
+                                total +
+                                occurrences
+                            );
+
+                        },
+                        0
+                    );
+
+
+                // =====================================================
+                // بناء HTML للمراجع النهائية
+                // نفس قالب المستند الحالي
+                // =====================================================
+
+                const finalReferenceHTML =
+                    finalReferenceResults
+                        .map(
+                            function (
+                                reference,
+                                index
+                            ) {
+
+                                const type =
+                                    String(
+                                        reference?.type ||
+                                        "book"
+                                    )
+                                        .trim()
+                                        .toLowerCase();
+
+                                const typeLabel =
+                                    type === "hadith"
+                                        ? "تخريج حديث"
+                                        : type === "journal"
+                                            ? "مجلة"
+                                            : type === "article"
+                                                ? "بحث / مقال"
+                                                : type === "thesis"
+                                                    ? "رسالة علمية"
+                                                    : type === "website"
+                                                        ? "موقع إلكتروني"
+                                                        : "كتاب";
+
+                                const author =
+                                    escapeReferenceHTML(
+                                        reference?.author ||
+                                        "مؤلف غير محدد"
+                                    );
+
+                                const title =
+                                    escapeReferenceHTML(
+                                        reference?.title ||
+                                        "عنوان غير محدد"
+                                    );
+
+                                const locations =
+                                    Array.isArray(
+                                        reference?.locations
+                                    )
+                                        ? reference.locations
+                                        : [];
+
+                                const variants =
+                                    Array.isArray(
+                                        reference?.variants
+                                    )
+                                        ? reference.variants
+                                        : [];
+
+                                const occurrences =
+                                    Array.isArray(
+                                        reference?.occurrences
+                                    )
+                                        ? reference.occurrences
+                                        : [];
+
+                                const confidenceValue =
+                                    Number(
+                                        reference?.confidence ?? 0
+                                    );
+
+                                const confidence =
+                                    Math.max(
+                                        0,
+                                        Math.min(
+                                            100,
+                                            Math.round(
+                                                confidenceValue <= 1
+                                                    ? confidenceValue * 100
+                                                    : confidenceValue
+                                            )
+                                        )
+                                    );
+
+                                const locationParts =
+                                    locations
+                                        .map(
+                                            function (
+                                                location
+                                            ) {
+
+                                                const volume =
+                                                    escapeReferenceHTML(
+                                                        location?.volume || ""
+                                                    );
+
+                                                const page =
+                                                    escapeReferenceHTML(
+                                                        location?.page || ""
+                                                    );
+
+                                                const pageRange =
+                                                    escapeReferenceHTML(
+                                                        location?.pageRange || ""
+                                                    );
+
+                                                if (
+                                                    volume &&
+                                                    page
+                                                ) {
+
+                                                    return (
+                                                        `ج ${volume} / ص ${page}`
+                                                    );
+
+                                                }
+
+                                                if (
+                                                    pageRange
+                                                ) {
+
+                                                    return (
+                                                        `ص ${pageRange}`
+                                                    );
+
+                                                }
+
+                                                if (
+                                                    page
+                                                ) {
+
+                                                    return (
+                                                        `ص ${page}`
+                                                    );
+
+                                                }
+
+                                                return "";
+
+                                            }
+                                        )
+                                        .filter(
+                                            Boolean
+                                        );
+
+                                const locationHTML =
+                                    locationParts.length
+                                        ? `
+                                            <div class="ai-reference-locations-line">
+
+                                                ${locationParts
+                                                    .map(
+                                                        function (
+                                                            location
+                                                        ) {
+
+                                                            return `
+                                                                <span class="ai-reference-location-chip">
+                                                                    ${location}
+                                                                </span>
+                                                            `;
+
+                                                        }
+                                                    )
+                                                    .join("")}
+
+                                            </div>
+                                        `
+                                        : "";
+
+                                const variantHTML =
+                                    variants.length
+                                        ? `
+                                            <details class="ai-reference-variants">
+
+                                                <summary>
+                                                    صيغ الظهور
+                                                    <span>
+                                                        ${variants.length}
+                                                    </span>
+                                                </summary>
+
+                                                <div class="ai-reference-variants-list">
+
+                                                    ${variants
+                                                        .map(
+                                                            function (
+                                                                variant
+                                                            ) {
+
+                                                                return `
+                                                                    <div class="ai-reference-variant">
+                                                                        ${escapeReferenceHTML(
+                                                                            variant
+                                                                        )}
+                                                                    </div>
+                                                                `;
+
+                                                            }
+                                                        )
+                                                        .join("")}
+
+                                                </div>
+
+                                            </details>
+                                        `
+                                        : "";
+
+                                const reviewHTML =
+                                    reference?.needsReview
+                                        ? `
+                                            <span class="ai-reference-review">
+                                                يحتاج مراجعة
+                                            </span>
+                                        `
+                                        : "";
+
+                                const referenceId =
+                                    escapeReferenceHTML(
+                                        reference?.id ||
+                                        `reference-${index + 1}`
+                                    );
+
+                                return `
+                                    <div
+                                        class="ai-reference-row"
+                                        data-reference-id="${referenceId}">
+
+                                        <div class="ai-reference-index">
+                                            ${String(
+                                                index + 1
+                                            ).padStart(
+                                                2,
+                                                "0"
+                                            )}
+                                        </div>
+
+                                        <div class="ai-reference-main">
+
+                                            <div class="ai-reference-heading">
+
+                                                <span class="ai-reference-type">
+                                                    ${typeLabel}
+                                                </span>
+
+                                                <span class="ai-reference-author">
+                                                    ${author}
+                                                </span>
+
+                                            </div>
+
+                                            <div class="ai-reference-title">
+                                                ${title}
+                                            </div>
+
+                                            ${locationHTML}
+
+                                            <div class="ai-reference-meta">
+
+                                                <span>
+                                                    ظهور
+                                                    <strong>
+                                                        ${occurrences.length}
+                                                    </strong>
+                                                </span>
+
+                                                <span class="ai-reference-separator">
+                                                    |
+                                                </span>
+
+                                                <span>
+                                                    ثقة
+                                                    <strong>
+                                                        ${confidence}%
+                                                    </strong>
+                                                </span>
+
+                                                ${reviewHTML}
+
+                                            </div>
+
+                                            ${variantHTML}
+
+                                        </div>
+
+                                    </div>
+                                `;
+
+                            }
+                        )
+                        .join("");
+
+
+                // =====================================================
+                // عرض النتيجة
+                // =====================================================
 
                 const container =
                     document.getElementById(
                         "project-references-analysis-container"
                     );
-
 
                 if (
                     container
@@ -1693,104 +2076,127 @@ function renderProjectReferenceDocuments() {
                         <div class="references-analysis-result">
 
                             <div
-                                class="references-analysis-status success">
+                                class="references-analysis-status success
+                                    reference-collapsible-header"
+                                data-reference-collapse-toggle
+                                data-reference-collapse-target="project-references-analysis-content">
 
-                                ✓ تم استخراج وتوحيد المراجع
+                                <span>
+                                    ✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي
+                                </span>
 
-                            </div>
-
-                            <div class="references-analysis-info">
-
-                                المستندات المختارة:
-                                <strong>
-                                    ${selectedIds.length}
-                                </strong>
-
-                                <br>
-
-                                المواد المرسلة للتحليل:
-                                <strong>
-                                    ${processedReferences.length}
-                                </strong>
-
-                                <br>
-
-                                المراجع الموحدة:
-                                <strong>
-                                    ${finalReferenceResults.length}
-                                </strong>
+                                <span class="reference-collapsible-arrow">
+                                    ▾
+                                </span>
 
                             </div>
 
-                            <div class="references-final-results">
+                            <div
+                                id="project-references-analysis-content"
+                                class="references-analysis-info
+                                    reference-collapsible-content">
 
-                                <div class="references-final-results-title">
+                                <div>
+                                    المستندات المختارة:
+                                    <strong>
+                                        ${selectedIds.length}
+                                    </strong>
+                                </div>
 
-                                    المراجع الموحدة
+                                <div>
+                                    المواد المرسلة للتحليل:
+                                    <strong>
+                                        ${processedReferences.length}
+                                    </strong>
+                                </div>
 
+                                <div>
+                                    المراجع:
+                                    <strong>
+                                        ${referenceCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    مواد تحتوي عدة مراجع:
+                                    <strong>
+                                        ${multipleReferenceCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    المصدر نفسه:
+                                    <strong>
+                                        ${ibidCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    إحالات داخلية:
+                                    <strong>
+                                        ${internalReferenceCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    تخريج أحاديث:
+                                    <strong>
+                                        ${hadithCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    شرح فقط:
+                                    <strong>
+                                        ${explanatoryCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    شرح + مرجع:
+                                    <strong>
+                                        ${mixedCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    تحتاج مراجعة:
+                                    <strong>
+                                        ${reviewCount}
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    المراجع الموحدة:
                                     <strong>
                                         ${finalReferenceResults.length}
                                     </strong>
-
                                 </div>
 
-                                <div class="references-final-list">
+                                <div>
+                                    مرات الاستشهاد:
+                                    <strong>
+                                        ${totalOccurrences}
+                                    </strong>
+                                </div>
 
-                                    ${
-                                        finalReferenceResults
-                                            .map(
-                                                function (
-                                                    reference,
-                                                    index
-                                                ) {
+                                <div class="references-final-results">
 
-                                                    const author =
-                                                        escapeReferenceHTML(
-                                                            reference?.author ||
-                                                            "مؤلف غير محدد"
-                                                        );
+                                    <div class="references-final-results-title">
 
-                                                    const title =
-                                                        escapeReferenceHTML(
-                                                            reference?.title ||
-                                                            "عنوان غير محدد"
-                                                        );
+                                        المراجع الموحدة
 
-                                                    return `
-                                                        <div class="ai-reference-row">
+                                        <strong>
+                                            ${finalReferenceResults.length}
+                                        </strong>
 
-                                                            <div class="ai-reference-index">
-                                                                ${String(
-                                                                    index + 1
-                                                                ).padStart(
-                                                                    2,
-                                                                    "0"
-                                                                )}
-                                                            </div>
+                                    </div>
 
-                                                            <div class="ai-reference-main">
+                                    <div class="references-final-list">
 
-                                                                <div class="ai-reference-heading">
+                                        ${finalReferenceHTML}
 
-                                                                    <span class="ai-reference-author">
-                                                                        ${author}
-                                                                    </span>
-
-                                                                </div>
-
-                                                                <div class="ai-reference-title">
-                                                                    ${title}
-                                                                </div>
-
-                                                            </div>
-
-                                                        </div>
-                                                    `;
-
-                                                }
-                                            )
-                                            .join("")
-                                    }
+                                    </div>
 
                                 </div>
 
@@ -1800,7 +2206,6 @@ function renderProjectReferenceDocuments() {
                         `;
 
                 }
-
 
                 analyzeProjectReferencesBtn.textContent =
                     "✓ تم استخراج المراجع";
@@ -1876,9 +2281,7 @@ async function readSelectedProjectReferenceDocuments(
 ) {
 
     if (
-        !Array.isArray(
-            documentIds
-        ) ||
+        !Array.isArray(documentIds) ||
         documentIds.length === 0
     ) {
 
@@ -1896,9 +2299,7 @@ async function readSelectedProjectReferenceDocuments(
 
 
     if (
-        !Array.isArray(
-            projectDocuments
-        )
+        !Array.isArray(projectDocuments)
     ) {
 
         throw new Error(
@@ -1946,13 +2347,19 @@ async function readSelectedProjectReferenceDocuments(
     }
 
 
-    const processedReferences = [];
+    const combinedReferenceSources = {
 
+        mainText:
+            "",
 
-    // =====================================================
-    // قراءة المستندات المختارة
-    // ثم استخدام نفس دالة معالجة المواد الحالية
-    // =====================================================
+        footnotes:
+            [],
+
+        endnotes:
+            []
+
+    };
+
 
     for (
         const documentItem of
@@ -1969,11 +2376,6 @@ async function readSelectedProjectReferenceDocuments(
             !file
         ) {
 
-            console.warn(
-                "تعذر العثور على ملف المستند:",
-                documentItem.name
-            );
-
             continue;
 
         }
@@ -1985,42 +2387,97 @@ async function readSelectedProjectReferenceDocuments(
             );
 
 
-        const records =
-            processReferenceSources(
-                referenceSources
-            );
+        if (
+            !referenceSources ||
+            typeof referenceSources !==
+                "object"
+        ) {
 
+            continue;
+
+        }
+
+
+        // =================================================
+        // المتن
+        // =================================================
+
+        if (
+            referenceSources.mainText
+        ) {
+
+            combinedReferenceSources.mainText +=
+                (
+                    combinedReferenceSources.mainText
+                        ? "\n\n"
+                        : ""
+                ) +
+                String(
+                    referenceSources.mainText
+                );
+
+        }
+
+
+        // =================================================
+        // الحواشي
+        // =================================================
 
         if (
             Array.isArray(
-                records
-            ) &&
-            records.length
+                referenceSources.footnotes
+            )
         ) {
 
-            records.forEach(
+            referenceSources.footnotes.forEach(
                 function (
-                    record
+                    note,
+                    index
                 ) {
 
-                    // الاحتفاظ باسم المستند
-                    // لتشخيص المصدر عند تعدد المستندات
+                    combinedReferenceSources.footnotes.push({
 
-                    processedReferences.push({
+                        ...note,
 
-                        ...record,
+                        id:
+                            `project-${documentItem.id}-footnote-${index + 1}`,
 
-                        projectDocumentId:
-                            String(
-                                documentItem.id
-                            ),
+                        number:
+                            combinedReferenceSources.footnotes.length + 1
 
-                        projectDocumentName:
-                            String(
-                                documentItem.name ||
-                                documentItem.fileName ||
-                                ""
-                            )
+                    });
+
+                }
+            );
+
+        }
+
+
+        // =================================================
+        // الحواشي الختامية
+        // =================================================
+
+        if (
+            Array.isArray(
+                referenceSources.endnotes
+            )
+        ) {
+
+            referenceSources.endnotes.forEach(
+                function (
+                    note,
+                    index
+                ) {
+
+                    combinedReferenceSources.endnotes.push({
+
+                        ...note,
+
+                        id:
+                            `project-${documentItem.id}-endnote-${index + 1}`,
+
+                        number:
+                            combinedReferenceSources.endnotes.length + 1
 
                     });
 
@@ -2033,17 +2490,19 @@ async function readSelectedProjectReferenceDocuments(
 
 
     if (
-        processedReferences.length === 0
+        !combinedReferenceSources.mainText.trim() &&
+        combinedReferenceSources.footnotes.length === 0 &&
+        combinedReferenceSources.endnotes.length === 0
     ) {
 
         throw new Error(
-            "لم يتم العثور على مواد قابلة للتحليل في المستندات المختارة."
+            "تعذر استخراج محتوى قابل للتحليل من المستندات المختارة."
         );
 
     }
 
 
-    return processedReferences;
+    return combinedReferenceSources;
 
 }
 // ======================================
@@ -27673,6 +28132,9 @@ if (referencesContent) {
                 saved.format ||
                 "author-title";
 
+            referenceStyle.addMissingAuthors =
+                saved.addMissingAuthors === true;
+
         }
         catch (error) {
 
@@ -29597,6 +30059,82 @@ if (referencesContent) {
 
             }
         );
+
+}
+
+function sortUnifiedReferences(
+    references,
+    order
+) {
+
+    if (
+        !Array.isArray(references)
+    ) {
+
+        return [];
+
+    }
+
+
+    const result =
+        [...references];
+
+
+    if (
+        order === "author"
+    ) {
+
+        result.sort(
+            function (
+                a,
+                b
+            ) {
+
+                return String(
+                    a?.author ||
+                    ""
+                ).localeCompare(
+                    String(
+                        b?.author ||
+                        ""
+                    ),
+                    "ar"
+                );
+
+            }
+        );
+
+    }
+
+
+    else if (
+        order === "title"
+    ) {
+
+        result.sort(
+            function (
+                a,
+                b
+            ) {
+
+                return String(
+                    a?.title ||
+                    ""
+                ).localeCompare(
+                    String(
+                        b?.title ||
+                        ""
+                    ),
+                    "ar"
+                );
+
+            }
+        );
+
+    }
+
+
+    return result;
 
 }
 
