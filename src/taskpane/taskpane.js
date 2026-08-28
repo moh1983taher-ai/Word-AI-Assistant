@@ -36921,7 +36921,45 @@ if (
                                     "library"
                                 ) {
 
-                                    showLibraryScopePicker();
+                                    // ================================================
+                                    // المكتبة الإلكترونية
+                                    // ================================================
+
+                                    researchScope = {
+
+                                        type:
+                                            "library",
+
+                                        scope:
+                                            "specific",
+
+                                        id:
+                                            "ketabonline",
+
+                                        name:
+                                            "المكتبة الإلكترونية"
+
+                                    };
+
+
+                                    updateScopeStatus();
+
+
+                                    scopePanel.classList.remove(
+                                        "open"
+                                    );
+
+
+                                    scopePanel.setAttribute(
+                                        "aria-hidden",
+                                        "true"
+                                    );
+
+
+                                    console.log(
+                                        "نطاق البحث الحالي:",
+                                        researchScope
+                                    );
 
                                 }
 
