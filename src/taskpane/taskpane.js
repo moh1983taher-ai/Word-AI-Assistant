@@ -30621,6 +30621,12 @@ async function sendMessage() {
         researchScope.type === "library"
     ) {
 
+        console.log(
+            "LIBRARY SEARCH START:",
+            researchScope
+        );
+
+
         const libraryData =
             await searchLibrary(
                 text,
@@ -30633,10 +30639,6 @@ async function sendMessage() {
             true;
 
 
-        // =================================================
-        // إلغاء أي تحديث مؤجل
-        // =================================================
-
         if (
             renderTimer !==
             null
@@ -30646,7 +30648,6 @@ async function sendMessage() {
                 renderTimer
             );
 
-
             renderTimer =
                 null;
 
@@ -30654,7 +30655,7 @@ async function sendMessage() {
 
 
         // =================================================
-        // تجهيز نتائج المكتبة
+        // تجهيز النتيجة
         // =================================================
 
         let libraryAnswer =
@@ -30677,42 +30678,44 @@ async function sendMessage() {
                             index
                         ) {
 
-                            const title =
-                                item.title ||
-                                "بدون عنوان";
+                            let result =
+                                `${index + 1}. ${item.title || "بدون عنوان"}\n`;
 
 
-                            const author =
-                                item.author ||
-                                "";
+                            if (
+                                item.author
+                            ) {
+
+                                result +=
+                                    `المؤلف: ${item.author}\n`;
+
+                            }
 
 
-                            const page =
+                            if (
                                 item.page !==
-                                undefined
-                                    ? `الصفحة: ${item.page}`
-                                    : "";
+                                undefined &&
+                                item.page !==
+                                null
+                            ) {
+
+                                result +=
+                                    `الصفحة: ${item.page}\n`;
+
+                            }
 
 
-                            const textResult =
-                                item.text ||
-                                "";
+                            if (
+                                item.text
+                            ) {
+
+                                result +=
+                                    `${item.text}`;
+
+                            }
 
 
-                            return (
-                                `${index + 1}. ${title}\n` +
-                                (
-                                    author
-                                        ? `المؤلف: ${author}\n`
-                                        : ""
-                                ) +
-                                (
-                                    page
-                                        ? `${page}\n`
-                                        : ""
-                                ) +
-                                `${textResult}`
-                            );
+                            return result;
 
                         }
                     )
@@ -30730,7 +30733,7 @@ async function sendMessage() {
 
 
         // =================================================
-        // عرض النتيجة
+        // عرض النتيجة مباشرة
         // =================================================
 
         pendingRenderText =
@@ -30739,10 +30742,6 @@ async function sendMessage() {
 
         renderPendingText();
 
-
-        // =================================================
-        // إزالة فقاعة التحميل
-        // =================================================
 
         if (
             loading &&
@@ -30755,21 +30754,48 @@ async function sendMessage() {
 
 
         // =================================================
-        // حفظ نتيجة المكتبة
+        // إضافة النتيجة للمحادثة
+        // بدون أي نظام إحالات
         // =================================================
 
-        addAIMessage(
-            currentChat,
-            libraryAnswer,
-            []
-        );
+        if (
+            currentChat &&
+            Array.isArray(
+                currentChat.messages
+            )
+        ) {
+
+            currentChat.messages.push({
+
+                role:
+                    "assistant",
+
+                content:
+                    libraryAnswer,
+
+                text:
+                    libraryAnswer,
+
+                citations:
+                    [],
+
+                sources:
+                    [],
+
+                createdAt:
+                    new Date().toISOString()
+
+            });
+
+        }
 
 
         // =================================================
-        // تحديث الواجهة
+        // تحديث العرض مباشرة
         // =================================================
 
         renderChat();
+
 
         renderSidebarChats();
 
@@ -30783,7 +30809,6 @@ async function sendMessage() {
 
 
         return;
-
     }
 
 
