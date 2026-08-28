@@ -20447,6 +20447,438 @@ async function openCitationInWord(
 
 }
 
+function formatLibraryResults(
+    results
+) {
+
+    if (
+        !Array.isArray(
+            results
+        ) ||
+        results.length === 0
+    ) {
+
+        return `
+            <div class="library-empty">
+                لم يتم العثور على نتائج مناسبة في المكتبة.
+            </div>
+        `;
+
+    }
+
+
+    return results
+        .map(
+            function (
+                item,
+                index
+            ) {
+
+                if (!item) {
+
+                    return "";
+
+                }
+
+
+                const bookId =
+                    String(
+                        item.bookId ||
+                        ""
+                    );
+
+
+                const page =
+                    item.page !==
+                    undefined &&
+                    item.page !==
+                    null
+                        ? String(
+                            item.page
+                        )
+                        : "";
+
+
+                const title =
+                    String(
+                        item.title ||
+                        "بدون عنوان"
+                    );
+
+
+                const author =
+                    String(
+                        item.author ||
+                        ""
+                    );
+
+
+                const text =
+                    String(
+                        item.text ||
+                        ""
+                    );
+
+
+                const score =
+                    Number(
+                        item.score ||
+                        0
+                    );
+
+
+                return `
+                    <div
+                        class="library-result-card"
+                        data-library-index="${index}"
+                        data-library-book-id="${bookId}"
+                        data-library-page="${page}"
+                    >
+
+                        <div
+                            class="library-result-header"
+                        >
+
+                            <span
+                                class="library-result-number"
+                            >
+                                ${index + 1}
+                            </span>
+
+                            <div
+                                class="library-result-title-wrap"
+                            >
+
+                                <div
+                                    class="library-result-title"
+                                >
+                                    ${escapeHtml(
+                                        title
+                                    )}
+                                </div>
+
+                                ${
+                                    author
+                                        ? `
+                                            <div
+                                                class="library-result-author"
+                                            >
+                                                ${escapeHtml(
+                                                    author
+                                                )}
+                                            </div>
+                                        `
+                                        : ""
+                                }
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="library-result-meta"
+                        >
+
+                            ${
+                                page
+                                    ? `
+                                        <span>
+                                            الصفحة ${escapeHtml(
+                                                page
+                                            )}
+                                        </span>
+                                    `
+                                    : ""
+                            }
+
+                            ${
+                                score
+                                    ? `
+                                        <span>
+                                            درجة الصلة ${score}
+                                        </span>
+                                    `
+                                    : ""
+                            }
+
+                        </div>
+
+
+                        <div
+                            class="library-result-text"
+                        >
+                            ${escapeHtml(
+                                text
+                            )}
+                        </div>
+
+
+                        <div
+                            class="library-result-actions"
+                        >
+
+                            <button
+                                type="button"
+                                class="library-open-btn"
+                                data-library-action="open"
+                                data-library-index="${index}"
+                            >
+                                فتح الموضع
+                            </button>
+
+
+                            <button
+                                type="button"
+                                class="library-copy-btn"
+                                data-library-action="copy"
+                                data-library-index="${index}"
+                            >
+                                نسخ النص
+                            </button>
+
+                        </div>
+
+                    </div>
+                `;
+
+            }
+        )
+        .join("");
+
+}
+
+function escapeHtml(
+    value
+) {
+
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.textContent =
+        String(
+            value ||
+            ""
+        );
+
+    return div.innerHTML;
+
+}
+
+// =====================================================
+// حماية النص قبل إدخاله إلى HTML
+// =====================================================
+
+function escapeHtml(value) {
+
+    const div =
+        document.createElement("div");
+
+    div.textContent =
+        String(value || "");
+
+    return div.innerHTML;
+}
+
+
+// =====================================================
+// عرض نتائج المكتبة
+// =====================================================
+
+function formatLibraryResults(results) {
+
+    if (
+        !Array.isArray(results) ||
+        results.length === 0
+    ) {
+
+        return `
+            <div class="library-empty">
+                لم يتم العثور على نتائج مناسبة في المكتبة.
+            </div>
+        `;
+
+    }
+
+
+    return `
+        <div class="library-results">
+            ${results
+                .map(
+                    function (
+                        item,
+                        index
+                    ) {
+
+                        if (!item) {
+                            return "";
+                        }
+
+
+                        const title =
+                            escapeHtml(
+                                item.title ||
+                                "بدون عنوان"
+                            );
+
+
+                        const author =
+                            escapeHtml(
+                                item.author ||
+                                ""
+                            );
+
+
+                        const page =
+                            item.page !==
+                                undefined &&
+                            item.page !==
+                                null
+                                ? escapeHtml(
+                                    item.page
+                                )
+                                : "";
+
+
+                        const text =
+                            escapeHtml(
+                                item.text ||
+                                ""
+                            );
+
+
+                        const score =
+                            Number(
+                                item.score ||
+                                0
+                            );
+
+
+                        return `
+                            <div
+                                class="library-result-card"
+                                data-library-index="${index}"
+                                data-library-book-id="${escapeHtml(
+                                    item.bookId || ""
+                                )}"
+                                data-library-page="${page}"
+                                data-library-page-id="${escapeHtml(
+                                    item.pageId || ""
+                                )}"
+                            >
+
+                                <div
+                                    class="library-result-header"
+                                >
+
+                                    <span
+                                        class="library-result-number"
+                                    >
+                                        ${index + 1}
+                                    </span>
+
+
+                                    <div
+                                        class="library-result-title-area"
+                                    >
+
+                                        <div
+                                            class="library-result-title"
+                                        >
+                                            ${title}
+                                        </div>
+
+
+                                        ${
+                                            author
+                                                ? `
+                                                    <div
+                                                        class="library-result-author"
+                                                    >
+                                                        ${author}
+                                                    </div>
+                                                `
+                                                : ""
+                                        }
+
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    class="library-result-meta"
+                                >
+
+                                    ${
+                                        page
+                                            ? `
+                                                <span>
+                                                    الصفحة ${page}
+                                                </span>
+                                            `
+                                            : ""
+                                    }
+
+
+                                    ${
+                                        score
+                                            ? `
+                                                <span>
+                                                    درجة الصلة ${score}
+                                                </span>
+                                            `
+                                            : ""
+                                    }
+
+                                </div>
+
+
+                                <div
+                                    class="library-result-text"
+                                >
+                                    ${text}
+                                </div>
+
+
+                                <div
+                                    class="library-result-actions"
+                                >
+
+                                    <button
+                                        type="button"
+                                        class="library-open-btn"
+                                        data-library-action="open"
+                                        data-library-index="${index}"
+                                    >
+                                        فتح الموضع
+                                    </button>
+
+
+                                    <button
+                                        type="button"
+                                        class="library-copy-btn"
+                                        data-library-action="copy"
+                                        data-library-index="${index}"
+                                    >
+                                        نسخ النص
+                                    </button>
+
+                                </div>
+
+                            </div>
+                        `;
+
+                    }
+                )
+                .join("")
+            }
+        </div>
+    `;
+
+}
 
 // =====================================================
 // Render Chat
@@ -20548,7 +20980,25 @@ function renderChat() {
 
 
             // ==================================
-            // رسالة AI
+            // نتائج المكتبة
+            // ==================================
+
+            else if (
+                Array.isArray(
+                    msg.libraryResults
+                )
+            ) {
+
+                div.innerHTML =
+                    formatLibraryResults(
+                        msg.libraryResults
+                    );
+
+            }
+
+
+            // ==================================
+            // رسالة AI العادية
             // ==================================
 
             else {
@@ -20574,6 +21024,180 @@ function renderChat() {
 
         }
     );
+
+
+    // =====================================================
+    // زر فتح الموضع
+    // =====================================================
+
+    chatArea
+        .querySelectorAll(
+            ".library-open-btn"
+        )
+        .forEach(
+            function (
+                button
+            ) {
+
+                button.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        const card =
+                            button.closest(
+                                ".library-result-card"
+                            );
+
+
+                        if (!card) {
+
+                            return;
+
+                        }
+
+
+                        const index =
+                            Number(
+                                card.getAttribute(
+                                    "data-library-index"
+                                )
+                            );
+
+
+                        const bookId =
+                            card.getAttribute(
+                                "data-library-book-id"
+                            );
+
+
+                        const page =
+                            card.getAttribute(
+                                "data-library-page"
+                            );
+
+
+                        const pageId =
+                            card.getAttribute(
+                                "data-library-page-id"
+                            );
+
+
+                        console.log(
+                            "LIBRARY OPEN:",
+                            {
+                                index,
+                                bookId,
+                                page,
+                                pageId
+                            }
+                        );
+
+                    };
+
+            }
+        );
+
+
+    // =====================================================
+    // زر نسخ النص
+    // =====================================================
+
+    chatArea
+        .querySelectorAll(
+            ".library-copy-btn"
+        )
+        .forEach(
+            function (
+                button
+            ) {
+
+                button.onclick =
+                    async function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        const card =
+                            button.closest(
+                                ".library-result-card"
+                            );
+
+
+                        if (!card) {
+
+                            return;
+
+                        }
+
+
+                        const textElement =
+                            card.querySelector(
+                                ".library-result-text"
+                            );
+
+
+                        const text =
+                            textElement
+                                ? textElement.textContent.trim()
+                                : "";
+
+
+                        if (!text) {
+
+                            return;
+
+                        }
+
+
+                        try {
+
+                            await navigator.clipboard.writeText(
+                                text
+                            );
+
+
+                            const originalText =
+                                button.textContent;
+
+
+                            button.textContent =
+                                "تم النسخ ✓";
+
+
+                            setTimeout(
+                                function () {
+
+                                    button.textContent =
+                                        originalText;
+
+                                },
+                                1200
+                            );
+
+                        }
+                        catch (
+                            error
+                        ) {
+
+                            console.error(
+                                "تعذر نسخ النص:",
+                                error
+                            );
+
+                        }
+
+                    };
+
+            }
+        );
 
 
     chatArea.scrollTop =
@@ -20780,7 +21404,8 @@ function cloneCitationSources(
 function addAIMessage(
     chat,
     text,
-    citationSources
+    citationSources,
+    libraryResults
 ) {
 
     if (!chat) {
@@ -20815,8 +21440,19 @@ function addAIMessage(
 
         citationSources:
             cloneCitationSources(
-                citationSources
+                Array.isArray(
+                    citationSources
+                )
+                    ? citationSources
+                    : []
+            ),
+
+        libraryResults:
+            Array.isArray(
+                libraryResults
             )
+                ? libraryResults
+                : null
 
     });
 
@@ -30657,7 +31293,7 @@ async function sendMessage() {
 
 
         // =================================================
-        // تجهيز النتيجة
+        // تجهيز النص الاحتياطي للرسالة
         // =================================================
 
         let libraryAnswer =
@@ -30712,7 +31348,7 @@ async function sendMessage() {
                             ) {
 
                                 result +=
-                                    `${item.text}`;
+                                    item.text;
 
                             }
 
@@ -30735,7 +31371,7 @@ async function sendMessage() {
 
 
         // =================================================
-        // عرض النتيجة مباشرة
+        // عرض النتيجة الحالية
         // =================================================
 
         pendingRenderText =
@@ -30744,6 +31380,10 @@ async function sendMessage() {
 
         renderPendingText();
 
+
+        // =================================================
+        // إزالة فقاعة التحميل
+        // =================================================
 
         if (
             loading &&
@@ -30756,8 +31396,7 @@ async function sendMessage() {
 
 
         // =================================================
-        // إضافة النتيجة للمحادثة
-        // بدون أي نظام إحالات
+        // حفظ رسالة المكتبة مع النتائج الأصلية
         // =================================================
 
         if (
@@ -30770,34 +31409,46 @@ async function sendMessage() {
             currentChat.messages.push({
 
                 role:
-                    "assistant",
-
-                content:
-                    libraryAnswer,
+                    "ai",
 
                 text:
                     libraryAnswer,
 
-                citations:
+                citationSources:
                     [],
 
-                sources:
-                    [],
+                libraryResults:
+                    (
+                        libraryData &&
+                        Array.isArray(
+                            libraryData.results
+                        )
+                    )
+                        ? libraryData.results
+                        : [],
 
                 createdAt:
                     new Date().toISOString()
 
             });
 
+
+            currentChat.updatedAt =
+                new Date().toISOString();
+
+
+            saveChat(
+                currentChat
+            );
+
         }
 
 
         // =================================================
-        // تحديث العرض مباشرة
+        // تحديث الواجهة
         // =================================================
 
         renderChat();
-
 
         renderSidebarChats();
 
