@@ -60,6 +60,8 @@ let currentDocument = null;
 let currentChat = null;
 let referencesSourceDocument = null;
 
+let currentCitationSources = [];
+
 let researchScope = {
 
     type: "project",
