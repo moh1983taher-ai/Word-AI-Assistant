@@ -1600,23 +1600,21 @@ function renderProjectReferenceDocuments() {
 
             try {
 
-                const referenceSources =
+                // =====================================================
+                // قراءة وتجهيز كل مستند على حدة
+                // =====================================================
+
+                const projectInputs =
                     await readSelectedProjectReferenceDocuments(
                         selectedIds
                     );
 
 
-                const processedReferences =
-                    processReferenceSources(
-                        referenceSources
-                    );
-
-
                 if (
                     !Array.isArray(
-                        processedReferences
+                        projectInputs
                     ) ||
-                    processedReferences.length === 0
+                    projectInputs.length === 0
                 ) {
 
                     throw new Error(
@@ -1626,59 +1624,230 @@ function renderProjectReferenceDocuments() {
                 }
 
 
-                if (
-                    !Array.isArray(
-                        processedReferences
-                    ) ||
-                    processedReferences.length === 0
+                // =====================================================
+                // تحليل كل مستند في طلب مستقل
+                // =====================================================
+
+                const allReferences = [];
+
+                let totalMaterials = 0;
+
+                let referenceCount = 0;
+
+                let multipleReferenceCount = 0;
+
+                let ibidCount = 0;
+
+                let internalReferenceCount = 0;
+
+                let hadithCount = 0;
+
+                let explanatoryCount = 0;
+
+                let mixedCount = 0;
+
+                let reviewCount = 0;
+
+
+                for (
+                    let documentIndex = 0;
+
+                    documentIndex <
+                        projectInputs.length;
+
+                    documentIndex++
                 ) {
 
-                    throw new Error(
-                        "لم يتم العثور على مواد قابلة للتحليل في المستندات المختارة."
-                    );
-
-                }
-
-
-                analyzeProjectReferencesBtn.textContent =
-                    "جارٍ تحليل وتوحيد المراجع بالذكاء الاصطناعي...";
+                    const projectInput =
+                        projectInputs[
+                            documentIndex
+                        ];
 
 
-                const addMissingAuthors =
-                    addAuthors
-                        ? addAuthors.checked
-                        : false;
+                    const processedReferences =
+                        Array.isArray(
+                            projectInput.processedReferences
+                        )
+                            ? projectInput.processedReferences
+                            : [];
 
 
-                const aiAnalysisResult =
-                    await analyzeReferencesWithAI(
-                        processedReferences,
-                        addMissingAuthors
-                    );
+                    if (
+                        processedReferences.length === 0
+                    ) {
+
+                        continue;
+
+                    }
 
 
-                if (
-                    !aiAnalysisResult ||
-                    typeof aiAnalysisResult !==
-                        "object"
-                ) {
-
-                    throw new Error(
-                        "لم تصل نتيجة منظمة من الذكاء الاصطناعي."
-                    );
-
-                }
+                    analyzeProjectReferencesBtn.textContent =
+                        `جارٍ تحليل المستند ${documentIndex + 1} من ${projectInputs.length}...`;
 
 
-                let finalReferenceResults =
-                    Array.isArray(
-                        aiAnalysisResult.references
-                    )
-                        ? mergeEquivalentReferences(
+                    const addMissingAuthors =
+                        addAuthors
+                            ? addAuthors.checked
+                            : false;
+
+
+                    const aiAnalysisResult =
+                        await analyzeReferencesWithAI(
+                            processedReferences,
+                            addMissingAuthors
+                        );
+
+
+                    if (
+                        !aiAnalysisResult ||
+                        typeof aiAnalysisResult !==
+                            "object"
+                    ) {
+
+                        throw new Error(
+                            `تعذر تحليل المستند: ${projectInput.documentName}`
+                        );
+
+                    }
+
+
+                    // =================================================
+                    // إحصاءات المستند
+                    // =================================================
+
+                    const documentStats =
+                        aiAnalysisResult.stats &&
+                        typeof aiAnalysisResult.stats === "object"
+                            ? aiAnalysisResult.stats
+                            : {};
+
+
+                    totalMaterials +=
+                        processedReferences.length;
+
+
+                    referenceCount +=
+                        Number(
+                            documentStats.referenceCount ||
+                            0
+                        );
+
+
+                    multipleReferenceCount +=
+                        Number(
+                            documentStats.multipleReferenceCount ||
+                            0
+                        );
+
+
+                    ibidCount +=
+                        Number(
+                            documentStats.ibidCount ||
+                            0
+                        );
+
+
+                    internalReferenceCount +=
+                        Number(
+                            documentStats.internalReferenceCount ||
+                            0
+                        );
+
+
+                    hadithCount +=
+                        Number(
+                            documentStats.hadithCount ||
+                            0
+                        );
+
+
+                    explanatoryCount +=
+                        Number(
+                            documentStats.explanatoryCount ||
+                            0
+                        );
+
+
+                    mixedCount +=
+                        Number(
+                            documentStats.mixedCount ||
+                            0
+                        );
+
+
+                    reviewCount +=
+                        Number(
+                            documentStats.reviewCount ||
+                            0
+                        );
+
+
+                    // =================================================
+                    // تجميع مراجع المستند
+                    // =================================================
+
+                    if (
+                        Array.isArray(
                             aiAnalysisResult.references
                         )
-                        : [];
+                    ) {
 
+                        aiAnalysisResult.references.forEach(
+                            function (
+                                reference
+                            ) {
+
+                                if (
+                                    !reference ||
+                                    typeof reference !==
+                                        "object"
+                                ) {
+
+                                    return;
+
+                                }
+
+
+                                allReferences.push(
+                                    reference
+                                );
+
+                            }
+                        );
+
+                    }
+
+                }
+
+
+                // =====================================================
+                // لا توجد نتائج
+                // =====================================================
+
+                if (
+                    allReferences.length === 0
+                ) {
+
+                    throw new Error(
+                        "لم ينتج التحليل أي مراجع."
+                    );
+
+                }
+
+
+                // =====================================================
+                // توحيد نتائج جميع المستندات
+                // =====================================================
+
+                let finalReferenceResults =
+                    mergeEquivalentReferences(
+                        allReferences
+                    );
+
+
+                // =====================================================
+                // ترتيب المراجع
+                // =====================================================
 
                 finalReferenceResults =
                     sortUnifiedReferences(
@@ -1689,79 +1858,6 @@ function renderProjectReferenceDocuments() {
 
                 latestUnifiedReferences =
                     finalReferenceResults;
-
-                // =====================================================
-                // إحصاءات النتيجة
-                // =====================================================
-
-                const aiStats =
-                    aiAnalysisResult.stats &&
-                    typeof aiAnalysisResult.stats === "object"
-                        ? aiAnalysisResult.stats
-                        : {};
-
-                const referenceCount =
-                    Number(
-                        aiStats.referenceCount || 0
-                    );
-
-                const multipleReferenceCount =
-                    Number(
-                        aiStats.multipleReferenceCount || 0
-                    );
-
-                const ibidCount =
-                    Number(
-                        aiStats.ibidCount || 0
-                    );
-
-                const internalReferenceCount =
-                    Number(
-                        aiStats.internalReferenceCount || 0
-                    );
-
-                const hadithCount =
-                    Number(
-                        aiStats.hadithCount || 0
-                    );
-
-                const explanatoryCount =
-                    Number(
-                        aiStats.explanatoryCount || 0
-                    );
-
-                const mixedCount =
-                    Number(
-                        aiStats.mixedCount || 0
-                    );
-
-                const reviewCount =
-                    Number(
-                        aiStats.reviewCount || 0
-                    );
-
-                const totalOccurrences =
-                    finalReferenceResults.reduce(
-                        function (
-                            total,
-                            reference
-                        ) {
-
-                            const occurrences =
-                                Array.isArray(
-                                    reference?.occurrences
-                                )
-                                    ? reference.occurrences.length
-                                    : 0;
-
-                            return (
-                                total +
-                                occurrences
-                            );
-
-                        },
-                        0
-                    );
 
 
                 // =====================================================
@@ -2347,19 +2443,12 @@ async function readSelectedProjectReferenceDocuments(
     }
 
 
-    const combinedReferenceSources = {
+    const projectInputs = [];
 
-        mainText:
-            "",
 
-        footnotes:
-            [],
-
-        endnotes:
-            []
-
-    };
-
+    // =====================================================
+    // تجهيز كل مستند على حدة
+    // =====================================================
 
     for (
         const documentItem of
@@ -2376,6 +2465,11 @@ async function readSelectedProjectReferenceDocuments(
             !file
         ) {
 
+            console.warn(
+                "تعذر العثور على ملف المستند:",
+                documentItem.name
+            );
+
             continue;
 
         }
@@ -2389,8 +2483,7 @@ async function readSelectedProjectReferenceDocuments(
 
         if (
             !referenceSources ||
-            typeof referenceSources !==
-                "object"
+            typeof referenceSources !== "object"
         ) {
 
             continue;
@@ -2398,111 +2491,58 @@ async function readSelectedProjectReferenceDocuments(
         }
 
 
-        // =================================================
-        // المتن
-        // =================================================
+        const processedReferences =
+            processReferenceSources(
+                referenceSources
+            );
+
 
         if (
-            referenceSources.mainText
+            !Array.isArray(
+                processedReferences
+            ) ||
+            processedReferences.length === 0
         ) {
 
-            combinedReferenceSources.mainText +=
-                (
-                    combinedReferenceSources.mainText
-                        ? "\n\n"
-                        : ""
-                ) +
+            continue;
+
+        }
+
+
+        projectInputs.push({
+
+            documentId:
                 String(
-                    referenceSources.mainText
-                );
+                    documentItem.id
+                ),
 
-        }
+            documentName:
+                String(
+                    documentItem.name ||
+                    documentItem.fileName ||
+                    ""
+                ),
 
+            processedReferences:
+                processedReferences
 
-        // =================================================
-        // الحواشي
-        // =================================================
-
-        if (
-            Array.isArray(
-                referenceSources.footnotes
-            )
-        ) {
-
-            referenceSources.footnotes.forEach(
-                function (
-                    note,
-                    index
-                ) {
-
-                    combinedReferenceSources.footnotes.push({
-
-                        ...note,
-
-                        id:
-                            `project-${documentItem.id}-footnote-${index + 1}`,
-
-                        number:
-                            combinedReferenceSources.footnotes.length + 1
-
-                    });
-
-                }
-            );
-
-        }
-
-
-        // =================================================
-        // الحواشي الختامية
-        // =================================================
-
-        if (
-            Array.isArray(
-                referenceSources.endnotes
-            )
-        ) {
-
-            referenceSources.endnotes.forEach(
-                function (
-                    note,
-                    index
-                ) {
-
-                    combinedReferenceSources.endnotes.push({
-
-                        ...note,
-
-                        id:
-                            `project-${documentItem.id}-endnote-${index + 1}`,
-
-                        number:
-                            combinedReferenceSources.endnotes.length + 1
-
-                    });
-
-                }
-            );
-
-        }
+        });
 
     }
 
 
     if (
-        !combinedReferenceSources.mainText.trim() &&
-        combinedReferenceSources.footnotes.length === 0 &&
-        combinedReferenceSources.endnotes.length === 0
+        projectInputs.length === 0
     ) {
 
         throw new Error(
-            "تعذر استخراج محتوى قابل للتحليل من المستندات المختارة."
+            "لم يتم العثور على مواد قابلة للتحليل في المستندات المختارة."
         );
 
     }
 
 
-    return combinedReferenceSources;
+    return projectInputs;
 
 }
 // ======================================
