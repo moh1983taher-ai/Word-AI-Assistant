@@ -1730,7 +1730,18 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 3. تحليل كل مستند
+                // 3. عدد مواد السياق المحيطة بكل دفعة
+                //
+                // هذه المواد تساعد الذكاء الاصطناعي على فهم
+                // الاستمرارية بين الدفعات، لكنها لا تدخل في
+                // التحليل الفعلي ولا تُنشأ منها occurrences.
+                // =====================================================
+
+                const PROJECT_REFERENCE_CONTEXT_SIZE = 20;
+
+
+                // =====================================================
+                // 4. تحليل كل مستند
                 //    مع تقسيمه إلى دفعات عند تجاوز الحد
                 // =====================================================
 
@@ -1776,6 +1787,7 @@ function renderProjectReferenceDocuments() {
                             PROJECT_REFERENCE_BATCH_SIZE
                         );
 
+
                     // -------------------------------------------------
                     // تحليل الدفعات
                     // -------------------------------------------------
@@ -1807,6 +1819,67 @@ function renderProjectReferenceDocuments() {
                         }
 
 
+                        // =================================================
+                        // تحديد موضع الدفعة داخل المستند الأصلي
+                        // =================================================
+
+                        const batchStartIndex =
+                            processedReferences.indexOf(
+                                batch[0]
+                            );
+
+
+                        const batchEndIndex =
+                            batchStartIndex >= 0
+                                ? (
+                                    batchStartIndex +
+                                    batch.length
+                                )
+                                : processedReferences.length;
+
+
+                        // =================================================
+                        // مواد السياق السابقة
+                        // =================================================
+
+                        const contextBefore =
+                            batchStartIndex > 0
+                                ? processedReferences.slice(
+                                    Math.max(
+                                        0,
+                                        batchStartIndex -
+                                            PROJECT_REFERENCE_CONTEXT_SIZE
+                                    ),
+                                    batchStartIndex
+                                )
+                                : [];
+
+
+                        // =================================================
+                        // مواد السياق اللاحقة
+                        // =================================================
+
+                        const contextAfter =
+                            batchEndIndex <
+                            processedReferences.length
+                                ? processedReferences.slice(
+                                    batchEndIndex,
+                                    Math.min(
+                                        processedReferences.length,
+                                        batchEndIndex +
+                                            PROJECT_REFERENCE_CONTEXT_SIZE
+                                    )
+                                )
+                                : [];
+
+
+                        const contextMaterials =
+                            [
+                                ...contextBefore,
+                                ...contextAfter
+                            ];
+
+
                         analyzeProjectReferencesBtn.textContent =
                             `جارٍ تحليل ${projectInput.documentName} — الدفعة ${batchIndex + 1} من ${batches.length}...`;
 
@@ -1833,19 +1906,29 @@ function renderProjectReferenceDocuments() {
                                     batches.length,
 
                                 materials:
-                                    batch.length
+                                    batch.length,
+
+                                contextBefore:
+                                    contextBefore.length,
+
+                                contextAfter:
+                                    contextAfter.length,
+
+                                contextTotal:
+                                    contextMaterials.length
                             }
                         );
 
 
                         // =================================================
-                        // تحليل الدفعة
+                        // تحليل الدفعة مع السياق
                         // =================================================
 
                         const aiAnalysisResult =
                             await analyzeReferencesWithAI(
                                 batch,
-                                addMissingAuthors
+                                addMissingAuthors,
+                                contextMaterials
                             );
 
 
@@ -1873,6 +1956,9 @@ function renderProjectReferenceDocuments() {
 
                                 batch:
                                     batchIndex + 1,
+
+                                totalBatches:
+                                    batches.length,
 
                                 result:
                                     aiAnalysisResult
@@ -1993,7 +2079,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 4. التحقق من النتائج
+                // 5. التحقق من النتائج
                 // =====================================================
 
                 if (
@@ -2008,7 +2094,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 5. التوحيد النهائي بين جميع الدفعات والمستندات
+                // 6. التوحيد النهائي بين جميع الدفعات والمستندات
                 // =====================================================
 
                 let finalReferenceResults =
@@ -2018,7 +2104,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 6. الترتيب
+                // 7. الترتيب
                 // =====================================================
 
                 finalReferenceResults =
@@ -2033,7 +2119,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 7. إجمالي مرات الاستشهاد
+                // 8. إجمالي مرات الاستشهاد
                 // =====================================================
 
                 const totalOccurrences =
@@ -2062,7 +2148,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 8. بناء HTML للمراجع
+                // 9. بناء HTML للمراجع
                 // =====================================================
 
                 const finalReferenceHTML =
@@ -2378,7 +2464,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 9. عرض النتيجة النهائية
+                // 10. عرض النتيجة النهائية
                 // =====================================================
 
                 const container =
@@ -24141,11 +24227,14 @@ function escapeHTML(value) {
 
 async function analyzeReferencesWithAI(
     materials,
-    addMissingAuthors = false
+    addMissingAuthors = false,
+    contextMaterials = []
 ) {
 
     if (
-        !Array.isArray(materials) ||
+        !Array.isArray(
+            materials
+        ) ||
         materials.length === 0
     ) {
 
@@ -24165,6 +24254,14 @@ async function analyzeReferencesWithAI(
         };
 
     }
+
+
+    const safeContextMaterials =
+        Array.isArray(
+            contextMaterials
+        )
+            ? contextMaterials
+            : [];
 
 
     const settings =
@@ -24196,7 +24293,9 @@ async function analyzeReferencesWithAI(
             .trim();
 
 
-    if (!key) {
+    if (
+        !key
+    ) {
 
         throw new Error(
             "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
@@ -24205,7 +24304,9 @@ async function analyzeReferencesWithAI(
     }
 
 
-    if (!model) {
+    if (
+        !model
+    ) {
 
         throw new Error(
             "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
@@ -24215,7 +24316,7 @@ async function analyzeReferencesWithAI(
 
 
     // =====================================================
-    // تجهيز المواد
+    // تجهيز المواد المستهدفة
     // =====================================================
 
     const payload =
@@ -24231,17 +24332,20 @@ async function analyzeReferencesWithAI(
                         `material-${index + 1}`
                     );
 
+
                 const source =
                     String(
                         material?.source ||
                         ""
                     );
 
+
                 const kind =
                     String(
                         material?.kind ||
                         ""
                     );
+
 
                 const originalText =
                     String(
@@ -24265,6 +24369,7 @@ async function analyzeReferencesWithAI(
 
                 let markedText =
                     originalText;
+
 
                 if (
                     source === "footnote" &&
@@ -24313,7 +24418,120 @@ async function analyzeReferencesWithAI(
                             material?.context ||
                             ""
                         )
-                            .trim()
+                            .trim(),
+
+                    analysisRole:
+                        "target"
+
+                };
+
+            }
+        );
+
+
+    // =====================================================
+    // تجهيز مواد السياق
+    // =====================================================
+
+    const contextPayload =
+        safeContextMaterials.map(
+            function (
+                material,
+                index
+            ) {
+
+                const materialId =
+                    String(
+                        material?.id ||
+                        `context-material-${index + 1}`
+                    );
+
+
+                const source =
+                    String(
+                        material?.source ||
+                        ""
+                    );
+
+
+                const kind =
+                    String(
+                        material?.kind ||
+                        ""
+                    );
+
+
+                const originalText =
+                    String(
+                        material?.originalText ||
+                        material?.cleanedText ||
+                        material?.text ||
+                        ""
+                    )
+                        .trim();
+
+
+                let markedText =
+                    originalText;
+
+
+                if (
+                    source === "footnote" &&
+                    materialId
+                ) {
+
+                    markedText =
+                        `【CONTEXT_ONLY_FOOTNOTE_ID:${materialId}】\n${originalText}`;
+
+                }
+                else if (
+                    source === "endnote" &&
+                    materialId
+                ) {
+
+                    markedText =
+                        `【CONTEXT_ONLY_ENDNOTE_ID:${materialId}】\n${originalText}`;
+
+                }
+                else {
+
+                    markedText =
+                        `【CONTEXT_ONLY_MATERIAL_ID:${materialId}】\n${originalText}`;
+
+                }
+
+
+                return {
+
+                    materialId:
+                        materialId,
+
+                    source:
+                        source,
+
+                    kind:
+                        kind,
+
+                    noteNumber:
+                        material?.noteNumber ??
+                        null,
+
+                    position:
+                        material?.position ??
+                        null,
+
+                    text:
+                        markedText,
+
+                    context:
+                        String(
+                            material?.context ||
+                            ""
+                        )
+                            .trim(),
+
+                    analysisRole:
+                        "context-only"
 
                 };
 
@@ -24329,7 +24547,10 @@ async function analyzeReferencesWithAI(
         new Map();
 
 
-    payload.forEach(
+    [
+        ...payload,
+        ...contextPayload
+    ].forEach(
         function (
             material
         ) {
@@ -24387,47 +24608,78 @@ async function analyzeReferencesWithAI(
                 }
 
 
-                reference.occurrences.forEach(
-                    function (
-                        occurrence
-                    ) {
+                reference.occurrences =
+                    reference.occurrences.filter(
+                        function (
+                            occurrence
+                        ) {
 
-                        const material =
-                            materialIndex.get(
+                            const material =
+                                materialIndex.get(
+                                    String(
+                                        occurrence?.materialId ||
+                                        ""
+                                    )
+                                );
+
+
+                            if (
+                                !material
+                            ) {
+
+                                return false;
+
+                            }
+
+
+                            /*
+                             * لا نسمح بإنشاء occurrence
+                             * من مادة سياق فقط.
+                             */
+
+                            if (
+                                material.analysisRole ===
+                                "context-only"
+                            ) {
+
+                                return false;
+
+                            }
+
+
+                            // هذه البيانات مصدرها المادة الأصلية
+
+                            occurrence.source =
                                 String(
-                                    occurrence?.materialId ||
+                                    material.source ||
                                     ""
-                                )
-                            );
+                                );
 
 
-                        if (!material) {
+                            occurrence.noteNumber =
+                                material.noteNumber ??
+                                null;
 
-                            return;
+
+                            occurrence.position =
+                                material.position ??
+                                null;
+
+
+                            /*
+                             * نحتفظ بالهوية الأصلية للمادة.
+                             */
+
+                            occurrence.materialId =
+                                String(
+                                    material.materialId
+                                );
+
+
+                            return true;
 
                         }
-
-
-                        // هذه البيانات مصدرها Word نفسه
-
-                        occurrence.source =
-                            String(
-                                material.source ||
-                                ""
-                            );
-
-
-                        occurrence.noteNumber =
-                            material.noteNumber ??
-                            null;
-
-
-                        occurrence.position =
-                            material.position ??
-                            null;
-
-                    }
-                );
+                    );
 
             }
         );
@@ -24552,24 +24804,51 @@ materialId = "endnote-12"
 عند نقص السياق، لا تخترع معلومات غير موجودة.
 
 =====================================================
-4. المراجع المتعددة داخل المادة
+1.5 المواد المستهدفة ومواد السياق
 =====================================================
 
-المادة الواحدة قد تحتوي على مرجع واحد أو عدة مراجع مستقلة.
+كل مادة تحمل analysisRole.
 
-بالنسبة لمواد الحواشي والتعليقات الختامية:
-حلل المادة كاملة وحدد جميع المراجع المستقلة الظاهرة فيها.
+إذا كان:
 
-بالنسبة لمواد المتن:
-لا تفترض وجود مرجع.
-استخرج المرجع فقط إذا وجدت قرينة توثيقية واضحة.
+analysisRole = "target"
 
-إذا احتوت المادة على عدة عناصر،
-فاستخرج المراجع الخارجية الواضحة فقط،
-ولا تحول العناصر غير المرجعية إلى references.
+فهذه مادة مستهدفة للتحليل،
+ويجب استخراج المراجع منها وربطها بـ occurrences.
 
-لا تكتفِ بالتشابه الشكلي مع عنوان كتاب،
-ولا تعتبر أي عبارة مرجعًا لمجرد إمكان تفسيرها كذلك.
+إذا كان:
+
+analysisRole = "context-only"
+
+فهذه مادة سياق فقط.
+
+استخدم مادة السياق لفهم الإحالات المختصرة،
+وتحديد المرجع المقصود،
+وفهم الاستمرار بين المواد،
+لكن لا تستخرج منها أي reference،
+ولا تنشئ منها أي occurrence،
+ولا تحسبها ضمن المراجع أو الإحصاءات الخاصة بالمواد المستهدفة.
+
+المواد ذات analysisRole = "context-only"
+لا تدخل في قائمة المواد التي يجب تحليلها.
+
+إذا ظهر مرجع في مادة السياق وكان ظهوره غير موجود
+في مادة مستهدفة، فلا تُنشئ له reference.
+
+المصدر الوحيد لإنشاء reference جديد هو المواد
+التي تحمل analysisRole = "target".
+
+=====================================================
+1.6 المحافظة على هوية الدفعة
+=====================================================
+
+لا تنشئ occurrence من مادة context-only.
+
+كل occurrence يجب أن يعود إلى materialId
+من مادة target فقط.
+
+لا تستخدم materialId الخاص بمادة السياق
+بوصفه materialId لمرجع مستخرج من مادة target.
 
 =====================================================
 2. هوية المرجع
@@ -24591,7 +24870,6 @@ materialId = "endnote-12"
 
 إذا كان النص الأصلي يذكر مرجعًا معينًا بوضوح، فحافظ على
 هويته ولا تغيّر عنوانه.
-
 
 =====================================================
 3. نسبة الكتاب إلى المؤلف
@@ -24632,7 +24910,19 @@ ${addMissingAuthors
 
 المادة الواحدة قد تحتوي على مرجع واحد أو عدة مراجع مستقلة.
 
+بالنسبة لمواد الحواشي والتعليقات الختامية:
 حلل المادة كاملة وحدد جميع المراجع المستقلة الظاهرة فيها.
+
+بالنسبة لمواد المتن:
+لا تفترض وجود مرجع.
+استخرج المرجع فقط إذا وجدت قرينة توثيقية واضحة.
+
+إذا احتوت المادة على عدة عناصر،
+فاستخرج المراجع الخارجية الواضحة فقط،
+ولا تحول العناصر غير المرجعية إلى references.
+
+لا تكتفِ بالتشابه الشكلي مع عنوان كتاب،
+ولا تعتبر أي عبارة مرجعًا لمجرد إمكان تفسيرها كذلك.
 
 كل مرجع مستقل يجب أن ينتج عنه سجل مستقل في النتيجة.
 
@@ -24654,7 +24944,7 @@ ${addMissingAuthors
 5. occurrences
 =====================================================
 
-كل ظهور فعلي للمرجع داخل مادة أصلية يمثل occurrence.
+كل ظهور فعلي للمرجع داخل مادة target يمثل occurrence.
 
 إذا كانت المادة تحتوي عدة مراجع مستقلة،
 فلكل مرجع occurrence مستقل.
@@ -24669,6 +24959,8 @@ materialId نفسه.
 
 إذا احتوت مادة واحدة على عدة مراجع،
 فلا تجعلها occurrence واحدًا لمجرد أنها مادة واحدة.
+
+لا تنشئ أي occurrence من مواد context-only.
 
 =====================================================
 6. المواضع والمواقع
@@ -24727,11 +25019,7 @@ materialId نفسه.
 لكن إذا احتوى الشرح بوضوح على مرجع خارجي،
 فاستخرج المرجع الموجود داخله.
 
-عبارات تخريج الحديث مثل:
-أخرجه،
-رواه،
-وما شابهها،
-تصنف كتخريج حديث.
+عبارات تخريج الحديث تصنف كتخريج حديث.
 
 =====================================================
 10. variants
@@ -24761,34 +25049,13 @@ variants تستخدم للصيغ المختلفة للمرجع نفسه فقط.
 واترك المعلومات غير المؤكدة فارغة.
 
 إذا لم يكن المؤلف مؤكدًا،
-يمكن استخدام needsReview = true
-بمعنى:
-"يحتاج مراجعة"
+يمكن استخدام needsReview = true.
 
 لا تحذف المرجع بسبب نقص بياناته.
 
 وفي المقابل:
 لا تخترع مرجعًا غير موجود،
 ولا تخترع مؤلفًا أو عنوانًا أو ناشرًا أو سنة.
-
-=====================================================
-13. قاعدة نهائية حاسمة
-=====================================================
-
-الأولوية لدقة تصنيف المواد، وليس لزيادة عدد المراجع.
-
-إدخال مادة غير مرجعية في references خطأ يجب تجنبه.
-
-إذا تعارض احتمال وجود مرجع مع احتمال كون المادة غير مرجعية،
-فلا تنشئ reference إلا عند وجود قرينة توثيقية كافية.
-
-لا تخترع عنوانًا أو مؤلفًا أو بيانات ببليوغرافية.
-
-لا تمنح درجة ثقة مرتفعة لمادة متن لا تحتوي على قرينة توثيقية واضحة.
-
-لا تُنشئ references للكلمات أو المصطلحات أو الأمثلة أو الشواهد
-أو العبارات التعليمية أو الإحالات القرآنية ما لم يظهر فيها
-توثيق خارجي واضح.
 
 =====================================================
 12. النتيجة
@@ -24856,25 +25123,63 @@ other
 
 لا تحذف occurrence صحيحًا لمجرد أن المرجع ظهر أيضًا في مادة أخرى.
 
-`;
-const userPrompt =
-    [
-        "حلل جميع المواد التالية.",
-        "",
-        "مهم جدًا: حافظ على materialId كما هو، ولا تغيّر هويات المواد.",
-        "افصل جميع المراجع المستقلة الموجودة داخل كل مادة.",
-        "إذا كان المرجع نفسه له أكثر من موضع، احتفظ بجميع مواضعه.",
-        "",
-        "ابنِ قائمة المراجع النهائية.",
-        "",
-        JSON.stringify(
-            payload,
-            null,
-            2
-        )
-    ].join("\n");
+لا تنشئ references أو occurrences من مواد context-only.
 
-let result;
+`;
+
+
+    // =====================================================
+    // Prompt المستخدم
+    // =====================================================
+
+    const userPrompt =
+        [
+            "حلل جميع المواد المستهدفة التالية.",
+
+            "",
+
+            "مهم جدًا: حافظ على materialId كما هو، ولا تغيّر هويات المواد.",
+
+            "استخرج المراجع من المواد التي تحمل analysisRole = target فقط.",
+
+            "لا تنشئ أي reference أو occurrence من مواد context-only.",
+
+            "استخدم مواد context-only للسياق والفهم فقط.",
+
+            "افصل جميع المراجع المستقلة الموجودة داخل كل مادة.",
+
+            "إذا كان المرجع نفسه له أكثر من موضع، احتفظ بجميع مواضعه.",
+
+            "",
+
+            "المواد المستهدفة:",
+
+            JSON.stringify(
+                payload,
+                null,
+                2
+            ),
+
+            "",
+
+            "مواد السياق:",
+
+            JSON.stringify(
+                contextPayload,
+                null,
+                2
+            ),
+
+            "",
+
+            "ابنِ قائمة المراجع النهائية من المواد المستهدفة فقط."
+
+        ].join(
+            "\n"
+        );
+
+
+    let result;
 
 
     // =====================================================
@@ -24974,7 +25279,9 @@ let result;
 
         if (
             !answer ||
-            !String(answer).trim()
+            !String(
+                answer
+            ).trim()
         ) {
 
             throw new Error(
@@ -25015,7 +25322,8 @@ let result;
             "application/json",
 
         "Authorization":
-            "Bearer " + key
+            "Bearer " +
+            key
 
     };
 
@@ -25116,7 +25424,9 @@ let result;
 
     if (
         !answer ||
-        !String(answer).trim()
+        !String(
+            answer
+        ).trim()
     ) {
 
         throw new Error(
