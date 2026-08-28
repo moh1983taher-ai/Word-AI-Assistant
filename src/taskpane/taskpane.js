@@ -30606,7 +30606,9 @@ async function sendMessage() {
     try {
 
         console.log(
-            "SEND MESSAGE SCOPE:",
+            "SEND MESSAGE SCOPE TYPE:",
+            researchScope?.type,
+            "FULL:",
             researchScope
         );
 
