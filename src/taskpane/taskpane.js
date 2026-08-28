@@ -30605,45 +30605,20 @@ async function sendMessage() {
 
     try {
 
-        const settings =
-            getActiveAISettings();
+    // =================================================
+    // البحث في المكتبة عند اختيار نطاق المكتبة
+    // =================================================
 
+    if (
+        researchScope &&
+        researchScope.type === "library"
+    ) {
 
-        if (
-            !settings.key.trim()
-        ) {
-
-            throw new Error(
-                "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
-            );
-
-        }
-
-
-        if (
-            !settings.model.trim()
-        ) {
-
-            throw new Error(
-                "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
-            );
-
-        }
-
-
-        const answer =
-            await streamAI(
+        const libraryData =
+            await searchLibrary(
                 text,
-                function (
-                    delta,
-                    fullText
-                ) {
-
-                    scheduleRender(
-                        fullText
-                    );
-
-                }
+                100,
+                10
             );
 
 
@@ -30672,14 +30647,87 @@ async function sendMessage() {
 
 
         // =================================================
-        // عرض الرد النهائي
+        // تجهيز نتائج المكتبة
+        // =================================================
+
+        let libraryAnswer =
+            "";
+
+
+        if (
+            libraryData &&
+            Array.isArray(
+                libraryData.results
+            ) &&
+            libraryData.results.length > 0
+        ) {
+
+            libraryAnswer =
+                libraryData.results
+                    .map(
+                        function (
+                            item,
+                            index
+                        ) {
+
+                            const title =
+                                item.title ||
+                                "بدون عنوان";
+
+
+                            const author =
+                                item.author ||
+                                "";
+
+
+                            const page =
+                                item.page !==
+                                undefined
+                                    ? `الصفحة: ${item.page}`
+                                    : "";
+
+
+                            const textResult =
+                                item.text ||
+                                "";
+
+
+                            return (
+                                `${index + 1}. ${title}\n` +
+                                (
+                                    author
+                                        ? `المؤلف: ${author}\n`
+                                        : ""
+                                ) +
+                                (
+                                    page
+                                        ? `${page}\n`
+                                        : ""
+                                ) +
+                                `${textResult}`
+                            );
+
+                        }
+                    )
+                    .join(
+                        "\n\n"
+                    );
+
+        }
+        else {
+
+            libraryAnswer =
+                "لم يتم العثور على نتائج مناسبة في المكتبة.";
+
+        }
+
+
+        // =================================================
+        // عرض النتيجة
         // =================================================
 
         pendingRenderText =
-            String(
-                answer ||
-                ""
-            );
+            libraryAnswer;
 
 
         renderPendingText();
@@ -30700,23 +30748,13 @@ async function sendMessage() {
 
 
         // =================================================
-        // حفظ مصادر الإحالات
-        // =================================================
-
-        const savedSources =
-            cloneCitationSources(
-                currentCitationSources
-            );
-
-
-        // =================================================
-        // حفظ إجابة AI
+        // حفظ نتيجة المكتبة
         // =================================================
 
         addAIMessage(
             currentChat,
-            answer,
-            savedSources
+            libraryAnswer,
+            []
         );
 
 
@@ -30726,14 +30764,153 @@ async function sendMessage() {
 
         renderChat();
 
-        
-
         renderSidebarChats();
 
         renderRecentChats();
 
 
+        console.log(
+            "LIBRARY RESULTS:",
+            libraryData
+        );
+
+
+        return;
+
     }
+
+
+    // =================================================
+    // المسار الأصلي للذكاء الاصطناعي
+    // =================================================
+
+    const settings =
+        getActiveAISettings();
+
+
+    if (
+        !settings.key.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
+        );
+
+    }
+
+
+    if (
+        !settings.model.trim()
+    ) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
+        );
+
+    }
+
+
+    const answer =
+        await streamAI(
+            text,
+            function (
+                delta,
+                fullText
+            ) {
+
+                scheduleRender(
+                    fullText
+                );
+
+            }
+        );
+
+
+    requestFinished =
+        true;
+
+
+    // =================================================
+    // إلغاء أي تحديث مؤجل
+    // =================================================
+
+    if (
+        renderTimer !==
+        null
+    ) {
+
+        clearTimeout(
+            renderTimer
+        );
+
+
+        renderTimer =
+            null;
+
+    }
+
+
+    // =================================================
+    // عرض الرد النهائي
+    // =================================================
+
+    pendingRenderText =
+        String(
+            answer ||
+            ""
+        );
+
+
+    renderPendingText();
+
+
+    // =================================================
+    // إزالة فقاعة التحميل
+    // =================================================
+
+    if (
+        loading &&
+        loading.parentNode
+    ) {
+
+        loading.remove();
+
+    }
+
+
+    // =================================================
+    // حفظ مصادر الإحالات
+    // =================================================
+
+    const savedSources =
+        cloneCitationSources(
+            currentCitationSources
+        );
+
+
+    // =================================================
+    // حفظ إجابة AI
+    // =================================================
+
+    addAIMessage(
+        currentChat,
+        answer,
+        savedSources
+    );
+
+
+    // =================================================
+    // تحديث الواجهة
+    // =================================================
+
+    renderChat();
+
+    renderSidebarChats();
+
+    renderRecentChats();
+
+
+}
     catch (error) {
 
         requestFinished =
