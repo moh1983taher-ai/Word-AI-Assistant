@@ -1690,6 +1690,20 @@ function renderProjectReferenceDocuments() {
                             ? addAuthors.checked
                             : false;
 
+                    
+                    console.log(
+                        "تحليل مستند المشروع:",
+                        {
+                            documentName:
+                                projectInput.documentName,
+
+                            documentId:
+                                projectInput.documentId,
+
+                            materials:
+                                processedReferences.length
+                        }
+                    );
 
                     const aiAnalysisResult =
                         await analyzeReferencesWithAI(
