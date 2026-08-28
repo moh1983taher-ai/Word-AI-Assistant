@@ -7024,5 +7024,147 @@ body.sidebar-is-pinned .message-box {
 
 }
 /* =========================================================
+   نتائج بحث المكتبة
+   ========================================================= */
+
+.library-results {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+    direction: rtl;
+}
+
+
+.library-result-card {
+    border: 1px solid #e1e5ea;
+    border-radius: 12px;
+    background: #fff;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    transition:
+        box-shadow 0.18s ease,
+        border-color 0.18s ease;
+}
+
+
+.library-result-card:hover {
+    border-color: #c9ced6;
+    box-shadow:
+        0 3px 12px rgba(0, 0, 0, 0.06);
+}
+
+
+.library-result-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+
+.library-result-number {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0f2f5;
+    color: #555;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+.library-result-title-area {
+    min-width: 0;
+    flex: 1;
+}
+
+
+.library-result-title {
+    font-size: 15px;
+    line-height: 1.6;
+    font-weight: 700;
+    color: #202124;
+}
+
+
+.library-result-author {
+    margin-top: 2px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #6b7280;
+}
+
+
+.library-result-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #777;
+}
+
+
+.library-result-meta span {
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: #f6f7f8;
+}
+
+
+.library-result-text {
+    margin-top: 12px;
+    padding-top: 11px;
+    border-top: 1px solid #eef0f2;
+    font-size: 13.5px;
+    line-height: 2;
+    color: #333;
+    white-space: normal;
+}
+
+
+.library-result-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+
+.library-open-btn,
+.library-copy-btn {
+    appearance: none;
+    border: 1px solid #d9dde3;
+    background: #fff;
+    border-radius: 7px;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
+}
+
+
+.library-open-btn:hover,
+.library-copy-btn:hover {
+    background: #f6f7f8;
+    border-color: #c5cad1;
+}
+
+
+.library-empty {
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    color: #666;
+    text-align: center;
+    font-size: 13px;
+}
+/* =========================================================
    END
    ========================================================= */

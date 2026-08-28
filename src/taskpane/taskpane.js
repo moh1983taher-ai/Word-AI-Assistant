@@ -20705,6 +20705,7 @@ function formatLibraryResults(results) {
 
     return `
         <div class="library-results">
+
             ${results
                 .map(
                     function (
@@ -20733,13 +20734,27 @@ function formatLibraryResults(results) {
 
                         const page =
                             item.page !==
-                                undefined &&
+                            undefined &&
                             item.page !==
-                                null
+                            null
                                 ? escapeHtml(
                                     item.page
                                 )
                                 : "";
+
+
+                        const bookId =
+                            escapeHtml(
+                                item.bookId ||
+                                ""
+                            );
+
+
+                        const pageId =
+                            escapeHtml(
+                                item.pageId ||
+                                ""
+                            );
 
 
                         const text =
@@ -20760,13 +20775,9 @@ function formatLibraryResults(results) {
                             <div
                                 class="library-result-card"
                                 data-library-index="${index}"
-                                data-library-book-id="${escapeHtml(
-                                    item.bookId || ""
-                                )}"
+                                data-library-book-id="${bookId}"
                                 data-library-page="${page}"
-                                data-library-page-id="${escapeHtml(
-                                    item.pageId || ""
-                                )}"
+                                data-library-page-id="${pageId}"
                             >
 
                                 <div
@@ -20875,6 +20886,7 @@ function formatLibraryResults(results) {
                 )
                 .join("")
             }
+
         </div>
     `;
 
