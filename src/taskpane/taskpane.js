@@ -36643,92 +36643,15 @@ function renderProjects() {
 
 
         // =====================================================
-        // قراءة المراجع من كائن المشروع الحالي
+        // المراجع المحفوظة داخل المشروع
         // =====================================================
 
-        let projectReferences =
+        const projectReferences =
             Array.isArray(
                 project.references
             )
                 ? project.references
                 : [];
-
-
-        // =====================================================
-        // مصدر احتياطي:
-        // قراءة المشروع المحفوظ مباشرة من localStorage
-        // =====================================================
-
-        if (
-            projectReferences.length === 0
-        ) {
-
-            try {
-
-                const savedProjects =
-                    JSON.parse(
-                        localStorage.getItem(
-                            "WORD_AI_PROJECTS"
-                        ) || "[]"
-                    );
-
-
-                const savedProject =
-                    Array.isArray(
-                        savedProjects
-                    )
-                        ? savedProjects.find(
-                            function (
-                                item
-                            ) {
-
-                                return (
-                                    item &&
-                                    String(
-                                        item.id
-                                    ) ===
-                                    String(
-                                        project.id
-                                    )
-                                );
-
-                            }
-                        )
-                        : null;
-
-
-                if (
-                    savedProject &&
-                    Array.isArray(
-                        savedProject.unifiedReferences
-                    )
-                ) {
-
-                    projectReferences =
-                        savedProject.unifiedReferences;
-
-
-                    // إعادة المراجع إلى الكائن الحالي
-                    // حتى تبقى الذاكرة الحالية متزامنة مع التخزين
-
-                    project.unifiedReferences =
-                        projectReferences;
-
-                }
-
-            }
-            catch (
-                error
-            ) {
-
-                console.warn(
-                    "تعذر قراءة مراجع المشروع المحفوظة:",
-                    error
-                );
-
-            }
-
-        }
 
 
         // =====================================================
@@ -36764,7 +36687,227 @@ function renderProjects() {
 
 
         // =====================================================
-        // بناء قائمة المراجع
+        // رأس قسم المراجع
+        // =====================================================
+
+        const header =
+            document.createElement(
+                "div"
+            );
+
+
+        header.className =
+            "project-references-toolbar";
+
+
+        const count =
+            document.createElement(
+                "div"
+            );
+
+
+        count.className =
+            "project-references-count";
+
+
+        count.innerHTML =
+            `
+            المراجع الموحدة
+            <strong>
+                ${projectReferences.length}
+            </strong>
+            `;
+
+
+        header.appendChild(
+            count
+        );
+
+
+        // =====================================================
+        // زر نقل المراجع إلى المستند المفتوح
+        // =====================================================
+
+        const transferButton =
+            document.createElement(
+                "button"
+            );
+
+
+        transferButton.type =
+            "button";
+
+
+        transferButton.className =
+            "project-references-transfer-btn";
+
+
+        transferButton.textContent =
+            "نقل المراجع إلى المستند المفتوح";
+
+
+        transferButton.onclick =
+            async function (
+                e
+            ) {
+
+                e.preventDefault();
+
+                e.stopPropagation();
+
+
+                if (
+                    !Array.isArray(
+                        projectReferences
+                    ) ||
+                    projectReferences.length ===
+                        0
+                ) {
+
+                    return;
+
+                }
+
+
+                transferButton.disabled =
+                    true;
+
+
+                transferButton.textContent =
+                    "جارٍ نقل المراجع...";
+
+
+                try {
+
+                    // =================================================
+                    // قراءة قائمة المراجع الموجودة في المستند المفتوح
+                    // =================================================
+
+                    const bibliography =
+                        await readBibliographyFromCurrentDocument();
+
+
+                    // =================================================
+                    // مقارنة مراجع المشروع بقائمة المستند
+                    // =================================================
+
+                    const comparison =
+                        compareUnifiedReferencesWithBibliography(
+                            projectReferences,
+                            bibliography
+                        );
+
+
+                    // =================================================
+                    // بناء القائمة النهائية
+                    // =================================================
+
+                    const finalBibliography =
+                        buildFinalBibliography(
+                            projectReferences,
+                            comparison
+                        );
+
+
+                    console.log(
+                        "قائمة مراجع المشروع المنقولة إلى المستند:",
+                        finalBibliography
+                    );
+
+
+                    // =================================================
+                    // كتابة القائمة إلى المستند
+                    // =================================================
+
+                    const result =
+                        await writeFinalBibliographyToDocument(
+                            finalBibliography,
+                            comparison
+                        );
+
+
+                    // =================================================
+                    // النتيجة
+                    // =================================================
+
+                    if (
+                        result.created
+                    ) {
+
+                        transferButton.textContent =
+                            `✓ تم إنشاء قائمة المراجع (${result.added})`;
+
+                    }
+                    else if (
+                        result.added >
+                        0
+                    ) {
+
+                        transferButton.textContent =
+                            `✓ تم تحديث قائمة المراجع (+${result.added})`;
+
+                    }
+                    else {
+
+                        transferButton.textContent =
+                            "✓ قائمة المراجع مكتملة";
+
+                    }
+
+
+                    console.log(
+                        "نتيجة نقل مراجع المشروع:",
+                        result
+                    );
+
+                }
+                catch (
+                    error
+                ) {
+
+                    console.error(
+                        "فشل نقل مراجع المشروع إلى المستند:",
+                        error
+                    );
+
+
+                    transferButton.textContent =
+                        "⚠ تعذر نقل المراجع";
+
+
+                    setTimeout(
+                        function () {
+
+                            transferButton.textContent =
+                                "نقل المراجع إلى المستند المفتوح";
+
+                        },
+                        2500
+                    );
+
+                }
+                finally {
+
+                    transferButton.disabled =
+                        false;
+
+                }
+
+            };
+
+
+        header.appendChild(
+            transferButton
+        );
+
+
+        container.appendChild(
+            header
+        );
+
+
+        // =====================================================
+        // قائمة المراجع
         // =====================================================
 
         const list =

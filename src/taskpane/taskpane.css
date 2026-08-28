@@ -6938,6 +6938,75 @@ body.sidebar-is-pinned .message-box {
     color: #666c75;
 
 }
+
+.project-references-toolbar {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 8px;
+
+    margin-bottom: 6px;
+
+}
+
+
+.project-references-count {
+
+    font-size: 11px;
+
+    color: #747b84;
+
+}
+
+
+.project-references-count strong {
+
+    margin-inline-start: 4px;
+
+    color: #444a52;
+
+    font-weight: 600;
+
+}
+
+
+.project-references-transfer-btn {
+
+    border: 1px solid #e1e4e8;
+
+    background: #ffffff;
+
+    color: #444a52;
+
+    border-radius: 7px;
+
+    padding: 5px 9px;
+
+    font-size: 10px;
+
+    cursor: pointer;
+
+}
+
+
+.project-references-transfer-btn:hover {
+
+    background: #f7f8fa;
+
+}
+
+
+.project-references-transfer-btn:disabled {
+
+    opacity: .6;
+
+    cursor: default;
+
+}
 /* =========================================================
    END
    ========================================================= */
