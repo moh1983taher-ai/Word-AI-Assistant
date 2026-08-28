@@ -820,7 +820,12 @@ async function getWorkingWordFile(
 // استخراج النص من مستند Word محفوظ في مستندات المشروع
 // =====================================================
 
-async function extractMainTextFromProjectDocument(
+// =====================================================
+// قراءة مصادر المراجع من ملف Word محفوظ في المشروع
+// المتن + الحواشي السفلية + الحواشي الختامية
+// =====================================================
+
+async function extractReferenceSourcesFromProjectDocument(
     file
 ) {
 
@@ -841,6 +846,77 @@ async function extractMainTextFromProjectDocument(
         );
 
 
+    // =====================================================
+    // استخراج النص من XML
+    // =====================================================
+
+    function extractXmlText(
+        xml
+    ) {
+
+        const parser =
+            new DOMParser();
+
+
+        const xmlDocument =
+            parser.parseFromString(
+                xml,
+                "application/xml"
+            );
+
+
+        const parserError =
+            xmlDocument.querySelector(
+                "parsererror"
+            );
+
+
+        if (
+            parserError
+        ) {
+
+            throw new Error(
+                "تعذر قراءة بنية مستند Word."
+            );
+
+        }
+
+
+        const textNodes =
+            Array.from(
+                xmlDocument.getElementsByTagName(
+                    "w:t"
+                )
+            );
+
+
+        return textNodes
+            .map(
+                function (
+                    node
+                ) {
+
+                    return String(
+                        node.textContent ||
+                        ""
+                    );
+
+                }
+            )
+            .join(" ")
+            .replace(
+                /\s+/g,
+                " "
+            )
+            .trim();
+
+    }
+
+
+    // =====================================================
+    // المتن
+    // =====================================================
+
     const documentEntry =
         zip.file(
             "word/document.xml"
@@ -852,73 +928,265 @@ async function extractMainTextFromProjectDocument(
     ) {
 
         throw new Error(
-            "تعذر العثور على محتوى مستند Word."
+            "تعذر العثور على متن مستند Word."
         );
 
     }
 
 
-    const xml =
+    const documentXml =
         await documentEntry.async(
             "string"
         );
 
 
-    const parser =
-        new DOMParser();
-
-
-    const xmlDocument =
-        parser.parseFromString(
-            xml,
-            "application/xml"
+    const mainText =
+        extractXmlText(
+            documentXml
         );
 
 
-    const parserError =
-        xmlDocument.querySelector(
-            "parsererror"
-        );
+    // =====================================================
+    // الحواشي السفلية
+    // =====================================================
 
-
-    if (
-        parserError
+    async function extractNotes(
+        fileName,
+        noteType
     ) {
 
-        throw new Error(
-            "تعذر قراءة بنية مستند Word."
+        const entry =
+            zip.file(
+                fileName
+            );
+
+
+        if (
+            !entry
+        ) {
+
+            return [];
+
+        }
+
+
+        const xml =
+            await entry.async(
+                "string"
+            );
+
+
+        const parser =
+            new DOMParser();
+
+
+        const xmlDocument =
+            parser.parseFromString(
+                xml,
+                "application/xml"
+            );
+
+
+        const parserError =
+            xmlDocument.querySelector(
+                "parsererror"
+            );
+
+
+        if (
+            parserError
+        ) {
+
+            throw new Error(
+                "تعذر قراءة " +
+                (
+                    noteType ===
+                    "footnote"
+                        ? "الحواشي السفلية."
+                        : "الحواشي الختامية."
+                )
+            );
+
+        }
+
+
+        const noteTag =
+            noteType ===
+            "footnote"
+                ? "w:footnote"
+                : "w:endnote";
+
+
+        const noteElements =
+            Array.from(
+                xmlDocument.getElementsByTagName(
+                    noteTag
+                )
+            );
+
+
+        const notes = [];
+
+
+        noteElements.forEach(
+            function (
+                noteElement
+            ) {
+
+                const rawId =
+                    noteElement.getAttribute(
+                        "w:id"
+                    );
+
+
+                const id =
+                    Number(
+                        rawId
+                    );
+
+
+                // =============================================
+                // تجاهل عناصر الفواصل الخاصة بـ Word
+                // مثل separator و continuationSeparator
+                // =============================================
+
+                if (
+                    id < 0
+                ) {
+
+                    return;
+
+                }
+
+
+                const textNodes =
+                    Array.from(
+                        noteElement.getElementsByTagName(
+                            "w:t"
+                        )
+                    );
+
+
+                const text =
+                    textNodes
+                        .map(
+                            function (
+                                node
+                            ) {
+
+                                return String(
+                                    node.textContent ||
+                                    ""
+                                );
+
+                            }
+                        )
+                        .join(" ")
+                        .replace(
+                            /\s+/g,
+                            " "
+                        )
+                        .trim();
+
+
+                if (
+                    !text
+                ) {
+
+                    return;
+
+                }
+
+
+                notes.push({
+
+                    id:
+                        noteType +
+                        "-" +
+                        (
+                            Number.isFinite(id)
+                                ? id
+                                : notes.length + 1
+                        ),
+
+                    number:
+                        Number.isFinite(id)
+                            ? id
+                            : notes.length + 1,
+
+                    reference:
+                        String(
+                            Number.isFinite(id)
+                                ? id
+                                : notes.length + 1
+                        ),
+
+                    text:
+                        text,
+
+                    rawText:
+                        text
+
+                });
+
+            }
         );
+
+
+        // =====================================================
+        // ترتيب الحواشي حسب رقمها
+        // =====================================================
+
+        notes.sort(
+            function (
+                a,
+                b
+            ) {
+
+                return (
+                    Number(
+                        a.number || 0
+                    ) -
+                    Number(
+                        b.number || 0
+                    )
+                );
+
+            }
+        );
+
+
+        return notes;
 
     }
 
 
-    const textNodes =
-        Array.from(
-            xmlDocument.getElementsByTagName(
-                "w:t"
-            )
+    const footnotes =
+        await extractNotes(
+            "word/footnotes.xml",
+            "footnote"
         );
 
 
-    return textNodes
-        .map(
-            function (
-                node
-            ) {
+    const endnotes =
+        await extractNotes(
+            "word/endnotes.xml",
+            "endnote"
+        );
 
-                return String(
-                    node.textContent ||
-                    ""
-                );
 
-            }
-        )
-        .join(" ")
-        .replace(
-            /\s+/g,
-            " "
-        )
-        .trim();
+    return {
+
+        mainText:
+            mainText,
+
+        footnotes:
+            footnotes,
+
+        endnotes:
+            endnotes
+
+    };
 
 }
 
@@ -1332,34 +1600,24 @@ function renderProjectReferenceDocuments() {
 
             try {
 
-                const projectText =
+                const processedReferences =
                     await readSelectedProjectReferenceDocuments(
                         selectedIds
                     );
 
 
                 if (
-                    !projectText.trim()
+                    !Array.isArray(
+                        processedReferences
+                    ) ||
+                    processedReferences.length === 0
                 ) {
 
                     throw new Error(
-                        "تعذر استخراج نص المستندات المختارة."
+                        "لم يتم العثور على مواد قابلة للتحليل في المستندات المختارة."
                     );
 
                 }
-
-
-                analyzeProjectReferencesBtn.textContent =
-                    "جارٍ تجهيز مواد المراجع...";
-
-
-                const processedReferences =
-                    processReferenceSources(
-                        {
-                            mainText:
-                                projectText
-                        }
-                    );
 
 
                 if (
@@ -1688,194 +1946,13 @@ async function readSelectedProjectReferenceDocuments(
     }
 
 
-    const referenceParts = [];
+    const processedReferences = [];
 
 
     // =====================================================
-    // استخراج المقاطع المرجعية المحتملة فقط
+    // قراءة المستندات المختارة
+    // ثم استخدام نفس دالة معالجة المواد الحالية
     // =====================================================
-
-    function extractLikelyReferenceParts(
-        text
-    ) {
-
-        const source =
-            String(
-                text || ""
-            );
-
-
-        if (
-            !source.trim()
-        ) {
-
-            return [];
-
-        }
-
-
-        const parts = [];
-
-
-        // -------------------------------------------------
-        // 1. الإحالات بين الأقواس
-        // -------------------------------------------------
-
-        const parentheticalPatterns = [
-
-            /\(([^()\n]{2,400})\)/g,
-
-            /\[([^\[\]\n]{2,400})\]/g,
-
-            /（([^（）\n]{2,400})）/g,
-
-            /【([^【】\n]{2,400})】/g
-
-        ];
-
-
-        parentheticalPatterns.forEach(
-            function (
-                pattern
-            ) {
-
-                let match;
-
-
-                while (
-                    (
-                        match =
-                            pattern.exec(
-                                source
-                            )
-                    ) !== null
-                ) {
-
-                    const value =
-                        String(
-                            match[1] || ""
-                        ).trim();
-
-
-                    if (
-                        value
-                    ) {
-
-                        parts.push(
-                            value
-                        );
-
-                    }
-
-                }
-
-            }
-        );
-
-
-        // -------------------------------------------------
-        // 2. الإحالات اللفظية
-        // -------------------------------------------------
-
-        const verbalPattern =
-            /(?:ينظر|انظر|راجع|المصدر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,500})/gi;
-
-
-        let verbalMatch;
-
-
-        while (
-            (
-                verbalMatch =
-                    verbalPattern.exec(
-                        source
-                    )
-            ) !== null
-        ) {
-
-            const value =
-                String(
-                    verbalMatch[0] || ""
-                ).trim();
-
-
-            if (
-                value
-            ) {
-
-                parts.push(
-                    value
-                );
-
-            }
-
-        }
-
-
-        // -------------------------------------------------
-        // 3. أسطر تحتوي على أرقام المجلدات والصفحات
-        // -------------------------------------------------
-
-        const lines =
-            source.split(
-                /\r?\n/
-            );
-
-
-        lines.forEach(
-            function (
-                line
-            ) {
-
-                const value =
-                    String(
-                        line || ""
-                    ).trim();
-
-
-                if (
-                    !value
-                ) {
-
-                    return;
-
-                }
-
-
-                const hasPagePattern =
-                    /\b\d+\s*\/\s*\d+\b/.test(
-                        value
-                    );
-
-
-                const hasReferenceWords =
-                    /(?:ينظر|انظر|راجع|الكتاب|المجلد|ص|ج)\b/i.test(
-                        value
-                    );
-
-
-                if (
-                    hasPagePattern &&
-                    (
-                        hasReferenceWords ||
-                        value.length <= 500
-                    )
-                ) {
-
-                    parts.push(
-                        value
-                    );
-
-                }
-
-            }
-        );
-
-
-        return parts;
-
-    }
-
 
     for (
         const documentItem of
@@ -1892,92 +1969,81 @@ async function readSelectedProjectReferenceDocuments(
             !file
         ) {
 
+            console.warn(
+                "تعذر العثور على ملف المستند:",
+                documentItem.name
+            );
+
             continue;
 
         }
 
 
-        const text =
-            await extractMainTextFromProjectDocument(
+        const referenceSources =
+            await extractReferenceSourcesFromProjectDocument(
                 file
             );
 
 
-        if (
-            !text
-        ) {
-
-            continue;
-
-        }
-
-
-        const likelyReferences =
-            extractLikelyReferenceParts(
-                text
+        const records =
+            processReferenceSources(
+                referenceSources
             );
 
 
-        likelyReferences.forEach(
-            function (
-                referenceText
-            ) {
+        if (
+            Array.isArray(
+                records
+            ) &&
+            records.length
+        ) {
 
-                referenceParts.push(
-                    referenceText
-                );
+            records.forEach(
+                function (
+                    record
+                ) {
 
-            }
-        );
+                    // الاحتفاظ باسم المستند
+                    // لتشخيص المصدر عند تعدد المستندات
+
+                    processedReferences.push({
+
+                        ...record,
+
+                        projectDocumentId:
+                            String(
+                                documentItem.id
+                            ),
+
+                        projectDocumentName:
+                            String(
+                                documentItem.name ||
+                                documentItem.fileName ||
+                                ""
+                            )
+
+                    });
+
+                }
+            );
+
+        }
 
     }
 
 
     if (
-        referenceParts.length === 0
+        processedReferences.length === 0
     ) {
 
         throw new Error(
-            "لم يتم العثور على مقاطع يُحتمل أن تحتوي على مراجع في المستندات المختارة."
+            "لم يتم العثور على مواد قابلة للتحليل في المستندات المختارة."
         );
 
     }
 
 
-    // =====================================================
-    // إزالة التكرار النصي فقط
-    // =====================================================
-
-    const uniqueParts =
-        Array.from(
-            new Set(
-                referenceParts
-                    .map(
-                        function (
-                            value
-                        ) {
-
-                            return String(
-                                value || ""
-                            )
-                                .replace(
-                                    /\s+/g,
-                                    " "
-                                )
-                                .trim();
-
-                        }
-                    )
-                    .filter(
-                        Boolean
-                    )
-            )
-        );
-
-
-    return uniqueParts.join(
-        "\n"
-    );
+    return processedReferences;
 
 }
 // ======================================
