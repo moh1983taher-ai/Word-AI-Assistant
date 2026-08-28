@@ -6816,7 +6816,7 @@ body.sidebar-is-pinned .message-box {
 
     flex-direction: column;
 
-    gap: 3px;
+    gap: 4px;
 
     margin-top: 6px;
 
@@ -6827,15 +6827,15 @@ body.sidebar-is-pinned .message-box {
 
     display: flex;
 
-    align-items: center;
+    align-items: flex-start;
 
-    gap: 7px;
+    gap: 8px;
 
-    padding: 6px 8px;
+    padding: 7px 8px;
 
     border: 1px solid transparent;
 
-    border-radius: 7px;
+    border-radius: 8px;
 
     background: #ffffff;
 
@@ -6857,15 +6857,17 @@ body.sidebar-is-pinned .message-box {
 
 .project-reference-index {
 
-    flex: 0 0 22px;
+    flex: 0 0 24px;
 
     font-size: 10px;
 
-    line-height: 1.4;
+    line-height: 1.5;
 
     color: #9aa1aa;
 
     text-align: center;
+
+    padding-top: 1px;
 
 }
 
@@ -6876,44 +6878,28 @@ body.sidebar-is-pinned .message-box {
 
     min-width: 0;
 
-    display: flex;
+}
 
-    align-items: center;
 
-    gap: 5px;
+.project-reference-heading {
+
+    margin-bottom: 1px;
 
 }
 
 
 .project-reference-author {
 
-    flex: 0 0 auto;
-
     font-size: 11px;
 
     line-height: 1.4;
 
-    color: #747b84;
-
-    white-space: nowrap;
-
-}
-
-
-.project-reference-author::after {
-
-    content: " — ";
-
-    color: #b7bcc3;
+    color: #7a8088;
 
 }
 
 
 .project-reference-title {
-
-    flex: 1;
-
-    min-width: 0;
 
     font-size: 12px;
 
@@ -6934,15 +6920,13 @@ body.sidebar-is-pinned .message-box {
 
 .project-reference-meta {
 
-    flex: 0 0 auto;
+    margin-top: 2px;
 
     font-size: 10px;
 
     line-height: 1.4;
 
     color: #9298a1;
-
-    white-space: nowrap;
 
 }
 

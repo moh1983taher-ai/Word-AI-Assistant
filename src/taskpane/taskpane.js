@@ -2119,7 +2119,37 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // حفظ المراجع الموحدة داخل المشروع
+                // إجمالي مرات الاستشهاد
+                // يجب حسابه قبل استخدامه في حفظ المشروع
+                // =====================================================
+
+                const totalOccurrences =
+                    finalReferenceResults.reduce(
+                        function (
+                            total,
+                            reference
+                        ) {
+
+                            const occurrences =
+                                Array.isArray(
+                                    reference?.occurrences
+                                )
+                                    ? reference.occurrences.length
+                                    : 0;
+
+
+                            return (
+                                total +
+                                occurrences
+                            );
+
+                        },
+                        0
+                    );
+
+
+                // =====================================================
+                //  7. حفظ المراجع الموحدة داخل المشروع
                 // =====================================================
 
                 const targetProject =
@@ -2223,35 +2253,6 @@ function renderProjectReferenceDocuments() {
                     saveProjects();
 
                 }
-
-
-                // =====================================================
-                // 8. إجمالي مرات الاستشهاد
-                // =====================================================
-
-                const totalOccurrences =
-                    finalReferenceResults.reduce(
-                        function (
-                            total,
-                            reference
-                        ) {
-
-                            const occurrences =
-                                Array.isArray(
-                                    reference?.occurrences
-                                )
-                                    ? reference.occurrences.length
-                                    : 0;
-
-
-                            return (
-                                total +
-                                occurrences
-                            );
-
-                        },
-                        0
-                    );
 
 
                 // =====================================================
