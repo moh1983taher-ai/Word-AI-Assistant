@@ -33652,9 +33652,10 @@ function mergeEquivalentReferences(references) {
                 }
             );
 
+            
             /*
-             * occurrences
-             */
+            * occurrences
+            */
             (
                 reference.occurrences ||
                 []
@@ -33670,22 +33671,52 @@ function mergeEquivalentReferences(references) {
                             ) {
 
                                 return (
-                                    old.materialId ===
-                                    occurrence.materialId &&
-                                    old.source ===
-                                    occurrence.source &&
                                     String(
-                                        old.noteNumber ??
-                                        ""
+                                        old.materialId ?? ""
                                     ) ===
                                     String(
-                                        occurrence.noteNumber ??
-                                        ""
+                                        occurrence.materialId ?? ""
+                                    ) &&
+
+                                    String(
+                                        old.source ?? ""
+                                    ) ===
+                                    String(
+                                        occurrence.source ?? ""
+                                    ) &&
+
+                                    String(
+                                        old.noteNumber ?? ""
+                                    ) ===
+                                    String(
+                                        occurrence.noteNumber ?? ""
+                                    ) &&
+
+                                    String(
+                                        old.volume ?? ""
+                                    ) ===
+                                    String(
+                                        occurrence.volume ?? ""
+                                    ) &&
+
+                                    String(
+                                        old.page ?? ""
+                                    ) ===
+                                    String(
+                                        occurrence.page ?? ""
+                                    ) &&
+
+                                    String(
+                                        old.pageRange ?? ""
+                                    ) ===
+                                    String(
+                                        occurrence.pageRange ?? ""
                                     )
                                 );
 
                             }
                         );
+
 
                     if (
                         !exists
