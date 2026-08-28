@@ -1090,7 +1090,7 @@ function renderProjectReferenceDocuments() {
             <div class="reference-style-row">
 
                 <label>
-                    المراجع
+                    الترتيب
                 </label>
 
                 <select id="project-reference-order-select">
@@ -1688,7 +1688,193 @@ async function readSelectedProjectReferenceDocuments(
     }
 
 
-    const texts = [];
+    const referenceParts = [];
+
+
+    // =====================================================
+    // استخراج المقاطع المرجعية المحتملة فقط
+    // =====================================================
+
+    function extractLikelyReferenceParts(
+        text
+    ) {
+
+        const source =
+            String(
+                text || ""
+            );
+
+
+        if (
+            !source.trim()
+        ) {
+
+            return [];
+
+        }
+
+
+        const parts = [];
+
+
+        // -------------------------------------------------
+        // 1. الإحالات بين الأقواس
+        // -------------------------------------------------
+
+        const parentheticalPatterns = [
+
+            /\(([^()\n]{2,400})\)/g,
+
+            /\[([^\[\]\n]{2,400})\]/g,
+
+            /（([^（）\n]{2,400})）/g,
+
+            /【([^【】\n]{2,400})】/g
+
+        ];
+
+
+        parentheticalPatterns.forEach(
+            function (
+                pattern
+            ) {
+
+                let match;
+
+
+                while (
+                    (
+                        match =
+                            pattern.exec(
+                                source
+                            )
+                    ) !== null
+                ) {
+
+                    const value =
+                        String(
+                            match[1] || ""
+                        ).trim();
+
+
+                    if (
+                        value
+                    ) {
+
+                        parts.push(
+                            value
+                        );
+
+                    }
+
+                }
+
+            }
+        );
+
+
+        // -------------------------------------------------
+        // 2. الإحالات اللفظية
+        // -------------------------------------------------
+
+        const verbalPattern =
+            /(?:ينظر|انظر|راجع|المصدر|نقلاً عن|نقلًا عن)\s*[:：]?\s*([^.\n؛]{3,500})/gi;
+
+
+        let verbalMatch;
+
+
+        while (
+            (
+                verbalMatch =
+                    verbalPattern.exec(
+                        source
+                    )
+            ) !== null
+        ) {
+
+            const value =
+                String(
+                    verbalMatch[0] || ""
+                ).trim();
+
+
+            if (
+                value
+            ) {
+
+                parts.push(
+                    value
+                );
+
+            }
+
+        }
+
+
+        // -------------------------------------------------
+        // 3. أسطر تحتوي على أرقام المجلدات والصفحات
+        // -------------------------------------------------
+
+        const lines =
+            source.split(
+                /\r?\n/
+            );
+
+
+        lines.forEach(
+            function (
+                line
+            ) {
+
+                const value =
+                    String(
+                        line || ""
+                    ).trim();
+
+
+                if (
+                    !value
+                ) {
+
+                    return;
+
+                }
+
+
+                const hasPagePattern =
+                    /\b\d+\s*\/\s*\d+\b/.test(
+                        value
+                    );
+
+
+                const hasReferenceWords =
+                    /(?:ينظر|انظر|راجع|الكتاب|المجلد|ص|ج)\b/i.test(
+                        value
+                    );
+
+
+                if (
+                    hasPagePattern &&
+                    (
+                        hasReferenceWords ||
+                        value.length <= 500
+                    )
+                ) {
+
+                    parts.push(
+                        value
+                    );
+
+                }
+
+            }
+        );
+
+
+        return parts;
+
+    }
 
 
     for (
@@ -1718,31 +1904,79 @@ async function readSelectedProjectReferenceDocuments(
 
 
         if (
-            text
+            !text
         ) {
 
-            texts.push(
-                text
-            );
+            continue;
 
         }
 
-    }
+
+        const likelyReferences =
+            extractLikelyReferenceParts(
+                text
+            );
 
 
-    if (
-        texts.length === 0
-    ) {
+        likelyReferences.forEach(
+            function (
+                referenceText
+            ) {
 
-        throw new Error(
-            "تعذر استخراج نص من المستندات المختارة."
+                referenceParts.push(
+                    referenceText
+                );
+
+            }
         );
 
     }
 
 
-    return texts.join(
-        "\n\n"
+    if (
+        referenceParts.length === 0
+    ) {
+
+        throw new Error(
+            "لم يتم العثور على مقاطع يُحتمل أن تحتوي على مراجع في المستندات المختارة."
+        );
+
+    }
+
+
+    // =====================================================
+    // إزالة التكرار النصي فقط
+    // =====================================================
+
+    const uniqueParts =
+        Array.from(
+            new Set(
+                referenceParts
+                    .map(
+                        function (
+                            value
+                        ) {
+
+                            return String(
+                                value || ""
+                            )
+                                .replace(
+                                    /\s+/g,
+                                    " "
+                                )
+                                .trim();
+
+                        }
+                    )
+                    .filter(
+                        Boolean
+                    )
+            )
+        );
+
+
+    return uniqueParts.join(
+        "\n"
     );
 
 }
