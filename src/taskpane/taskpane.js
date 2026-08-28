@@ -815,7 +815,7 @@ async function getWorkingWordFile(
     );
 
 }
-
+const PROJECT_REFERENCE_BATCH_SIZE = 200;
 // =====================================================
 // استخراج النص من مستند Word محفوظ في مستندات المشروع
 // =====================================================
@@ -1195,6 +1195,7 @@ function renderProjectReferenceDocuments() {
     if (
         !referencesSourceWorkspace
     ) {
+        
 
         return;
 
@@ -1601,7 +1602,7 @@ function renderProjectReferenceDocuments() {
             try {
 
                 // =====================================================
-                // 1. قراءة وتجهيز المستندات
+                // 1. تجهيز المستندات
                 // =====================================================
 
                 const projectInputs =
@@ -1625,7 +1626,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 2. المتغيرات النهائية
+                // 2. المتغيرات العامة للنتيجة
                 // =====================================================
 
                 const allReferences = [];
@@ -1650,7 +1651,8 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 3. تحليل كل مستند في طلب مستقل
+                // 3. تحليل كل مستند
+                //    مع تقسيمه إلى دفعات عند تجاوز الحد
                 // =====================================================
 
                 for (
@@ -1685,174 +1687,244 @@ function renderProjectReferenceDocuments() {
                     }
 
 
-                    analyzeProjectReferencesBtn.textContent =
-                        `جارٍ تحليل المستند ${documentIndex + 1} من ${projectInputs.length}...`;
+                    // -------------------------------------------------
+                    // تقسيم المستند إلى دفعات
+                    // -------------------------------------------------
+
+                    const batches = [];
 
 
-                    const addMissingAuthors =
-                        addAuthors
-                            ? addAuthors.checked
-                            : false;
+                    for (
+                        let start = 0;
 
+                        start <
+                            processedReferences.length;
 
-                    console.log(
-                        "تحليل مستند المشروع:",
-                        {
-                            documentName:
-                                projectInput.documentName,
-
-                            documentId:
-                                projectInput.documentId,
-
-                            materials:
-                                processedReferences.length
-                        }
-                    );
-
-
-                    // =================================================
-                    // تحليل المستند الحالي فقط
-                    // =================================================
-
-                    const aiAnalysisResult =
-                        await analyzeReferencesWithAI(
-                            processedReferences,
-                            addMissingAuthors
-                        );
-
-
-                    if (
-                        !aiAnalysisResult ||
-                        typeof aiAnalysisResult !==
-                            "object"
+                        start +=
+                            PROJECT_REFERENCE_BATCH_SIZE
                     ) {
 
-                        throw new Error(
-                            `تعذر تحليل المستند: ${projectInput.documentName}`
+                        batches.push(
+                            processedReferences.slice(
+                                start,
+                                start +
+                                    PROJECT_REFERENCE_BATCH_SIZE
+                            )
                         );
 
                     }
 
 
-                    console.log(
-                        "نتيجة تحليل مستند المشروع:",
-                        {
-                            documentName:
-                                projectInput.documentName,
+                    // -------------------------------------------------
+                    // تحليل الدفعات
+                    // -------------------------------------------------
 
-                            documentId:
-                                projectInput.documentId,
+                    for (
+                        let batchIndex = 0;
 
-                            result:
-                                aiAnalysisResult
-                        }
-                    );
+                        batchIndex <
+                            batches.length;
 
-
-                    // =================================================
-                    // إحصاءات المستند
-                    // =================================================
-
-                    const documentStats =
-                        aiAnalysisResult.stats &&
-                        typeof aiAnalysisResult.stats ===
-                            "object"
-                            ? aiAnalysisResult.stats
-                            : {};
-
-
-                    totalMaterials +=
-                        processedReferences.length;
-
-
-                    referenceCount +=
-                        Number(
-                            documentStats.referenceCount ||
-                            0
-                        );
-
-
-                    multipleReferenceCount +=
-                        Number(
-                            documentStats.multipleReferenceCount ||
-                            0
-                        );
-
-
-                    ibidCount +=
-                        Number(
-                            documentStats.ibidCount ||
-                            0
-                        );
-
-
-                    internalReferenceCount +=
-                        Number(
-                            documentStats.internalReferenceCount ||
-                            0
-                        );
-
-
-                    hadithCount +=
-                        Number(
-                            documentStats.hadithCount ||
-                            0
-                        );
-
-
-                    explanatoryCount +=
-                        Number(
-                            documentStats.explanatoryCount ||
-                            0
-                        );
-
-
-                    mixedCount +=
-                        Number(
-                            documentStats.mixedCount ||
-                            0
-                        );
-
-
-                    reviewCount +=
-                        Number(
-                            documentStats.reviewCount ||
-                            0
-                        );
-
-
-                    // =================================================
-                    // إضافة مراجع المستند إلى المجموعة العامة
-                    // =================================================
-
-                    if (
-                        Array.isArray(
-                            aiAnalysisResult.references
-                        )
+                        batchIndex++
                     ) {
 
-                        aiAnalysisResult.references.forEach(
-                            function (
-                                reference
-                            ) {
-
-                                if (
-                                    !reference ||
-                                    typeof reference !==
-                                        "object"
-                                ) {
-
-                                    return;
-
-                                }
+                        const batch =
+                            batches[
+                                batchIndex
+                            ];
 
 
-                                allReferences.push(
-                                    reference
-                                );
+                        if (
+                            !Array.isArray(
+                                batch
+                            ) ||
+                            batch.length === 0
+                        ) {
 
+                            continue;
+
+                        }
+
+
+                        analyzeProjectReferencesBtn.textContent =
+                            `جارٍ تحليل ${projectInput.documentName} — الدفعة ${batchIndex + 1} من ${batches.length}...`;
+
+
+                        const addMissingAuthors =
+                            addAuthors
+                                ? addAuthors.checked
+                                : false;
+
+
+                        console.log(
+                            "تحليل دفعة من مستند المشروع:",
+                            {
+                                documentName:
+                                    projectInput.documentName,
+
+                                documentId:
+                                    projectInput.documentId,
+
+                                batch:
+                                    batchIndex + 1,
+
+                                totalBatches:
+                                    batches.length,
+
+                                materials:
+                                    batch.length
                             }
                         );
+
+
+                        // =================================================
+                        // تحليل الدفعة
+                        // =================================================
+
+                        const aiAnalysisResult =
+                            await analyzeReferencesWithAI(
+                                batch,
+                                addMissingAuthors
+                            );
+
+
+                        if (
+                            !aiAnalysisResult ||
+                            typeof aiAnalysisResult !==
+                                "object"
+                        ) {
+
+                            throw new Error(
+                                `تعذر تحليل الدفعة ${batchIndex + 1} من المستند: ${projectInput.documentName}`
+                            );
+
+                        }
+
+
+                        console.log(
+                            "نتيجة تحليل دفعة مستند المشروع:",
+                            {
+                                documentName:
+                                    projectInput.documentName,
+
+                                documentId:
+                                    projectInput.documentId,
+
+                                batch:
+                                    batchIndex + 1,
+
+                                result:
+                                    aiAnalysisResult
+                            }
+                        );
+
+
+                        // =================================================
+                        // إحصاءات الدفعة
+                        // =================================================
+
+                        const batchStats =
+                            aiAnalysisResult.stats &&
+                            typeof aiAnalysisResult.stats ===
+                                "object"
+                                ? aiAnalysisResult.stats
+                                : {};
+
+
+                        totalMaterials +=
+                            batch.length;
+
+
+                        referenceCount +=
+                            Number(
+                                batchStats.referenceCount ||
+                                0
+                            );
+
+
+                        multipleReferenceCount +=
+                            Number(
+                                batchStats.multipleReferenceCount ||
+                                0
+                            );
+
+
+                        ibidCount +=
+                            Number(
+                                batchStats.ibidCount ||
+                                0
+                            );
+
+
+                        internalReferenceCount +=
+                            Number(
+                                batchStats.internalReferenceCount ||
+                                0
+                            );
+
+
+                        hadithCount +=
+                            Number(
+                                batchStats.hadithCount ||
+                                0
+                            );
+
+
+                        explanatoryCount +=
+                            Number(
+                                batchStats.explanatoryCount ||
+                                0
+                            );
+
+
+                        mixedCount +=
+                            Number(
+                                batchStats.mixedCount ||
+                                0
+                            );
+
+
+                        reviewCount +=
+                            Number(
+                                batchStats.reviewCount ||
+                                0
+                            );
+
+
+                        // =================================================
+                        // جمع مراجع الدفعة
+                        // =================================================
+
+                        if (
+                            Array.isArray(
+                                aiAnalysisResult.references
+                            )
+                        ) {
+
+                            aiAnalysisResult.references.forEach(
+                                function (
+                                    reference
+                                ) {
+
+                                    if (
+                                        !reference ||
+                                        typeof reference !==
+                                            "object"
+                                    ) {
+
+                                        return;
+
+                                    }
+
+
+                                    allReferences.push(
+                                        reference
+                                    );
+
+                                }
+                            );
+
+                        }
 
                     }
 
@@ -1860,7 +1932,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 4. التحقق من وجود نتائج
+                // 4. التحقق من النتائج
                 // =====================================================
 
                 if (
@@ -1875,7 +1947,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 5. التوحيد النهائي بين جميع المستندات
+                // 5. التوحيد النهائي بين جميع الدفعات والمستندات
                 // =====================================================
 
                 let finalReferenceResults =
@@ -1885,7 +1957,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 6. ترتيب المراجع
+                // 6. الترتيب
                 // =====================================================
 
                 finalReferenceResults =
@@ -1916,6 +1988,7 @@ function renderProjectReferenceDocuments() {
                                 )
                                     ? reference.occurrences.length
                                     : 0;
+
 
                             return (
                                 total +
@@ -2029,19 +2102,22 @@ function renderProjectReferenceDocuments() {
 
                                                 const volume =
                                                     escapeReferenceHTML(
-                                                        location?.volume || ""
+                                                        location?.volume ||
+                                                        ""
                                                     );
 
 
                                                 const page =
                                                     escapeReferenceHTML(
-                                                        location?.page || ""
+                                                        location?.page ||
+                                                        ""
                                                     );
 
 
                                                 const pageRange =
                                                     escapeReferenceHTML(
-                                                        location?.pageRange || ""
+                                                        location?.pageRange ||
+                                                        ""
                                                     );
 
 
@@ -2241,7 +2317,7 @@ function renderProjectReferenceDocuments() {
 
 
                 // =====================================================
-                // 9. عرض النتيجة
+                // 9. عرض النتيجة النهائية
                 // =====================================================
 
                 const container =
@@ -2265,7 +2341,7 @@ function renderProjectReferenceDocuments() {
                                 data-reference-collapse-target="project-references-analysis-content">
 
                                 <span>
-                                    ✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي
+                                    ✓ تم تحليل وتوحيد مراجع مستندات المشروع
                                 </span>
 
                                 <span class="reference-collapsible-arrow">
@@ -28313,6 +28389,8 @@ if (referencesContent) {
                             source ===
                             "project-documents"
                         ) {
+
+                            
 
                             renderProjectReferenceDocuments();
 
