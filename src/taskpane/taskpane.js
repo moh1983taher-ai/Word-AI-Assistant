@@ -20634,13 +20634,35 @@ function formatLibraryResults(
 
                 const page =
                     item.page !==
-                    undefined &&
+                        undefined &&
                     item.page !==
-                    null
+                        null
                         ? String(
                             item.page
                         )
                         : "";
+
+
+                const pageId =
+                    item.pageId !==
+                        undefined &&
+                    item.pageId !==
+                        null
+                        ? String(
+                            item.pageId
+                        )
+                        : "";
+
+
+                const part =
+                    item.part !==
+                        undefined &&
+                    item.part !==
+                        null
+                        ? String(
+                            item.part
+                        )
+                        : "1";
 
 
                 const title =
@@ -20657,12 +20679,16 @@ function formatLibraryResults(
                     );
 
 
+                const rawText =
+                    cleanLibraryText(
+                        item.text ||
+                        ""
+                    );
+
+
                 const text =
                     escapeHtml(
-                        cleanLibraryText(
-                            item.text ||
-                            ""
-                        )
+                        rawText
                     );
 
 
@@ -20677,8 +20703,18 @@ function formatLibraryResults(
                     <div
                         class="library-result-card"
                         data-library-index="${index}"
-                        data-library-book-id="${bookId}"
-                        data-library-page="${page}"
+                        data-library-book-id="${escapeHtml(
+                            bookId
+                        )}"
+                        data-library-page="${escapeHtml(
+                            page
+                        )}"
+                        data-library-page-id="${escapeHtml(
+                            pageId
+                        )}"
+                        data-library-part="${escapeHtml(
+                            part
+                        )}"
                     >
 
                         <div
@@ -20754,9 +20790,7 @@ function formatLibraryResults(
                         <div
                             class="library-result-text"
                         >
-                            ${escapeHtml(
-                                text
-                            )}
+                            ${text}
                         </div>
 
 
@@ -21121,10 +21155,6 @@ function renderChat() {
                 );
 
 
-            // ==================================
-            // رسالة المستخدم
-            // ==================================
-
             if (
                 msg.role ===
                 "user"
@@ -21137,11 +21167,13 @@ function renderChat() {
             }
 
 
-            // ==================================
-            // نتائج المكتبة
-            // ==================================
-
             else if (
+                (
+                    msg.type === "library" ||
+                    Array.isArray(
+                        msg.libraryResults
+                    )
+                ) &&
                 Array.isArray(
                     msg.libraryResults
                 )
@@ -21154,10 +21186,6 @@ function renderChat() {
 
             }
 
-
-            // ==================================
-            // رسالة AI العادية
-            // ==================================
 
             else {
 
@@ -21219,14 +21247,6 @@ function renderChat() {
                         }
 
 
-                        const index =
-                            Number(
-                                card.getAttribute(
-                                    "data-library-index"
-                                )
-                            );
-
-
                         const bookId =
                             card.getAttribute(
                                 "data-library-book-id"
@@ -21245,14 +21265,63 @@ function renderChat() {
                             );
 
 
+                        const part =
+                            card.getAttribute(
+                                "data-library-part"
+                            ) ||
+                            "1";
+
+
+                        if (!bookId) {
+
+                            return;
+
+                        }
+
+
+                        const targetURL =
+                            new URL(
+                                `https://ketabonline.com/ar/books/${encodeURIComponent(
+                                    bookId
+                                )}/read`
+                            );
+
+
+                        targetURL.searchParams.set(
+                            "part",
+                            part
+                        );
+
+
+                        if (page) {
+
+                            targetURL.searchParams.set(
+                                "page",
+                                page
+                            );
+
+                        }
+
+
+                        if (pageId) {
+
+                            targetURL.searchParams.set(
+                                "index",
+                                pageId
+                            );
+
+                        }
+
+
                         console.log(
                             "LIBRARY OPEN:",
-                            {
-                                index,
-                                bookId,
-                                page,
-                                pageId
-                            }
+                            targetURL.toString()
+                        );
+
+
+                        window.open(
+                            targetURL.toString(),
+                            "_blank"
                         );
 
                     };
@@ -21296,10 +21365,47 @@ function renderChat() {
                         }
 
 
+                        const titleElement =
+                            card.querySelector(
+                                ".library-result-title"
+                            );
+
+
+                        const authorElement =
+                            card.querySelector(
+                                ".library-result-author"
+                            );
+
+
+                        const pageElement =
+                            card.querySelector(
+                                ".library-result-meta span"
+                            );
+
+
                         const textElement =
                             card.querySelector(
                                 ".library-result-text"
                             );
+
+
+                        const title =
+                            titleElement
+                                ? titleElement.textContent.trim()
+                                : "";
+
+
+                        const author =
+                            authorElement
+                                ? authorElement.textContent.trim()
+                                : "";
+
+
+                        const page =
+                            card.getAttribute(
+                                "data-library-page"
+                            ) ||
+                            "";
 
 
                         const text =
@@ -21315,10 +21421,53 @@ function renderChat() {
                         }
 
 
+                        const citationParts =
+                            [];
+
+
+                        if (title) {
+
+                            citationParts.push(
+                                title
+                            );
+
+                        }
+
+
+                        if (author) {
+
+                            citationParts.push(
+                                author
+                            );
+
+                        }
+
+
+                        if (page) {
+
+                            citationParts.push(
+                                `ص ${page}`
+                            );
+
+                        }
+
+
+                        const citation =
+                            citationParts.join(
+                                "، "
+                            );
+
+
+                        const finalText =
+                            citation
+                                ? `${citation}\n\n${text}`
+                                : text;
+
+
                         try {
 
                             await navigator.clipboard.writeText(
-                                text
+                                finalText
                             );
 
 
@@ -31568,6 +31717,9 @@ async function sendMessage() {
 
                 role:
                     "ai",
+
+                type:
+                    "library",
 
                 text:
                     libraryAnswer,
