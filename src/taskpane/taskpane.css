@@ -7192,6 +7192,22 @@ body.sidebar-is-pinned .message-box {
     height: 17px;
     flex: 0 0 17px;
 }
+.scope-mode-mark {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+    font-size: 16px;
+}
+
+.scope-mode-mark svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
 /* =========================================================
    END
    ========================================================= */
