@@ -7165,6 +7165,33 @@ body.sidebar-is-pinned .message-box {
     text-align: center;
     font-size: 13px;
 }
+
+.scope-option-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 20px;
+}
+
+.scope-option-icon svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.project-resource-header > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.project-resource-header > span:first-child svg {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+}
 /* =========================================================
    END
    ========================================================= */
