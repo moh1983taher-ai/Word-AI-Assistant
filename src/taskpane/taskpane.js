@@ -20727,16 +20727,12 @@ function formatLibraryResults(
                                 );
 
 
-                            const rawText =
-                                cleanLibraryText(
-                                    item.text ||
-                                    ""
-                                );
-
-
                             const text =
                                 escapeHtml(
-                                    rawText
+                                    String(
+                                        item.text ||
+                                        ""
+                                    )
                                 );
 
 
