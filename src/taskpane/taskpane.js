@@ -20591,242 +20591,7 @@ function cleanLibraryText(text) {
 
 }
 
-function formatLibraryResults(
-    results
-) {
 
-    if (
-        !Array.isArray(
-            results
-        ) ||
-        results.length === 0
-    ) {
-
-        return `
-            <div class="library-empty">
-                لم يتم العثور على نتائج مناسبة في المكتبة.
-            </div>
-        `;
-
-    }
-
-
-    return results
-        .map(
-            function (
-                item,
-                index
-            ) {
-
-                if (!item) {
-
-                    return "";
-
-                }
-
-
-                const bookId =
-                    String(
-                        item.bookId ||
-                        ""
-                    );
-
-
-                const page =
-                    item.page !==
-                        undefined &&
-                    item.page !==
-                        null
-                        ? String(
-                            item.page
-                        )
-                        : "";
-
-
-                const pageId =
-                    item.pageId !==
-                        undefined &&
-                    item.pageId !==
-                        null
-                        ? String(
-                            item.pageId
-                        )
-                        : "";
-
-
-                const part =
-                    item.part !==
-                        undefined &&
-                    item.part !==
-                        null
-                        ? String(
-                            item.part
-                        )
-                        : "1";
-
-
-                const title =
-                    String(
-                        item.title ||
-                        "بدون عنوان"
-                    );
-
-
-                const author =
-                    String(
-                        item.author ||
-                        ""
-                    );
-
-
-                const rawText =
-                    cleanLibraryText(
-                        item.text ||
-                        ""
-                    );
-
-
-                const text =
-                    escapeHtml(
-                        rawText
-                    );
-
-
-                const score =
-                    Number(
-                        item.score ||
-                        0
-                    );
-
-
-                return `
-                    <div
-                        class="library-result-card"
-                        data-library-index="${index}"
-                        data-library-book-id="${escapeHtml(
-                            bookId
-                        )}"
-                        data-library-page="${escapeHtml(
-                            page
-                        )}"
-                        data-library-page-id="${escapeHtml(
-                            pageId
-                        )}"
-                        data-library-part="${escapeHtml(
-                            part
-                        )}"
-                    >
-
-                        <div
-                            class="library-result-header"
-                        >
-
-                            <span
-                                class="library-result-number"
-                            >
-                                ${index + 1}
-                            </span>
-
-                            <div
-                                class="library-result-title-wrap"
-                            >
-
-                                <div
-                                    class="library-result-title"
-                                >
-                                    ${escapeHtml(
-                                        title
-                                    )}
-                                </div>
-
-                                ${
-                                    author
-                                        ? `
-                                            <div
-                                                class="library-result-author"
-                                            >
-                                                ${escapeHtml(
-                                                    author
-                                                )}
-                                            </div>
-                                        `
-                                        : ""
-                                }
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            class="library-result-meta"
-                        >
-
-                            ${
-                                page
-                                    ? `
-                                        <span>
-                                            الصفحة ${escapeHtml(
-                                                page
-                                            )}
-                                        </span>
-                                    `
-                                    : ""
-                            }
-
-                            ${
-                                score
-                                    ? `
-                                        <span>
-                                            درجة الصلة ${score}
-                                        </span>
-                                    `
-                                    : ""
-                            }
-
-                        </div>
-
-
-                        <div
-                            class="library-result-text"
-                        >
-                            ${text}
-                        </div>
-
-
-                        <div
-                            class="library-result-actions"
-                        >
-
-                            <button
-                                type="button"
-                                class="library-open-btn"
-                                data-library-action="open"
-                                data-library-index="${index}"
-                            >
-                                فتح الموضع
-                            </button>
-
-
-                            <button
-                                type="button"
-                                class="library-copy-btn"
-                                data-library-action="copy"
-                                data-library-index="${index}"
-                            >
-                                نسخ النص
-                            </button>
-
-                        </div>
-
-                    </div>
-                `;
-
-            }
-        )
-        .join("");
-
-}
 
 function escapeHtml(
     value
@@ -20867,10 +20632,14 @@ function escapeHtml(value) {
 // عرض نتائج المكتبة
 // =====================================================
 
-function formatLibraryResults(results) {
+function formatLibraryResults(
+    results
+) {
 
     if (
-        !Array.isArray(results) ||
+        !Array.isArray(
+            results
+        ) ||
         results.length === 0
     ) {
 
@@ -20886,185 +20655,227 @@ function formatLibraryResults(results) {
     return `
         <div class="library-results">
 
-            ${results
-                .map(
-                    function (
-                        item,
-                        index
-                    ) {
+            ${
+                results
+                    .map(
+                        function (
+                            item,
+                            index
+                        ) {
 
-                        if (!item) {
-                            return "";
-                        }
+                            if (!item) {
 
+                                return "";
 
-                        const title =
-                            escapeHtml(
-                                item.title ||
-                                "بدون عنوان"
-                            );
+                            }
 
 
-                        const author =
-                            escapeHtml(
-                                item.author ||
-                                ""
-                            );
+                            const bookId =
+                                String(
+                                    item.bookId ||
+                                    ""
+                                );
 
 
-                        const page =
-                            item.page !==
-                            undefined &&
-                            item.page !==
-                            null
-                                ? escapeHtml(
-                                    item.page
-                                )
-                                : "";
+                            const part =
+                                String(
+                                    item.part ??
+                                    "1"
+                                );
 
 
-                        const bookId =
-                            escapeHtml(
-                                item.bookId ||
-                                ""
-                            );
+                            const page =
+                                item.page !==
+                                    undefined &&
+                                item.page !==
+                                    null
+                                    ? String(
+                                        item.page
+                                    )
+                                    : "";
 
 
-                        const pageId =
-                            escapeHtml(
-                                item.pageId ||
-                                ""
-                            );
+                            const pageId =
+                                item.pageId !==
+                                    undefined &&
+                                item.pageId !==
+                                    null
+                                    ? String(
+                                        item.pageId
+                                    )
+                                    : "";
 
 
-                        const text =
-                            escapeHtml(
-                                item.text ||
-                                ""
-                            );
+                            const openUrl =
+                                String(
+                                    item.openUrl ||
+                                    ""
+                                );
 
 
-                        const score =
-                            Number(
-                                item.score ||
-                                0
-                            );
+                            const title =
+                                String(
+                                    item.title ||
+                                    "بدون عنوان"
+                                );
 
 
-                        return `
-                            <div
-                                class="library-result-card"
-                                data-library-index="${index}"
-                                data-library-book-id="${bookId}"
-                                data-library-page="${page}"
-                                data-library-page-id="${pageId}"
-                            >
+                            const author =
+                                String(
+                                    item.author ||
+                                    ""
+                                );
 
+
+                            const rawText =
+                                cleanLibraryText(
+                                    item.text ||
+                                    ""
+                                );
+
+
+                            const text =
+                                escapeHtml(
+                                    rawText
+                                );
+
+
+                            const score =
+                                Number(
+                                    item.score ||
+                                    0
+                                );
+
+
+                            return `
                                 <div
-                                    class="library-result-header"
+                                    class="library-result-card"
+                                    data-library-index="${index}"
+                                    data-library-book-id="${escapeHtml(
+                                        bookId
+                                    )}"
+                                    data-library-part="${escapeHtml(
+                                        part
+                                    )}"
+                                    data-library-page="${escapeHtml(
+                                        page
+                                    )}"
+                                    data-library-page-id="${escapeHtml(
+                                        pageId
+                                    )}"
+                                    data-library-open-url="${escapeHtml(
+                                        openUrl
+                                    )}"
                                 >
 
-                                    <span
-                                        class="library-result-number"
+                                    <div
+                                        class="library-result-header"
                                     >
-                                        ${index + 1}
-                                    </span>
+
+                                        <span
+                                            class="library-result-number"
+                                        >
+                                            ${index + 1}
+                                        </span>
+
+                                        <div
+                                            class="library-result-title-wrap"
+                                        >
+
+                                            <div
+                                                class="library-result-title"
+                                            >
+                                                ${escapeHtml(
+                                                    title
+                                                )}
+                                            </div>
+
+                                            ${
+                                                author
+                                                    ? `
+                                                        <div
+                                                            class="library-result-author"
+                                                        >
+                                                            ${escapeHtml(
+                                                                author
+                                                            )}
+                                                        </div>
+                                                    `
+                                                    : ""
+                                            }
+
+                                        </div>
+
+                                    </div>
 
 
                                     <div
-                                        class="library-result-title-area"
+                                        class="library-result-meta"
                                     >
 
-                                        <div
-                                            class="library-result-title"
-                                        >
-                                            ${title}
-                                        </div>
-
+                                        ${
+                                            page
+                                                ? `
+                                                    <span>
+                                                        الصفحة ${escapeHtml(
+                                                            page
+                                                        )}
+                                                    </span>
+                                                `
+                                                : ""
+                                        }
 
                                         ${
-                                            author
+                                            score
                                                 ? `
-                                                    <div
-                                                        class="library-result-author"
-                                                    >
-                                                        ${author}
-                                                    </div>
+                                                    <span>
+                                                        درجة الصلة ${score}
+                                                    </span>
                                                 `
                                                 : ""
                                         }
 
                                     </div>
 
-                                </div>
 
-
-                                <div
-                                    class="library-result-meta"
-                                >
-
-                                    ${
-                                        page
-                                            ? `
-                                                <span>
-                                                    الصفحة ${page}
-                                                </span>
-                                            `
-                                            : ""
-                                    }
-
-
-                                    ${
-                                        score
-                                            ? `
-                                                <span>
-                                                    درجة الصلة ${score}
-                                                </span>
-                                            `
-                                            : ""
-                                    }
-
-                                </div>
-
-
-                                <div
-                                    class="library-result-text"
-                                >
-                                    ${text}
-                                </div>
-
-
-                                <div
-                                    class="library-result-actions"
-                                >
-
-                                    <button
-                                        type="button"
-                                        class="library-open-btn"
-                                        data-library-action="open"
-                                        data-library-index="${index}"
+                                    <div
+                                        class="library-result-text"
                                     >
-                                        فتح الموضع
-                                    </button>
+                                        ${text}
+                                    </div>
 
 
-                                    <button
-                                        type="button"
-                                        class="library-copy-btn"
-                                        data-library-action="copy"
-                                        data-library-index="${index}"
+                                    <div
+                                        class="library-result-actions"
                                     >
-                                        نسخ النص
-                                    </button>
+
+                                        <button
+                                            type="button"
+                                            class="library-open-btn"
+                                            data-library-action="open"
+                                            data-library-index="${index}"
+                                        >
+                                            فتح الموضع
+                                        </button>
+
+
+                                        <button
+                                            type="button"
+                                            class="library-copy-btn"
+                                            data-library-action="copy"
+                                            data-library-index="${index}"
+                                        >
+                                            نسخ النص
+                                        </button>
+
+                                    </div>
 
                                 </div>
+                            `;
 
-                            </div>
-                        `;
-
-                    }
-                )
-                .join("")
+                        }
+                    )
+                    .join("")
             }
 
         </div>
@@ -21231,6 +21042,7 @@ function renderChat() {
                     ) {
 
                         e.preventDefault();
+
                         e.stopPropagation();
 
 
@@ -21247,10 +21059,53 @@ function renderChat() {
                         }
 
 
+                        const openUrl =
+                            card.getAttribute(
+                                "data-library-open-url"
+                            );
+
+
+                        // =================================================
+                        // استخدام الرابط الجاهز من الـWorker
+                        // =================================================
+
+                        if (
+                            openUrl
+                        ) {
+
+                            console.log(
+                                "LIBRARY OPEN:",
+                                openUrl
+                            );
+
+
+                            window.open(
+                                openUrl,
+                                "_blank",
+                                "noopener,noreferrer"
+                            );
+
+
+                            return;
+
+                        }
+
+
+                        // =================================================
+                        // احتياط للنتائج القديمة المحفوظة
+                        // =================================================
+
                         const bookId =
                             card.getAttribute(
                                 "data-library-book-id"
                             );
+
+
+                        const part =
+                            card.getAttribute(
+                                "data-library-part"
+                            ) ||
+                            "1";
 
 
                         const page =
@@ -21263,13 +21118,6 @@ function renderChat() {
                             card.getAttribute(
                                 "data-library-page-id"
                             );
-
-
-                        const part =
-                            card.getAttribute(
-                                "data-library-part"
-                            ) ||
-                            "1";
 
 
                         if (!bookId) {
@@ -21293,7 +21141,9 @@ function renderChat() {
                         );
 
 
-                        if (page) {
+                        if (
+                            page
+                        ) {
 
                             targetURL.searchParams.set(
                                 "page",
@@ -21303,7 +21153,9 @@ function renderChat() {
                         }
 
 
-                        if (pageId) {
+                        if (
+                            pageId
+                        ) {
 
                             targetURL.searchParams.set(
                                 "index",
@@ -21314,14 +21166,15 @@ function renderChat() {
 
 
                         console.log(
-                            "LIBRARY OPEN:",
+                            "LIBRARY OPEN FALLBACK:",
                             targetURL.toString()
                         );
 
 
                         window.open(
                             targetURL.toString(),
-                            "_blank"
+                            "_blank",
+                            "noopener,noreferrer"
                         );
 
                     };
@@ -22060,6 +21913,7 @@ chats =
 
 // =====================================================
 // Normalize Chat Messages
+// الحفاظ على جميع بيانات الرسائل
 // =====================================================
 
 chats.forEach(
@@ -22068,59 +21922,202 @@ chats.forEach(
     ) {
 
         chat.messages =
-            chat.messages.map(
-                function (
-                    message
-                ) {
-
-                    if (
-                        !message ||
-                        typeof message !==
-                            "object"
+            chat.messages
+                .map(
+                    function (
+                        message
                     ) {
 
-                        return null;
+                        if (
+                            !message ||
+                            typeof message !==
+                                "object"
+                        ) {
 
-                    }
+                            return null;
+
+                        }
 
 
-                    return {
+                        const normalizedMessage = {
 
-                        role:
-                            message.role ===
-                            "ai"
-                                ? "ai"
-                                : "user",
+                            role:
+                                message.role ===
+                                "ai"
+                                    ? "ai"
+                                    : "user",
 
-                        text:
-                            String(
-                                message.text ||
-                                ""
-                            ),
+                            text:
+                                String(
+                                    message.text ||
+                                    ""
+                                ),
 
-                        citationSources:
-                            Array.isArray(
-                                message.citationSources
-                            )
-                                ? cloneCitationSources(
+                            citationSources:
+                                Array.isArray(
                                     message.citationSources
                                 )
-                                : []
+                                    ? cloneCitationSources(
+                                        message.citationSources
+                                    )
+                                    : []
 
-                    };
+                        };
 
-                }
-            )
-            .filter(
-                function (
-                    message
-                ) {
 
-                    return message !==
-                        null;
+                        // =================================================
+                        // رسائل المكتبة
+                        // الاحتفاظ بنوع الرسالة ونتائج البحث الأصلية
+                        // =================================================
 
-                }
-            );
+                        if (
+                            message.type ===
+                                "library" ||
+                            Array.isArray(
+                                message.libraryResults
+                            )
+                        ) {
+
+                            normalizedMessage.type =
+                                "library";
+
+
+                            normalizedMessage.libraryResults =
+                                Array.isArray(
+                                    message.libraryResults
+                                )
+                                    ? message.libraryResults.map(
+                                        function (
+                                            result
+                                        ) {
+
+                                            if (
+                                                !result ||
+                                                typeof result !==
+                                                    "object"
+                                            ) {
+
+                                                return null;
+
+                                            }
+
+
+                                            return {
+
+                                                bookId:
+                                                    result.bookId ??
+                                                    "",
+
+                                                title:
+                                                    String(
+                                                        result.title ||
+                                                        ""
+                                                    ),
+
+                                                author:
+                                                    String(
+                                                        result.author ||
+                                                        ""
+                                                    ),
+
+                                                part:
+                                                    result.part ??
+                                                    "1",
+
+                                                page:
+                                                    result.page ??
+                                                    "",
+
+                                                pageId:
+                                                    result.pageId ??
+                                                    "",
+
+                                                score:
+                                                    Number(
+                                                        result.score ||
+                                                        0
+                                                    ),
+
+                                                matchedTerms:
+                                                    Number(
+                                                        result.matchedTerms ||
+                                                        0
+                                                    ),
+
+                                                totalTerms:
+                                                    Number(
+                                                        result.totalTerms ||
+                                                        0
+                                                    ),
+
+                                                exactPhrase:
+                                                    Boolean(
+                                                        result.exactPhrase
+                                                    ),
+
+                                                coverage:
+                                                    Number(
+                                                        result.coverage ||
+                                                        0
+                                                    ),
+
+                                                weightedCoverage:
+                                                    Number(
+                                                        result.weightedCoverage ||
+                                                        0
+                                                    ),
+
+                                                importantMatched:
+                                                    Number(
+                                                        result.importantMatched ||
+                                                        0
+                                                    ),
+
+                                                proximity:
+                                                    Number(
+                                                        result.proximity ||
+                                                        0
+                                                    ),
+
+                                                text:
+                                                    String(
+                                                        result.text ||
+                                                        ""
+                                                    )
+
+                                            };
+
+                                        }
+                                    )
+                                        .filter(
+                                            function (
+                                                result
+                                            ) {
+
+                                                return result !==
+                                                    null;
+
+                                            }
+                                        )
+                                    : [];
+
+                        }
+
+
+                        return normalizedMessage;
+
+                    }
+                )
+                .filter(
+                    function (
+                        message
+                    ) {
+
+                        return message !==
+                            null;
+
+                    }
+                );
 
     }
 );
