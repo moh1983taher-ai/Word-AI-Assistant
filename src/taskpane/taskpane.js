@@ -31230,7 +31230,7 @@ async function searchLibrary(
     query,
     source = "all",
     books = 100,
-    results = 10
+    results = 100
 ) {
 
     const text =
