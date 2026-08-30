@@ -38501,58 +38501,6 @@ if (
             <button
                 type="button"
                 class="scope-project-item"
-                data-library-source="all">
-
-                <span class="scope-project-icon">
-
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#000000"
-                        stroke-width="1"
-                        stroke-linecap="round"
-                        stroke-linejoin="round">
-
-                        <rect
-                            x="4"
-                            y="5"
-                            width="4.5"
-                            height="14"
-                            rx="1.5"
-                        />
-
-                        <rect
-                            x="9.5"
-                            y="5"
-                            width="4.5"
-                            height="14"
-                            rx="1.5"
-                        />
-
-                        <rect
-                            x="15.5"
-                            y="5"
-                            width="4.5"
-                            height="14"
-                            rx="1.5"
-                            transform="rotate(-5, 17.75, 12)"
-                        />
-
-                    </svg>
-
-                </span>
-
-                <span class="scope-project-name">
-                    جميع المكتبات
-                </span>
-
-            </button>
-
-
-            <button
-                type="button"
-                class="scope-project-item"
                 data-library-source="ketabonline">
 
                 <span class="scope-project-icon">
@@ -38618,9 +38566,30 @@ if (
                         stroke-linecap="round"
                         stroke-linejoin="round">
 
-                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <rect
+                            x="4"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                        />
 
-                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        <rect
+                            x="9.5"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                        />
+
+                        <rect
+                            x="15.5"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                            transform="rotate(-5, 17.75, 12)"
+                        />
 
                     </svg>
 
@@ -38686,9 +38655,6 @@ if (
 
 
                             const names = {
-
-                                all:
-                                    "جميع المكتبات",
 
                                 ketabonline:
                                     "جامع الكتب",
