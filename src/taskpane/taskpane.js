@@ -37792,42 +37792,44 @@ if (
 
 
 
-    function showScopeType(
-        type
-    ) {
+    function showScopeType(type) {
 
-        const titles = {
+        const scopeOptions = {
 
-            project:
-                "المشاريع",
+            project: {
+                title: "المشاريع",
+                all: "جميع المشاريع",
+                specific: "مشروع محدد"
+            },
 
-            document:
-                "المستندات",
+            document: {
+                title: "المستندات",
+                all: "جميع المستندات",
+                specific: "مستند محدد"
+            },
 
-            reference:
-                "المراجع",
+            reference: {
+                title: "المراجع",
+                all: "جميع المراجع",
+                specific: "مرجع محدد"
+            },
 
-            library:
-                "المكتبة"
-
-        };
-
-
-        const labels = {
-
-            project:
-                "مشروع",
-
-            document:
-                "مستند",
-
-            reference:
-                "مرجع",
-
-            library:
-                "مكتبة"
+            library: {
+                title: "المكتبة",
+                all: "جميع المكتبات",
+                specific: "مكتبة محددة"
+            }
 
         };
+
+
+        const options =
+            scopeOptions[type] ||
+            {
+                title: "نطاق البحث",
+                all: "الكل",
+                specific: "محدد"
+            };
 
 
         scopePanelTitle.innerHTML =
@@ -37840,7 +37842,7 @@ if (
             </button>
 
             <span>
-                ${titles[type] || "نطاق البحث"}
+                ${options.title}
             </span>
             `;
 
@@ -37857,7 +37859,7 @@ if (
                 </span>
 
                 <span>
-                    جميع ${labels[type] || ""}
+                    ${options.all}
                 </span>
 
             </button>
@@ -37874,7 +37876,7 @@ if (
                 </span>
 
                 <span>
-                    ${labels[type] || ""} محدد
+                    ${options.specific}
                 </span>
 
             </button>
@@ -37892,9 +37894,7 @@ if (
         ) {
 
             backButton.onclick =
-                function (
-                    e
-                ) {
+                function(e) {
 
                     e.preventDefault();
                     e.stopPropagation();
@@ -37911,14 +37911,10 @@ if (
                 ".scope-mode-option"
             )
             .forEach(
-                function (
-                    button
-                ) {
+                function(button) {
 
                     button.onclick =
-                        function (
-                            e
-                        ) {
+                        function(e) {
 
                             e.preventDefault();
                             e.stopPropagation();
@@ -37929,10 +37925,6 @@ if (
                                     "data-scope-mode"
                                 );
 
-
-                            // =========================================
-                            // جميع
-                            // =========================================
 
                             if (
                                 mode ===
@@ -37981,7 +37973,6 @@ if (
                                     "open"
                                 );
 
-
                                 scopePanel.setAttribute(
                                     "aria-hidden",
                                     "true"
@@ -37998,10 +37989,6 @@ if (
 
                             }
 
-
-                            // =========================================
-                            // محدد
-                            // =========================================
 
                             if (
                                 mode ===
@@ -38039,10 +38026,6 @@ if (
                                     type ===
                                     "library"
                                 ) {
-
-                                    // =========================================
-                                    // فتح قائمة اختيار المكتبات
-                                    // =========================================
 
                                     showLibraryScopePicker();
 
