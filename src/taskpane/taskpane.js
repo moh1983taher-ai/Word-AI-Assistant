@@ -31228,6 +31228,7 @@ const LIBRARY_API =
 
 async function searchLibrary(
     query,
+    source = "all",
     books = 100,
     results = 10
 ) {
@@ -31247,9 +31248,16 @@ async function searchLibrary(
     }
 
 
+    const selectedSource =
+        String(
+            source || "all"
+        ).trim().toLowerCase();
+
+
     const apiURL =
         `${LIBRARY_API}/library-search` +
         `?q=${encodeURIComponent(text)}` +
+        `&source=${encodeURIComponent(selectedSource)}` +
         `&books=${encodeURIComponent(books)}` +
         `&results=${encodeURIComponent(results)}`;
 
@@ -31565,9 +31573,42 @@ async function sendMessage() {
         );
 
 
+        // =================================================
+        // تحديد مصدر البحث
+        // all         = جميع المكتبات
+        // ketabonline = جامع الكتب الإسلامية
+        // shamela     = المكتبة الشاملة
+        // =================================================
+
+        const librarySource =
+            (
+                researchScope &&
+                researchScope.scope === "all"
+            )
+                ? "all"
+                : (
+                    researchScope &&
+                    researchScope.id
+                        ? researchScope.id
+                        : ""
+                );
+
+
+        if (
+            !librarySource
+        ) {
+
+            throw new Error(
+                "لم يتم تحديد مكتبة للبحث."
+            );
+
+        }
+
+
         const libraryData =
             await searchLibrary(
                 text,
+                librarySource,
                 100,
                 100
             );
@@ -31590,7 +31631,6 @@ async function sendMessage() {
                 null;
 
         }
-
 
         // =================================================
         // تجهيز النص الاحتياطي للرسالة
@@ -31632,9 +31672,9 @@ async function sendMessage() {
 
                             if (
                                 item.page !==
-                                undefined &&
+                                    undefined &&
                                 item.page !==
-                                null
+                                    null
                             ) {
 
                                 result +=
@@ -31756,6 +31796,12 @@ async function sendMessage() {
         renderSidebarChats();
 
         renderRecentChats();
+
+
+        console.log(
+            "LIBRARY SOURCE:",
+            librarySource
+        );
 
 
         console.log(
@@ -38451,7 +38497,141 @@ if (
 
 
         scopePanelContent.innerHTML =
-            "";
+            `
+            <button
+                type="button"
+                class="scope-project-item"
+                data-library-source="all">
+
+                <span class="scope-project-icon">
+
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#000000"
+                        stroke-width="1"
+                        stroke-linecap="round"
+                        stroke-linejoin="round">
+
+                        <rect
+                            x="4"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                        />
+
+                        <rect
+                            x="9.5"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                        />
+
+                        <rect
+                            x="15.5"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                            transform="rotate(-5, 17.75, 12)"
+                        />
+
+                    </svg>
+
+                </span>
+
+                <span class="scope-project-name">
+                    جميع المكتبات
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-project-item"
+                data-library-source="ketabonline">
+
+                <span class="scope-project-icon">
+
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#000000"
+                        stroke-width="1"
+                        stroke-linecap="round"
+                        stroke-linejoin="round">
+
+                        <rect
+                            x="4"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                        />
+
+                        <rect
+                            x="9.5"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                        />
+
+                        <rect
+                            x="15.5"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                            transform="rotate(-5, 17.75, 12)"
+                        />
+
+                    </svg>
+
+                </span>
+
+                <span class="scope-project-name">
+                    جامع الكتب
+                </span>
+
+            </button>
+
+
+            <button
+                type="button"
+                class="scope-project-item"
+                data-library-source="shamela">
+
+                <span class="scope-project-icon">
+
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#000000"
+                        stroke-width="1"
+                        stroke-linecap="round"
+                        stroke-linejoin="round">
+
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+
+                    </svg>
+
+                </span>
+
+                <span class="scope-project-name">
+                    المكتبة الشاملة
+                </span>
+
+            </button>
+            `;
 
 
         const backButton =
@@ -38481,121 +38661,88 @@ if (
         }
 
 
-        const libraryButton =
-            document.createElement(
-                "button"
+        scopePanelContent
+            .querySelectorAll(
+                "[data-library-source]"
+            )
+            .forEach(
+                function (
+                    button
+                ) {
+
+                    button.onclick =
+                        function (
+                            e
+                        ) {
+
+                            e.preventDefault();
+                            e.stopPropagation();
+
+
+                            const source =
+                                button.getAttribute(
+                                    "data-library-source"
+                                );
+
+
+                            const names = {
+
+                                all:
+                                    "جميع المكتبات",
+
+                                ketabonline:
+                                    "جامع الكتب",
+
+                                shamela:
+                                    "المكتبة الشاملة"
+
+                            };
+
+
+                            researchScope = {
+
+                                type:
+                                    "library",
+
+                                scope:
+                                    "specific",
+
+                                id:
+                                    source,
+
+                                librarySource:
+                                    source,
+
+                                name:
+                                    names[source] ||
+                                    "المكتبة"
+
+                            };
+
+
+                            updateScopeStatus();
+
+
+                            scopePanel.classList.remove(
+                                "open"
+                            );
+
+
+                            scopePanel.setAttribute(
+                                "aria-hidden",
+                                "true"
+                            );
+
+
+                            console.log(
+                                "نطاق البحث الحالي:",
+                                researchScope
+                            );
+
+                        };
+
+                }
             );
-
-
-        libraryButton.type =
-            "button";
-
-
-        libraryButton.className =
-            "scope-project-item";
-
-
-        libraryButton.innerHTML =
-            `
-            <span
-                class="scope-project-icon">
-
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#000000"
-                    stroke-width="1"
-                    stroke-linecap="round"
-                    stroke-linejoin="round">
-
-                    <rect
-                        x="4"
-                        y="5"
-                        width="4.5"
-                        height="14"
-                        rx="1.5"
-                    />
-
-                    <rect
-                        x="9.5"
-                        y="5"
-                        width="4.5"
-                        height="14"
-                        rx="1.5"
-                    />
-
-                    <rect
-                        x="15.5"
-                        y="5"
-                        width="4.5"
-                        height="14"
-                        rx="1.5"
-                        transform="rotate(-5, 17.75, 12)"
-                    />
-
-                </svg>
-
-            </span>
-
-            <span
-                class="scope-project-name">
-                المكتبة الإلكترونية
-            </span>
-            `;
-
-
-        libraryButton.onclick =
-            function (
-                e
-            ) {
-
-                e.preventDefault();
-                e.stopPropagation();
-
-
-                researchScope = {
-
-                    type:
-                        "library",
-
-                    scope:
-                        "specific",
-
-                    id:
-                        "ketabonline",
-
-                    name:
-                        "المكتبة الإلكترونية"
-
-                };
-
-
-                updateScopeStatus();
-
-
-                scopePanel.classList.remove(
-                    "open"
-                );
-
-
-                scopePanel.setAttribute(
-                    "aria-hidden",
-                    "true"
-                );
-
-
-                console.log(
-                    "نطاق البحث الحالي:",
-                    researchScope
-                );
-
-            };
-
-
-        scopePanelContent.appendChild(
-            libraryButton
-        );
 
     }
 
