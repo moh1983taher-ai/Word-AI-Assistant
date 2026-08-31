@@ -20688,11 +20688,24 @@ function formatLibraryResults(
                                 item.page !==
                                     undefined &&
                                 item.page !==
-                                    null
+                                    null &&
+                                item.page !==
+                                    ""
                                     ? String(
                                         item.page
                                     )
-                                    : "";
+                                    : (
+                                        item.pageId !==
+                                            undefined &&
+                                        item.pageId !==
+                                            null &&
+                                        item.pageId !==
+                                            ""
+                                            ? String(
+                                                item.pageId
+                                            )
+                                            : ""
+                                    );
 
 
                             const pageId =
