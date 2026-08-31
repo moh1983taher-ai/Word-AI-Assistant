@@ -33721,6 +33721,9 @@ async function sendMessage() {
         researchScope.type === "library"
     ) {
 
+        console.log("SMART ACTIVITY START");
+            showSmartSearchActivity();
+
         console.log(
             "LIBRARY SEARCH START:",
             researchScope
@@ -34171,7 +34174,7 @@ async function sendMessage() {
     finally {
 
         hideSmartSearchActivity();
-        
+
         if (
             requestFinished
         ) {
