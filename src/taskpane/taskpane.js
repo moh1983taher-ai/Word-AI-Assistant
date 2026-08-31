@@ -20663,7 +20663,9 @@ function formatLibraryResults(
                             index
                         ) {
 
-                            if (!item) {
+                            if (
+                                !item
+                            ) {
 
                                 return "";
 
@@ -20677,23 +20679,49 @@ function formatLibraryResults(
                                 );
 
 
-                            const part =
-                                String(
-                                    item.part ??
-                                    "1"
-                                );
+                            // =================================================
+                            // الجزء
+                            //
+                            // لا نفترض أن الكتاب له جزء.
+                            // =================================================
 
+                            const part =
+                                item.part !==
+                                    undefined &&
+                                item.part !==
+                                    null &&
+                                String(
+                                    item.part
+                                ).trim() !==
+                                    ""
+                                    ? String(
+                                        item.part
+                                    ).trim()
+                                    : "";
+
+
+                            // =================================================
+                            // الصفحة الحقيقية
+                            // =================================================
 
                             const page =
                                 item.page !==
                                     undefined &&
                                 item.page !==
-                                    null
+                                    null &&
+                                String(
+                                    item.page
+                                ).trim() !==
+                                    ""
                                     ? String(
                                         item.page
-                                    )
+                                    ).trim()
                                     : "";
 
+
+                            // =================================================
+                            // المعرف الداخلي للموضع
+                            // =================================================
 
                             const pageId =
                                 item.pageId !==
@@ -20706,12 +20734,20 @@ function formatLibraryResults(
                                     : "";
 
 
+                            // =================================================
+                            // رابط الموضع
+                            // =================================================
+
                             const openUrl =
                                 String(
                                     item.openUrl ||
                                     ""
                                 );
 
+
+                            // =================================================
+                            // عنوان الكتاب
+                            // =================================================
 
                             const title =
                                 String(
@@ -20720,12 +20756,20 @@ function formatLibraryResults(
                                 );
 
 
+                            // =================================================
+                            // المؤلف
+                            // =================================================
+
                             const author =
                                 String(
                                     item.author ||
                                     ""
                                 );
 
+
+                            // =================================================
+                            // النص
+                            // =================================================
 
                             const text =
                                 escapeHtml(
@@ -20735,6 +20779,10 @@ function formatLibraryResults(
                                     )
                                 );
 
+
+                            // =================================================
+                            // درجة الصلة
+                            // =================================================
 
                             const score =
                                 Number(
@@ -20774,6 +20822,7 @@ function formatLibraryResults(
                                             ${index + 1}
                                         </span>
 
+
                                         <div
                                             class="library-result-title-wrap"
                                         >
@@ -20785,6 +20834,7 @@ function formatLibraryResults(
                                                     title
                                                 )}
                                             </div>
+
 
                                             ${
                                                 author
@@ -20813,22 +20863,36 @@ function formatLibraryResults(
                                             page
                                                 ? `
                                                     <span>
+
                                                         ${
                                                             part
-                                                                ? `الجزء ${escapeHtml(part)} — `
+                                                                ? `
+                                                                    الجزء
+                                                                    ${escapeHtml(
+                                                                        part
+                                                                    )}
+                                                                    —
+                                                                `
                                                                 : ""
                                                         }
-                                                        الصفحة ${escapeHtml(page)}
+
+                                                        الصفحة
+                                                        ${escapeHtml(
+                                                            page
+                                                        )}
+
                                                     </span>
                                                 `
                                                 : ""
                                         }
 
+
                                         ${
                                             score
                                                 ? `
                                                     <span>
-                                                        درجة الصلة ${score}
+                                                        درجة الصلة
+                                                        ${score}
                                                     </span>
                                                 `
                                                 : ""
@@ -20881,6 +20945,8 @@ function formatLibraryResults(
     `;
 
 }
+
+
 
 // =====================================================
 // Render Chat
