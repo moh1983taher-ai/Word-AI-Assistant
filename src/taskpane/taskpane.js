@@ -33417,208 +33417,6 @@ async function rebuildLibraryResponseFromResults(
             : [];
 
 
-    // =========================================================
-    // إثراء نتائج الشاملة
-    //
-    // نستخدم المسار المثبت:
-    // /shamela-page-info
-    //
-    // ولا نغيّر أي شيء آخر في النتيجة.
-    // =========================================================
-
-    finalResults =
-        await Promise.all(
-            finalResults.map(
-                async function (
-                    result
-                ) {
-
-                    if (
-                        !result
-                    ) {
-
-                        return result;
-
-                    }
-
-
-                    // -------------------------------------------------
-                    // لا نلمس جامع الكتب
-                    // -------------------------------------------------
-
-                    if (
-                        result.source !==
-                        "shamela"
-                    ) {
-
-                        return result;
-
-                    }
-
-
-                    // -------------------------------------------------
-                    // نحتاج bookId + pageId
-                    // -------------------------------------------------
-
-                    if (
-                        !result.bookId ||
-                        !result.pageId
-                    ) {
-
-                        return result;
-
-                    }
-
-
-                    // -------------------------------------------------
-                    // إذا كانت البيانات موجودة أصلًا،
-                    // لا نعيد طلبها.
-                    // -------------------------------------------------
-
-                    const hasPage =
-                        result.page !==
-                            undefined &&
-                        result.page !==
-                            null &&
-                        String(
-                            result.page
-                        ).trim() !==
-                            "";
-
-
-                    const hasPart =
-                        result.part !==
-                            undefined &&
-                        result.part !==
-                            null &&
-                        String(
-                            result.part
-                        ).trim() !==
-                            "";
-
-
-                    if (
-                        hasPage &&
-                        hasPart
-                    ) {
-
-                        return result;
-
-                    }
-
-
-                    try {
-
-                        // =================================================
-                        // نفس الـWorker الذي نستخدمه للبحث
-                        // =================================================
-
-                        const infoURL =
-                            new URL(
-                                "/shamela-page-info",
-                                LIBRARY_API
-                            );
-
-
-                        infoURL.searchParams.set(
-                            "bookId",
-                            String(
-                                result.bookId
-                            )
-                        );
-
-
-                        infoURL.searchParams.set(
-                            "pageId",
-                            String(
-                                result.pageId
-                            )
-                        );
-
-
-                        const response =
-                            await fetch(
-                                infoURL.toString(),
-                                {
-                                    method:
-                                        "GET",
-
-                                    headers: {
-
-                                        "Accept":
-                                            "application/json"
-                                    }
-                                }
-                            );
-
-
-                        if (
-                            !response.ok
-                        ) {
-
-                            return result;
-
-                        }
-
-
-                        const data =
-                            await response.json();
-
-
-                        if (
-                            !data ||
-                            data.ok !==
-                                true
-                        ) {
-
-                            return result;
-
-                        }
-
-
-                        return {
-
-                            ...result,
-
-                            part:
-                                data.part ||
-                                result.part ||
-                                "",
-
-                            page:
-                                data.page ||
-                                result.page ||
-                                "",
-
-                            pageId:
-                                String(
-                                    result.pageId
-                                )
-
-                        };
-
-                    }
-                    catch (
-                        error
-                    ) {
-
-                        console.warn(
-                            "تعذر إثراء نتيجة الشاملة:",
-                            result.bookId,
-                            result.pageId,
-                            error?.message ||
-                            error
-                        );
-
-
-                        return result;
-
-                    }
-
-                }
-            )
-        );
-
 
     // =========================================================
     // الكتب الفريدة
@@ -33829,7 +33627,9 @@ async function searchLibrary(
         .trim();
 
 
-    if (!text) {
+    if (
+        !text
+    ) {
 
         throw new Error(
             "أدخل عبارة البحث في المكتبة."
@@ -33860,9 +33660,9 @@ async function searchLibrary(
         );
 
 
-    // =================================================
+    // =========================================================
     // البحث المباشر في المكتبة
-    // =================================================
+    // =========================================================
 
     const asyncDirectSearch =
         async function (
@@ -33874,7 +33674,9 @@ async function searchLibrary(
                 `?q=${encodeURIComponent(searchTerm)}` +
                 `&source=${encodeURIComponent(selectedSource)}` +
                 `&books=${encodeURIComponent(books)}` +
-                `&results=${encodeURIComponent(LIBRARY_AI_FETCH_RESULTS_PER_QUERY)}`;
+                `&results=${encodeURIComponent(
+                    LIBRARY_AI_FETCH_RESULTS_PER_QUERY
+                )}`;
 
 
             const response =
@@ -33941,10 +33743,214 @@ async function searchLibrary(
         };
 
 
-    // =================================================
-    // عند اختيار مكتبة محددة:
-    // نحافظ على المسار الحالي
-    // =================================================
+    // =========================================================
+    // إثراء نتائج الشاملة
+    //
+    // لا نستخدم pageId باعتباره رقم الصفحة.
+    //
+    // نرسل:
+    // bookId + pageId
+    //
+    // إلى الـWorker الذي يعيد:
+    // page = رقم الصفحة الحقيقي
+    // part = رقم الجزء الحقيقي
+    // =========================================================
+
+    const enrichShamelaResults =
+        async function (
+            resultList
+        ) {
+
+            if (
+                !Array.isArray(
+                    resultList
+                ) ||
+                !resultList.length
+            ) {
+
+                return resultList || [];
+
+            }
+
+
+            return await Promise.all(
+
+                resultList.map(
+                    async function (
+                        result
+                    ) {
+
+                        if (
+                            !result ||
+                            result.source !==
+                                "shamela"
+                        ) {
+
+                            return result;
+
+                        }
+
+
+                        if (
+                            !result.bookId ||
+                            !result.pageId
+                        ) {
+
+                            return result;
+
+                        }
+
+
+                        // -------------------------------------------------
+                        // إذا كانت البيانات موجودة بالفعل فلا نعيد الطلب.
+                        // -------------------------------------------------
+
+                        const existingPage =
+                            result.page !==
+                                undefined &&
+                            result.page !==
+                                null &&
+                            String(
+                                result.page
+                            ).trim() !==
+                                "";
+
+
+                        const existingPart =
+                            result.part !==
+                                undefined &&
+                            result.part !==
+                                null &&
+                            String(
+                                result.part
+                            ).trim() !==
+                                "";
+
+
+                        if (
+                            existingPage &&
+                            existingPart
+                        ) {
+
+                            return result;
+
+                        }
+
+
+                        try {
+
+                            const infoURL =
+                                new URL(
+                                    "/shamela-page-info",
+                                    LIBRARY_API
+                                );
+
+
+                            infoURL.searchParams.set(
+                                "bookId",
+                                String(
+                                    result.bookId
+                                )
+                            );
+
+
+                            infoURL.searchParams.set(
+                                "pageId",
+                                String(
+                                    result.pageId
+                                )
+                            );
+
+
+                            const response =
+                                await fetch(
+                                    infoURL.toString(),
+                                    {
+                                        method:
+                                            "GET",
+
+                                        headers: {
+                                            Accept:
+                                                "application/json"
+                                        }
+                                    }
+                                );
+
+
+                            if (
+                                !response.ok
+                            ) {
+
+                                return result;
+
+                            }
+
+
+                            const data =
+                                await response.json();
+
+
+                            if (
+                                !data ||
+                                data.ok !==
+                                    true
+                            ) {
+
+                                return result;
+
+                            }
+
+
+                            return {
+
+                                ...result,
+
+                                part:
+                                    data.part ||
+                                    result.part ||
+                                    "",
+
+                                page:
+                                    data.page ||
+                                    result.page ||
+                                    "",
+
+                                pageId:
+                                    String(
+                                        result.pageId
+                                    )
+
+                            };
+
+                        }
+                        catch (
+                            error
+                        ) {
+
+                            console.warn(
+                                "تعذر الحصول على بيانات موضع الشاملة:",
+                                result.bookId,
+                                result.pageId,
+                                error?.message ||
+                                error
+                            );
+
+
+                            return result;
+
+                        }
+
+                    }
+                )
+
+            );
+
+        };
+
+
+    // =========================================================
+    // عند اختيار مكتبة محددة
+    // =========================================================
 
     if (
         selectedSource !==
@@ -33957,7 +33963,7 @@ async function searchLibrary(
             );
 
 
-        data.results =
+        let finalSpecificResults =
             Array.isArray(
                 data.results
             )
@@ -33966,6 +33972,28 @@ async function searchLibrary(
                     requestedResults
                 )
                 : [];
+
+
+        // ---------------------------------------------------------
+        // إذا كانت المكتبة المحددة هي الشاملة:
+        // نحصل على الصفحة والجزء الحقيقيين.
+        // ---------------------------------------------------------
+
+        if (
+            selectedSource ===
+            "shamela"
+        ) {
+
+            finalSpecificResults =
+                await enrichShamelaResults(
+                    finalSpecificResults
+                );
+
+        }
+
+
+        data.results =
+            finalSpecificResults;
 
 
         data.resultsRequested =
@@ -33985,10 +34013,10 @@ async function searchLibrary(
     }
 
 
-    // =================================================
+    // =========================================================
     // المرحلة الأولى:
     // توسيع سؤال الباحث
-    // =================================================
+    // =========================================================
 
     let smartQueries =
         [
@@ -34004,7 +34032,9 @@ async function searchLibrary(
             );
 
     }
-    catch (error) {
+    catch (
+        error
+    ) {
 
         console.warn(
             "تعذر توسيع سؤال بحث المكتبات بالذكاء الاصطناعي:",
@@ -34021,9 +34051,9 @@ async function searchLibrary(
     }
 
 
-    // =================================================
+    // =========================================================
     // البحث المتوازي في المكتبات
-    // =================================================
+    // =========================================================
 
     const searchTasks =
         smartQueries.map(
@@ -34207,9 +34237,9 @@ async function searchLibrary(
     }
 
 
-    // =================================================
+    // =========================================================
     // لا توجد نتائج
-    // =================================================
+    // =========================================================
 
     if (
         !allResults.length
@@ -34222,10 +34252,10 @@ async function searchLibrary(
     }
 
 
-    // =================================================
+    // =========================================================
     // المرحلة الثانية:
     // ترشيح النتائج بالذكاء
-    // =================================================
+    // =========================================================
 
     let rankedResults =
         allResults;
@@ -34258,7 +34288,9 @@ async function searchLibrary(
         }
 
     }
-    catch (error) {
+    catch (
+        error
+    ) {
 
         console.warn(
             "تعذر ترشيح نتائج المكتبات بالذكاء الاصطناعي:",
@@ -34273,16 +34305,45 @@ async function searchLibrary(
     }
 
 
-    // =================================================
-    // النتيجة النهائية
-    // =================================================
+    // =========================================================
+    // النتائج التي ستظهر فعليًا
+    //
+    // نجهز العدد النهائي أولًا.
+    // =========================================================
+
+    let finalRankedResults =
+        rankedResults.slice(
+            0,
+            requestedResults
+        );
+
+
+    // =========================================================
+    // الحصول على بيانات الشاملة الحقيقية
+    //
+    // يتم ذلك بعد انتهاء الذكاء الاصطناعي،
+    // وعلى النتائج النهائية فقط.
+    // =========================================================
+
+    finalRankedResults =
+        await enrichShamelaResults(
+            finalRankedResults
+        );
+
+
+    // =========================================================
+    // إعادة بناء الاستجابة
+    //
+    // نرسل النتائج المزودة بالصفحة والجزء.
+    // =========================================================
 
     return await rebuildLibraryResponseFromResults(
-        rankedResults,
+        finalRankedResults,
         text,
         requestedResults,
         "all",
         {
+
             ketabonlineCount:
                 totalKetabOnline,
 
@@ -34299,10 +34360,13 @@ async function searchLibrary(
                 maxLastPage,
 
             smartQueries
+
         }
     );
 
 }
+
+
 
 async function rankLibraryResultsWithAI(
     query,
