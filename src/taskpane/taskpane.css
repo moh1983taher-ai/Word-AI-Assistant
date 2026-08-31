@@ -7457,6 +7457,92 @@ body.sidebar-is-pinned .message-box {
 .recent-chat-menu button:hover {
     background: #f3f3f3;
 }
+
+#recent-chat-list {
+    max-height: 420px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.recent-chat-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: inherit;
+}
+
+.recent-chat-select-all {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.recent-chat-delete-selected {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.recent-chat-delete-selected:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.recent-chat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+}
+
+.recent-chat-checkbox {
+    flex: 0 0 auto;
+    cursor: pointer;
+}
+
+.recent-chat-title-btn {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: right;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.recent-chat-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recent-chat-action-btn {
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 4px 6px;
+    opacity: .7;
+}
+
+.recent-chat-action-btn:hover {
+    opacity: 1;
+}
+
+.recent-chat-delete-btn {
+    color: #b00020;
+}
 /* =========================================================
    END
    ========================================================= */
