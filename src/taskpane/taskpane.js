@@ -33270,6 +33270,10 @@ function showSmartSearchActivity(
     }
 
 
+    // =================================================
+    // إيقاف أي نشاط سابق
+    // =================================================
+
     if (
         smartSearchActivityTimer
     ) {
@@ -33284,6 +33288,10 @@ function showSmartSearchActivity(
     }
 
 
+    // =================================================
+    // تهيئة عنصر التحميل نفسه
+    // =================================================
+
     loadingElement.classList.add(
         "smart-search-activity"
     );
@@ -33296,6 +33304,10 @@ function showSmartSearchActivity(
     smartSearchActivityIndex =
         0;
 
+
+    // =================================================
+    // إضافة رسالة نشاط
+    // =================================================
 
     function addMessage() {
 
@@ -33325,23 +33337,47 @@ function showSmartSearchActivity(
         );
 
 
+        // ---------------------------------------------
+        // ظهور ناعم
+        // ---------------------------------------------
+
         requestAnimationFrame(
             () => {
 
-                line.classList.add(
-                    "visible"
+                requestAnimationFrame(
+                    () => {
+
+                        line.classList.add(
+                            "visible"
+                        );
+
+                    }
                 );
 
             }
         );
 
 
+        // ---------------------------------------------
+        // اختفاء ناعم
+        // ---------------------------------------------
+
         setTimeout(
             () => {
+
+                if (
+                    !line.parentNode
+                ) {
+
+                    return;
+
+                }
+
 
                 line.classList.remove(
                     "visible"
                 );
+
 
                 line.classList.add(
                     "fade-out"
@@ -33362,16 +33398,20 @@ function showSmartSearchActivity(
                         }
 
                     },
-                    500
+                    550
                 );
 
             },
-            2200
+            1800
         );
 
 
         smartSearchActivityIndex++;
 
+
+        // =================================================
+        // إبقاء موضع الدردشة عند آخر سطر
+        // =================================================
 
         if (
             chatArea
@@ -33385,13 +33425,21 @@ function showSmartSearchActivity(
     }
 
 
+    // =================================================
+    // الرسالة الأولى
+    // =================================================
+
     addMessage();
 
+
+    // =================================================
+    // الرسائل التالية
+    // =================================================
 
     smartSearchActivityTimer =
         setInterval(
             addMessage,
-            900
+            1100
         );
 
 }
