@@ -31226,17 +31226,1545 @@ const LIBRARY_API =
     "https://research-tools-library.moh1983taher.workers.dev";
 
 
+/*
+ * أدوات الباحث — طبقة البحث الذكي للمكتبات
+ *
+ * الفكرة:
+ * 1) الذكاء الأول يوسع الاستعلام إلى 3 صيغ بحث قريبة.
+ * 2) نبحث بهذه الصيغ في المسار الحالي للمكتبات.
+ * 3) نزيل التكرارات.
+ * 4) الذكاء الثاني يرتب أفضل النتائج بحسب:
+ *    - قرب عنوان الكتاب من السؤال
+ *    - قرب عنوان الموضع
+ *    - المطابقة الحرفية
+ *    - المطابقة المفاهيمية
+ *    - صلة النص بالموضوع
+ * 5) عند فشل الذكاء يعود البحث الأصلي تلقائيًا.
+ *
+ * مهم:
+ * - لا يغير Worker الحالي.
+ * - لا يغير واجهة المستخدم.
+ * - لا يغير أسماء الدوال الحالية.
+ * - يستبدل دالة searchLibrary ويضيف الدوال المساعدة التالية.
+ */
+
+const LIBRARY_AI_EXPANSION_COUNT = 3;
+const LIBRARY_AI_FETCH_RESULTS_PER_QUERY = 40;
+const LIBRARY_AI_MAX_CANDIDATES = 60;
+const LIBRARY_AI_MIN_RELEVANCE = 68;
+const LIBRARY_AI_TIMEOUT_MS = 15000;
+
+
+// =====================================================
+// إعدادات الذكاء الاصطناعي
+// =====================================================
+
+function getLibraryAISavedSettings() {
+
+    try {
+
+        if (
+            typeof getSavedSettings ===
+            "function"
+        ) {
+
+            const saved =
+                getSavedSettings();
+
+            if (
+                saved &&
+                typeof saved ===
+                    "object"
+            ) {
+
+                return saved;
+
+            }
+
+        }
+
+    }
+    catch (_) {}
+
+
+    try {
+
+        return (
+            JSON.parse(
+                localStorage.getItem(
+                    "AI_SETTINGS"
+                ) || "{}"
+            ) || {}
+        );
+
+    }
+    catch (_) {
+
+        return {};
+
+    }
+
+}
+
+
+function getLibraryAIProviderConfig() {
+
+    const settings =
+        getLibraryAISavedSettings();
+
+
+    const provider =
+        String(
+            settings.provider ||
+            "openrouter"
+        )
+        .trim()
+        .toLowerCase();
+
+
+    const key =
+        String(
+            settings.key ||
+            ""
+        )
+        .trim();
+
+
+    const model =
+        String(
+            settings.model ||
+            ""
+        )
+        .trim();
+
+
+    if (
+        !key ||
+        !model
+    ) {
+
+        throw new Error(
+            "لم يتم تحديد مفتاح ونموذج الذكاء الاصطناعي."
+        );
+
+    }
+
+
+    return {
+        provider,
+        key,
+        model
+    };
+
+}
+
+
+// =====================================================
+// مهلة الاتصال
+// =====================================================
+
+function withLibraryAITimeout(
+    promise,
+    timeoutMs =
+        LIBRARY_AI_TIMEOUT_MS
+) {
+
+    let timer = null;
+
+
+    const timeout =
+        new Promise(
+            function (
+                _,
+                reject
+            ) {
+
+                timer =
+                    setTimeout(
+                        function () {
+
+                            reject(
+                                new Error(
+                                    "انتهت مهلة الذكاء الاصطناعي."
+                                )
+                            );
+
+                        },
+                        timeoutMs
+                    );
+
+            }
+        );
+
+
+    return Promise.race(
+        [
+            promise,
+            timeout
+        ]
+    ).finally(
+        function () {
+
+            if (timer) {
+
+                clearTimeout(
+                    timer
+                );
+
+            }
+
+        }
+    );
+
+}
+
+
+// =====================================================
+// استخراج رد الذكاء
+// =====================================================
+
+function extractLibraryAIText(
+    result,
+    provider
+) {
+
+    if (
+        provider ===
+        "gemini"
+    ) {
+
+        const parts =
+            result?.candidates?.[0]
+                ?.content?.parts;
+
+
+        if (
+            !Array.isArray(parts)
+        ) {
+
+            throw new Error(
+                "لم يصل رد صالح من Gemini."
+            );
+
+        }
+
+
+        const text =
+            parts
+                .filter(
+                    function (
+                        part
+                    ) {
+
+                        return (
+                            part &&
+                            typeof part.text ===
+                                "string" &&
+                            part.thought !==
+                                true
+                        );
+
+                    }
+                )
+                .map(
+                    function (
+                        part
+                    ) {
+
+                        return part.text;
+
+                    }
+                )
+                .join("\n")
+                .trim();
+
+
+        if (!text) {
+
+            throw new Error(
+                "لم يصل نص صالح من Gemini."
+            );
+
+        }
+
+
+        return text;
+
+    }
+
+
+    const text =
+        result?.choices?.[0]
+            ?.message?.content;
+
+
+    if (
+        typeof text ===
+            "string" &&
+        text.trim()
+    ) {
+
+        return text.trim();
+
+    }
+
+
+    throw new Error(
+        `لم يصل رد صالح من ${provider}.`
+    );
+
+}
+
+
+// =====================================================
+// استدعاء الذكاء الاصطناعي
+// =====================================================
+
+async function callLibraryAI(
+    systemPrompt,
+    userPrompt,
+    options = {}
+) {
+
+    const config =
+        getLibraryAIProviderConfig();
+
+
+    const temperature =
+        typeof options.temperature ===
+            "number"
+            ? options.temperature
+            : 0.1;
+
+
+    const maxTokens =
+        typeof options.maxTokens ===
+            "number"
+            ? options.maxTokens
+            : 900;
+
+
+    // ================================================
+    // Gemini
+    // ================================================
+
+    if (
+        config.provider ===
+        "gemini"
+    ) {
+
+        const model =
+            String(
+                config.model
+            )
+            .replace(
+                /^models\//,
+                ""
+            );
+
+
+        const requestPromise =
+            fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.key)}`,
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify(
+                            {
+                                systemInstruction: {
+                                    parts: [
+                                        {
+                                            text:
+                                                systemPrompt
+                                        }
+                                    ]
+                                },
+
+                                contents: [
+                                    {
+                                        role:
+                                            "user",
+
+                                        parts: [
+                                            {
+                                                text:
+                                                    userPrompt
+                                            }
+                                        ]
+                                    }
+                                ],
+
+                                generationConfig: {
+                                    temperature,
+                                    maxOutputTokens:
+                                        maxTokens
+                                }
+
+                            }
+                        )
+
+                }
+            );
+
+
+        const response =
+            await withLibraryAITimeout(
+                requestPromise
+            );
+
+
+        let result;
+
+        try {
+
+            result =
+                await response.json();
+
+        }
+        catch (_) {
+
+            throw new Error(
+                `استجابة Gemini غير صالحة: HTTP ${response.status}`
+            );
+
+        }
+
+
+        if (
+            !response.ok
+        ) {
+
+            const message =
+                result?.error?.message ||
+                result?.message ||
+                `فشل الاتصال بـ Gemini: HTTP ${response.status}`;
+
+
+            throw new Error(
+                message
+            );
+
+        }
+
+
+        return extractLibraryAIText(
+            result,
+            "gemini"
+        );
+
+    }
+
+
+    // ================================================
+    // OpenAI / Groq / OpenRouter
+    // ================================================
+
+    let endpoint;
+
+
+    if (
+        config.provider ===
+        "openai"
+    ) {
+
+        endpoint =
+            "https://api.openai.com/v1/chat/completions";
+
+    }
+
+    else if (
+        config.provider ===
+        "groq"
+    ) {
+
+        endpoint =
+            "https://api.groq.com/openai/v1/chat/completions";
+
+    }
+
+    else {
+
+        endpoint =
+            "https://openrouter.ai/api/v1/chat/completions";
+
+    }
+
+
+    const headers = {
+
+        "Content-Type":
+            "application/json",
+
+        "Authorization":
+            "Bearer " +
+            config.key
+
+    };
+
+
+    if (
+        config.provider ===
+        "openrouter"
+    ) {
+
+        headers["HTTP-Referer"] =
+            window.location.href;
+
+        headers["X-Title"] =
+            "Research Tools";
+
+    }
+
+
+    const requestPromise =
+        fetch(
+            endpoint,
+            {
+                method:
+                    "POST",
+
+                headers,
+
+                body:
+                    JSON.stringify(
+                        {
+                            model:
+                                config.model,
+
+                            messages: [
+                                {
+                                    role:
+                                        "system",
+
+                                    content:
+                                        systemPrompt
+                                },
+
+                                {
+                                    role:
+                                        "user",
+
+                                    content:
+                                        userPrompt
+                                }
+                            ],
+
+                            temperature,
+
+                            max_tokens:
+                                maxTokens
+                        }
+                    )
+            }
+        );
+
+
+    const response =
+        await withLibraryAITimeout(
+            requestPromise
+        );
+
+
+    let result;
+
+
+    try {
+
+        result =
+            await response.json();
+
+    }
+    catch (_) {
+
+        throw new Error(
+            `استجابة ${config.provider} غير صالحة: HTTP ${response.status}`
+        );
+
+    }
+
+
+    if (
+        !response.ok
+    ) {
+
+        const message =
+            result?.error?.message ||
+            result?.message ||
+            `فشل الاتصال بـ ${config.provider}: HTTP ${response.status}`;
+
+
+        throw new Error(
+            message
+        );
+
+    }
+
+
+    return extractLibraryAIText(
+        result,
+        config.provider
+    );
+
+}
+
+
+// =====================================================
+// تحليل JSON القادم من الذكاء
+// =====================================================
+
+function parseLibraryAIJSON(
+    text
+) {
+
+    let raw =
+        String(
+            text ||
+            ""
+        )
+        .trim();
+
+
+    raw =
+        raw
+            .replace(
+                /^```json\s*/i,
+                ""
+            )
+            .replace(
+                /^```\s*/i,
+                ""
+            )
+            .replace(
+                /\s*```$/i,
+                ""
+            )
+            .trim();
+
+
+    try {
+
+        return JSON.parse(
+            raw
+        );
+
+    }
+    catch (_) {}
+
+
+    const objectStart =
+        raw.indexOf(
+            "{"
+        );
+
+    const objectEnd =
+        raw.lastIndexOf(
+            "}"
+        );
+
+
+    const arrayStart =
+        raw.indexOf(
+            "["
+        );
+
+    const arrayEnd =
+        raw.lastIndexOf(
+            "]"
+        );
+
+
+    if (
+        arrayStart >= 0 &&
+        arrayEnd > arrayStart
+    ) {
+
+        return JSON.parse(
+            raw.substring(
+                arrayStart,
+                arrayEnd + 1
+            )
+        );
+
+    }
+
+
+    if (
+        objectStart >= 0 &&
+        objectEnd > objectStart
+    ) {
+
+        return JSON.parse(
+            raw.substring(
+                objectStart,
+                objectEnd + 1
+            )
+        );
+
+    }
+
+
+    throw new Error(
+        "رد الذكاء الاصطناعي ليس JSON صالحًا."
+    );
+
+}
+
+
+// =====================================================
+// المرحلة الأولى:
+// توسيع سؤال الباحث
+// =====================================================
+
+async function expandLibrarySearchQuery(
+    query
+) {
+
+    const original =
+        String(
+            query ||
+            ""
+        )
+        .trim();
+
+
+    if (!original) {
+
+        return [
+            original
+        ];
+
+    }
+
+
+    const systemPrompt = [
+        "أنت مساعد بحث أكاديمي للمكتبات العربية.",
+        "مهمتك توسيع الاستعلام دون تغيير موضوعه.",
+        "ولّد ثلاث صيغ بحث بديلة تكشف مصادر قد لا تظهر بالعبارة الأصلية.",
+        "حافظ على المفهوم العلمي نفسه.",
+        "استخدم أحيانًا مرادفات أو علاقات مفهومية أو إعادة تركيب طبيعية.",
+        "لا تشرح ولا تضف عناوين من عندك.",
+        "لا تكرر الاستعلام الأصلي حرفيًا.",
+        "أعد JSON فقط بالشكل:",
+        "[\"صيغة 1\",\"صيغة 2\",\"صيغة 3\"]"
+    ].join(
+        "\n"
+    );
+
+
+    const userPrompt =
+        "الاستعلام الأصلي:\n" +
+        original;
+
+
+    const answer =
+        await callLibraryAI(
+            systemPrompt,
+            userPrompt,
+            {
+                temperature:
+                    0.2,
+
+                maxTokens:
+                    350
+            }
+        );
+
+
+    const parsed =
+        parseLibraryAIJSON(
+            answer
+        );
+
+
+    let variants = [];
+
+
+    if (
+        Array.isArray(
+            parsed
+        )
+    ) {
+
+        variants =
+            parsed;
+
+    }
+
+    else if (
+        parsed &&
+        Array.isArray(
+            parsed.queries
+        )
+    ) {
+
+        variants =
+            parsed.queries;
+
+    }
+
+    else if (
+        parsed &&
+        Array.isArray(
+            parsed.searchQueries
+        )
+    ) {
+
+        variants =
+            parsed.searchQueries;
+
+    }
+
+
+    variants =
+        variants
+            .map(
+                function (
+                    item
+                ) {
+
+                    return String(
+                        item ||
+                        ""
+                    )
+                    .trim();
+
+                }
+            )
+            .filter(Boolean)
+            .filter(
+                function (
+                    item
+                ) {
+
+                    return (
+                        item !==
+                        original
+                    );
+
+                }
+            );
+
+
+    const unique = [];
+
+
+    const seen =
+        new Set(
+            [
+                original
+            ]
+        );
+
+
+    for (
+        const item of variants
+    ) {
+
+        const key =
+            item
+                .replace(
+                    /\s+/g,
+                    " "
+                )
+                .trim()
+                .toLowerCase();
+
+
+        if (
+            seen.has(
+                key
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        seen.add(
+            key
+        );
+
+
+        unique.push(
+            item
+        );
+
+
+        if (
+            unique.length >=
+            LIBRARY_AI_EXPANSION_COUNT
+        ) {
+
+            break;
+
+        }
+
+    }
+
+
+    return [
+        original,
+        ...unique
+    ];
+
+}
+
+
+// =====================================================
+// مفتاح التكرار
+// =====================================================
+
+function libraryResultKey(
+    result
+) {
+
+    if (!result) {
+
+        return "";
+
+    }
+
+
+    const source =
+        String(
+            result.source ||
+            ""
+        )
+        .trim()
+        .toLowerCase();
+
+
+    const bookId =
+        String(
+            result.bookId ||
+            ""
+        )
+        .trim();
+
+
+    const pageId =
+        String(
+            result.pageId ||
+            result.page ||
+            ""
+        )
+        .trim();
+
+
+    const title =
+        String(
+            result.title ||
+            ""
+        )
+        .trim()
+        .toLowerCase();
+
+
+    return [
+        source,
+        bookId,
+        pageId,
+        title
+    ].join(
+        "|"
+    );
+
+}
+
+
+// =====================================================
+// تجهيز النتائج للذكاء
+// =====================================================
+
+function trimLibraryCandidateForAI(
+    result
+) {
+
+    return {
+
+        source:
+            String(
+                result?.source ||
+                ""
+            ),
+
+        title:
+            String(
+                result?.title ||
+                ""
+            ),
+
+        author:
+            String(
+                result?.author ||
+                ""
+            ),
+
+        sectionTitle:
+            String(
+                result?.sectionTitle ||
+                ""
+            ),
+
+        text:
+            String(
+                result?.text ||
+                ""
+            )
+            .replace(
+                /\s+/g,
+                " "
+            )
+            .trim()
+            .substring(
+                0,
+                1400
+            )
+
+    };
+
+}
+
+
+// =====================================================
+// تجهيز عدد محدود من المرشحين
+// =====================================================
+
+function prepareLibraryAICandidates(
+    results
+) {
+
+    const unique = [];
+
+    const seen =
+        new Set();
+
+
+    for (
+        const result of
+            Array.isArray(results)
+                ? results
+                : []
+    ) {
+
+        if (!result) {
+
+            continue;
+
+        }
+
+
+        const key =
+            libraryResultKey(
+                result
+            );
+
+
+        if (
+            !key ||
+            seen.has(
+                key
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        seen.add(
+            key
+        );
+
+
+        unique.push(
+            result
+        );
+
+
+        if (
+            unique.length >=
+            LIBRARY_AI_MAX_CANDIDATES
+        ) {
+
+            break;
+
+        }
+
+    }
+
+
+    return unique.map(
+        function (
+            result,
+            index
+        ) {
+
+            return {
+
+                id:
+                    `C${index + 1}`,
+
+                result,
+
+                ai:
+                    trimLibraryCandidateForAI(
+                        result
+                    )
+
+            };
+
+        }
+    );
+
+}
+
+
+// =====================================================
+// المرحلة الثانية:
+// ترشيح وترتيب النتائج
+// =====================================================
+
+async function rankLibraryResultsWithAI(
+    query,
+    results
+) {
+
+    const candidates =
+        prepareLibraryAICandidates(
+            results
+        );
+
+
+    if (
+        !candidates.length
+    ) {
+
+        return [];
+
+    }
+
+
+    const candidateData =
+        candidates.map(
+            function (
+                item
+            ) {
+
+                return {
+
+                    id:
+                        item.id,
+
+                    source:
+                        item.ai.source,
+
+                    title:
+                        item.ai.title,
+
+                    sectionTitle:
+                        item.ai.sectionTitle,
+
+                    text:
+                        item.ai.text
+
+                };
+
+            }
+        );
+
+
+    const systemPrompt = [
+        "أنت محكّم نتائج بحث أكاديمي عربي.",
+        "لا تبحث عن مصادر جديدة ولا تخترع نتائج.",
+        "قيّم فقط النتائج المعطاة لك.",
+        "المطلوب ترتيبها بحسب صلتها الفعلية بطلب الباحث.",
+        "أعط وزنًا واضحًا لقرب عنوان الكتاب من الموضوع، وقرب عنوان الموضع، والمطابقة الحرفية، والمطابقة المفاهيمية، ووضوح علاقة النص بالموضوع.",
+        "يمكن قبول نتيجة مهمة مفهوميًا حتى لو لم تطابق ألفاظ السؤال.",
+        "وفي المقابل لا ترفع نتيجة لمجرد وجود كلمة واحدة مشتركة.",
+        "أعط درجة صلة من 0 إلى 100.",
+        "أعد JSON فقط بالشكل:",
+        "[{\"id\":\"C1\",\"score\":95},{\"id\":\"C2\",\"score\":81}]",
+        "رتب من الأعلى إلى الأدنى.",
+        "لا تضف شرحًا ولا معرفات غير موجودة."
+    ].join(
+        "\n"
+    );
+
+
+    const userPrompt = [
+
+        "سؤال الباحث:",
+
+        query,
+
+        "",
+
+        "النتائج:",
+
+        JSON.stringify(
+            candidateData,
+            null,
+            2
+        )
+
+    ].join(
+        "\n"
+    );
+
+
+    const answer =
+        await callLibraryAI(
+            systemPrompt,
+            userPrompt,
+            {
+                temperature:
+                    0.1,
+
+                maxTokens:
+                    Math.min(
+                        1800,
+                        200 +
+                        candidates.length *
+                        25
+                    )
+            }
+        );
+
+
+    const parsed =
+        parseLibraryAIJSON(
+            answer
+        );
+
+
+    const ranking =
+        Array.isArray(
+            parsed
+        )
+            ? parsed
+            : Array.isArray(
+                parsed?.results
+            )
+                ? parsed.results
+                : [];
+
+
+    const candidateMap =
+        new Map(
+            candidates.map(
+                function (
+                    item
+                ) {
+
+                    return [
+                        item.id,
+                        item.result
+                    ];
+
+                }
+            )
+        );
+
+
+    const used =
+        new Set();
+
+
+    const ordered =
+        [];
+
+
+    for (
+        const item of ranking
+    ) {
+
+        const id =
+            String(
+                item?.id ||
+                ""
+            )
+            .trim();
+
+
+        if (
+            !id ||
+            used.has(
+                id
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        const original =
+            candidateMap.get(
+                id
+            );
+
+
+        if (!original) {
+
+            continue;
+
+        }
+
+
+        const score =
+            Math.max(
+                0,
+                Math.min(
+                    100,
+                    Number(
+                        item?.score ||
+                        0
+                    )
+                )
+            );
+
+
+        used.add(
+            id
+        );
+
+
+        ordered.push(
+            {
+                result:
+                    original,
+
+                aiScore:
+                    score
+            }
+        );
+
+    }
+
+
+    ordered.sort(
+        function (
+            a,
+            b
+        ) {
+
+            return (
+                b.aiScore -
+                a.aiScore
+            );
+
+        }
+    );
+
+
+    const strong =
+        ordered.filter(
+            function (
+                item
+            ) {
+
+                return (
+                    item.aiScore >=
+                    LIBRARY_AI_MIN_RELEVANCE
+                );
+
+            }
+        );
+
+
+    if (
+        strong.length > 0
+    ) {
+
+        return strong;
+
+    }
+
+
+    return ordered;
+
+}
+
+
+// =====================================================
+// إعادة بناء استجابة المكتبة
+// =====================================================
+
+function rebuildLibraryResponseFromResults(
+    results,
+    query,
+    requestedResults,
+    source,
+    meta = {}
+) {
+
+    const finalResults =
+        results.slice(
+            0,
+            Math.max(
+                1,
+                requestedResults
+            )
+        );
+
+
+    const bookMap =
+        new Map();
+
+
+    for (
+        const result of finalResults
+    ) {
+
+        const key =
+            `${result?.source || source}:${result?.bookId || ""}`;
+
+
+        if (
+            bookMap.has(
+                key
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        bookMap.set(
+            key,
+            {
+                id:
+                    String(
+                        result?.bookId ||
+                        ""
+                    ),
+
+                title:
+                    String(
+                        result?.title ||
+                        ""
+                    ),
+
+                author:
+                    String(
+                        result?.author ||
+                        ""
+                    ),
+
+                source:
+                    String(
+                        result?.source ||
+                        source
+                    )
+            }
+        );
+
+    }
+
+
+    return {
+
+        ok:
+            true,
+
+        source,
+
+        query,
+
+        page:
+            1,
+
+        resultsRequested:
+            requestedResults,
+
+        count:
+            finalResults.length,
+
+        ketabonlineCount:
+            Number(
+                meta.ketabonlineCount ||
+                0
+            ),
+
+        shamelaCount:
+            Number(
+                meta.shamelaCount ||
+                0
+            ),
+
+        rawResultsCollected:
+            Number(
+                meta.rawResultsCollected ||
+                0
+            ),
+
+        apiPagesFetched:
+            Number(
+                meta.apiPagesFetched ||
+                0
+            ),
+
+        apiLastPage:
+            Number(
+                meta.apiLastPage ||
+                0
+            ),
+
+        booksFound:
+            bookMap.size,
+
+        books:
+            Array.from(
+                bookMap.values()
+            ),
+
+        results:
+            finalResults,
+
+        smartSearch:
+            true,
+
+        smartQueries:
+            Array.isArray(
+                meta.smartQueries
+            )
+                ? meta.smartQueries
+                : [
+                    query
+                ]
+
+    };
+
+}
+
+
+// =====================================================
+// الدالة البديلة searchLibrary
+// =====================================================
+
 async function searchLibrary(
     query,
     source = "all",
     books = 100,
-    results = 100
+    results = 10
 ) {
 
     const text =
         String(
-            query || ""
-        ).trim();
+            query ||
+            ""
+        )
+        .trim();
 
 
     if (!text) {
@@ -31250,77 +32778,469 @@ async function searchLibrary(
 
     const selectedSource =
         String(
-            source || "all"
-        ).trim().toLowerCase();
+            source ||
+            "all"
+        )
+        .trim()
+        .toLowerCase();
 
 
-    const apiURL =
-        `${LIBRARY_API}/library-search` +
-        `?q=${encodeURIComponent(text)}` +
-        `&source=${encodeURIComponent(selectedSource)}` +
-        `&books=${encodeURIComponent(books)}` +
-        `&results=${encodeURIComponent(results)}`;
-
-
-    const response =
-        await fetch(
-            apiURL,
-            {
-                method:
-                    "GET",
-
-                headers: {
-                    "Accept":
-                        "application/json"
-                }
-            }
+    const requestedResults =
+        Math.max(
+            1,
+            Math.min(
+                Number(
+                    results
+                ) ||
+                    10,
+                100
+            )
         );
 
 
-    let data;
+    // =================================================
+    // البحث المباشر في المكتبة
+    // =================================================
+
+    const asyncDirectSearch =
+        async function (
+            searchTerm
+        ) {
+
+            const apiURL =
+                `${LIBRARY_API}/library-search` +
+                `?q=${encodeURIComponent(searchTerm)}` +
+                `&source=${encodeURIComponent(selectedSource)}` +
+                `&books=${encodeURIComponent(books)}` +
+                `&results=${encodeURIComponent(LIBRARY_AI_FETCH_RESULTS_PER_QUERY)}`;
+
+
+            const response =
+                await fetch(
+                    apiURL,
+                    {
+                        method:
+                            "GET",
+
+                        headers: {
+                            Accept:
+                                "application/json"
+                        }
+                    }
+                );
+
+
+            let data;
+
+
+            try {
+
+                data =
+                    await response.json();
+
+            }
+            catch (_) {
+
+                throw new Error(
+                    `استجابة المكتبة غير صالحة: HTTP ${response.status}`
+                );
+
+            }
+
+
+            if (
+                !response.ok
+            ) {
+
+                throw new Error(
+                    data?.error ||
+                    data?.message ||
+                    `فشل الاتصال بالمكتبة: HTTP ${response.status}`
+                );
+
+            }
+
+
+            if (
+                data?.ok ===
+                false
+            ) {
+
+                throw new Error(
+                    data.error ||
+                    "فشل البحث في المكتبة."
+                );
+
+            }
+
+
+            return data;
+
+        };
+
+
+    // =================================================
+    // عند اختيار مكتبة محددة:
+    // نحافظ على المسار الحالي
+    // =================================================
+
+    if (
+        selectedSource !==
+        "all"
+    ) {
+
+        const data =
+            await asyncDirectSearch(
+                text
+            );
+
+
+        data.results =
+            Array.isArray(
+                data.results
+            )
+                ? data.results.slice(
+                    0,
+                    requestedResults
+                )
+                : [];
+
+
+        data.resultsRequested =
+            requestedResults;
+
+
+        data.count =
+            data.results.length;
+
+
+        data.smartSearch =
+            false;
+
+
+        return data;
+
+    }
+
+
+    // =================================================
+    // المرحلة الأولى:
+    // توسيع سؤال الباحث
+    // =================================================
+
+    let smartQueries =
+        [
+            text
+        ];
 
 
     try {
 
-        data =
-            await response.json();
+        smartQueries =
+            await expandLibrarySearchQuery(
+                text
+            );
 
     }
-    catch {
+    catch (error) {
 
-        throw new Error(
-            `استجابة المكتبة غير صالحة: HTTP ${response.status}`
+        console.warn(
+            "تعذر توسيع سؤال بحث المكتبات بالذكاء الاصطناعي:",
+            error?.message ||
+            error
         );
 
+
+        smartQueries =
+            [
+                text
+            ];
+
     }
 
 
-    if (
-        !response.ok
+    // =================================================
+    // البحث المتوازي في المكتبات
+    // =================================================
+
+    const searchTasks =
+        smartQueries.map(
+            function (
+                queryItem
+            ) {
+
+                return asyncDirectSearch(
+                    queryItem
+                )
+                .then(
+                    function (
+                        data
+                    ) {
+
+                        return {
+
+                            query:
+                                queryItem,
+
+                            data,
+
+                            error:
+                                null
+
+                        };
+
+                    }
+                )
+                .catch(
+                    function (
+                        error
+                    ) {
+
+                        return {
+
+                            query:
+                                queryItem,
+
+                            data:
+                                null,
+
+                            error
+
+                        };
+
+                    }
+                );
+
+            }
+        );
+
+
+    const searchResponses =
+        await Promise.all(
+            searchTasks
+        );
+
+
+    const allResults =
+        [];
+
+
+    const seen =
+        new Set();
+
+
+    let totalKetabOnline =
+        0;
+
+
+    let totalShamela =
+        0;
+
+
+    let totalRaw =
+        0;
+
+
+    let maxPagesFetched =
+        0;
+
+
+    let maxLastPage =
+        0;
+
+
+    for (
+        const response of
+            searchResponses
     ) {
 
-        throw new Error(
-            data?.error ||
-            data?.message ||
-            `فشل الاتصال بالمكتبة: HTTP ${response.status}`
-        );
+        if (
+            !response.data
+        ) {
+
+            continue;
+
+        }
+
+
+        const data =
+            response.data;
+
+
+        totalKetabOnline +=
+            Number(
+                data.ketabonlineCount ||
+                0
+            );
+
+
+        totalShamela +=
+            Number(
+                data.shamelaCount ||
+                0
+            );
+
+
+        totalRaw +=
+            Number(
+                data.rawResultsCollected ||
+                0
+            );
+
+
+        maxPagesFetched =
+            Math.max(
+                maxPagesFetched,
+                Number(
+                    data.apiPagesFetched ||
+                    0
+                )
+            );
+
+
+        maxLastPage =
+            Math.max(
+                maxLastPage,
+                Number(
+                    data.apiLastPage ||
+                    0
+                )
+            );
+
+
+        for (
+            const result of
+                data.results ||
+                []
+        ) {
+
+            const key =
+                libraryResultKey(
+                    result
+                );
+
+
+            if (
+                seen.has(
+                    key
+                )
+            ) {
+
+                continue;
+
+            }
+
+
+            seen.add(
+                key
+            );
+
+
+            allResults.push(
+                result
+            );
+
+        }
 
     }
 
+
+    // =================================================
+    // لا توجد نتائج
+    // =================================================
 
     if (
-        data?.ok === false
+        !allResults.length
     ) {
 
-        throw new Error(
-            data.error ||
-            "فشل البحث في المكتبة."
+        return asyncDirectSearch(
+            text
         );
 
     }
 
 
-    return data;
+    // =================================================
+    // المرحلة الثانية:
+    // ترشيح النتائج بالذكاء
+    // =================================================
+
+    let rankedResults =
+        allResults;
+
+
+    try {
+
+        const ranked =
+            await rankLibraryResultsWithAI(
+                text,
+                allResults
+            );
+
+
+        if (
+            ranked.length
+        ) {
+
+            rankedResults =
+                ranked.map(
+                    function (
+                        item
+                    ) {
+
+                        return item.result;
+
+                    }
+                );
+
+        }
+
+    }
+    catch (error) {
+
+        console.warn(
+            "تعذر ترشيح نتائج المكتبات بالذكاء الاصطناعي:",
+            error?.message ||
+            error
+        );
+
+
+        rankedResults =
+            allResults;
+
+    }
+
+
+    // =================================================
+    // النتيجة النهائية
+    // =================================================
+
+    return rebuildLibraryResponseFromResults(
+        rankedResults,
+        text,
+        requestedResults,
+        "all",
+        {
+
+            ketabonlineCount:
+                totalKetabOnline,
+
+            shamelaCount:
+                totalShamela,
+
+            rawResultsCollected:
+                totalRaw,
+
+            apiPagesFetched:
+                maxPagesFetched,
+
+            apiLastPage:
+                maxLastPage,
+
+            smartQueries
+
+        }
+    );
 
 }
 
