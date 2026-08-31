@@ -20688,24 +20688,11 @@ function formatLibraryResults(
                                 item.page !==
                                     undefined &&
                                 item.page !==
-                                    null &&
-                                item.page !==
-                                    ""
+                                    null
                                     ? String(
                                         item.page
                                     )
-                                    : (
-                                        item.pageId !==
-                                            undefined &&
-                                        item.pageId !==
-                                            null &&
-                                        item.pageId !==
-                                            ""
-                                            ? String(
-                                                item.pageId
-                                            )
-                                            : ""
-                                    );
+                                    : "";
 
 
                             const pageId =
@@ -20826,9 +20813,12 @@ function formatLibraryResults(
                                             page
                                                 ? `
                                                     <span>
-                                                        الصفحة ${escapeHtml(
-                                                            page
-                                                        )}
+                                                        ${
+                                                            part
+                                                                ? `الجزء ${escapeHtml(part)} — `
+                                                                : ""
+                                                        }
+                                                        الصفحة ${escapeHtml(page)}
                                                     </span>
                                                 `
                                                 : ""
