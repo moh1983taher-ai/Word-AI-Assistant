@@ -45641,40 +45641,130 @@ function renderSidebarChats() {
         );
 
 
-    if (
-        !list
-    ) {
-
+    if (!list)
         return;
-
-    }
 
 
     list.innerHTML =
         "";
 
 
-    // =====================================================
-    // تنظيف التحديد من المحادثات التي لم تعد موجودة
-    // =====================================================
+    if (
+        chats.length ===
+        0
+    ) {
 
-    selectedChatIds =
-        new Set(
-            Array.from(
-                selectedChatIds
-            ).filter(
-                id =>
-                    chats.some(
-                        chat =>
-                            String(
-                                chat.id
-                            ) ===
-                            String(
-                                id
-                            )
-                    )
-            )
+        list.innerHTML = `
+            <div class="empty-chat">
+                لا توجد محادثات
+            </div>
+        `;
+
+        return;
+
+    }
+
+
+    chats
+        .slice(
+            0,
+            8
+        )
+        .forEach(
+            function (
+                chat
+            ) {
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                item.className =
+                    "recent-chat-item";
+
+
+                item.innerHTML = `
+                    <span class="chat-title">
+                        ${chatIcon}
+                        ${chat.title}
+                    </span>
+                `;
+
+
+                item.onclick =
+                    function (e) {
+
+                        e.stopPropagation();
+
+
+                        currentChat =
+                            chat;
+
+
+                        currentCitationSources =
+                            [];
+
+
+                        renderChat();
+
+
+                        if (projectsPopup) {
+
+                            projectsPopup.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        if (chatPopup) {
+
+                            chatPopup.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+
+                        if (searchPopup) {
+
+                            searchPopup.classList.remove(
+                                "open"
+                            );
+
+                        }
+
+                    };
+
+
+                list.appendChild(
+                    item
+                );
+
+            }
         );
+
+}
+
+
+
+
+// =====================================================
+// Recent Chats Popup
+// =====================================================
+
+function renderRecentChats() {
+
+    if (
+        !recentChatList
+    )
+        return;
+
+
+    recentChatList.innerHTML =
+        "";
 
 
     // =====================================================
@@ -45682,15 +45772,12 @@ function renderSidebarChats() {
     // =====================================================
 
     if (
-        !chats.length
+        chats.length ===
+        0
     ) {
 
-        list.innerHTML =
-            `
-            <div class="empty-chat">
-                لا توجد محادثات
-            </div>
-            `;
+        recentChatList.innerHTML =
+            "<div class='empty-chat'>لا توجد محادثات</div>";
 
         return;
 
@@ -45698,7 +45785,7 @@ function renderSidebarChats() {
 
 
     // =====================================================
-    // شريط أدوات المحادثات
+    // شريط التحكم
     // =====================================================
 
     const toolbar =
@@ -45708,78 +45795,71 @@ function renderSidebarChats() {
 
 
     toolbar.className =
-        "sidebar-chat-toolbar";
+        "recent-chat-toolbar";
 
 
-    toolbar.innerHTML =
-        `
-        <label
-            class="sidebar-chat-select-all">
-
+    toolbar.innerHTML = `
+        <label class="recent-chat-select-all">
             <input
                 type="checkbox"
-                class="sidebar-chat-select-all-checkbox">
-
-            <span>
-                تحديد الكل
-            </span>
-
+                class="recent-chat-select-all-checkbox">
+            <span>تحديد الكل</span>
         </label>
 
         <button
             type="button"
-            class="sidebar-chat-delete-selected"
+            class="recent-chat-delete-selected"
             disabled>
-
             حذف المحدد
-
         </button>
-        `;
+    `;
 
 
-    list.appendChild(
+    recentChatList.appendChild(
         toolbar
     );
 
 
     const selectAllCheckbox =
         toolbar.querySelector(
-            ".sidebar-chat-select-all-checkbox"
+            ".recent-chat-select-all-checkbox"
         );
 
 
     const deleteSelectedButton =
         toolbar.querySelector(
-            ".sidebar-chat-delete-selected"
+            ".recent-chat-delete-selected"
         );
 
 
     // =====================================================
-    // تحديث حالة شريط الأدوات
+    // مجموعة المحادثات المحددة
     // =====================================================
 
-    function updateChatSelectionUI() {
+    if (
+        typeof selectedRecentChatIds ===
+        "undefined"
+    ) {
 
-        const total =
-            chats.length;
+        window.selectedRecentChatIds =
+            new Set();
 
+    }
+
+
+    // =====================================================
+    // تحديث شريط التحكم
+    // =====================================================
+
+    function updateToolbar() {
 
         const selectedCount =
-            selectedChatIds.size;
+            selectedRecentChatIds.size;
 
 
         deleteSelectedButton.disabled =
-            selectedCount === 0;
-
-
-        selectAllCheckbox.checked =
-            total > 0 &&
-            selectedCount === total;
-
-
-        selectAllCheckbox.indeterminate =
-            selectedCount > 0 &&
-            selectedCount < total;
+            selectedCount ===
+            0;
 
 
         deleteSelectedButton.textContent =
@@ -45787,11 +45867,23 @@ function renderSidebarChats() {
                 ? `حذف المحدد (${selectedCount})`
                 : "حذف المحدد";
 
+
+        selectAllCheckbox.checked =
+            chats.length > 0 &&
+            selectedCount ===
+                chats.length;
+
+
+        selectAllCheckbox.indeterminate =
+            selectedCount > 0 &&
+            selectedCount <
+                chats.length;
+
     }
 
 
     // =====================================================
-    // تحديد الكل
+    // تحديد / إلغاء تحديد الكل
     // =====================================================
 
     selectAllCheckbox.onchange =
@@ -45806,7 +45898,7 @@ function renderSidebarChats() {
                         chat
                     ) {
 
-                        selectedChatIds.add(
+                        selectedRecentChatIds.add(
                             String(
                                 chat.id
                             )
@@ -45818,37 +45910,38 @@ function renderSidebarChats() {
             }
             else {
 
-                selectedChatIds.clear();
+                selectedRecentChatIds.clear();
 
             }
 
 
-            renderSidebarChats();
+            renderRecentChats();
 
         };
 
 
     // =====================================================
-    // حذف المحادثات المحددة
+    // حذف جماعي
     // =====================================================
 
     deleteSelectedButton.onclick =
         function (
-            e
+            event
         ) {
 
-            e.preventDefault();
-            e.stopPropagation();
+            event.preventDefault();
+            event.stopPropagation();
 
 
             const ids =
                 Array.from(
-                    selectedChatIds
+                    selectedRecentChatIds
                 );
 
 
             if (
-                !ids.length
+                ids.length ===
+                0
             ) {
 
                 return;
@@ -45856,14 +45949,10 @@ function renderSidebarChats() {
             }
 
 
-            const count =
-                ids.length;
-
-
             const message =
-                count === 1
+                ids.length === 1
                     ? "هل تريد حذف المحادثة المحددة؟"
-                    : `هل تريد حذف ${count} محادثات محددة؟`;
+                    : `هل تريد حذف ${ids.length} محادثات محددة؟`;
 
 
             if (
@@ -45883,7 +45972,7 @@ function renderSidebarChats() {
                         chat
                     ) {
 
-                        return !selectedChatIds.has(
+                        return !selectedRecentChatIds.has(
                             String(
                                 chat.id
                             )
@@ -45895,7 +45984,7 @@ function renderSidebarChats() {
 
             if (
                 currentChat &&
-                selectedChatIds.has(
+                selectedRecentChatIds.has(
                     String(
                         currentChat.id
                     )
@@ -45910,22 +45999,21 @@ function renderSidebarChats() {
             }
 
 
-            selectedChatIds.clear();
+            selectedRecentChatIds.clear();
 
 
             saveChats();
 
 
-            renderChatList();
-            renderSidebarChats();
             renderRecentChats();
 
         };
 
 
     // =====================================================
-    // إنشاء جميع المحادثات
+    // جميع المحادثات
     //
+    // مهم:
     // لا يوجد slice(0, 8)
     // =====================================================
 
@@ -45949,29 +46037,14 @@ function renderSidebarChats() {
                 );
 
 
-            const item =
+            const div =
                 document.createElement(
                     "div"
                 );
 
 
-            item.className =
+            div.className =
                 "recent-chat-item";
-
-
-            if (
-                currentChat &&
-                String(
-                    currentChat.id
-                ) ===
-                chatId
-            ) {
-
-                item.classList.add(
-                    "active-chat"
-                );
-
-            }
 
 
             // =================================================
@@ -45985,7 +46058,7 @@ function renderSidebarChats() {
 
 
             checkboxWrap.className =
-                "sidebar-chat-checkbox-wrap";
+                "recent-chat-checkbox-wrap";
 
 
             const checkbox =
@@ -45999,11 +46072,11 @@ function renderSidebarChats() {
 
 
             checkbox.className =
-                "sidebar-chat-checkbox";
+                "recent-chat-checkbox";
 
 
             checkbox.checked =
-                selectedChatIds.has(
+                selectedRecentChatIds.has(
                     chatId
                 );
 
@@ -46017,28 +46090,31 @@ function renderSidebarChats() {
             // عنوان المحادثة
             // =================================================
 
-            const title =
+            const titleButton =
                 document.createElement(
-                    "span"
+                    "button"
                 );
 
 
-            title.className =
-                "chat-title";
+            titleButton.type =
+                "button";
 
 
-            title.innerHTML =
-                chatIcon;
+            titleButton.className =
+                "recent-chat-title-btn";
+
+
+            titleButton.innerHTML =
+                `
+                ${chatIcon}
+                <span class="recent-chat-title-text"></span>
+                `;
 
 
             const titleText =
-                document.createElement(
-                    "span"
+                titleButton.querySelector(
+                    ".recent-chat-title-text"
                 );
-
-
-            titleText.className =
-                "sidebar-chat-title-text";
 
 
             titleText.textContent =
@@ -46048,79 +46124,67 @@ function renderSidebarChats() {
                 );
 
 
-            title.appendChild(
-                titleText
-            );
-
-
             // =================================================
-            // زر القائمة
+            // زر الخيارات
             // =================================================
 
-            const menu =
+            const menuButton =
                 document.createElement(
                     "button"
                 );
 
 
-            menu.type =
+            menuButton.type =
                 "button";
 
 
-            menu.className =
-                "chat-menu";
+            menuButton.className =
+                "recent-chat-menu-btn";
 
 
-            menu.textContent =
+            menuButton.textContent =
                 "⋮";
 
 
-            menu.setAttribute(
-                "aria-label",
-                "خيارات المحادثة"
-            );
+            menuButton.title =
+                "خيارات المحادثة";
 
 
             // =================================================
             // قائمة الخيارات
             // =================================================
 
-            const options =
+            const menu =
                 document.createElement(
                     "div"
                 );
 
 
-            options.className =
-                "chat-options-menu";
+            menu.className =
+                "recent-chat-menu";
 
 
-            options.innerHTML =
-                `
-                <div
-                    class="rename-chat">
-                    ✏ إعادة تسمية
-                </div>
+            menu.innerHTML = `
+                <button
+                    type="button"
+                    class="recent-chat-rename-btn">
+                    إعادة تسمية
+                </button>
 
-                <div
-                    class="delete-chat">
-                    🗑 حذف
-                </div>
-                `;
+                <button
+                    type="button"
+                    class="recent-chat-delete-btn">
+                    حذف
+                </button>
+            `;
 
 
             // =================================================
             // فتح المحادثة
             // =================================================
 
-            title.onclick =
-                function (
-                    e
-                ) {
-
-                    e.preventDefault();
-                    e.stopPropagation();
-
+            titleButton.onclick =
+                function () {
 
                     currentChat =
                         chat;
@@ -46129,19 +46193,15 @@ function renderSidebarChats() {
                     renderChat();
 
 
-                    projectsPopup?.classList.remove(
-                        "open"
-                    );
+                    if (
+                        chatPopup
+                    ) {
 
+                        chatPopup.classList.remove(
+                            "open"
+                        );
 
-                    chatPopup?.classList.remove(
-                        "open"
-                    );
-
-
-                    searchPopup?.classList.remove(
-                        "open"
-                    );
+                    }
 
                 };
 
@@ -46152,10 +46212,10 @@ function renderSidebarChats() {
 
             checkbox.onclick =
                 function (
-                    e
+                    event
                 ) {
 
-                    e.stopPropagation();
+                    event.stopPropagation();
 
                 };
 
@@ -46167,41 +46227,41 @@ function renderSidebarChats() {
                         this.checked
                     ) {
 
-                        selectedChatIds.add(
+                        selectedRecentChatIds.add(
                             chatId
                         );
 
                     }
                     else {
 
-                        selectedChatIds.delete(
+                        selectedRecentChatIds.delete(
                             chatId
                         );
 
                     }
 
 
-                    updateChatSelectionUI();
+                    updateToolbar();
 
                 };
 
 
             // =================================================
-            // القائمة
+            // فتح قائمة الخيارات
             // =================================================
 
-            menu.onclick =
+            menuButton.onclick =
                 function (
-                    e
+                    event
                 ) {
 
-                    e.preventDefault();
-                    e.stopPropagation();
+                    event.preventDefault();
+                    event.stopPropagation();
 
 
                     document
                         .querySelectorAll(
-                            ".chat-options-menu.open"
+                            ".recent-chat-menu.open"
                         )
                         .forEach(
                             function (
@@ -46216,7 +46276,7 @@ function renderSidebarChats() {
                         );
 
 
-                    options.classList.add(
+                    menu.classList.toggle(
                         "open"
                     );
 
@@ -46228,21 +46288,21 @@ function renderSidebarChats() {
             // =================================================
 
             const renameButton =
-                options.querySelector(
-                    ".rename-chat"
+                menu.querySelector(
+                    ".recent-chat-rename-btn"
                 );
 
 
             renameButton.onclick =
                 function (
-                    e
+                    event
                 ) {
 
-                    e.preventDefault();
-                    e.stopPropagation();
+                    event.preventDefault();
+                    event.stopPropagation();
 
 
-                    options.classList.remove(
+                    menu.classList.remove(
                         "open"
                     );
 
@@ -46254,110 +46314,44 @@ function renderSidebarChats() {
                         );
 
 
-                    const edit =
-                        document.createElement(
-                            "input"
+                    const newTitle =
+                        prompt(
+                            "اكتب اسم المحادثة الجديد:",
+                            oldTitle
                         );
 
 
-                    edit.type =
-                        "text";
-
-
-                    edit.className =
-                        "edit-chat-title";
-
-
-                    edit.value =
-                        oldTitle;
-
-
-                    title.replaceChildren(
-                        chatIcon,
-                        edit
-                    );
-
-
-                    edit.focus();
-
-
-                    edit.select();
-
-
-                    function finishRename(
-                        save
+                    if (
+                        newTitle ===
+                        null
                     ) {
 
-                        if (
-                            save
-                        ) {
-
-                            const newTitle =
-                                edit.value.trim();
-
-
-                            chat.title =
-                                newTitle ||
-                                oldTitle;
-
-
-                            saveChats();
-
-                        }
-
-
-                        renderSidebarChats();
-                        renderRecentChats();
-                        renderChatList();
+                        return;
 
                     }
 
 
-                    edit.onkeydown =
-                        function (
-                            event
-                        ) {
-
-                            if (
-                                event.key ===
-                                "Enter"
-                            ) {
-
-                                event.preventDefault();
+                    const trimmedTitle =
+                        newTitle.trim();
 
 
-                                finishRename(
-                                    true
-                                );
+                    if (
+                        !trimmedTitle
+                    ) {
 
-                            }
+                        return;
 
-
-                            else if (
-                                event.key ===
-                                "Escape"
-                            ) {
-
-                                event.preventDefault();
+                    }
 
 
-                                finishRename(
-                                    false
-                                );
-
-                            }
-
-                        };
+                    chat.title =
+                        trimmedTitle;
 
 
-                    edit.onblur =
-                        function () {
+                    saveChats();
 
-                            finishRename(
-                                true
-                            );
 
-                        };
+                    renderRecentChats();
 
                 };
 
@@ -46367,21 +46361,21 @@ function renderSidebarChats() {
             // =================================================
 
             const deleteButton =
-                options.querySelector(
-                    ".delete-chat"
+                menu.querySelector(
+                    ".recent-chat-delete-btn"
                 );
 
 
             deleteButton.onclick =
                 function (
-                    e
+                    event
                 ) {
 
-                    e.preventDefault();
-                    e.stopPropagation();
+                    event.preventDefault();
+                    event.stopPropagation();
 
 
-                    options.classList.remove(
+                    menu.classList.remove(
                         "open"
                     );
 
@@ -46412,7 +46406,7 @@ function renderSidebarChats() {
                         );
 
 
-                    selectedChatIds.delete(
+                    selectedRecentChatIds.delete(
                         chatId
                     );
 
@@ -46436,158 +46430,44 @@ function renderSidebarChats() {
                     saveChats();
 
 
-                    renderChatList();
-                    renderSidebarChats();
                     renderRecentChats();
 
                 };
 
 
             // =================================================
-            // إغلاق القائمة عند النقر خارجها
+            // بناء العنصر
             // =================================================
 
-            item.onclick =
-                function (
-                    e
-                ) {
-
-                    if (
-                        e.target.closest(
-                            ".chat-menu"
-                        ) ||
-                        e.target.closest(
-                            ".chat-options-menu"
-                        ) ||
-                        e.target.closest(
-                            ".sidebar-chat-checkbox-wrap"
-                        )
-                    ) {
-
-                        return;
-
-                    }
-
-                };
-
-
-            item.appendChild(
+            div.appendChild(
                 checkboxWrap
             );
 
 
-            item.appendChild(
-                title
+            div.appendChild(
+                titleButton
             );
 
 
-            item.appendChild(
+            div.appendChild(
+                menuButton
+            );
+
+
+            div.appendChild(
                 menu
             );
 
 
-            item.appendChild(
-                options
-            );
-
-
-            list.appendChild(
-                item
+            recentChatList.appendChild(
+                div
             );
 
         }
     );
 
 
-    updateChatSelectionUI();
-
-}
-
-
-
-
-// =====================================================
-// Recent Chats Popup
-// =====================================================
-
-function renderRecentChats() {
-
-    if (!recentChatList)
-        return;
-
-
-    recentChatList.innerHTML =
-        "";
-
-
-    if (
-        chats.length ===
-        0
-    ) {
-
-        recentChatList.innerHTML =
-            "<div class='empty-chat'>لا توجد محادثات</div>";
-
-        return;
-
-    }
-
-
-    chats
-        .slice(
-            0,
-            8
-        )
-        .forEach(
-            function (
-                chat
-            ) {
-
-                const div =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                div.className =
-                    "recent-chat-item";
-
-
-                div.innerHTML = `
-                    <span class="chat-title">
-                        ${chatIcon}
-                        ${chat.title}
-                    </span>
-                `;
-
-
-                div.onclick =
-                    function () {
-
-                        currentChat =
-                            chat;
-
-
-                        renderChat();
-
-
-                        if (chatPopup) {
-
-                            chatPopup.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-                    };
-
-
-                recentChatList.appendChild(
-                    div
-                );
-
-            }
-        );
+    updateToolbar();
 
 }
 

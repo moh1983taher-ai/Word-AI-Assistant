@@ -7359,12 +7359,7 @@ body.sidebar-is-pinned .message-box {
 
 }
 
-#new-chat-list {
-    max-height: 420px;
-    overflow-y: auto;
-}
-
-.sidebar-chat-toolbar {
+.recent-chat-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -7372,56 +7367,95 @@ body.sidebar-is-pinned .message-box {
     padding: 6px 8px;
 }
 
-.sidebar-chat-select-all {
+.recent-chat-select-all {
     display: flex;
     align-items: center;
     gap: 6px;
-    cursor: pointer;
     font-size: 12px;
+    cursor: pointer;
 }
 
-.sidebar-chat-delete-selected {
+.recent-chat-delete-selected {
     border: none;
     background: transparent;
     cursor: pointer;
     font-size: 12px;
 }
 
-.sidebar-chat-delete-selected:disabled {
+.recent-chat-delete-selected:disabled {
     opacity: 0.45;
     cursor: default;
 }
 
 .recent-chat-item {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 6px;
+    padding: 4px 6px;
 }
 
-.sidebar-chat-checkbox-wrap {
+.recent-chat-checkbox-wrap {
     display: flex;
     align-items: center;
-    flex: 0 0 auto;
 }
 
-.sidebar-chat-checkbox {
+.recent-chat-title-btn {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    text-align: right;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
 }
 
-.sidebar-chat-title-text {
+.recent-chat-title-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.recent-chat-item .chat-title {
-    flex: 1;
-    min-width: 0;
+.recent-chat-menu-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 5px;
+}
+
+.recent-chat-menu {
+    display: none;
+    position: absolute;
+    left: 8px;
+    top: 34px;
+    z-index: 1000;
+    min-width: 120px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+
+.recent-chat-menu.open {
+    display: block;
+}
+
+.recent-chat-menu button {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 8px 10px;
+    text-align: right;
     cursor: pointer;
 }
 
-.recent-chat-item .chat-menu {
-    flex: 0 0 auto;
+.recent-chat-menu button:hover {
+    background: #f3f3f3;
 }
 /* =========================================================
    END
