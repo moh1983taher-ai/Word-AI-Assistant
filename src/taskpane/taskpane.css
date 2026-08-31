@@ -3,6 +3,7 @@
    CLEAN / CONSOLIDATED CSS
    ========================================================= */
 
+
 /* =========================================================
    1. BASIC
    ========================================================= */
@@ -25,8 +26,6 @@ body {
 
 /* =========================================================
    2. SIDEBAR
-   الشريط الجانبي المصغر
-
    ========================================================= */
 
 .sidebar {
@@ -50,7 +49,6 @@ body {
 
     z-index: 2000;
 
-    /* مخفي افتراضيًا */
     transform: translateX(-48px);
 
     transition:
@@ -60,8 +58,7 @@ body {
 
 
 /* =========================================================
-   منطقة حساسة على حافة الشاشة
-   هذه المنطقة مسؤولة فقط عن إظهار الشريط.
+   منطقة إظهار الشريط
    ========================================================= */
 
 .sidebar-hover-zone {
@@ -80,27 +77,12 @@ body {
 
 
 /* =========================================================
-   إظهار الشريط عند المرور على الشريط نفسه
+   إظهار الشريط
    ========================================================= */
 
-.sidebar:hover {
-    transform: translateX(0);
-
-    box-shadow:
-        3px 0 14px rgba(0, 0, 0, 0.08);
-}
-
-
-/* =========================================================
-   إظهار الشريط عند المرور على منطقة الحافة
-
-   مهم جدًا:
-   هذه القاعدة تؤثر على الشريط فقط.
-
-   لا علاقة لها بالقائمة المنبثقة.
-   ========================================================= */
-
-.sidebar-hover-zone:hover + .sidebar {
+.sidebar:hover,
+.sidebar-hover-zone:hover + .sidebar,
+.sidebar.pinned {
     transform: translateX(0);
 
     box-shadow:
@@ -133,8 +115,7 @@ body {
 
 
 /* =========================================================
-   حجم أيقونات الشريط
-   التصميم الداخلي لـ SVG لا يتغير
+   أزرار الشريط
    ========================================================= */
 
 .side-icon {
@@ -157,7 +138,11 @@ body {
     box-sizing: border-box;
 }
 
-/* حجم موحد لكل SVG */
+
+/* =========================================================
+   SVG العام للشريط
+   ========================================================= */
+
 .side-icon svg {
     width: 22px;
     height: 22px;
@@ -165,9 +150,9 @@ body {
     flex-shrink: 0;
 }
 
+
 /* =========================================================
    أيقونة محادثة جديدة
-   الحجم فقط — دون تغيير التصميم
    ========================================================= */
 
 #new-chat-btn svg {
@@ -177,9 +162,10 @@ body {
     display: block;
     flex-shrink: 0;
 }
+
+
 /* =========================================================
    أيقونة الإعدادات
-   ترس SVG — الحجم فقط
    ========================================================= */
 
 #settings-btn svg {
@@ -190,10 +176,13 @@ body {
 
     fill: none;
     stroke: #222;
+
     stroke-width: 1;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
+
+
 /* =========================================================
    زر البحث
    ========================================================= */
@@ -203,8 +192,6 @@ body {
     line-height: 1;
     transform: scaleX(-1);
 }
-
-
 
 
 /* =========================================================
@@ -237,7 +224,6 @@ body {
         transform 0.2s ease;
 }
 
-/* عند التثبيت: يستقيم الدبوس */
 #pin-sidebar.pinned {
     color: #222;
     background: transparent;
@@ -245,7 +231,6 @@ body {
     transform: rotate(0deg);
 }
 
-/* تصميم الدبوس نفسه */
 #pin-sidebar svg {
     width: 16px;
     height: 16px;
@@ -262,12 +247,10 @@ body {
 
 
 /* =========================================================
-   REFERENCES WORKSPACE
-   مساحة عمل المراجع
+   3. REFERENCES WORKSPACE
    ========================================================= */
 
 .references-workspace {
-
     display: none;
 
     position: absolute;
@@ -294,11 +277,9 @@ body {
 }
 
 .references-header {
-
     display: flex;
 
     align-items: center;
-
     justify-content: space-between;
 
     min-height: 62px;
@@ -310,18 +291,15 @@ body {
     box-sizing: border-box;
 
     direction: rtl;
-
 }
 
 
 /* =========================================================
-   زر إغلاق نافذة المراجع
+   زر إغلاق المراجع
    ========================================================= */
 
 .close-references {
-
     width: 30px;
-
     height: 30px;
 
     flex-shrink: 0;
@@ -329,15 +307,12 @@ body {
     display: flex;
 
     align-items: center;
-
     justify-content: center;
 
     padding: 0;
-
     margin: 0;
 
     border: none;
-
     border-radius: 8px;
 
     background: transparent;
@@ -345,9 +320,7 @@ body {
     color: #666;
 
     font-size: 20px;
-
     font-weight: 400;
-
     line-height: 1;
 
     cursor: pointer;
@@ -357,37 +330,29 @@ body {
     transition:
         background 0.15s ease,
         color 0.15s ease;
-
 }
-
 
 .close-references:hover {
-
     background: #f1f1f1;
-
     color: #222;
-
 }
-
 
 .close-references:active {
-
     background: #e8e8e8;
-
 }
 
+
+/* =========================================================
+   عنوان رأس المراجع
+   ========================================================= */
+
 .references-header-title {
-
     display: flex;
-
     align-items: center;
-
     gap: 10px;
-
 }
 
 .references-header-icon {
-
     width: 34px;
     height: 34px;
 
@@ -397,54 +362,40 @@ body {
     justify-content: center;
 
     border: 1px solid #e5e5e5;
-
     border-radius: 9px;
 
     background: #fafafa;
 
     color: #333;
-
     font-size: 17px;
-
 }
+
 .references-header-icon svg {
-
     width: 18px;
-
     height: 18px;
 
     display: block;
-
 }
+
 .references-title {
-
     font-size: 15px;
-
     font-weight: 600;
-
     color: #222;
-
 }
 
 .references-subtitle {
-
     margin-top: 3px;
-
     font-size: 11px;
-
     color: #777;
-
 }
+
 
 /* =========================================================
    REFERENCES SOURCE PANEL
-   مصدر عمل المراجع
    ========================================================= */
 
 .references-content {
-
     width: 100%;
-
     max-width: 720px;
 
     margin: 0 auto;
@@ -452,50 +403,28 @@ body {
     padding: 20px;
 
     box-sizing: border-box;
-
 }
 
-
-/* =========================================================
-   عنوان مصدر العمل
-   ========================================================= */
-
 .references-source-heading {
-
     margin-bottom: 12px;
 
     color: #333;
 
     font-size: 14px;
-
     font-weight: 600;
-
 }
-
-
-/* =========================================================
-   خيارات المصدر
-   ========================================================= */
 
 .references-source-options {
-
     display: flex;
-
     flex-direction: column;
-
     gap: 8px;
-
 }
 
-
 .references-source-option {
-
     width: 100%;
-
     min-height: 62px;
 
     display: flex;
-
     align-items: center;
 
     gap: 12px;
@@ -503,17 +432,14 @@ body {
     padding: 10px 12px;
 
     border: 1px solid #e3e3e3;
-
     border-radius: 12px;
 
     background: #fff;
-
     color: #222;
 
     cursor: pointer;
 
     direction: rtl;
-
     text-align: right;
 
     box-sizing: border-box;
@@ -522,121 +448,88 @@ body {
         background 0.15s ease,
         border-color 0.15s ease,
         transform 0.12s ease;
-
 }
-
 
 .references-source-option:hover {
-
     background: #f7f7f7;
-
     border-color: #cfcfcf;
-
     transform: translateY(-1px);
-
 }
-
 
 .references-source-option:active {
-
     background: #eeeeee;
-
     transform: translateY(0);
-
 }
 
-
-/* =========================================================
-   أيقونة المصدر
-   ========================================================= */
-
 .references-source-icon {
-
     width: 34px;
-
     height: 34px;
 
     flex-shrink: 0;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     border: 1px solid #e5e5e5;
-
     border-radius: 9px;
 
     background: #fafafa;
 
     color: #333;
-
     font-size: 17px;
-
 }
 
+.references-source-icon svg {
+    width: 20px;
+    height: 20px;
 
-/* =========================================================
-   معلومات المصدر
-   ========================================================= */
+    display: block;
+
+    flex: 0 0 20px;
+}
 
 .references-source-info {
-
     min-width: 0;
 
     display: flex;
-
     flex-direction: column;
 
     gap: 4px;
-
 }
-
 
 .references-source-title {
-
     font-size: 13px;
-
     font-weight: 600;
-
     color: #222;
-
 }
 
-
 .references-source-description {
-
     font-size: 11px;
-
     font-weight: 400;
-
     line-height: 1.45;
 
     color: #777;
-
 }
+
+
 /* =========================================================
-   REFERENCES SELECTED SOURCE
-   المستند المحدد للعمل
+   المصدر المحدد
    ========================================================= */
 
 .references-selected-source {
-
     width: 100%;
 
     display: flex;
-
     align-items: center;
 
-    gap: 12px;
+    gap: 10px;
 
     margin-top: 16px;
 
     padding: 12px 14px;
 
     border: 1px solid #dedede;
-
     border-radius: 12px;
 
     background: #fafafa;
@@ -644,114 +537,115 @@ body {
     direction: rtl;
 
     box-sizing: border-box;
-
 }
 
-
-/* أيقونة المستند */
-
 .references-selected-icon {
+    width: 34px;
+    height: 34px;
 
-    width: 36px;
-
-    height: 36px;
-
-    flex-shrink: 0;
+    min-width: 34px;
+    flex: 0 0 34px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
-    border: 1px solid #e2e2e2;
+    overflow: visible;
 
+    border: 1px solid #e2e2e2;
     border-radius: 9px;
 
     background: #ffffff;
 
     color: #333333;
 
-    font-size: 17px;
-
+    box-sizing: border-box;
 }
 
 .references-selected-icon svg {
-
-    width: 18px;
-
-    height: 18px;
+    width: 20px;
+    height: 20px;
 
     display: block;
-
 }
 
-/* معلومات المستند */
-
 .references-selected-info {
-
+    flex: 1 1 auto;
     min-width: 0;
 
     display: flex;
-
     flex-direction: column;
 
     gap: 4px;
-
 }
-
 
 .references-selected-title {
-
-    font-size: 11px;
-
+    font-size: 13px;
+    font-weight: 400;
     color: #777777;
 
-    font-weight: 400;
-
+    white-space: nowrap;
 }
-
 
 .references-selected-name {
+    min-width: 0;
 
     overflow: hidden;
-
     text-overflow: ellipsis;
-
     white-space: nowrap;
 
-    font-size: 13px;
-
-    color: #222222;
-
+    font-size: 11px;
     font-weight: 600;
 
+    color: #222222;
 }
 
 
+/* =========================================================
+   أزرار المراجع
+   ========================================================= */
 
-
-.compare-references-btn {
+.compare-references-btn,
+.build-bibliography-btn {
     width: 100%;
-    margin-top: 8px;
-    padding: 8px 12px;
+
     border: 1px solid #dfe2e6;
     border-radius: 6px;
+
     background: #f8f9fa;
     color: #444;
+
     font-size: 12px;
     font-weight: 600;
+
     cursor: pointer;
-    transition: background 0.15s ease,
-                border-color 0.15s ease;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.compare-references-btn {
+    margin-top: 8px;
+    padding: 8px 12px;
+}
+
+.build-bibliography-btn {
+    margin-top: 6px;
+    padding: 8px 12px;
+}
+
+.compare-references-btn:hover,
+.build-bibliography-btn:hover {
+    background: #f1f3f5;
 }
 
 .compare-references-btn:hover {
-    background: #f1f3f5;
     border-color: #d2d6da;
 }
 
-.compare-references-btn:disabled {
+.compare-references-btn:disabled,
+.build-bibliography-btn:disabled {
     opacity: 0.65;
     cursor: default;
 }
@@ -763,25 +657,36 @@ body {
 
 .references-comparison-result {
     margin-top: 12px;
+
     padding-top: 10px;
+
     border-top: 1px solid #e8e8e8;
+
     font-size: 12px;
     color: #555;
 }
 
 .references-comparison-title {
     margin-bottom: 8px;
+
     font-size: 13px;
     font-weight: 600;
+
     color: #333;
 }
 
 .references-comparison-summary {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
     gap: 5px 18px;
+
     padding-bottom: 9px;
+
     border-bottom: 1px solid #eeeeee;
+
     line-height: 1.7;
 }
 
@@ -789,11 +694,6 @@ body {
     color: #333;
     font-weight: 600;
 }
-
-
-/* =========================================================
-   أقسام المقارنة
-   ========================================================= */
 
 .references-comparison-section {
     margin-top: 10px;
@@ -803,22 +703,21 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+
     margin-bottom: 5px;
+
     font-size: 12px;
     font-weight: 600;
+
     color: #444;
 }
 
 .references-comparison-section-title strong {
     color: #777;
+
     font-size: 11px;
     font-weight: 600;
 }
-
-
-/* =========================================================
-   عناصر المقارنة
-   ========================================================= */
 
 .references-comparison-list {
     display: flex;
@@ -828,9 +727,13 @@ body {
 .references-comparison-item {
     display: flex;
     align-items: flex-start;
+
     gap: 7px;
+
     padding: 6px 2px;
+
     border-bottom: 1px solid #eeeeee;
+
     font-size: 11px;
     line-height: 1.6;
 }
@@ -841,14 +744,18 @@ body {
 
 .references-comparison-number {
     flex: 0 0 20px;
+
     color: #999;
+
     font-size: 10px;
+
     text-align: center;
 }
 
 .references-comparison-text {
     flex: 1;
     min-width: 0;
+
     color: #555;
 }
 
@@ -857,40 +764,22 @@ body {
     font-weight: 600;
 }
 
-
-/* =========================================================
-   المصدر الأصلي عند عرض المطابقات
-   ========================================================= */
-
 .references-comparison-source {
     margin-top: 2px;
+
     color: #888;
+
     font-size: 10px;
     line-height: 1.5;
 }
 
 
 /* =========================================================
-   الشاشات الضيقة
-   ========================================================= */
-
-@media (max-width: 600px) {
-
-    .references-comparison-summary {
-        grid-template-columns: 1fr;
-    }
-
-}
-
-/* =========================================================
-   ANALYZE REFERENCES BUTTON
-   زر تحليل المراجع
+   ANALYZE REFERENCES
    ========================================================= */
 
 .analyze-references-btn {
-
     width: 100%;
-
     min-height: 42px;
 
     margin-top: 10px;
@@ -898,15 +787,12 @@ body {
     padding: 8px 14px;
 
     border: 1px solid #222;
-
     border-radius: 10px;
 
     background: #222;
-
     color: #fff;
 
     font-size: 13px;
-
     font-weight: 500;
 
     cursor: pointer;
@@ -916,74 +802,37 @@ body {
     transition:
         background 0.15s ease,
         transform 0.12s ease;
-
 }
-
 
 .analyze-references-btn:hover {
-
     background: #111;
-
 }
-
 
 .analyze-references-btn:active {
-
     background: #000;
-
     transform: translateY(1px);
-
 }
 
-.build-bibliography-btn {
-    width: 100%;
-    margin-top: 6px;
-    padding: 8px 12px;
-    border: 1px solid #dfe2e6;
-    border-radius: 6px;
-    background: #f8f9fa;
-    color: #444;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-}
 
-.build-bibliography-btn:hover {
-    background: #f1f3f5;
-}
-
-.build-bibliography-btn:disabled {
-    opacity: 0.65;
-    cursor: default;
-}
 /* =========================================================
    REFERENCE CANDIDATES
-   المرشحون للمراجع
    ========================================================= */
 
 .references-candidates {
-
     display: flex;
-
     flex-direction: column;
 
     gap: 8px;
 
     margin-top: 14px;
-
 }
 
-
-/* بطاقة المرشح */
-
 .reference-candidate {
-
     width: 100%;
 
     padding: 11px 12px;
 
     border: 1px solid #e4e4e4;
-
     border-radius: 11px;
 
     background: #fff;
@@ -991,86 +840,52 @@ body {
     box-sizing: border-box;
 
     direction: rtl;
-
     text-align: right;
-
 }
 
-
-/* رأس البطاقة */
-
 .reference-candidate-head {
-
     display: flex;
-
     align-items: center;
 
     gap: 7px;
 
     margin-bottom: 7px;
-
 }
 
-
-/* رقم المرشح */
-
 .reference-candidate-number {
-
     min-width: 22px;
-
     height: 22px;
 
     display: inline-flex;
-
     align-items: center;
-
     justify-content: center;
 
     border-radius: 6px;
 
     background: #f3f3f3;
-
     color: #555;
 
     font-size: 10px;
 
     box-sizing: border-box;
-
 }
-
-
-/* مصدر المرشح */
 
 .reference-candidate-source {
-
     font-size: 10px;
-
     color: #777;
-
 }
 
-
-/* النص الذي التقطه الاستخراج */
-
 .reference-candidate-text {
-
     color: #222;
 
     font-size: 12px;
-
     font-weight: 600;
 
     line-height: 1.65;
-
 }
 
-
-/* السياق المحيط */
-
 .reference-candidate-context {
-
     margin-top: 7px;
-
     padding-top: 7px;
 
     border-top: 1px solid #f0f0f0;
@@ -1078,54 +893,46 @@ body {
     color: #777;
 
     font-size: 11px;
-
     line-height: 1.7;
-
 }
 
-/* عدم وجود مستند */
-
 .references-empty {
-
     margin-top: 16px;
 
     padding: 14px;
 
     border: 1px dashed #d8d8d8;
-
     border-radius: 12px;
 
     color: #777777;
-
     background: #fafafa;
 
     font-size: 12px;
-
     text-align: center;
 
     direction: rtl;
-
 }
+
+
 /* =========================================================
-   نتائج تحليل المراجع
+   تحليل المراجع
    ========================================================= */
 
 .references-analysis-result {
     margin-top: 12px;
+
     font-size: 13px;
     line-height: 1.6;
+
     color: #444;
 }
-
-
-/* =========================================================
-   رسالة النجاح
-   ========================================================= */
 
 .references-analysis-status {
     font-size: 13px;
     font-weight: 600;
+
     line-height: 1.6;
+
     margin-bottom: 10px;
 }
 
@@ -1137,17 +944,18 @@ body {
     color: #b43a32;
 }
 
-
-/* =========================================================
-   معلومات التحليل
-   ========================================================= */
-
 .references-analysis-info {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
     gap: 5px 18px;
+
     padding: 8px 0 10px;
+
     border-bottom: 1px solid #e8e8e8;
+
     font-size: 12px;
     line-height: 1.7;
 }
@@ -1163,22 +971,27 @@ body {
 
 
 /* =========================================================
-   عنوان المراجع الموحدة
+   FINAL REFERENCES
    ========================================================= */
 
 .references-final-results {
-    margin-top: 12px;
+    margin-top: 18px;
+    direction: rtl;
 }
 
 .references-final-results-title {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 6px;
+
+    margin-bottom: 8px;
     padding-bottom: 6px;
+
     border-bottom: 1px solid #e8e8e8;
+
     font-size: 13px;
     font-weight: 600;
+
     color: #333;
 }
 
@@ -1188,26 +1001,21 @@ body {
     color: #666;
 }
 
-
-/* =========================================================
-   قائمة المراجع
-   ========================================================= */
-
 .references-final-list {
     display: flex;
     flex-direction: column;
+
+    gap: 8px;
 }
-
-
-/* =========================================================
-   المرجع الواحد
-   ========================================================= */
 
 .ai-reference-row {
     display: flex;
     align-items: flex-start;
+
     gap: 8px;
+
     padding: 8px 2px;
+
     border-bottom: 1px solid #eeeeee;
 }
 
@@ -1215,40 +1023,32 @@ body {
     border-bottom: none;
 }
 
-
-/* =========================================================
-   رقم المرجع
-   ========================================================= */
-
 .ai-reference-index {
     flex: 0 0 22px;
     width: 22px;
+
     padding-top: 1px;
+
     color: #888;
+
     font-size: 11px;
+
     text-align: center;
 }
-
-
-/* =========================================================
-   المحتوى
-   ========================================================= */
 
 .ai-reference-main {
     flex: 1;
     min-width: 0;
+
     font-size: 12px;
 }
-
-
-/* =========================================================
-   المؤلف والنوع
-   ========================================================= */
 
 .ai-reference-heading {
     display: flex;
     align-items: baseline;
+
     gap: 6px;
+
     flex-wrap: wrap;
 }
 
@@ -1263,49 +1063,47 @@ body {
     color: #333;
 }
 
-
-/* =========================================================
-   العنوان
-   ========================================================= */
-
 .ai-reference-title {
     margin-top: 1px;
+
     font-size: 12px;
     line-height: 1.6;
+
     color: #555;
 }
 
-
-/* =========================================================
-   المواضع
-   ========================================================= */
-
 .ai-reference-locations-line {
     display: flex;
+
     flex-wrap: wrap;
+
     gap: 4px 10px;
+
     margin-top: 4px;
 }
 
 .ai-reference-location-chip {
     display: inline-block;
+
     white-space: nowrap;
+
     font-size: 10px;
+
     color: #666;
 }
-
-
-/* =========================================================
-   البيانات السفلية
-   ========================================================= */
 
 .ai-reference-meta {
     display: flex;
     align-items: center;
+
     flex-wrap: wrap;
+
     gap: 5px;
+
     margin-top: 3px;
+
     font-size: 10px;
+
     color: #888;
 }
 
@@ -1317,11 +1115,6 @@ body {
 .ai-reference-separator {
     color: #ccc;
 }
-
-
-/* =========================================================
-   يحتاج مراجعة
-   ========================================================= */
 
 .ai-reference-review {
     font-size: 10px;
@@ -1339,8 +1132,11 @@ body {
 
 .ai-reference-variants summary {
     cursor: pointer;
+
     list-style: none;
+
     font-size: 10px;
+
     color: #888;
 }
 
@@ -1350,7 +1146,9 @@ body {
 
 .ai-reference-variants summary::before {
     content: "▸";
+
     margin-left: 4px;
+
     font-size: 9px;
 }
 
@@ -1360,336 +1158,291 @@ body {
 
 .ai-reference-variants summary span {
     margin-right: 3px;
+
     font-size: 9px;
+
     color: #999;
 }
 
 .ai-reference-variants-list {
     margin-top: 3px;
+
     padding-right: 8px;
+
     border-right: 1px solid #e5e5e5;
 }
 
 .ai-reference-variant {
     padding: 2px 0;
+
     font-size: 10px;
+
     line-height: 1.5;
+
     color: #777;
 }
-
-
-/* =========================================================
-   الملاحظات
-   ========================================================= */
 
 .ai-merged-reference-notes {
     margin-top: 4px;
+
     font-size: 10px;
     line-height: 1.5;
+
     color: #777;
+}
+
+.reference-author-toggle {
+    display: inline-flex;
+    align-items: center;
+
+    gap: 8px;
+
+    cursor: pointer;
+    user-select: none;
+
+    white-space: nowrap;
+}
+
+.reference-author-toggle-text {
+    white-space: nowrap;
 }
 
 
 /* =========================================================
-   الشاشات الضيقة
+   Reference styles
    ========================================================= */
-
-@media (max-width: 600px) {
-
-    .references-analysis-info {
-        grid-template-columns: 1fr;
-    }
-
-    .ai-reference-row {
-        gap: 6px;
-    }
-
-    .ai-reference-main {
-        font-size: 12px;
-    }
-
-}
-
 
 .reference-style-options {
     margin: 8px 0;
+
     padding: 8px 0;
+
     border-bottom: 1px solid #eeeeee;
 }
 
 .reference-style-title {
     margin-bottom: 6px;
+
     font-size: 12px;
     font-weight: 600;
+
     color: #444;
 }
 
 .reference-style-row {
     display: flex;
     align-items: center;
+
     gap: 8px;
+
     margin-top: 5px;
 }
 
 .reference-style-row label {
     width: 55px;
+
     font-size: 11px;
+
     color: #777;
 }
 
 .reference-style-row select {
     flex: 1;
+
     padding: 5px 7px;
+
     border: 1px solid #dddddd;
     border-radius: 5px;
+
     background: #fff;
+
     font-size: 11px;
+
     color: #444;
 }
 
+
+/* =========================================================
+   FOOTNOTE SUGGESTIONS
+   ========================================================= */
+
 .footnote-suggestions-result {
     margin-top: 12px;
+
     padding-top: 10px;
+
     border-top: 1px solid #e8e8e8;
+
     font-size: 12px;
 }
 
 .footnote-suggestions-title {
+    margin-bottom: 8px;
+
     font-size: 13px;
     font-weight: 600;
+
     color: #333;
-    margin-bottom: 8px;
 }
 
 .footnote-suggestions-title strong {
     color: #777;
+
     font-size: 11px;
 }
 
 .footnote-suggestion-item {
     display: flex;
+
     gap: 7px;
+
     padding: 7px 2px;
+
     border-bottom: 1px solid #eeeeee;
 }
 
 .footnote-suggestion-number {
     flex: 0 0 20px;
+
     color: #999;
+
     font-size: 10px;
 }
 
 .footnote-suggestion-content {
     flex: 1;
+
     min-width: 0;
 }
 
 .footnote-suggestion-original {
     color: #777;
+
     font-size: 11px;
 }
 
 .footnote-suggestion-arrow {
     margin: 2px 0;
+
     color: #aaa;
 }
 
 .footnote-suggestion-new {
     color: #444;
+
     font-size: 12px;
     font-weight: 600;
 }
 
 .apply-footnote-suggestions-btn {
     width: 100%;
+
     margin-top: 8px;
+
     padding: 8px 12px;
+
     border: 1px solid #dfe2e6;
     border-radius: 6px;
+
     background: #f8f9fa;
     color: #444;
+
     font-size: 12px;
     font-weight: 600;
+
     cursor: pointer;
 }
+
+
 /* =========================================================
-   FINAL REFERENCES
+   FINAL REFERENCE CARDS
    ========================================================= */
 
-.references-final-results {
-
-    margin-top: 18px;
-
-    direction: rtl;
-
-}
-
-
-.references-final-results-title {
-
-    margin-bottom: 10px;
-
-    color: #333;
-
-    font-size: 13px;
-
-    font-weight: 600;
-
-}
-
-
-.references-final-list {
-
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 8px;
-
-}
-
-
 .final-reference-card {
-
     padding: 12px 14px;
 
     border: 1px solid #e3e3e3;
-
     border-radius: 11px;
 
     background: #fff;
 
     box-sizing: border-box;
-
 }
-
 
 .final-reference-card:hover {
-
     background: #fafafa;
-
 }
 
-
 .final-reference-head {
-
     display: flex;
-
     align-items: center;
 
     gap: 7px;
 
     margin-bottom: 7px;
-
 }
 
-
 .final-reference-number {
-
     width: 22px;
-
     height: 22px;
 
     display: flex;
-
     align-items: center;
-
     justify-content: center;
 
     border-radius: 6px;
 
     background: #f1f1f1;
-
     color: #666;
 
     font-size: 10px;
-
 }
 
-
 .final-reference-type {
-
     color: #888;
 
     font-size: 10px;
-
 }
 
-
 .final-reference-author {
-
     color: #222;
 
     font-size: 12px;
-
     font-weight: 600;
-
 }
 
-
 .final-reference-title {
-
     margin-top: 3px;
 
     color: #333;
 
     font-size: 12px;
-
     line-height: 1.6;
-
 }
 
-
 .final-reference-location {
-
     margin-top: 5px;
 
     color: #666;
 
     font-size: 11px;
-
 }
 
-
 .final-reference-meta {
-
     margin-top: 8px;
 
     color: #999;
 
     font-size: 10px;
-
 }
-
 
 .final-reference-card.reference-needs-review {
-
     border-style: dashed;
-
 }
-
 
 .reference-review-label {
-
     color: #a66;
-
 }
-/* =========================================================
-   الشريط المثبت
-
-   التثبيت يؤثر على الشريط فقط.
-   لا يفتح القائمة.
-   ========================================================= */
-
-.sidebar.pinned {
-    transform: translateX(0);
-
-    box-shadow:
-        3px 0 14px rgba(0, 0, 0, 0.08);
-}
-
-
-
 
 
 /* =========================================================
@@ -1712,11 +1465,6 @@ body {
     border-bottom: 1px solid #eee;
 }
 
-
-/* =========================================================
-   عناوين أقسام القائمة
-   ========================================================= */
-
 .expand-section-header {
     width: 100%;
     min-height: 40px;
@@ -1732,7 +1480,6 @@ body {
     border-radius: 8px;
 
     color: #444;
-
     background: transparent;
 
     user-select: none;
@@ -1750,11 +1497,6 @@ body {
     color: #111;
 }
 
-
-/* =========================================================
-   النص الفعلي داخل عنوان القسم
-   ========================================================= */
-
 .expand-section-header > span:not(.section-arrow) {
     font-size: 14px;
     font-weight: 700;
@@ -1764,11 +1506,6 @@ body {
     line-height: 1.4;
 }
 
-
-/* =========================================================
-   أيقونة + اسم القسم
-   ========================================================= */
-
 .expand-section-title {
     display: flex;
     align-items: center;
@@ -1776,17 +1513,11 @@ body {
     gap: 9px;
 
     min-width: 0;
-
     flex: 1;
 
     font-size: 14px;
     font-weight: 700;
 }
-
-
-/* =========================================================
-   أيقونة القسم
-   ========================================================= */
 
 .section-icon {
     width: 20px;
@@ -1802,11 +1533,6 @@ body {
 
     color: #555;
 }
-
-
-/* =========================================================
-   السهم داخل عناصر القائمة
-   ========================================================= */
 
 .section-arrow {
     width: 18px;
@@ -1835,16 +1561,9 @@ body {
     transition: transform 0.2s ease;
 }
 
-
-/* عند فتح القسم */
 .section-toggle.open .section-arrow {
     transform: rotate(90deg) !important;
 }
-
-
-/* =========================================================
-   محتوى الأقسام
-   ========================================================= */
 
 .expand-section-content {
     display: none;
@@ -1859,11 +1578,6 @@ body {
 .expand-section.open .expand-section-content {
     display: block;
 }
-
-
-/* =========================================================
-   العناصر العامة
-   ========================================================= */
 
 .expand-item {
     position: relative;
@@ -1899,11 +1613,6 @@ body {
     background: #f3f3f3;
     color: #111;
 }
-
-
-/* =========================================================
-   العناصر الفرعية
-   ========================================================= */
 
 .section-content {
     display: none;
@@ -2036,9 +1745,11 @@ body {
 .chat-title {
     display: flex;
     align-items: center;
+
     gap: 7px;
 
     overflow: hidden;
+
     white-space: nowrap;
     text-overflow: ellipsis;
 
@@ -2053,6 +1764,7 @@ body {
     height: 16px;
 
     flex-shrink: 0;
+
     display: block;
 }
 
@@ -2077,13 +1789,11 @@ body {
    ========================================================= */
 
 .projects-popup {
-
     display: none;
 
     position: fixed;
 
     top: 60px;
-
     left: 50%;
 
     transform: translateX(-50%);
@@ -2110,11 +1820,8 @@ body {
     overflow: hidden;
 }
 
-
 .projects-popup.open {
-
     display: block;
-
 }
 
 .projects-header {
@@ -2158,7 +1865,6 @@ body {
     flex-shrink: 0;
 
     border: none;
-
     border-radius: 7px;
 
     background: transparent;
@@ -2239,17 +1945,17 @@ body {
     font-weight: 400;
 }
 
+
+/* =========================================================
+   PROJECT HIERARCHY
+   ========================================================= */
+
 .project-item {
-    display: flex;
-
-    align-items: center;
-    justify-content: space-between;
-
-    padding: 10px;
-
-    cursor: pointer;
-
     position: relative;
+
+    display: block;
+
+    padding: 0;
 
     border-radius: 8px;
 
@@ -2258,33 +1964,8 @@ body {
 }
 
 .project-item:hover {
-    background: #f4f4f4;
+    background: transparent;
 }
-
-.project-item span {
-    display: flex;
-
-    align-items: center;
-
-    gap: 8px;
-
-    font-size: 13px;
-    font-weight: 400;
-}
-/* =====================================================
-   Project Hierarchy
-   المستندات والمحادثات والمراجع داخل المشروع
-   ===================================================== */
-
-.project-item {
-    display: block;
-    padding: 0;
-}
-
-
-/* ==================================
-   رأس المشروع
-   ================================== */
 
 .project-header {
     display: flex;
@@ -2306,19 +1987,9 @@ body {
     position: relative;
 }
 
-
-/* ==================================
-   عند المرور على المشروع
-   ================================== */
-
 .project-header:hover {
     background: #f4f4f4;
 }
-
-
-/* ==================================
-   زر فتح وإغلاق المشروع
-   ================================== */
 
 .project-expand-toggle {
     border: none;
@@ -2330,7 +2001,6 @@ body {
     margin: 0 4px 0 0;
 
     width: 20px;
-
     min-width: 20px;
 
     height: 24px;
@@ -2338,7 +2008,6 @@ body {
     cursor: pointer;
 
     font-size: 15px;
-
     line-height: 24px;
 
     color: #666;
@@ -2346,19 +2015,12 @@ body {
     display: inline-flex;
 
     align-items: center;
-
     justify-content: center;
 }
-
 
 .project-expand-toggle:hover {
     color: #111;
 }
-
-
-/* ==================================
-   عنوان المشروع
-   ================================== */
 
 .project-title {
     display: flex !important;
@@ -2368,18 +2030,11 @@ body {
     gap: 7px;
 
     flex: 1;
-
     min-width: 0;
 
     font-size: 13px;
-
     font-weight: 500;
 }
-
-
-/* ==================================
-   زر خيارات المشروع
-   ================================== */
 
 .project-menu {
     border: none;
@@ -2387,11 +2042,9 @@ body {
     background: transparent;
 
     padding: 0;
-
     margin: 0;
 
     width: 28px;
-
     min-width: 28px;
 
     height: 28px;
@@ -2399,29 +2052,29 @@ body {
     cursor: pointer;
 
     font-size: 18px;
-
     color: #777;
 
     display: inline-flex;
 
     align-items: center;
-
     justify-content: center;
 }
-
 
 .project-menu:hover {
     color: #111;
 }
 
+.folder-icon {
+    display: inline-flex;
 
+    align-items: center;
 
-/* ==================================
-   محتوى المشروع الداخلي
-   ================================== */
+    margin-left: 6px;
+
+    color: #555;
+}
 
 .project-resources {
-
     display: none;
 
     margin-top: 2px;
@@ -2436,13 +2089,7 @@ body {
     box-sizing: border-box;
 }
 
-
-/* ==================================
-   أقسام المشروع
-   ================================== */
-
 .project-resource-section {
-
     width: 100%;
 
     margin-bottom: 2px;
@@ -2450,18 +2097,10 @@ body {
     box-sizing: border-box;
 }
 
-
-/* ==================================
-   عنوان:
-   المستندات / المحادثات / المراجع
-   ================================== */
-
 .project-resource-header {
-
     display: flex;
 
     align-items: center;
-
     justify-content: space-between;
 
     width: 100%;
@@ -2481,21 +2120,27 @@ body {
     color: #555;
 }
 
-
 .project-resource-header:hover {
-
     background: #f7f7f7;
 }
 
+.project-resource-header > span:first-child {
+    display: inline-flex;
 
-/* ==================================
-   سهم القسم
-   ================================== */
+    align-items: center;
+
+    gap: 6px;
+}
+
+.project-resource-header > span:first-child svg {
+    width: 17px;
+    height: 17px;
+
+    flex: 0 0 17px;
+}
 
 .project-resource-arrow {
-
     width: 18px;
-
     min-width: 18px;
 
     text-align: center;
@@ -2505,40 +2150,22 @@ body {
     color: #888;
 }
 
-
-/* ==================================
-   القسم المفتوح
-   ================================== */
-
 .project-resource-header.open {
-
     font-weight: 500;
-
     color: #222;
 }
 
-
-.project-resource-header.open
-.project-resource-arrow {
-
+.project-resource-header.open .project-resource-arrow {
     color: #444;
 }
 
-
-/* ==================================
-   محتوى القسم
-   ================================== */
-
 .project-resource-content {
-
     display: none;
 
     margin-right: 18px;
 
     padding-right: 8px;
-
     padding-top: 2px;
-
     padding-bottom: 4px;
 
     border-right: 1px solid #eeeeee;
@@ -2546,134 +2173,22 @@ body {
     box-sizing: border-box;
 }
 
-
-/* ==================================
-   عند فتح القسم
-   ================================== */
-
-.project-resource-header.open
-+ .project-resource-content {
-
+.project-resource-header.open + .project-resource-content {
     display: block;
 }
 
-
-/* ==================================
-   عناصر المستندات داخل المشروع
-   ================================== */
-
-.project-resource-content
-.document-item {
-
+.project-resource-content .document-item,
+.project-resource-content .chat-item,
+.project-resource-content .reference-item {
     margin-right: 4px;
-
 }
 
 
 /* =========================================================
-   زر إضافة مستند داخل مشروع
-   ========================================================= */
-
-.project-add-document-box {
-    margin: 3px 0 5px 8px;
-    padding: 0;
-}
-
-
-.project-add-document {
-    width: 100%;
-
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-
-    gap: 6px;
-
-    padding: 6px 9px;
-
-    border: none;
-    border-radius: 6px;
-
-    background: transparent;
-
-    color: #666;
-
-    font-size: 12.5px;
-    font-weight: 400;
-
-    cursor: pointer;
-
-    box-sizing: border-box;
-
-    transition:
-        background 0.15s ease,
-        color 0.15s ease;
-}
-
-
-.project-add-document:hover {
-    background: #f4f4f4;
-    color: #222;
-}
-
-
-.project-add-document:active {
-    background: #eeeeee;
-}
-
-
-.project-add-document-icon {
-    width: 18px;
-    min-width: 18px;
-
-    display: inline-flex;
-
-    align-items: center;
-    justify-content: center;
-
-    font-size: 18px;
-    font-weight: 400;
-
-    line-height: 1;
-}
-
-
-.project-add-document-text {
-    font-size: 12.5px;
-    line-height: 1.4;
-}
-
-/* ==================================
-   عناصر المحادثات داخل المشروع
-   ================================== */
-
-.project-resource-content
-.chat-item {
-
-    margin-right: 4px;
-
-}
-
-
-/* ==================================
-   عناصر المراجع داخل المشروع
-   ================================== */
-
-.project-resource-content
-.reference-item {
-
-    margin-right: 4px;
-
-}
-
-
-
-/* =========================================================
-   مستندات المشروع
+   PROJECT DOCUMENTS
    ========================================================= */
 
 .project-document-item {
-
     display: flex;
 
     align-items: center;
@@ -2699,49 +2214,30 @@ body {
     position: relative;
 
     gap: 6px;
-
 }
-
 
 .project-document-item:hover {
-
     background: #f7f7f7;
-
 }
-
-
-/* المستند المفعّل */
 
 .project-document-item.active-document {
-
     background: #f5f5f5;
-
 }
 
-
-/* عنوان المستند */
-
 .project-document-title {
-
     display: flex;
 
     align-items: center;
 
     flex: 1 1 auto;
-
     min-width: 0;
 
     gap: 2px;
 
     overflow: hidden;
-
 }
 
-
-/* اسم المستند */
-
 .project-document-title .document-name {
-
     display: block;
 
     min-width: 0;
@@ -2749,31 +2245,19 @@ body {
     overflow: hidden;
 
     white-space: nowrap;
-
     text-overflow: ellipsis;
 
     font-size: 12px;
-
 }
 
-
-/* علامة التفعيل */
-
 .project-document-title .document-active-mark {
-
     flex: 0 0 auto;
 
     font-size: 12px;
-
     line-height: 1;
-
 }
 
-
-/* حالة القراءة والفهرسة */
-
 .project-document-status {
-
     flex: 0 0 auto;
 
     max-width: 42%;
@@ -2781,7 +2265,6 @@ body {
     overflow: hidden;
 
     white-space: nowrap;
-
     text-overflow: ellipsis;
 
     font-size: 10.5px;
@@ -2789,16 +2272,10 @@ body {
     color: #888;
 
     text-align: left;
-
 }
 
-
-/* زر الخيارات */
-
 .project-document-menu {
-
     width: 24px;
-
     min-width: 24px;
 
     height: 24px;
@@ -2806,7 +2283,6 @@ body {
     display: inline-flex;
 
     align-items: center;
-
     justify-content: center;
 
     flex: 0 0 24px;
@@ -2826,23 +2302,14 @@ body {
     border-radius: 5px;
 
     cursor: pointer;
-
 }
-
 
 .project-document-menu:hover {
-
     background: #eeeeee;
-
     color: #222;
-
 }
 
-
-/* قائمة الخيارات */
-
 .project-document-options {
-
     display: none;
 
     position: fixed;
@@ -2863,21 +2330,13 @@ body {
         0 4px 18px rgba(0, 0, 0, 0.14);
 
     z-index: 999999;
-
 }
-
 
 .project-document-options.open {
-
     display: block;
-
 }
 
-
-/* عناصر قائمة الخيارات */
-
 .project-document-options > div {
-
     padding: 7px 9px;
 
     border-radius: 6px;
@@ -2889,27 +2348,26 @@ body {
     color: #444;
 
     cursor: pointer;
-
 }
-
 
 .project-document-options > div:hover {
-
     background: #f4f4f4;
-
     color: #111;
-
 }
 
+.project-document-options .delete-project-document {
+    color: #c62828;
+}
 
-/* حقل إعادة التسمية */
+.project-document-options .delete-project-document:hover {
+    background: #fff1f1;
+    color: #b71c1c;
+}
 
 .edit-project-document-title {
-
     flex: 1 1 auto;
 
     min-width: 0;
-
     width: 100%;
 
     padding: 4px 6px;
@@ -2925,73 +2383,14 @@ body {
     font-size: 12px;
 
     background: #fff;
-
-}
-
-
-
-.project-document-options .delete-project-document {
-    color: #c62828;
-}
-
-.project-document-options .delete-project-document:hover {
-    background: #fff1f1;
-    color: #b71c1c;
 }
 
 
 /* =========================================================
-   زر حذف المستند داخل نافذة التأكيد
-   ========================================================= */
-
-.project-document-delete-confirm
-.confirm-project-document-delete {
-
-    background: #d32f2f;
-
-    color: #ffffff;
-
-    border: none;
-
-    border-radius: 6px;
-
-    padding: 7px 16px;
-
-    font-size: 12px;
-
-    font-weight: 500;
-
-    cursor: pointer;
-
-    transition:
-        background 0.15s ease,
-        transform 0.1s ease;
-}
-
-
-.project-document-delete-confirm
-.confirm-project-document-delete:hover {
-
-    background: #b71c1c;
-
-}
-
-
-.project-document-delete-confirm
-.confirm-project-document-delete:active {
-
-    transform: scale(0.97);
-
-}
-
-
-
-/* =========================================================
-   صندوق إضافة المستند
+   PROJECT ADD DOCUMENT
    ========================================================= */
 
 .project-add-document-box {
-
     width: 100%;
 
     margin: 5px 0 7px 0;
@@ -2999,16 +2398,9 @@ body {
     padding: 0 4px;
 
     box-sizing: border-box;
-
 }
 
-
-/* =========================================================
-   زر إضافة المستند
-   ========================================================= */
-
 .project-add-document {
-
     width: 100%;
 
     min-height: 34px;
@@ -3044,16 +2436,9 @@ body {
         border-color 0.15s ease,
         color 0.15s ease,
         box-shadow 0.15s ease;
-
 }
 
-
-/* =========================================================
-   عند المرور
-   ========================================================= */
-
 .project-add-document:hover {
-
     background: #f5f5f5;
 
     border-color: #c8c8c8;
@@ -3062,31 +2447,15 @@ body {
 
     box-shadow:
         0 1px 4px rgba(0, 0, 0, 0.05);
-
 }
-
-
-/* =========================================================
-   عند الضغط
-   ========================================================= */
 
 .project-add-document:active {
-
     background: #eeeeee;
-
     box-shadow: none;
-
 }
 
-
-/* =========================================================
-   علامة +
-   ========================================================= */
-
 .project-add-document-icon {
-
     width: 20px;
-
     min-width: 20px;
 
     height: 20px;
@@ -3094,7 +2463,6 @@ body {
     display: inline-flex;
 
     align-items: center;
-
     justify-content: center;
 
     box-sizing: border-box;
@@ -3117,91 +2485,26 @@ body {
         border-color 0.15s ease,
         background 0.15s ease,
         color 0.15s ease;
-
 }
 
-
-/* =========================================================
-   شكل +
-   عند المرور
-   ========================================================= */
-
-.project-add-document:hover
-.project-add-document-icon {
-
+.project-add-document:hover .project-add-document-icon {
     border-color: #bdbdbd;
-
     background: #ffffff;
-
     color: #222;
-
 }
-
-
-/* =========================================================
-   النص
-   ========================================================= */
 
 .project-add-document-text {
-
     font-size: 12px;
-
     line-height: 1.4;
-
 }
 
-
-/* ==================================
-   منع تنسيق .project-item span
-   القديمة من إفساد العناصر الداخلية
-   ================================== */
-
-.project-item
-.project-resources
-span {
-
+.project-item .project-resources span {
     font-size: inherit;
 }
 
 
-/* ==================================
-   قائمة خيارات المشروع
-   ================================== */
-
-.project-options-menu {
-
-    z-index: 999999;
-}
-
-.folder-icon {
-    display: inline-flex;
-
-    align-items: center;
-
-    margin-left: 6px;
-
-    color: #555;
-}
-
-.project-menu {
-    border: none;
-
-    background: none;
-
-    cursor: pointer;
-
-    font-size: 18px;
-
-    color: #777;
-}
-
-.project-menu:hover {
-    color: #111;
-}
-
-
 /* =========================================================
-   8. PROJECT OPTIONS MENU
+   PROJECT OPTIONS
    ========================================================= */
 
 .project-options-menu {
@@ -3273,7 +2576,7 @@ span {
 
 
 /* =========================================================
-   9. NEW PROJECT BOX
+   PROJECT CREATE BOX
    ========================================================= */
 
 .project-create-box {
@@ -3357,7 +2660,7 @@ span {
 
 
 /* =========================================================
-   10. CHAT OPTIONS MENUS
+   CHAT OPTIONS MENUS
    ========================================================= */
 
 .chat-options-menu {
@@ -3429,7 +2732,32 @@ span {
 
 
 /* =========================================================
-   11. CHAT POPUP
+   8. POPUP FONT UNIFICATION
+   ========================================================= */
+
+.projects-popup,
+.chat-popup,
+.search-popup {
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.projects-popup .popup-title,
+.chat-popup .popup-title,
+.search-popup .popup-title {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.projects-popup .popup-item,
+.chat-popup .popup-item,
+.search-popup .popup-item {
+    font-size: 13px;
+    font-weight: 400;
+}
+
+
+/* =========================================================
+   9. CHAT POPUP
    ========================================================= */
 
 #chat-popup {
@@ -3470,33 +2798,251 @@ span {
     border-bottom: 1px solid #eee;
 }
 
+
+/* =========================================================
+   المحادثات داخل النافذة
+   ========================================================= */
+
+#recent-chat-list {
+    max-height: 420px;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+
+/* عنصر المحادثة */
 .recent-chat-item {
-    padding: 10px 12px;
+    position: relative;
+
+    display: flex;
+    align-items: center;
+
+    gap: 6px;
+
+    width: 100%;
+
+    padding: 8px 10px;
+
+    border: none;
 
     font-size: 13px;
     font-weight: 400;
 
-    cursor: pointer;
-
-    border: none;
+    box-sizing: border-box;
 }
 
 .recent-chat-item:hover {
     background: #f5f5f5;
 }
 
-.empty-chat {
-    padding: 15px;
 
-    font-size: 13px;
-    font-weight: 400;
+/* عنوان المحادثة */
+.recent-chat-title-btn {
+    flex: 1;
+    min-width: 0;
 
-    color: #777;
+    display: flex;
+    align-items: center;
+
+    gap: 6px;
+
+    padding: 0;
+
+    border: none;
+
+    background: transparent;
+
+    color: #444;
+
+    text-align: right;
+
+    cursor: pointer;
+
+    overflow: hidden;
+}
+
+.recent-chat-title-text {
+    flex: 1;
+    min-width: 0;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
 }
 
 
 /* =========================================================
-   12. CHAT ACTION MENU
+   أزرار الإجراءات المباشرة
+   ========================================================= */
+
+.recent-chat-action-btn {
+    flex: 0 0 auto;
+
+    width: 26px;
+    height: 26px;
+
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    border: none;
+    border-radius: 6px;
+
+    background: transparent;
+
+    color: #777;
+
+    font-size: 14px;
+
+    cursor: pointer;
+}
+
+.recent-chat-action-btn:hover {
+    background: #eeeeee;
+    color: #222;
+}
+
+.recent-chat-delete-btn {
+    color: #b00020;
+}
+
+.recent-chat-delete-btn:hover {
+    background: #fff1f1;
+    color: #b00020;
+}
+
+
+/* =========================================================
+   النمط القديم للقائمة
+   يبقى محفوظًا للتوافق
+   ========================================================= */
+
+.recent-chat-toolbar {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 8px;
+
+    padding: 8px;
+
+    position: sticky;
+
+    top: 0;
+
+    z-index: 5;
+
+    background: #fff;
+}
+
+.recent-chat-select-all {
+    display: flex;
+
+    align-items: center;
+
+    gap: 6px;
+
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+.recent-chat-delete-selected {
+    border: none;
+
+    background: transparent;
+
+    cursor: pointer;
+
+    font-size: 12px;
+}
+
+.recent-chat-delete-selected:disabled {
+    opacity: 0.45;
+
+    cursor: default;
+}
+
+.recent-chat-checkbox-wrap {
+    display: flex;
+
+    align-items: center;
+}
+
+.recent-chat-checkbox {
+    flex: 0 0 auto;
+
+    cursor: pointer;
+}
+
+.recent-chat-menu-btn {
+    border: none;
+
+    background: transparent;
+
+    cursor: pointer;
+
+    font-size: 18px;
+
+    line-height: 1;
+
+    padding: 2px 5px;
+}
+
+.recent-chat-menu {
+    display: none;
+
+    position: absolute;
+
+    left: 8px;
+    top: 34px;
+
+    z-index: 1000;
+
+    min-width: 120px;
+
+    background: #fff;
+
+    border: 1px solid #ddd;
+
+    border-radius: 6px;
+
+    box-shadow:
+        0 4px 12px rgba(0,0,0,.15);
+}
+
+.recent-chat-menu.open {
+    display: block;
+}
+
+.recent-chat-menu button {
+    width: 100%;
+
+    border: none;
+
+    background: transparent;
+
+    padding: 8px 10px;
+
+    text-align: right;
+
+    cursor: pointer;
+}
+
+.recent-chat-menu button:hover {
+    background: #f3f3f3;
+}
+
+
+/* =========================================================
+   CHAT ACTION MENU
    ========================================================= */
 
 .chat-action-menu {
@@ -3534,9 +3080,18 @@ span {
     background: #f5f5f5;
 }
 
+.empty-chat {
+    padding: 15px;
+
+    font-size: 13px;
+    font-weight: 400;
+
+    color: #777;
+}
+
 
 /* =========================================================
-   13. DELETE CONFIRMATION
+   10. DELETE CONFIRMATION
    ========================================================= */
 
 .delete-confirm,
@@ -3563,6 +3118,7 @@ span {
     position: relative;
 
     width: 320px;
+
     max-width: calc(100vw - 30px);
     max-height: calc(100vh - 30px);
 
@@ -3632,7 +3188,7 @@ span {
 
 
 /* =========================================================
-   14. SEARCH POPUP
+   11. SEARCH POPUP
    ========================================================= */
 
 .search-popup {
@@ -3759,15 +3315,14 @@ span {
 
 
 /* =========================================================
-   15. MAIN
-
-   المحتوى الرئيسي لا يتحرك بسبب فتح القائمة المنبثقة.
+   12. MAIN
    ========================================================= */
 
 .main {
     position: relative;
 
     height: 100vh;
+
     margin-left: 0;
 
     display: flex;
@@ -3775,6 +3330,7 @@ span {
 
     transition: margin-left 0.25s ease;
 }
+
 
 /* =========================================================
    DOCUMENT TITLE
@@ -3797,11 +3353,12 @@ span {
 
 
 /* =========================================================
-   16. CHAT AREA
+   13. CHAT AREA
    ========================================================= */
 
 #chat-area {
     flex: 1;
+
     width: 100%;
     min-width: 0;
 
@@ -3809,6 +3366,7 @@ span {
     overflow-x: hidden;
 
     padding: 25px 5%;
+
     box-sizing: border-box;
 }
 
@@ -3848,19 +3406,16 @@ span {
 
 
 /* =========================================================
-17. MESSAGES
-========================================================= */
-
-/* =========================================================
-   MESSAGE BUBBLES
-   الفقاعات تأخذ مساحة المحتوى بدل عرض المحادثة كاملًا
+   14. MESSAGES
    ========================================================= */
 
 .message {
     width: auto;
+
     max-width: 92%;
 
     padding: 12px 16px;
+
     margin-bottom: 12px;
 
     border-radius: 14px;
@@ -3876,13 +3431,14 @@ span {
 
 .user-message {
     background: #222;
+
     color: #ffffff;
 
     margin-left: auto;
     margin-right: 0;
 
-    /* توسيع فقاعة المستخدم */
     width: fit-content;
+
     max-width: 85%;
     min-width: 120px;
 
@@ -3890,47 +3446,47 @@ span {
     direction: rtl;
 
     box-sizing: border-box;
+
     word-wrap: break-word;
     overflow-wrap: anywhere;
 }
 
 .ai-message {
     width: fit-content;
+
     max-width: 92%;
 
     margin-left: 0;
     margin-right: auto;
 
     background: #f5f5f5;
+
     color: #222;
 
     text-align: right;
     direction: rtl;
 
     line-height: 1.8;
-}
 
-
-
-/* ======================================
-   تنسيق ردود الذكاء الاصطناعي
-   ====================================== */
-
-.ai-message {
-    line-height: 1.8;
-    text-align: right;
-    direction: rtl;
     word-wrap: break-word;
     overflow-wrap: anywhere;
+
+    overflow-x: auto;
 }
 
-/* العناوين */
+
+/* =========================================================
+   AI MESSAGE TYPOGRAPHY
+   ========================================================= */
+
 .ai-message h1,
 .ai-message h2,
 .ai-message h3,
 .ai-message h4 {
     margin-top: 18px;
+
     margin-bottom: 10px;
+
     line-height: 1.5;
 }
 
@@ -3950,15 +3506,14 @@ span {
     font-size: 15px;
 }
 
-/* الفقرات */
 .ai-message p {
     margin: 8px 0;
 }
 
-/* القوائم */
 .ai-message ul,
 .ai-message ol {
     margin: 8px 0;
+
     padding-right: 28px;
 }
 
@@ -3966,58 +3521,77 @@ span {
     margin: 4px 0;
 }
 
-/* النص العريض */
 .ai-message strong {
     font-weight: 700;
 }
 
-/* النص المائل */
 .ai-message em {
     font-style: italic;
 }
 
-/* الاقتباسات */
 .ai-message blockquote {
     margin: 12px 0;
+
     padding: 8px 14px;
+
     border-right: 3px solid #999;
+
     background: rgba(0, 0, 0, 0.04);
 }
 
-/* الكود داخل السطر */
 .ai-message code {
     padding: 2px 5px;
+
     border-radius: 4px;
+
     background: rgba(0, 0, 0, 0.08);
+
     direction: ltr;
+
     unicode-bidi: embed;
-    font-family: Consolas, "Courier New", monospace;
+
+    font-family:
+        Consolas,
+        "Courier New",
+        monospace;
 }
 
-/* كتلة الكود */
 .ai-message pre {
     margin: 12px 0;
+
     padding: 12px;
+
     overflow-x: auto;
+
     border-radius: 8px;
+
     background: #f5f5f5;
+
     direction: ltr;
+
     text-align: left;
+
     white-space: pre-wrap;
 }
 
 .ai-message pre code {
     padding: 0;
+
     background: transparent;
+
     direction: ltr;
 }
 
-/* ======================================
-   الجداول
-   ====================================== */
+
+/* =========================================================
+   جداول الرسائل
+   ========================================================= */
 
 .ai-message table {
     width: 100%;
+
+    min-width: 100%;
+
     max-width: 100%;
 
     margin: 18px 0;
@@ -4026,6 +3600,7 @@ span {
     border-spacing: 0;
 
     direction: rtl;
+
     text-align: right;
 
     font-size: 13px;
@@ -4036,14 +3611,11 @@ span {
     background: #ffffff;
 
     border: 1px solid #e5e5e5;
+
     border-radius: 10px;
 
     overflow: hidden;
 }
-
-/* ======================================
-   رأس الجدول
-   ====================================== */
 
 .ai-message th {
     padding: 11px 13px;
@@ -4063,10 +3635,6 @@ span {
     border-bottom: 1px solid #dedede;
 }
 
-/* ======================================
-   خلايا الجدول
-   ====================================== */
-
 .ai-message td {
     padding: 10px 13px;
 
@@ -4085,42 +3653,22 @@ span {
     border-bottom: 1px solid #eeeeee;
 }
 
-/* ======================================
-   إزالة الحد من آخر صف
-   ====================================== */
-
 .ai-message tr:last-child td {
     border-bottom: none;
 }
-
-/* ======================================
-   الخطوط الرأسية الخفيفة
-   ====================================== */
 
 .ai-message th + th,
 .ai-message td + td {
     border-right: 1px solid #eeeeee;
 }
 
-/* ======================================
-   الصفوف المتناوبة
-   ====================================== */
-
 .ai-message tr:nth-child(even) td {
     background: #fafafa;
 }
 
-/* ======================================
-   تأثير المرور
-   ====================================== */
-
 .ai-message tbody tr:hover td {
     background: #f5f5f5;
 }
-
-/* ======================================
-   أول وآخر خلية في الرأس
-   ====================================== */
 
 .ai-message thead th:first-child {
     border-top-right-radius: 10px;
@@ -4130,46 +3678,16 @@ span {
     border-top-left-radius: 10px;
 }
 
-/* ======================================
-   النص الطويل داخل الخلايا
-   ====================================== */
-
-.ai-message td p {
-    margin: 0;
-}
-
+.ai-message td p,
 .ai-message th p {
     margin: 0;
 }
 
-/* ======================================
-   الروابط داخل الجدول
-   ====================================== */
-
 .ai-message table a {
     color: inherit;
+
     text-decoration: underline;
 }
-
-/* ======================================
-   الجداول العريضة جدًا
-   ====================================== */
-
-.ai-message table {
-    min-width: 100%;
-}
-
-/* ======================================
-   تمرير أفقي عند الحاجة
-   ====================================== */
-
-.ai-message {
-    overflow-x: auto;
-}
-
-/* ======================================
-   شريط التمرير الأفقي
-   ====================================== */
 
 .ai-message::-webkit-scrollbar {
     height: 6px;
@@ -4187,50 +3705,56 @@ span {
 .ai-message::-webkit-scrollbar-track {
     background: transparent;
 }
-/* الروابط */
+
 .ai-message a {
     text-decoration: underline;
 }
 
-/* الخط الفاصل */
 .ai-message hr {
     margin: 18px 0;
+
     border: 0;
     border-top: 1px solid #ddd;
 }
 
-/* الصور إن ظهرت في Markdown */
 .ai-message img {
     max-width: 100%;
     height: auto;
+
     border-radius: 8px;
 }
 
-/* منع خروج العناصر من مساحة الرسالة */
 .ai-message * {
     max-width: 100%;
 }
 
- /* ======================================
-   إحالات المقاطع — الشكل الأكاديمي
-   ====================================== */
+
+/* =========================================================
+   إحالات المقاطع
+   ========================================================= */
 
 .ai-message .document-citation {
     display: inline-flex;
+
     align-items: center;
     justify-content: center;
 
     margin: 0 3px;
+
     padding: 1px 7px;
 
     border: 1px solid #d8d8d8;
+
     border-radius: 6px;
 
     background: #fafafa;
+
     color: #555;
 
     font: inherit;
+
     font-size: 0.88em;
+
     font-weight: 600;
 
     line-height: 1.5;
@@ -4249,13 +3773,9 @@ span {
         transform 0.15s ease;
 }
 
-
-/* ======================================
-   عند مرور المؤشر
-   ====================================== */
-
 .ai-message .document-citation:hover {
     background: #f0f0f0;
+
     border-color: #bdbdbd;
 
     color: #222;
@@ -4263,26 +3783,14 @@ span {
     box-shadow:
         0 1px 3px rgba(0, 0, 0, 0.08);
 
-    transform:
-        translateY(-1px);
+    transform: translateY(-1px);
 }
-
-
-/* ======================================
-   عند الضغط
-   ====================================== */
 
 .ai-message .document-citation:active {
     background: #e8e8e8;
 
-    transform:
-        translateY(0);
+    transform: translateY(0);
 }
-
-
-/* ======================================
-   عند التركيز بلوحة المفاتيح
-   ====================================== */
 
 .ai-message .document-citation:focus {
     outline: none;
@@ -4293,27 +3801,17 @@ span {
         0 0 0 2px rgba(120, 120, 120, 0.18);
 }
 
-
-/* ======================================
-   إحالات متعددة متجاورة
-   ====================================== */
-
 .ai-message .document-citation + .document-citation {
     margin-right: 2px;
     margin-left: 2px;
 }
 
-/* =========================================================
-   18. INPUT AREA
-   ========================================================= */
 
 /* =========================================================
-   INPUT AREA
-   منطقة الإدخال
+   15. INPUT AREA
    ========================================================= */
 
 .input-area {
-
     position: relative;
 
     min-height: 68px;
@@ -4333,32 +3831,26 @@ span {
     padding: 0 10px 13px;
 
     box-sizing: border-box;
-
 }
+
 
 /* =========================================================
    SCOPE STATUS
-   حالة نطاق البحث فوق مربع الكتابة
    ========================================================= */
 
 .scope-status {
-
     width: 100%;
 
     max-height: 0;
-
     min-height: 0;
 
     display: flex;
-
     align-items: center;
-
     justify-content: flex-start;
 
     gap: 5px;
 
     padding: 0 8px;
-
     margin: 0;
 
     box-sizing: border-box;
@@ -4366,7 +3858,6 @@ span {
     overflow: hidden;
 
     opacity: 0;
-
     visibility: hidden;
 
     direction: rtl;
@@ -4376,34 +3867,19 @@ span {
         padding 0.20s ease,
         opacity 0.16s ease,
         visibility 0.20s ease;
-
 }
 
-
-
-/* الحالة النشطة */
-
 .scope-status.active {
-
     max-height: 34px;
 
     padding-top: 5px;
-
     padding-bottom: 5px;
 
     opacity: 1;
-
     visibility: visible;
-
 }
 
-
-/* =========================================================
-   نص النطاق
-   ========================================================= */
-
 .scope-label {
-
     max-width: 180px;
 
     overflow: hidden;
@@ -4415,26 +3891,16 @@ span {
     color: #666;
 
     font-size: 12px;
-
     font-weight: 500;
 
     line-height: 1;
 
     direction: rtl;
-
     text-align: right;
-
 }
 
-
-/* =========================================================
-   زر إلغاء النطاق
-   ========================================================= */
-
 .scope-clear {
-
     width: 20px;
-
     height: 20px;
 
     flex-shrink: 0;
@@ -4442,7 +3908,6 @@ span {
     display: flex;
 
     align-items: center;
-
     justify-content: center;
 
     padding: 0;
@@ -4456,31 +3921,24 @@ span {
     color: #777;
 
     font-size: 14px;
-
     line-height: 1;
 
     cursor: pointer;
 
     box-sizing: border-box;
-
 }
-
 
 .scope-clear:hover {
-
     background: #f1f1f1;
-
     color: #333;
-
 }
+
 
 /* =========================================================
    MESSAGE BOX
-   مربع الكتابة
    ========================================================= */
 
 .message-box {
-
     position: relative;
 
     width: calc(100% - 4px);
@@ -4488,7 +3946,6 @@ span {
     max-width: none;
 
     min-height: 44px;
-
     max-height: 140px;
 
     display: flex;
@@ -4503,10 +3960,6 @@ span {
 
     direction: rtl;
 
-    /*
-       مساحة كافية للزرين،
-       مع إبقاء أكبر مساحة ممكنة للكتابة.
-    */
     padding: 2px 42px 2px 42px;
 
     margin: 0 2px;
@@ -4522,42 +3975,25 @@ span {
         height 0.15s ease;
 
     overflow: hidden;
-
 }
 
-
-/* =========================================================
-   MESSAGE BOX FOCUS
-   ========================================================= */
-
 .message-box:focus-within {
-
     border-color: #b5b5b5;
 
     box-shadow:
         0 1px 5px rgba(0, 0, 0, 0.08);
-
 }
 
-
-/* =========================================================
-   USER INPUT
-   ========================================================= */
-
 #user-input {
-
     width: 100%;
 
     height: 36px;
-
     min-height: 36px;
-
     max-height: 120px;
 
     resize: none;
 
     border: none;
-
     outline: none;
 
     background: transparent;
@@ -4567,7 +4003,6 @@ span {
     box-sizing: border-box;
 
     font-size: 14px;
-
     line-height: 1.45;
 
     overflow-y: auto;
@@ -4575,24 +4010,18 @@ span {
     direction: rtl;
 
     text-align: right;
-
 }
 
-
 #user-input::placeholder {
-
     color: #999;
-
 }
 
 
 /* =========================================================
    SEND BUTTON
-   زر الإرسال — الجهة اليسرى
    ========================================================= */
 
 #send-btn {
-
     position: absolute;
 
     left: 3px;
@@ -4614,6 +4043,7 @@ span {
     color: #fff;
 
     display: flex;
+
     align-items: center;
     justify-content: center;
 
@@ -4632,40 +4062,40 @@ span {
         transform 0.12s ease;
 }
 
-
-/* عند المرور */
-
 #send-btn:hover {
-
     background: #111;
 
     transform: scale(1.03) !important;
-
 }
 
-
-/* عند الضغط */
-
 #send-btn:active {
-
     background: #000;
 
     transform: scale(0.96) !important;
+}
 
+#send-btn svg {
+    width: 19px;
+    height: 19px;
+
+    display: block;
+
+    fill: none;
+
+    stroke: currentColor;
+
+    stroke-width: 2.5;
+
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 
 /* =========================================================
    SCOPE TOOL
-   أداة نطاق البحث — تبقى في اليمين
    ========================================================= */
 
-/* =====================================
-   أداة نطاق البحث
-   ===================================== */
-
 .input-tools {
-
     position: absolute;
 
     right: 3px;
@@ -4685,30 +4115,21 @@ span {
     z-index: 20;
 
     pointer-events: auto;
+
     visibility: visible;
     opacity: 1;
-
 }
 
-/* =========================================================
-   SCOPE BUTTON
-   زر +
-   ========================================================= */
-
 #scope-btn {
-
     width: 34px;
-
     height: 34px;
 
     margin: 0;
-
     padding: 0;
 
     display: flex;
 
     align-items: center;
-
     justify-content: center;
 
     border: none;
@@ -4718,6 +4139,7 @@ span {
     background: transparent;
 
     color: #555;
+
     font-size: 24px;
     font-weight: 500;
 
@@ -4735,38 +4157,25 @@ span {
         background 0.15s ease,
         color 0.15s ease,
         transform 0.15s ease;
-
 }
-
-
-/* دائرة خفيفة فقط عند الاقتراب */
 
 #scope-btn:hover {
-
     background: #f1f1f1;
-
     color: #111;
-
 }
 
-
-/* الضغط */
-
 #scope-btn:active {
-
     background: #e7e7e7;
 
     transform: scale(0.94);
-
 }
+
 
 /* =========================================================
    SCOPE OPTIONS
-   خيارات نطاق البحث
    ========================================================= */
 
 .scope-panel-content {
-
     display: grid;
 
     grid-template-columns:
@@ -4776,15 +4185,10 @@ span {
 
     padding-top: 10px;
 
+    box-sizing: border-box;
 }
 
-
-/* =========================================================
-   SCOPE OPTION
-   ========================================================= */
-
 .scope-option {
-
     min-height: 58px;
 
     display: flex;
@@ -4808,7 +4212,6 @@ span {
     cursor: pointer;
 
     text-align: right;
-
     direction: rtl;
 
     box-sizing: border-box;
@@ -4817,92 +4220,57 @@ span {
         background 0.15s ease,
         border-color 0.15s ease,
         transform 0.12s ease;
-
 }
 
-
-/* =========================================================
-   عند المرور
-   ========================================================= */
-
 .scope-option:hover {
-
     background: #f7f7f7;
 
     border-color: #cfcfcf;
 
     transform: translateY(-1px);
-
 }
 
-
-/* =========================================================
-   عند الضغط
-   ========================================================= */
-
 .scope-option:active {
-
     background: #eeeeee;
 
     transform: translateY(0);
-
 }
-
-
-/* =========================================================
-   الأيقونة
-   ========================================================= */
 
 .scope-option-icon {
+    width: 20px;
+    height: 20px;
 
-    width: 30px;
-
-    height: 30px;
-
-    flex-shrink: 0;
-
-    display: flex;
+    display: inline-flex;
 
     align-items: center;
-
     justify-content: center;
 
-    border: 1px solid #e5e5e5;
-
-    border-radius: 8px;
-
-    background: #fafafa;
-
-    color: #333333;
-
-    font-size: 16px;
-
-    line-height: 1;
-
+    flex: 0 0 20px;
 }
 
+.scope-option-icon svg {
+    width: 18px;
+    height: 18px;
 
-/* =========================================================
-   النص
-   ========================================================= */
+    min-width: 18px;
+    min-height: 18px;
+
+    display: block;
+}
 
 .scope-option-text {
-
     font-size: 13px;
-
     font-weight: 600;
 
     white-space: nowrap;
-
 }
+
 
 /* =========================================================
    SCOPE MODE OPTIONS
-   الكل / المحدد
    ========================================================= */
 
 .scope-mode-option {
-
     width: 100%;
 
     min-height: 48px;
@@ -4926,7 +4294,6 @@ span {
     color: #222222;
 
     font-size: 13px;
-
     font-weight: 500;
 
     cursor: pointer;
@@ -4941,35 +4308,28 @@ span {
         background 0.15s ease,
         border-color 0.15s ease,
         transform 0.12s ease;
-
 }
 
-
 .scope-mode-option:hover {
-
     background: #f7f7f7;
 
     border-color: #cfcfcf;
 
     transform: translateX(-1px);
-
 }
 
-
 .scope-mode-option:active {
-
     background: #eeeeee;
 
     transform: translateX(0);
-
 }
+
+
 /* =========================================================
    PROJECT SCOPE PICKER
-   اختيار مشروع محدد
    ========================================================= */
 
 .scope-project-item {
-
     width: 100%;
 
     min-height: 48px;
@@ -5004,60 +4364,52 @@ span {
         background 0.15s ease,
         border-color 0.15s ease,
         transform 0.12s ease;
-
 }
 
-
 .scope-project-item:hover {
-
     background: #f7f7f7;
 
     border-color: #cfcfcf;
 
     transform: translateX(-1px);
-
 }
 
-
 .scope-project-item:active {
-
     background: #eeeeee;
 
     transform: translateX(0);
-
 }
-
-
-/* =========================================================
-   أيقونة المشروع
-   ========================================================= */
 
 .scope-project-icon {
     width: 26px;
     height: 26px;
+
     flex-shrink: 0;
+
     display: flex;
+
     align-items: center;
     justify-content: center;
+
     border: 1px solid #e5e5e5;
+
     border-radius: 8px;
+
     background: #fafafa;
+
     color: #333333;
+
     font-size: 14px;
 }
 
 .scope-project-icon svg {
     width: 16px;
     height: 16px;
+
     display: block;
 }
 
-/* =========================================================
-   اسم المشروع
-   ========================================================= */
-
 .scope-project-name {
-
     flex: 1;
 
     min-width: 0;
@@ -5069,18 +4421,10 @@ span {
     white-space: nowrap;
 
     font-size: 13px;
-
     font-weight: 600;
-
 }
 
-
-/* =========================================================
-   لا توجد مشاريع
-   ========================================================= */
-
 .scope-empty {
-
     padding: 18px 10px;
 
     text-align: center;
@@ -5088,25 +4432,17 @@ span {
     color: #777777;
 
     font-size: 13px;
-
 }
 
-/* =========================================================
-   علامة الاختيار
-   ========================================================= */
-
 .scope-mode-mark {
+    width: 18px;
+    height: 18px;
 
-    width: 27px;
+    flex: 0 0 18px;
 
-    height: 27px;
-
-    flex-shrink: 0;
-
-    display: flex;
+    display: inline-flex;
 
     align-items: center;
-
     justify-content: center;
 
     border: 1px solid #dddddd;
@@ -5117,19 +4453,18 @@ span {
 
     color: #333333;
 
-    font-size: 14px;
-
+    font-size: 16px;
 }
 
+.scope-mode-mark svg {
+    width: 16px;
+    height: 16px;
 
-/* =========================================================
-   زر الرجوع
-   ========================================================= */
+    display: block;
+}
 
 .scope-back-btn {
-
     width: 28px;
-
     height: 28px;
 
     margin-left: 7px;
@@ -5151,30 +4486,27 @@ span {
     display: inline-flex;
 
     align-items: center;
-
     justify-content: center;
-
 }
-
 
 .scope-back-btn:hover {
-
     background: #f1f1f1;
-
 }
+
+
 /* =========================================================
    SCOPE PANEL
-   لوحة نطاق البحث
    ========================================================= */
 
 .scope-panel {
-
     position: absolute;
 
     right: 3px;
+
     bottom: calc(100% + 8px);
 
     width: 300px;
+
     max-width: calc(100vw - 24px);
 
     background: #ffffff;
@@ -5193,7 +4525,9 @@ span {
     z-index: 1000;
 
     opacity: 0;
+
     visibility: hidden;
+
     pointer-events: none;
 
     transform:
@@ -5209,13 +4543,7 @@ span {
         visibility 0.16s ease;
 }
 
-
-/* =========================================================
-   لوحة مفتوحة
-   ========================================================= */
-
 .scope-panel.open {
-
     opacity: 1;
 
     visibility: visible;
@@ -5227,13 +4555,7 @@ span {
         scale(1);
 }
 
-
-/* =========================================================
-   رأس اللوحة
-   ========================================================= */
-
 .scope-panel-header {
-
     display: flex;
 
     align-items: center;
@@ -5251,87 +4573,22 @@ span {
         1px solid #eeeeee;
 }
 
-
-/* =========================================================
-   عنوان اللوحة
-   ========================================================= */
-
 .scope-panel-title {
-
     font-size: 13px;
 
     font-weight: 600;
 
     color: #333333;
-
-}
-
-
-/* =========================================================
-   محتوى اللوحة
-   ========================================================= */
-
-.scope-panel-content {
-
-    padding-top: 10px;
-
-    box-sizing: border-box;
-
 }
 
 #scope-panel {
     pointer-events: auto;
 }
-/* =========================================================
-SEND BUTTON HOVER
-========================================================= */
-
-#send-btn:hover {
-
-    background: #111;
-
-    transform:
-        scale(1.03);
-
-}
 
 
 /* =========================================================
-SEND BUTTON ACTIVE
-========================================================= */
-
-#send-btn:active {
-    transform:
-        translateY(-50%)
-        scale(0.94);
-}
-
-
-/* =========================================================
-SEND ICON
-========================================================= */
-
-#send-btn svg {
-    width: 19px;
-    height: 19px;
-
-    display: block;
-
-    fill: none;
-
-    stroke: currentColor;
-
-    stroke-width: 2.5;
-
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-
-/* =========================================================
-18-A
-عند تثبيت الشريط الجانبي
-========================================================= */
+   SIDEBAR PINNED
+   ========================================================= */
 
 body.sidebar-is-pinned .input-area {
     width: 100%;
@@ -5342,9 +4599,8 @@ body.sidebar-is-pinned .message-box {
 }
 
 
-
 /* =========================================================
-   19. CHAT ICONS
+   CHAT ICONS
    ========================================================= */
 
 .new-chat-icon,
@@ -5356,7 +4612,7 @@ body.sidebar-is-pinned .message-box {
 
 
 /* =========================================================
-   20. GLOBAL SCROLLBAR
+   16. GLOBAL SCROLLBAR
    ========================================================= */
 
 ::-webkit-scrollbar {
@@ -5379,7 +4635,7 @@ body.sidebar-is-pinned .message-box {
 
 
 /* =========================================================
-   21. AI SETTINGS WINDOW
+   17. SETTINGS WINDOW
    ========================================================= */
 
 #settings-window {
@@ -5410,6 +4666,7 @@ body.sidebar-is-pinned .message-box {
     z-index: 10000;
 
     opacity: 0;
+
     visibility: hidden;
 
     pointer-events: none;
@@ -5462,25 +4719,24 @@ body.sidebar-is-pinned .message-box {
 
     white-space: nowrap;
 }
-/* =========================================================
-   أيقونة الإعدادات داخل رأس نافذة الإعدادات
-   ========================================================= */
 
 #settings-header > span > svg {
     width: 16px !important;
     height: 16px !important;
 
     display: block !important;
+
     flex-shrink: 0;
 
     fill: none !important;
+
     stroke: #000000 !important;
 
     stroke-width: 1 !important;
+
     stroke-linecap: round !important;
     stroke-linejoin: round !important;
 }
-
 
 #close-settings {
     width: 32px;
@@ -5495,6 +4751,7 @@ body.sidebar-is-pinned .message-box {
     color: var(--muted-text, #6b7280);
 
     font-size: 23px;
+
     line-height: 1;
 
     cursor: pointer;
@@ -5521,6 +4778,7 @@ body.sidebar-is-pinned .message-box {
     margin: 17px 20px 7px;
 
     font-size: 13px;
+
     font-weight: 600;
 
     color: var(--text-color, #30343b);
@@ -5610,6 +4868,7 @@ body.sidebar-is-pinned .message-box {
     height: 100%;
 
     border: none;
+
     outline: none;
 
     background: transparent;
@@ -5621,6 +4880,7 @@ body.sidebar-is-pinned .message-box {
     font-size: 13px;
 
     direction: ltr;
+
     text-align: left;
 }
 
@@ -5855,7 +5115,7 @@ body.sidebar-is-pinned .message-box {
 
 
 /* =========================================================
-   22. DARK MODE - SETTINGS
+   DARK MODE SETTINGS
    ========================================================= */
 
 body.dark #settings-window,
@@ -5928,85 +5188,11 @@ body.dark #save-settings,
 
 
 /* =========================================================
-   23. SAFETY FOR POPUPS NEAR BOTTOM
-   ========================================================= */
-
-.projects-popup,
-.chat-popup {
-    overflow: visible;
-}
-
-.rename-dialog {
-    max-height: calc(100vh - 30px);
-
-    overflow-y: auto;
-}
-
-
-/* =========================================================
-   24. POPUP OPEN-UP BEHAVIOR
-   ========================================================= */
-
-.project-options-menu.open-up,
-.chat-options-menu.open-up {
-    top: auto;
-
-    bottom: 5px;
-}
-
-
-/* =========================================================
-   25. POPUP FONT UNIFICATION
-   ========================================================= */
-
-.projects-popup,
-.chat-popup,
-.search-popup {
-    font-family: "Segoe UI", Arial, sans-serif;
-}
-
-.projects-popup .popup-title,
-.chat-popup .popup-title,
-.search-popup .popup-title {
-    font-size: 14px;
-    font-weight: 700;
-}
-
-.projects-popup .popup-item,
-.chat-popup .popup-item,
-.search-popup .popup-item {
-    font-size: 13px;
-    font-weight: 400;
-}
-
-
-
-
-
-
-
-/* =========================================================
-   الحفاظ على زر الإرسال داخل المساحة المتاحة
-   ========================================================= */
-
-body.sidebar-is-pinned .input-area {
-    width: 100%;
-}
-
-body.sidebar-is-pinned .message-box {
-    width: calc(100% - 4px);
-}
-
-
-
-
-
-/* =========================================================
-   DOCUMENT CREATE BOX
+   18. DOCUMENT CREATE BOX
    ========================================================= */
 
 .document-create-box {
-    position: fixed;
+    position: fixed !important;
 
     width: 240px;
 
@@ -6024,6 +5210,10 @@ body.sidebar-is-pinned .message-box {
     box-sizing: border-box;
 
     direction: rtl;
+
+    z-index: 9999999 !important;
+
+    pointer-events: auto !important;
 }
 
 .document-create-box input {
@@ -6063,12 +5253,18 @@ body.sidebar-is-pinned .message-box {
     gap: 6px;
 
     margin-top: 9px;
+
+    position: relative !important;
+
+    z-index: 10000000 !important;
+
+    pointer-events: auto !important;
 }
 
 .document-create-box button {
-    position: relative;
+    position: relative !important;
 
-    z-index: 2;
+    z-index: 10000001 !important;
 
     pointer-events: auto;
 
@@ -6085,13 +5281,11 @@ body.sidebar-is-pinned .message-box {
 
 .document-create-box .save-document {
     background: #222222;
-
     color: #ffffff;
 }
 
 .document-create-box .cancel-document {
     background: #eeeeee;
-
     color: #333333;
 }
 
@@ -6099,24 +5293,6 @@ body.sidebar-is-pinned .message-box {
     opacity: 0.9;
 }
 
-.document-create-box {
-    position: fixed !important;
-    z-index: 9999999 !important;
-    pointer-events: auto !important;
-}
-
-.document-create-box .document-create-buttons {
-    position: relative !important;
-    z-index: 10000000 !important;
-    pointer-events: auto !important;
-}
-
-.document-create-box .save-document,
-.document-create-box .cancel-document {
-    position: relative !important;
-    z-index: 10000001 !important;
-    pointer-events: auto !important;
-}
 
 /* =========================================================
    DOCUMENTS LIST
@@ -6124,6 +5300,7 @@ body.sidebar-is-pinned .message-box {
 
 .documents-list {
     width: 100%;
+
     box-sizing: border-box;
 }
 
@@ -6131,6 +5308,7 @@ body.sidebar-is-pinned .message-box {
     position: relative;
 
     display: flex;
+
     align-items: center;
     justify-content: space-between;
 
@@ -6139,6 +5317,7 @@ body.sidebar-is-pinned .message-box {
     min-height: 36px;
 
     padding: 7px 10px;
+
     margin: 2px 0;
 
     border-radius: 7px;
@@ -6154,17 +5333,26 @@ body.sidebar-is-pinned .message-box {
 
 .document-item:hover {
     background: #f3f3f3;
+
     color: #111;
 }
 
 .document-title {
     min-width: 0;
+
     flex: 1;
 
     overflow: hidden;
 
     white-space: nowrap;
+
     text-overflow: ellipsis;
+
+    cursor: pointer;
+}
+
+.document-title:hover {
+    text-decoration: underline;
 }
 
 .document-menu {
@@ -6188,12 +5376,40 @@ body.sidebar-is-pinned .message-box {
 
 .document-menu:hover {
     background: #eaeaea;
+
     color: #111;
+}
+
+.document-item.active-document {
+    background: #eeeeee !important;
+
+    color: #111111 !important;
+
+    border: 1px solid #d8d8d8;
+
+    box-shadow:
+        inset 3px 0 0 #222222;
+}
+
+.document-read-status {
+    flex-shrink: 0;
+
+    margin-right: 8px;
+
+    font-size: 10px;
+
+    color: #888;
+
+    white-space: nowrap;
+
+    direction: rtl;
+
+    opacity: 0.85;
 }
 
 
 /* =========================================================
-   DOCUMENT OPTIONS MENU
+   DOCUMENT OPTIONS
    ========================================================= */
 
 .document-options-menu {
@@ -6240,18 +5456,15 @@ body.sidebar-is-pinned .message-box {
 
 .document-options-menu div:hover {
     background: #f3f3f3;
+
     color: #111;
 }
-
-
-/* =========================================================
-   DOCUMENT RENAME INPUT
-   ========================================================= */
 
 .edit-document-title {
     flex: 1;
 
     width: 100%;
+
     min-width: 0;
 
     height: 32px;
@@ -6267,6 +5480,7 @@ body.sidebar-is-pinned .message-box {
     font-size: 13px;
 
     direction: rtl;
+
     text-align: right;
 
     box-sizing: border-box;
@@ -6278,6 +5492,8 @@ body.sidebar-is-pinned .message-box {
     box-shadow:
         0 0 0 2px rgba(0, 0, 0, 0.05);
 }
+
+
 /* =========================================================
    ADD DOCUMENT BUTTON
    ========================================================= */
@@ -6286,7 +5502,6 @@ body.sidebar-is-pinned .message-box {
     display: flex;
 
     align-items: center;
-
     justify-content: center;
 
     width: calc(100% - 10px);
@@ -6326,6 +5541,7 @@ body.sidebar-is-pinned .message-box {
     text-align: right;
 }
 
+
 /* =========================================================
    DOCUMENT DELETE CONFIRMATION
    ========================================================= */
@@ -6352,6 +5568,7 @@ body.sidebar-is-pinned .message-box {
 
 .document-delete-dialog {
     width: 300px;
+
     max-width: calc(100% - 30px);
 
     padding: 20px;
@@ -6438,65 +5655,29 @@ body.sidebar-is-pinned .message-box {
     background: #e2e2e2;
 }
 
-.document-title {
-    cursor: pointer;
-}
-
-.document-title:hover {
-    text-decoration: underline;
-}
-
-.document-item.active-document {
-    background: #eeeeee !important;
-    color: #111111 !important;
-
-    border: 1px solid #d8d8d8;
-
-    box-shadow:
-        inset 3px 0 0 #222222;
-}
 
 /* =========================================================
-   DOCUMENT READ STATUS
+   COLLAPSIBLE REFERENCE RESULTS
    ========================================================= */
-
-.document-read-status {
-    flex-shrink: 0;
-
-    margin-right: 8px;
-
-    font-size: 10px;
-
-    color: #888;
-
-    white-space: nowrap;
-
-    direction: rtl;
-
-    opacity: 0.85;
-}
-
-/* =====================================================
-   نتائج المراجع والحواشي القابلة للطي
-   ===================================================== */
 
 .reference-result-container {
     width: 100%;
+
     margin-top: 8px;
 }
 
-
-/* شريط عنوان النتيجة القابل للطي */
-
 .reference-collapsible-header {
     display: flex;
+
     align-items: center;
     justify-content: space-between;
 
     width: 100%;
+
     box-sizing: border-box;
 
     cursor: pointer;
+
     user-select: none;
 
     transition:
@@ -6505,8 +5686,9 @@ body.sidebar-is-pinned .message-box {
         border-color 180ms ease;
 }
 
-
-/* السهم */
+.reference-collapsible-header:hover {
+    opacity: 0.86;
+}
 
 .reference-collapsible-arrow {
     display: inline-flex;
@@ -6531,720 +5713,254 @@ body.sidebar-is-pinned .message-box {
         opacity 180ms ease;
 }
 
-
-/* عند مرور المؤشر */
-
-.reference-collapsible-header:hover {
-    opacity: 0.86;
-}
-
-
-/* المحتوى */
-
 .reference-collapsible-content {
     overflow: hidden;
 }
-
-
-/* المحتوى المطوي */
 
 .reference-collapsible-content.is-collapsed {
     display: none;
 }
 
-
-/* -----------------------------------------------------
-   نتيجة تحليل المراجع
-   ----------------------------------------------------- */
-
-.references-analysis-result
-.reference-collapsible-header {
-
+.references-analysis-result .reference-collapsible-header,
+.references-comparison-result .reference-collapsible-header,
+.bibliography-build-result .reference-collapsible-header,
+.footnote-suggestions-result .reference-collapsible-header {
     border-radius: 8px;
 
     padding: 10px 12px;
 }
-
-
-/* -----------------------------------------------------
-   نتيجة المقارنة
-   ----------------------------------------------------- */
-
-.references-comparison-result
-.reference-collapsible-header {
-
-    border-radius: 8px;
-
-    padding: 10px 12px;
-}
-
-
-/* -----------------------------------------------------
-   نتيجة إنشاء / تحديث القائمة
-   ----------------------------------------------------- */
-
-.bibliography-build-result
-.reference-collapsible-header {
-
-    border-radius: 8px;
-
-    padding: 10px 12px;
-}
-
-
-/* -----------------------------------------------------
-   توثيق الحواشي
-   ----------------------------------------------------- */
-
-.footnote-suggestions-result
-.reference-collapsible-header {
-
-    border-radius: 8px;
-
-    padding: 10px 12px;
-}
-
-
-/* -----------------------------------------------------
-   مسافة منظمة بين الأقسام
-   ----------------------------------------------------- */
 
 .references-analysis-result,
 .references-comparison-result,
 .bibliography-build-result,
 .footnote-suggestions-result {
-
     margin-top: 8px;
 }
 
-
-/* -----------------------------------------------------
-   تحسين السهم في RTL
-   ----------------------------------------------------- */
-
 [dir="rtl"] .reference-collapsible-arrow {
-
     margin-inline-start: 0;
+
     margin-inline-end: 8px;
-
 }
 
 
-/* -----------------------------------------------------
-   تقليل الحركة لمن يفضل ذلك
-   ----------------------------------------------------- */
-
-@media (prefers-reduced-motion: reduce) {
-
-    .reference-collapsible-header,
-    .reference-collapsible-arrow {
-
-        transition: none;
-
-    }
-
-}
-
-.reference-author-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-}
-
-.reference-author-toggle-text {
-    white-space: nowrap;
-}
-
-/* =====================================================
-   مستندات المشروع - مساحة المراجع
-   ===================================================== */
-
-.project-reference-documents-box {
-    margin-top: 10px;
-    padding: 10px;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    background: #fafafa;
-}
-.references-selected-source {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    box-sizing: border-box;
-    gap: 10px;
-}
-
-.references-selected-icon {
-    width: 34px;
-    height: 34px;
-    min-width: 34px;
-    flex: 0 0 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: visible;
-    box-sizing: border-box;
-}
-
-.references-selected-icon svg {
-    width: 20px;
-    height: 20px;
-    display: block;
-}
-
-.references-selected-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.references-selected-title {
-    font-size: 13px;
-}
-
-.references-selected-name {
-    font-size: 11px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.project-reference-documents-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.project-reference-documents-actions button {
-    border: 1px solid #d9dde3;
-    background: #ffffff;
-    color: #333333;
-    border-radius: 7px;
-    padding: 6px 10px;
-    font-size: 10px;
-    cursor: pointer;
-}
-
-.project-reference-documents-actions button:hover {
-    background: #f3f4f6;
-}
-
-.project-reference-documents-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.project-reference-document-item {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    min-height: 38px;
-    padding: 7px 9px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: #ffffff;
-    cursor: pointer;
-    transition: background-color 0.15s ease,
-                border-color 0.15s ease;
-}
-
-.project-reference-document-item:hover {
-    background: #f7f8fa;
-    border-color: #e1e5ea;
-}
-
-.project-reference-document-checkbox {
-    width: 16px;
-    height: 16px;
-    margin: 0;
-    flex: 0 0 auto;
-    cursor: pointer;
-}
-
-.project-reference-document-name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 11px;
-    line-height: 1.5;
-    color: #222222;
-}
-
-.references-source-icon svg {
-    width: 20px;
-    height: 20px;
-    display: block;
-    flex: 0 0 20px;
-}
-
-.references-selected-source .references-selected-info {
-    min-width: 0 !important;
-    flex: 1 1 auto !important;
-}
-
-.references-selected-source .references-selected-title {
-    font-size: 13px !important;
-    white-space: nowrap !important;
-}
-
-.references-selected-source .references-selected-name {
-    font-size: 11px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-}
-
-/* =====================================================
-   مراجع المشروع
-   ===================================================== */
-
-.project-reference-list {
-
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 4px;
-
-    margin-top: 6px;
-
-}
-
-
-.project-reference-item {
-
-    display: flex;
-
-    align-items: flex-start;
-
-    gap: 8px;
-
-    padding: 7px 8px;
-
-    border: 1px solid transparent;
-
-    border-radius: 8px;
-
-    background: #ffffff;
-
-    transition:
-        background-color 0.15s ease,
-        border-color 0.15s ease;
-
-}
-
-
-.project-reference-item:hover {
-
-    background: #f7f8fa;
-
-    border-color: #e5e7eb;
-
-}
-
-
-.project-reference-index {
-
-    flex: 0 0 24px;
-
-    font-size: 10px;
-
-    line-height: 1.5;
-
-    color: #9aa1aa;
-
-    text-align: center;
-
-    padding-top: 1px;
-
-}
-
-
-.project-reference-content {
-
-    flex: 1;
-
-    min-width: 0;
-
-}
-
-
-.project-reference-heading {
-
-    margin-bottom: 1px;
-
-}
-
-
-.project-reference-author {
-
-    font-size: 11px;
-
-    line-height: 1.4;
-
-    color: #7a8088;
-
-}
-
-
-.project-reference-title {
-
-    font-size: 12px;
-
-    line-height: 1.5;
-
-    color: #222222;
-
-    font-weight: 500;
-
-    overflow: hidden;
-
-    text-overflow: ellipsis;
-
-    white-space: nowrap;
-
-}
-
-
-.project-reference-meta {
-
-    margin-top: 2px;
-
-    font-size: 10px;
-
-    line-height: 1.4;
-
-    color: #9298a1;
-
-}
-
-
-.project-reference-meta strong {
-
-    font-weight: 600;
-
-    color: #666c75;
-
-}
-
-.project-references-toolbar {
-
-    display: flex;
-
-    flex-direction: column;
-
-    align-items: stretch;
-
-    gap: 7px;
-
-    margin-bottom: 8px;
-
-}
-
-
-.project-references-count {
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    font-size: 12px;
-
-    line-height: 1.5;
-
-    color: #555b63;
-
-}
-
-
-.project-references-count strong {
-
-    margin-inline-start: 5px;
-
-    color: #222222;
-
-    font-weight: 600;
-
-}
-
-
-.project-references-transfer-btn {
-
-    width: 100%;
-
-    border: 1px solid #000000;
-
-    background: #000000;
-
-    color: #ffffff;
-
-    border-radius: 7px;
-
-    padding: 7px 10px;
-
-    font-size: 11px;
-
-    line-height: 1.4;
-
-    cursor: pointer;
-
-    transition:
-        background-color 0.15s ease,
-        opacity 0.15s ease;
-
-}
-
-
-.project-references-transfer-btn:hover {
-
-    background: #222222;
-
-}
-
-
-.project-references-transfer-btn:disabled {
-
-    opacity: .6;
-
-    cursor: default;
-
-}
 /* =========================================================
-   نتائج بحث المكتبة
+   LIBRARY SEARCH RESULTS
    ========================================================= */
 
 .library-results {
     display: flex;
     flex-direction: column;
+
     gap: 12px;
+
     margin-top: 8px;
+
     direction: rtl;
 }
 
-
 .library-result-card {
     border: 1px solid #e1e5ea;
+
     border-radius: 12px;
+
     background: #fff;
+
     padding: 14px 16px;
+
     box-sizing: border-box;
+
     transition:
         box-shadow 0.18s ease,
         border-color 0.18s ease;
 }
 
-
 .library-result-card:hover {
     border-color: #c9ced6;
+
     box-shadow:
         0 3px 12px rgba(0, 0, 0, 0.06);
 }
 
-
 .library-result-header {
     display: flex;
+
     align-items: flex-start;
+
     gap: 10px;
 }
 
-
 .library-result-number {
     flex: 0 0 auto;
+
     width: 26px;
     height: 26px;
+
     border-radius: 50%;
+
     display: inline-flex;
+
     align-items: center;
     justify-content: center;
+
     background: #f0f2f5;
+
     color: #555;
+
     font-size: 13px;
     font-weight: 600;
 }
 
-
 .library-result-title-area {
     min-width: 0;
+
     flex: 1;
 }
 
-
 .library-result-title {
     font-size: 15px;
+
     line-height: 1.6;
+
     font-weight: 700;
+
     color: #202124;
 }
 
-
 .library-result-author {
     margin-top: 2px;
+
     font-size: 13px;
+
     line-height: 1.6;
+
     color: #6b7280;
 }
 
-
 .library-result-meta {
     display: flex;
+
     flex-wrap: wrap;
+
     gap: 8px;
+
     margin-top: 8px;
+
     font-size: 12px;
+
     color: #777;
 }
 
-
 .library-result-meta span {
     padding: 3px 8px;
+
     border-radius: 6px;
+
     background: #f6f7f8;
 }
 
-
 .library-result-text {
     margin-top: 12px;
+
     padding-top: 11px;
+
     border-top: 1px solid #eef0f2;
+
     font-size: 13.5px;
+
     line-height: 2;
+
     color: #333;
+
     white-space: normal;
 }
 
-
 .library-result-actions {
     display: flex;
+
     gap: 8px;
+
     margin-top: 12px;
 }
-
 
 .library-open-btn,
 .library-copy-btn {
     appearance: none;
+
     border: 1px solid #d9dde3;
+
     background: #fff;
+
     border-radius: 7px;
+
     padding: 6px 12px;
+
     font-family: inherit;
+
     font-size: 12px;
+
     cursor: pointer;
+
     transition:
         background 0.15s ease,
         border-color 0.15s ease;
 }
 
-
 .library-open-btn:hover,
 .library-copy-btn:hover {
     background: #f6f7f8;
+
     border-color: #c5cad1;
 }
 
-
 .library-empty {
     padding: 16px;
+
     border: 1px solid #e5e7eb;
+
     border-radius: 10px;
+
     color: #666;
+
     text-align: center;
+
     font-size: 13px;
 }
 
-.scope-option-icon {
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 20px;
-}
 
-.scope-option-icon svg {
-    width: 18px;
-    height: 18px;
-    display: block;
-}
+/* =========================================================
+   SMART SEARCH ACTIVITY
+   ========================================================= */
 
-.project-resource-header > span:first-child {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.project-resource-header > span:first-child svg {
-    width: 17px;
-    height: 17px;
-    flex: 0 0 17px;
-}
-.scope-mode-mark {
-    width: 18px;
-    height: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 18px;
-    font-size: 16px;
-}
-
-.scope-mode-mark svg {
-    width: 16px;
-    height: 16px;
-    display: block;
-}
-
-.scope-option-icon {
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 20px;
-}
-
-.scope-option-icon svg {
-    width: 18px;
-    height: 18px;
-    min-width: 18px;
-    min-height: 18px;
-    display: block;
-}
 .smart-search-activity {
     width: auto !important;
+
     max-width: none !important;
 
     margin: 4px 0 10px 0 !important;
+
     padding: 0 !important;
 
     background: transparent !important;
+
     border: none !important;
+
     box-shadow: none !important;
 
     color: #999 !important;
 
     font-size: 12px !important;
+
     font-weight: 400 !important;
 
     line-height: 1.8 !important;
 
     direction: rtl;
+
     text-align: right;
 
     overflow: visible !important;
 }
-
-
-/* =====================================================
-   سطر نشاط البحث الذكي
-   ===================================================== */
 
 .smart-search-activity-line {
     display: flex;
@@ -7266,21 +5982,11 @@ body.sidebar-is-pinned .message-box {
         transform 0.8s ease;
 }
 
-
-/* =====================================================
-   الظهور
-   ===================================================== */
-
 .smart-search-activity-line.visible {
     opacity: 0.88;
 
     transform: translateY(0);
 }
-
-
-/* =====================================================
-   الاختفاء
-   ===================================================== */
 
 .smart-search-activity-line.fade-out {
     opacity: 0;
@@ -7291,11 +5997,6 @@ body.sidebar-is-pinned .message-box {
         opacity 0.8s ease,
         transform 0.8s ease;
 }
-
-
-/* =====================================================
-   النقطة
-   ===================================================== */
 
 .smart-search-activity-dot {
     display: inline-flex;
@@ -7318,11 +6019,6 @@ body.sidebar-is-pinned .message-box {
         smartSearchPulse 1.8s ease-in-out infinite;
 }
 
-
-/* =====================================================
-   النص
-   ===================================================== */
-
 .smart-search-activity-text {
     color: #6f6f6f;
 
@@ -7337,13 +6033,7 @@ body.sidebar-is-pinned .message-box {
     white-space: nowrap;
 }
 
-
-/* =====================================================
-   نبض النقطة
-   ===================================================== */
-
 @keyframes smartSearchPulse {
-
     0%,
     100% {
         opacity: 0.45;
@@ -7356,193 +6046,356 @@ body.sidebar-is-pinned .message-box {
 
         transform: scale(1.08);
     }
-
 }
 
-.recent-chat-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 6px 8px;
+
+/* =========================================================
+   SAFETY FOR POPUPS NEAR BOTTOM
+   ========================================================= */
+
+.projects-popup,
+.chat-popup {
+    overflow: visible;
 }
 
-.recent-chat-select-all {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    cursor: pointer;
-}
+.rename-dialog {
+    max-height: calc(100vh - 30px);
 
-.recent-chat-delete-selected {
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.recent-chat-delete-selected:disabled {
-    opacity: 0.45;
-    cursor: default;
-}
-
-.recent-chat-item {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 6px;
-}
-
-.recent-chat-checkbox-wrap {
-    display: flex;
-    align-items: center;
-}
-
-.recent-chat-title-btn {
-    flex: 1;
-    min-width: 0;
-    border: none;
-    background: transparent;
-    text-align: right;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    overflow: hidden;
-}
-
-.recent-chat-title-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.recent-chat-menu-btn {
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    font-size: 18px;
-    line-height: 1;
-    padding: 2px 5px;
-}
-
-.recent-chat-menu {
-    display: none;
-    position: absolute;
-    left: 8px;
-    top: 34px;
-    z-index: 1000;
-    min-width: 120px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,.15);
-}
-
-.recent-chat-menu.open {
-    display: block;
-}
-
-.recent-chat-menu button {
-    width: 100%;
-    border: none;
-    background: transparent;
-    padding: 8px 10px;
-    text-align: right;
-    cursor: pointer;
-}
-
-.recent-chat-menu button:hover {
-    background: #f3f3f3;
-}
-
-#recent-chat-list {
-    max-height: 420px;
     overflow-y: auto;
-    overflow-x: hidden;
 }
 
-.recent-chat-toolbar {
+
+/* =========================================================
+   POPUP OPEN-UP BEHAVIOR
+   ========================================================= */
+
+.project-options-menu.open-up,
+.chat-options-menu.open-up {
+    top: auto;
+
+    bottom: 5px;
+}
+
+
+/* =========================================================
+   PROJECT REFERENCES
+   ========================================================= */
+
+.project-reference-documents-box {
+    margin-top: 10px;
+
+    padding: 10px;
+
+    border: 1px solid #e5e7eb;
+
+    border-radius: 10px;
+
+    background: #fafafa;
+}
+
+.project-reference-documents-actions {
     display: flex;
+
     align-items: center;
-    justify-content: space-between;
+
     gap: 8px;
-    padding: 8px;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: inherit;
+
+    margin-bottom: 10px;
 }
 
-.recent-chat-select-all {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
+.project-reference-documents-actions button {
+    border: 1px solid #d9dde3;
+
+    background: #ffffff;
+
+    color: #333333;
+
+    border-radius: 7px;
+
+    padding: 6px 10px;
+
+    font-size: 10px;
+
     cursor: pointer;
 }
 
-.recent-chat-delete-selected {
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    font-size: 12px;
+.project-reference-documents-actions button:hover {
+    background: #f3f4f6;
 }
 
-.recent-chat-delete-selected:disabled {
-    opacity: .45;
-    cursor: default;
-}
-
-.recent-chat-item {
+.project-reference-documents-list {
     display: flex;
-    align-items: center;
+
+    flex-direction: column;
+
     gap: 6px;
-    padding: 6px 8px;
 }
 
-.recent-chat-checkbox {
+.project-reference-document-item {
+    display: flex;
+
+    align-items: center;
+
+    gap: 9px;
+
+    min-height: 38px;
+
+    padding: 7px 9px;
+
+    border: 1px solid transparent;
+
+    border-radius: 8px;
+
+    background: #ffffff;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.project-reference-document-item:hover {
+    background: #f7f8fa;
+
+    border-color: #e1e5ea;
+}
+
+.project-reference-document-checkbox {
+    width: 16px;
+    height: 16px;
+
+    margin: 0;
+
     flex: 0 0 auto;
+
     cursor: pointer;
 }
 
-.recent-chat-title-btn {
+.project-reference-document-name {
     flex: 1;
+
     min-width: 0;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    text-align: right;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+
     overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-size: 11px;
+
+    line-height: 1.5;
+
+    color: #222222;
 }
 
-.recent-chat-title-text {
+.project-reference-list {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+    margin-top: 6px;
+}
+
+.project-reference-item {
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 8px;
+
+    padding: 7px 8px;
+
+    border: 1px solid transparent;
+
+    border-radius: 8px;
+
+    background: #ffffff;
+
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.project-reference-item:hover {
+    background: #f7f8fa;
+
+    border-color: #e5e7eb;
+}
+
+.project-reference-index {
+    flex: 0 0 24px;
+
+    font-size: 10px;
+
+    line-height: 1.5;
+
+    color: #9aa1aa;
+
+    text-align: center;
+
+    padding-top: 1px;
+}
+
+.project-reference-content {
+    flex: 1;
+
+    min-width: 0;
+}
+
+.project-reference-heading {
+    margin-bottom: 1px;
+}
+
+.project-reference-author {
+    font-size: 11px;
+
+    line-height: 1.4;
+
+    color: #7a8088;
+}
+
+.project-reference-title {
+    font-size: 12px;
+
+    line-height: 1.5;
+
+    color: #222222;
+
+    font-weight: 500;
+
     overflow: hidden;
+
     text-overflow: ellipsis;
+
     white-space: nowrap;
 }
 
-.recent-chat-action-btn {
-    flex: 0 0 auto;
-    border: none;
-    background: transparent;
+.project-reference-meta {
+    margin-top: 2px;
+
+    font-size: 10px;
+
+    line-height: 1.4;
+
+    color: #9298a1;
+}
+
+.project-reference-meta strong {
+    font-weight: 600;
+
+    color: #666c75;
+}
+
+.project-references-toolbar {
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: stretch;
+
+    gap: 7px;
+
+    margin-bottom: 8px;
+}
+
+.project-references-count {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    font-size: 12px;
+
+    line-height: 1.5;
+
+    color: #555b63;
+}
+
+.project-references-count strong {
+    margin-inline-start: 5px;
+
+    color: #222222;
+
+    font-weight: 600;
+}
+
+.project-references-transfer-btn {
+    width: 100%;
+
+    border: 1px solid #000000;
+
+    background: #000000;
+
+    color: #ffffff;
+
+    border-radius: 7px;
+
+    padding: 7px 10px;
+
+    font-size: 11px;
+
+    line-height: 1.4;
+
     cursor: pointer;
-    padding: 4px 6px;
-    opacity: .7;
+
+    transition:
+        background-color 0.15s ease,
+        opacity 0.15s ease;
 }
 
-.recent-chat-action-btn:hover {
-    opacity: 1;
+.project-references-transfer-btn:hover {
+    background: #222222;
 }
 
-.recent-chat-delete-btn {
-    color: #b00020;
+.project-references-transfer-btn:disabled {
+    opacity: .6;
+
+    cursor: default;
 }
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 600px) {
+
+    .references-comparison-summary,
+    .references-analysis-info {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-reference-row {
+        gap: 6px;
+    }
+
+    .ai-reference-main {
+        font-size: 12px;
+    }
+
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .reference-collapsible-header,
+    .reference-collapsible-arrow,
+    .smart-search-activity-line {
+        transition: none;
+    }
+
+}
+
+
 /* =========================================================
    END
    ========================================================= */
