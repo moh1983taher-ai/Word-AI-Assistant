@@ -20948,6 +20948,7 @@ function formatLibraryResults(
 
 
 
+
 // =====================================================
 // Render Chat
 // عرض المحادثة
@@ -33538,6 +33539,53 @@ function rebuildLibraryResponseFromResults(
 
 }
 
+async function getShamelaRealLocation(
+    bookId,
+    pageId
+) {
+
+    const response =
+        await fetch(
+            `${LIBRARY_API}/shamela-page-info` +
+            `?bookId=${encodeURIComponent(bookId)}` +
+            `&pageId=${encodeURIComponent(pageId)}`
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        return {
+
+            page:
+                "",
+
+            part:
+                ""
+
+        };
+
+    }
+
+
+    const data =
+        await response.json();
+
+
+    return {
+
+        page:
+            data?.page ||
+            "",
+
+        part:
+            data?.part ||
+            ""
+
+    };
+
+}
 
 // =====================================================
 // الدالة البديلة searchLibrary
