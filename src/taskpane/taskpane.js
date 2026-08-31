@@ -33104,260 +33104,216 @@ async function rankLibraryResultsWithAI(
     results
 ) {
 
-    const candidates =
-        prepareLibraryAICandidates(
-            results
-        );
-
-
     if (
-        !candidates.length
+        !Array.isArray(results) ||
+        !results.length
     ) {
 
         return [];
 
     }
 
+    const prompt = `
+أنت محرر نتائج بحث أكاديمي.
 
-    const candidateData =
-        candidates.map(
+مهمتك الوحيدة:
+ترتيب النتائج التالية من الأكثر صلة بموضوع البحث إلى الأقل صلة.
+
+موضوع البحث:
+"${query}"
+
+قواعد الترتيب:
+1. قرب عنوان الكتاب أو عنوان الموضع من موضوع البحث.
+2. مدى تناول النص للمفهوم أو القضية المطلوبة.
+3. المطابقة بين أهم عناصر السؤال، لا مجرد وجود كلمات منفردة.
+4. إذا كانت النتيجة مرتبطة بالموضوع ارتباطًا علميًا واضحًا فهي أقوى من نتيجة تحتوي كلمات متفرقة فقط.
+5. لا تُسقط أي نتيجة.
+6. لا تضف نتائج من عندك.
+7. لا تغيّر نص النتائج.
+8. لا تعتمد على score الرقمي القادم من المكتبات.
+9. أعد جميع النتائج بنفس العدد الذي استلمته.
+10. الأولوية للصلة العلمية بالموضوع، ثم المطابقة النصية، ثم قرب العنوان.
+
+أعد JSON فقط بهذا الشكل:
+[
+  {"index": 0, "rank": 1},
+  {"index": 1, "rank": 2}
+]
+
+ويجب أن يحتوي الناتج على جميع الفهارس دون استثناء.
+`;
+
+    const inputResults =
+        results.map(
             function (
-                item
+                result,
+                index
             ) {
 
                 return {
 
-                    id:
-                        item.id,
-
-                    source:
-                        item.ai.source,
+                    index,
 
                     title:
-                        item.ai.title,
+                        result?.title || "",
 
                     sectionTitle:
-                        item.ai.sectionTitle,
+                        result?.sectionTitle || "",
 
                     text:
-                        item.ai.text
+                        String(
+                            result?.text || ""
+                        ).substring(
+                            0,
+                            2500
+                        ),
+
+                    source:
+                        result?.source || ""
 
                 };
 
             }
         );
 
-
-    const systemPrompt = [
-        "أنت محكّم نتائج بحث أكاديمي عربي.",
-        "لا تبحث عن مصادر جديدة ولا تخترع نتائج.",
-        "قيّم فقط النتائج المعطاة لك.",
-        "المطلوب ترتيبها بحسب صلتها الفعلية بطلب الباحث.",
-        "أعط وزنًا واضحًا لقرب عنوان الكتاب من الموضوع، وقرب عنوان الموضع، والمطابقة الحرفية، والمطابقة المفاهيمية، ووضوح علاقة النص بالموضوع.",
-        "يمكن قبول نتيجة مهمة مفهوميًا حتى لو لم تطابق ألفاظ السؤال.",
-        "وفي المقابل لا ترفع نتيجة لمجرد وجود كلمة واحدة مشتركة.",
-        "أعط درجة صلة من 0 إلى 100.",
-        "أعد JSON فقط بالشكل:",
-        "[{\"id\":\"C1\",\"score\":95},{\"id\":\"C2\",\"score\":81}]",
-        "رتب من الأعلى إلى الأدنى.",
-        "لا تضف شرحًا ولا معرفات غير موجودة."
-    ].join(
-        "\n"
-    );
-
-
-    const userPrompt = [
-
-        "سؤال الباحث:",
-
-        query,
-
-        "",
-
-        "النتائج:",
-
-        JSON.stringify(
-            candidateData,
-            null,
-            2
-        )
-
-    ].join(
-        "\n"
-    );
-
-
     const answer =
-        await callLibraryAI(
-            systemPrompt,
-            userPrompt,
-            {
-                temperature:
-                    0.1,
-
-                maxTokens:
-                    Math.min(
-                        1800,
-                        200 +
-                        candidates.length *
-                        25
-                    )
-            }
+        await askAIForLibraryRanking(
+            prompt,
+            inputResults
         );
 
+    let rankingData;
 
-    const parsed =
-        parseLibraryAIJSON(
-            answer
-        );
+    try {
 
+        rankingData =
+            JSON.parse(
+                answer
+            );
 
-    const ranking =
-        Array.isArray(
-            parsed
+    }
+    catch {
+
+        const match =
+            String(
+                answer || ""
+            ).match(
+                /\[[\s\S]*\]/
+            );
+
+        if (!match) {
+
+            throw new Error(
+                "تعذر قراءة ترتيب نتائج المكتبة من الذكاء الاصطناعي."
+            );
+
+        }
+
+        rankingData =
+            JSON.parse(
+                match[0]
+            );
+
+    }
+
+    if (
+        !Array.isArray(
+            rankingData
         )
-            ? parsed
-            : Array.isArray(
-                parsed?.results
-            )
-                ? parsed.results
-                : [];
-
-
-    const candidateMap =
-        new Map(
-            candidates.map(
-                function (
-                    item
-                ) {
-
-                    return [
-                        item.id,
-                        item.result
-                    ];
-
-                }
-            )
-        );
-
-
-    const used =
-        new Set();
-
-
-    const ordered =
-        [];
-
-
-    for (
-        const item of ranking
     ) {
 
-        const id =
-            String(
-                item?.id ||
-                ""
-            )
-            .trim();
-
-
-        if (
-            !id ||
-            used.has(
-                id
-            )
-        ) {
-
-            continue;
-
-        }
-
-
-        const original =
-            candidateMap.get(
-                id
-            );
-
-
-        if (!original) {
-
-            continue;
-
-        }
-
-
-        const score =
-            Math.max(
-                0,
-                Math.min(
-                    100,
-                    Number(
-                        item?.score ||
-                        0
-                    )
-                )
-            );
-
-
-        used.add(
-            id
-        );
-
-
-        ordered.push(
-            {
-                result:
-                    original,
-
-                aiScore:
-                    score
-            }
+        throw new Error(
+            "الذكاء الاصطناعي لم يُرجع قائمة ترتيب صالحة."
         );
 
     }
 
+    const orderMap =
+        new Map();
 
-    ordered.sort(
-        function (
-            a,
-            b
+    for (
+        const item
+        of rankingData
+    ) {
+
+        const index =
+            Number(
+                item?.index
+            );
+
+        const rank =
+            Number(
+                item?.rank
+            );
+
+        if (
+            Number.isInteger(index) &&
+            index >= 0 &&
+            index < results.length &&
+            Number.isFinite(rank)
         ) {
 
-            return (
-                b.aiScore -
-                a.aiScore
+            orderMap.set(
+                index,
+                rank
             );
 
         }
-    );
 
+    }
 
-    const strong =
-        ordered.filter(
+    // ---------------------------------------------------------
+    // أي نتيجة لم يعطها الذكاء ترتيبًا:
+    // نضعها بعد النتائج المرتبة، مع الحفاظ على ترتيبها الأصلي.
+    // ---------------------------------------------------------
+
+    return results
+        .map(
             function (
-                item
+                result,
+                index
             ) {
 
+                return {
+
+                    result,
+
+                    index,
+
+                    rank:
+                        orderMap.has(index)
+                            ? orderMap.get(index)
+                            : Number.MAX_SAFE_INTEGER
+
+                };
+
+            }
+        )
+        .sort(
+            function (
+                a,
+                b
+            ) {
+
+                if (
+                    a.rank !==
+                    b.rank
+                ) {
+
+                    return (
+                        a.rank -
+                        b.rank
+                    );
+
+                }
+
                 return (
-                    item.aiScore >=
-                    LIBRARY_AI_MIN_RELEVANCE
+                    a.index -
+                    b.index
                 );
 
             }
         );
-
-
-    if (
-        strong.length > 0
-    ) {
-
-        return strong;
-
-    }
-
-
-    return ordered;
-
 }
 
 
