@@ -2800,36 +2800,84 @@ body {
 
 
 /* =========================================================
-   المحادثات داخل النافذة
+   المحادثات في النافذة الجانبية
    ========================================================= */
 
 #recent-chat-list {
     max-height: 420px;
-
     overflow-y: auto;
     overflow-x: hidden;
 }
 
 
+/* شريط العنوان */
+
+.recent-chat-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 8px;
+
+    padding: 8px 10px;
+
+    background: #ffffff;
+
+    border-bottom: 1px solid #eeeeee;
+}
+
+
+/* عنوان عدد المحادثات */
+
+.recent-chat-toolbar > span {
+    color: #777;
+    font-size: 12px;
+}
+
+
+/* حذف الكل */
+
+.recent-chat-delete-selected {
+    border: none;
+    background: transparent;
+
+    color: #b00020;
+
+    font-size: 12px;
+
+    cursor: pointer;
+
+    padding: 4px 6px;
+
+    border-radius: 6px;
+}
+
+.recent-chat-delete-selected:hover {
+    background: #fff1f1;
+}
+
+
 /* عنصر المحادثة */
+
 .recent-chat-item {
     position: relative;
 
     display: flex;
     align-items: center;
 
-    gap: 6px;
-
     width: 100%;
 
-    padding: 8px 10px;
+    gap: 4px;
 
-    border: none;
-
-    font-size: 13px;
-    font-weight: 400;
+    padding: 6px 8px;
 
     box-sizing: border-box;
+
+    border: none;
 }
 
 .recent-chat-item:hover {
@@ -2837,9 +2885,11 @@ body {
 }
 
 
-/* عنوان المحادثة */
+/* زر اسم المحادثة */
+
 .recent-chat-title-btn {
     flex: 1;
+
     min-width: 0;
 
     display: flex;
@@ -2847,7 +2897,7 @@ body {
 
     gap: 6px;
 
-    padding: 0;
+    padding: 4px 2px;
 
     border: none;
 
@@ -2855,15 +2905,21 @@ body {
 
     color: #444;
 
-    text-align: right;
-
     cursor: pointer;
 
+    text-align: right;
+
     overflow: hidden;
+
+    font-size: 13px;
 }
+
+
+/* نص الاسم */
 
 .recent-chat-title-text {
     flex: 1;
+
     min-width: 0;
 
     overflow: hidden;
@@ -2874,12 +2930,10 @@ body {
 }
 
 
-/* =========================================================
-   أزرار الإجراءات المباشرة
-   ========================================================= */
+/* زر الثلاث نقاط */
 
-.recent-chat-action-btn {
-    flex: 0 0 auto;
+.recent-chat-menu-btn {
+    flex: 0 0 26px;
 
     width: 26px;
     height: 26px;
@@ -2892,31 +2946,130 @@ body {
     padding: 0;
 
     border: none;
+
     border-radius: 6px;
 
     background: transparent;
 
     color: #777;
 
-    font-size: 14px;
+    font-size: 19px;
+
+    line-height: 1;
 
     cursor: pointer;
 }
 
-.recent-chat-action-btn:hover {
+.recent-chat-menu-btn:hover {
     background: #eeeeee;
+
     color: #222;
 }
 
-.recent-chat-delete-btn {
+
+/* قائمة الخيارات */
+
+.recent-chat-menu {
+    position: absolute;
+
+    left: 8px;
+    top: 34px;
+
+    min-width: 125px;
+
+    display: none;
+
+    padding: 4px;
+
+    background: #ffffff;
+
+    border: 1px solid #dddddd;
+
+    border-radius: 8px;
+
+    box-shadow:
+        0 5px 18px rgba(0, 0, 0, 0.15);
+
+    z-index: 100000;
+}
+
+.recent-chat-menu.open {
+    display: block;
+}
+
+
+/* خيارات القائمة */
+
+.recent-chat-menu button {
+    width: 100%;
+
+    display: block;
+
+    padding: 8px 10px;
+
+    border: none;
+
+    border-radius: 6px;
+
+    background: transparent;
+
+    color: #444;
+
+    text-align: right;
+
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+.recent-chat-menu button:hover {
+    background: #f3f3f3;
+}
+
+
+/* خيار الحذف */
+
+.recent-chat-menu .recent-chat-delete-option {
     color: #b00020;
 }
 
-.recent-chat-delete-btn:hover {
+.recent-chat-menu .recent-chat-delete-option:hover {
     background: #fff1f1;
+
     color: #b00020;
 }
 
+
+/* رسالة عدم وجود محادثات */
+
+.empty-chat {
+    padding: 15px;
+
+    color: #777;
+
+    font-size: 13px;
+
+    text-align: center;
+}
+
+
+/* =========================================================
+   شريط التمرير
+   ========================================================= */
+
+#recent-chat-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#recent-chat-list::-webkit-scrollbar-thumb {
+    background: #c8c8c8;
+
+    border-radius: 10px;
+}
+
+#recent-chat-list::-webkit-scrollbar-track {
+    background: transparent;
+}
 
 /* =========================================================
    النمط القديم للقائمة

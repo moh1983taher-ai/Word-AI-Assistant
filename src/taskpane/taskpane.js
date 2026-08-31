@@ -45766,20 +45766,34 @@ function renderRecentChats() {
     }
 
 
-    recentChatList.innerHTML =
-        "";
+    // =====================================================
+    // تنظيف القائمة
+    // =====================================================
+
+    recentChatList.innerHTML = "";
 
 
     // =====================================================
-    // لا توجد محادثات
+    // إعداد التمرير
+    // =====================================================
+
+    recentChatList.style.maxHeight =
+        "420px";
+
+    recentChatList.style.overflowY =
+        "auto";
+
+    recentChatList.style.overflowX =
+        "hidden";
+
+
+    // =====================================================
+    // التحقق من وجود محادثات
     // =====================================================
 
     if (
-        !Array.isArray(
-            chats
-        ) ||
-        chats.length ===
-        0
+        !Array.isArray(chats) ||
+        chats.length === 0
     ) {
 
         recentChatList.innerHTML =
@@ -45791,25 +45805,261 @@ function renderRecentChats() {
 
 
     // =====================================================
-    // حاوية قابلة للتمرير
+    // التأكد من وجود معرفات للمحادثات
     // =====================================================
 
-    recentChatList.style.maxHeight =
-        "420px";
+    chats.forEach(
+        function (
+            chat,
+            index
+        ) {
+
+            if (
+                !chat
+            ) {
+
+                return;
+
+            }
 
 
-    recentChatList.style.overflowY =
-        "auto";
+            if (
+                !chat.id
+            ) {
 
+                chat.id =
+                    "chat_" +
+                    Date.now() +
+                    "_" +
+                    index +
+                    "_" +
+                    Math.random()
+                        .toString(36)
+                        .substring(2, 9);
 
-    recentChatList.style.overflowX =
-        "hidden";
+            }
+
+        }
+    );
 
 
     // =====================================================
-    // جميع المحادثات
-    //
-    // لا يوجد slice(0, 8)
+    // حفظ المحادثات
+    // =====================================================
+
+    function persistChats() {
+
+        try {
+
+            if (
+                typeof saveChats ===
+                "function"
+            ) {
+
+                saveChats();
+
+            }
+
+        }
+        catch (
+            error
+        ) {
+
+            console.warn(
+                "تعذر تنفيذ saveChats:",
+                error
+            );
+
+        }
+
+
+        // حفظ احتياطي
+        try {
+
+            localStorage.setItem(
+                "WORD_AI_CHATS",
+                JSON.stringify(
+                    chats
+                )
+            );
+
+        }
+        catch (
+            error
+        ) {
+
+            console.warn(
+                "تعذر حفظ المحادثات:",
+                error
+            );
+
+        }
+
+    }
+
+
+    // =====================================================
+    // شريط أدوات أعلى قائمة المحادثات
+    // =====================================================
+
+    const toolbar =
+        document.createElement(
+            "div"
+        );
+
+
+    toolbar.className =
+        "recent-chat-toolbar";
+
+
+    const toolbarTitle =
+        document.createElement(
+            "span"
+        );
+
+
+    toolbarTitle.textContent =
+        `المحادثات (${chats.length})`;
+
+
+    toolbarTitle.style.fontSize =
+        "12px";
+
+
+    toolbarTitle.style.color =
+        "#777";
+
+
+    const deleteAllButton =
+        document.createElement(
+            "button"
+        );
+
+
+    deleteAllButton.type =
+        "button";
+
+
+    deleteAllButton.className =
+        "recent-chat-delete-selected";
+
+
+    deleteAllButton.textContent =
+        "حذف الكل";
+
+
+    deleteAllButton.title =
+        "حذف جميع المحادثات";
+
+
+    deleteAllButton.addEventListener(
+        "click",
+        function (
+            event
+        ) {
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+
+            if (
+                !Array.isArray(chats) ||
+                chats.length === 0
+            ) {
+
+                return;
+
+            }
+
+
+            const confirmed =
+                window.confirm(
+                    `هل تريد حذف جميع المحادثات (${chats.length})؟\n\nلا يمكن التراجع عن هذا الإجراء.`
+                );
+
+
+            if (
+                !confirmed
+            ) {
+
+                return;
+
+            }
+
+
+            // -----------------------------------------------
+            // حذف جميع المحادثات
+            // -----------------------------------------------
+
+            chats =
+                [];
+
+
+            currentChat =
+                null;
+
+
+            // -----------------------------------------------
+            // حفظ
+            // -----------------------------------------------
+
+            persistChats();
+
+
+            // -----------------------------------------------
+            // إعادة عرض المحادثة
+            // -----------------------------------------------
+
+            renderChat();
+
+
+            // -----------------------------------------------
+            // إعادة رسم القائمة
+            // -----------------------------------------------
+
+            renderRecentChats();
+
+        }
+    );
+
+
+    toolbar.appendChild(
+        toolbarTitle
+    );
+
+
+    toolbar.appendChild(
+        deleteAllButton
+    );
+
+
+    recentChatList.appendChild(
+        toolbar
+    );
+
+
+    // =====================================================
+    // حاوية المحادثات
+    // =====================================================
+
+    const chatsContainer =
+        document.createElement(
+            "div"
+        );
+
+
+    chatsContainer.className =
+        "recent-chats-container";
+
+
+    recentChatList.appendChild(
+        chatsContainer
+    );
+
+
+    // =====================================================
+    // بناء المحادثات
     // =====================================================
 
     chats.forEach(
@@ -45836,8 +46086,14 @@ function renderRecentChats() {
                 "recent-chat-item";
 
 
+            div.dataset.chatId =
+                String(
+                    chat.id
+                );
+
+
             // =================================================
-            // اسم المحادثة
+            // زر اسم المحادثة
             // =================================================
 
             const titleButton =
@@ -45854,27 +46110,49 @@ function renderRecentChats() {
                 "recent-chat-title-btn";
 
 
-            titleButton.innerHTML =
-                `
-                ${chatIcon}
-                <span class="recent-chat-title-text"></span>
-                `;
+            const iconSpan =
+                document.createElement(
+                    "span"
+                );
 
 
-            titleButton.querySelector(
-                ".recent-chat-title-text"
-            ).textContent =
+            iconSpan.innerHTML =
+                chatIcon;
+
+
+            const titleSpan =
+                document.createElement(
+                    "span"
+                );
+
+
+            titleSpan.className =
+                "recent-chat-title-text";
+
+
+            titleSpan.textContent =
                 String(
                     chat.title ||
                     "محادثة جديدة"
                 );
 
 
+            titleButton.appendChild(
+                iconSpan
+            );
+
+
+            titleButton.appendChild(
+                titleSpan
+            );
+
+
             // =================================================
             // فتح المحادثة
             // =================================================
 
-            titleButton.onclick =
+            titleButton.addEventListener(
+                "click",
                 function (
                     event
                 ) {
@@ -45901,36 +46179,70 @@ function renderRecentChats() {
 
                     }
 
-                };
+                }
+            );
+
+
+            // =================================================
+            // زر الثلاث نقاط
+            // =================================================
+
+            const menuButton =
+                document.createElement(
+                    "button"
+                );
+
+
+            menuButton.type =
+                "button";
+
+
+            menuButton.className =
+                "recent-chat-menu-btn";
+
+
+            menuButton.textContent =
+                "⋮";
+
+
+            menuButton.title =
+                "خيارات المحادثة";
+
+
+            // =================================================
+            // قائمة الخيارات
+            // =================================================
+
+            const menu =
+                document.createElement(
+                    "div"
+                );
+
+
+            menu.className =
+                "recent-chat-menu";
 
 
             // =================================================
             // إعادة التسمية
             // =================================================
 
-            const renameButton =
+            const renameOption =
                 document.createElement(
                     "button"
                 );
 
 
-            renameButton.type =
+            renameOption.type =
                 "button";
 
 
-            renameButton.className =
-                "recent-chat-action-btn";
+            renameOption.textContent =
+                "إعادة التسمية";
 
 
-            renameButton.textContent =
-                "✏";
-
-
-            renameButton.title =
-                "إعادة تسمية";
-
-
-            renameButton.onclick =
+            renameOption.addEventListener(
+                "click",
                 function (
                     event
                 ) {
@@ -45938,6 +46250,11 @@ function renderRecentChats() {
                     event.preventDefault();
 
                     event.stopPropagation();
+
+
+                    menu.classList.remove(
+                        "open"
+                    );
 
 
                     const oldTitle =
@@ -45948,7 +46265,7 @@ function renderRecentChats() {
 
 
                     const newTitle =
-                        prompt(
+                        window.prompt(
                             "اكتب اسم المحادثة الجديد:",
                             oldTitle
                         );
@@ -45965,7 +46282,9 @@ function renderRecentChats() {
 
 
                     const trimmedTitle =
-                        newTitle.trim();
+                        String(
+                            newTitle
+                        ).trim();
 
 
                     if (
@@ -45981,41 +46300,55 @@ function renderRecentChats() {
                         trimmedTitle;
 
 
-                    saveChats();
+                    if (
+                        currentChat &&
+                        String(
+                            currentChat.id
+                        ) ===
+                        String(
+                            chat.id
+                        )
+                    ) {
+
+                        currentChat.title =
+                            trimmedTitle;
+
+                    }
+
+
+                    persistChats();
 
 
                     renderRecentChats();
 
-                };
+                }
+            );
 
 
             // =================================================
-            // حذف
+            // حذف المحادثة
             // =================================================
 
-            const deleteButton =
+            const deleteOption =
                 document.createElement(
                     "button"
                 );
 
 
-            deleteButton.type =
+            deleteOption.type =
                 "button";
 
 
-            deleteButton.className =
-                "recent-chat-action-btn recent-chat-delete-btn";
+            deleteOption.textContent =
+                "حذف";
 
 
-            deleteButton.textContent =
-                "🗑";
+            deleteOption.className =
+                "recent-chat-delete-option";
 
 
-            deleteButton.title =
-                "حذف المحادثة";
-
-
-            deleteButton.onclick =
+            deleteOption.addEventListener(
+                "click",
                 function (
                     event
                 ) {
@@ -46025,15 +46358,37 @@ function renderRecentChats() {
                     event.stopPropagation();
 
 
+                    menu.classList.remove(
+                        "open"
+                    );
+
+
+                    const title =
+                        String(
+                            chat.title ||
+                            "محادثة جديدة"
+                        );
+
+
+                    const confirmed =
+                        window.confirm(
+                            `هل تريد حذف المحادثة: ${title}؟`
+                        );
+
+
                     if (
-                        !confirm(
-                            `هل تريد حذف المحادثة: ${chat.title || "محادثة جديدة"}؟`
-                        )
+                        !confirmed
                     ) {
 
                         return;
 
                     }
+
+
+                    const chatId =
+                        String(
+                            chat.id
+                        );
 
 
                     chats =
@@ -46042,8 +46397,19 @@ function renderRecentChats() {
                                 item
                             ) {
 
-                                return item.id !==
-                                    chat.id;
+                                if (
+                                    !item
+                                ) {
+
+                                    return false;
+
+                                }
+
+
+                                return String(
+                                    item.id
+                                ) !==
+                                chatId;
 
                             }
                         );
@@ -46051,28 +46417,90 @@ function renderRecentChats() {
 
                     if (
                         currentChat &&
-                        currentChat.id ===
-                        chat.id
+                        String(
+                            currentChat.id
+                        ) ===
+                        chatId
                     ) {
 
                         currentChat =
                             null;
+
 
                         renderChat();
 
                     }
 
 
-                    saveChats();
+                    persistChats();
 
 
                     renderRecentChats();
 
-                };
+                }
+            );
+
+
+            menu.appendChild(
+                renameOption
+            );
+
+
+            menu.appendChild(
+                deleteOption
+            );
 
 
             // =================================================
-            // بناء العنصر
+            // فتح وإغلاق قائمة الثلاث نقاط
+            // =================================================
+
+            menuButton.addEventListener(
+                "click",
+                function (
+                    event
+                ) {
+
+                    event.preventDefault();
+
+                    event.stopPropagation();
+
+
+                    // إغلاق جميع القوائم الأخرى
+                    document
+                        .querySelectorAll(
+                            ".recent-chat-menu.open"
+                        )
+                        .forEach(
+                            function (
+                                openMenu
+                            ) {
+
+                                if (
+                                    openMenu !==
+                                    menu
+                                ) {
+
+                                    openMenu.classList.remove(
+                                        "open"
+                                    );
+
+                                }
+
+                            }
+                        );
+
+
+                    menu.classList.toggle(
+                        "open"
+                    );
+
+                }
+            );
+
+
+            // =================================================
+            // إضافة العناصر
             // =================================================
 
             div.appendChild(
@@ -46081,21 +46509,59 @@ function renderRecentChats() {
 
 
             div.appendChild(
-                renameButton
+                menuButton
             );
 
 
             div.appendChild(
-                deleteButton
+                menu
             );
 
 
-            recentChatList.appendChild(
+            chatsContainer.appendChild(
                 div
             );
 
         }
     );
+
+
+    // =====================================================
+    // إغلاق قوائم الخيارات عند الضغط خارجها
+    // =====================================================
+
+    if (
+        !renderRecentChats._outsideHandlerInstalled
+    ) {
+
+        document.addEventListener(
+            "click",
+            function () {
+
+                document
+                    .querySelectorAll(
+                        ".recent-chat-menu.open"
+                    )
+                    .forEach(
+                        function (
+                            menu
+                        ) {
+
+                            menu.classList.remove(
+                                "open"
+                            );
+
+                        }
+                    );
+
+            }
+        );
+
+
+        renderRecentChats._outsideHandlerInstalled =
+            true;
+
+    }
 
 }
 
