@@ -33245,6 +33245,240 @@ async function searchLibrary(
 }
 
 // =====================================================
+// شاشة نشاط البحث الذكي
+// =====================================================
+
+let smartSearchActivityTimer = null;
+let smartSearchActivityIndex = 0;
+
+const SMART_SEARCH_MESSAGES = [
+    "جارٍ تحليل موضوع البحث...",
+    "جارٍ توسيع صيغ البحث...",
+    "جارٍ البحث في المكتبة الشاملة...",
+    "جارٍ البحث في جامع الكتب...",
+    "جارٍ جمع النتائج من المكتبتين...",
+    "جارٍ تحليل النتائج...",
+    "جارٍ ترشيح النتائج الأكثر صلة..."
+];
+
+function showSmartSearchActivity() {
+
+    const container =
+        document.querySelector(
+            ".smart-search-activity"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    // إيقاف أي دورة سابقة
+    if (
+        smartSearchActivityTimer
+    ) {
+        clearInterval(
+            smartSearchActivityTimer
+        );
+
+        smartSearchActivityTimer =
+            null;
+    }
+
+    container.innerHTML = "";
+
+    container.classList.add(
+        "active"
+    );
+
+    container.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+    smartSearchActivityIndex = 0;
+
+
+    function addMessage() {
+
+        const message =
+            SMART_SEARCH_MESSAGES[
+                smartSearchActivityIndex %
+                SMART_SEARCH_MESSAGES.length
+            ];
+
+
+        const line =
+            document.createElement(
+                "div"
+            );
+
+
+        line.className =
+            "smart-search-activity-line";
+
+
+        line.textContent =
+            message;
+
+
+        container.appendChild(
+            line
+        );
+
+
+        requestAnimationFrame(
+            () => {
+
+                line.classList.add(
+                    "visible"
+                );
+
+            }
+        );
+
+
+        setTimeout(
+            () => {
+
+                line.classList.remove(
+                    "visible"
+                );
+
+                line.classList.add(
+                    "fade-out"
+                );
+
+
+                setTimeout(
+                    () => {
+
+                        if (
+                            line.parentNode
+                        ) {
+
+                            line.parentNode.removeChild(
+                                line
+                            );
+
+                        }
+
+                    },
+                    500
+                );
+
+            },
+            2200
+        );
+
+
+        smartSearchActivityIndex++;
+
+    }
+
+
+    addMessage();
+
+
+    smartSearchActivityTimer =
+        setInterval(
+            addMessage,
+            900
+        );
+
+}
+
+
+// =====================================================
+// إيقاف شاشة نشاط البحث الذكي
+// =====================================================
+
+function hideSmartSearchActivity() {
+
+    if (
+        smartSearchActivityTimer
+    ) {
+
+        clearInterval(
+            smartSearchActivityTimer
+        );
+
+        smartSearchActivityTimer =
+            null;
+
+    }
+
+
+    const container =
+        document.querySelector(
+            ".smart-search-activity"
+        );
+
+
+    if (!container) {
+        return;
+    }
+
+
+    container.classList.remove(
+        "active"
+    );
+
+
+    container.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+
+    setTimeout(
+        () => {
+
+            if (
+                !container.classList.contains(
+                    "active"
+                )
+            ) {
+
+                container.innerHTML = "";
+
+            }
+
+        },
+        500
+    );
+
+}
+
+function hideSmartSearchActivity() {
+
+    if (smartSearchActivityTimer) {
+
+        clearInterval(
+            smartSearchActivityTimer
+        );
+
+        smartSearchActivityTimer =
+            null;
+    }
+
+    const container =
+        document.querySelector(
+            ".smart-search-activity"
+        );
+
+    if (!container) {
+        return;
+    }
+
+    container.classList.remove(
+        "active"
+    );
+
+    container.innerHTML = "";
+
+}
+
+// =====================================================
 // Send Message
 // إرسال الرسالة
 // =====================================================
@@ -33524,6 +33758,7 @@ async function sendMessage() {
 
         }
 
+        showSmartSearchActivity();
 
         const libraryData =
             await searchLibrary(
@@ -33935,6 +34170,8 @@ async function sendMessage() {
     }
     finally {
 
+        hideSmartSearchActivity();
+        
         if (
             requestFinished
         ) {
