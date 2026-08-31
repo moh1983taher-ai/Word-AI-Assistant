@@ -33261,41 +33261,40 @@ const SMART_SEARCH_MESSAGES = [
     "جارٍ ترشيح النتائج الأكثر صلة..."
 ];
 
-function showSmartSearchActivity() {
+function showSmartSearchActivity(
+    loadingElement
+) {
 
-    const container =
-        document.querySelector(
-            ".smart-search-activity"
-        );
-
-    if (!container) {
+    if (!loadingElement) {
         return;
     }
 
-    // إيقاف أي دورة سابقة
+
     if (
         smartSearchActivityTimer
     ) {
+
         clearInterval(
             smartSearchActivityTimer
         );
 
         smartSearchActivityTimer =
             null;
+
     }
 
-    container.innerHTML = "";
 
-    container.classList.add(
-        "active"
+    loadingElement.classList.add(
+        "smart-search-activity"
     );
 
-    container.setAttribute(
-        "aria-hidden",
-        "false"
-    );
 
-    smartSearchActivityIndex = 0;
+    loadingElement.innerHTML =
+        "";
+
+
+    smartSearchActivityIndex =
+        0;
 
 
     function addMessage() {
@@ -33321,7 +33320,7 @@ function showSmartSearchActivity() {
             message;
 
 
-        container.appendChild(
+        loadingElement.appendChild(
             line
         );
 
@@ -33373,6 +33372,16 @@ function showSmartSearchActivity() {
 
         smartSearchActivityIndex++;
 
+
+        if (
+            chatArea
+        ) {
+
+            chatArea.scrollTop =
+                chatArea.scrollHeight;
+
+        }
+
     }
 
 
@@ -33408,44 +33417,8 @@ function hideSmartSearchActivity() {
     }
 
 
-    const container =
-        document.querySelector(
-            ".smart-search-activity"
-        );
-
-
-    if (!container) {
-        return;
-    }
-
-
-    container.classList.remove(
-        "active"
-    );
-
-
-    container.setAttribute(
-        "aria-hidden",
-        "true"
-    );
-
-
-    setTimeout(
-        () => {
-
-            if (
-                !container.classList.contains(
-                    "active"
-                )
-            ) {
-
-                container.innerHTML = "";
-
-            }
-
-        },
-        500
-    );
+    smartSearchActivityIndex =
+        0;
 
 }
 
@@ -33722,7 +33695,9 @@ async function sendMessage() {
     ) {
 
         console.log("SMART ACTIVITY START");
-            showSmartSearchActivity();
+            showSmartSearchActivity(
+                loading
+            );
 
         console.log(
             "LIBRARY SEARCH START:",

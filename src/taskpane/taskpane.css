@@ -7217,74 +7217,7 @@ body.sidebar-is-pinned .message-box {
     min-height: 18px;
     display: block;
 }
-/* =====================================================
-   نشاط البحث الذكي
-   ===================================================== */
 
-.smart-search-activity {
-    display: none;
-    margin: 0 12px 8px;
-    min-height: 24px;
-    overflow: hidden;
-    direction: rtl;
-    text-align: right;
-}
-
-.smart-search-activity.active {
-    display: block;
-}
-
-.smart-search-activity-line {
-    opacity: 0;
-    transition: opacity 0.45s ease;
-    font-size: 12px;
-    color: #999;
-    line-height: 1.8;
-}
-
-.smart-search-activity-line.visible {
-    opacity: 0.65;
-}
-
-.smart-search-activity-line.fade-out {
-    opacity: 0;
-}
-.smart-search-activity {
-    width: fit-content;
-    max-width: 92%;
-    margin-left: 0;
-    margin-right: auto;
-    background: #f5f5f5;
-    color: #999;
-    padding: 8px 12px;
-    direction: rtl;
-    text-align: right;
-    overflow: hidden;
-}
-
-.smart-search-activity.active {
-    display: block;
-}
-
-.smart-search-activity-line {
-    opacity: 0;
-    transform: translateY(4px);
-    transition:
-        opacity 0.45s ease,
-        transform 0.45s ease;
-    font-size: 12px;
-    line-height: 1.8;
-}
-
-.smart-search-activity-line.visible {
-    opacity: 0.65;
-    transform: translateY(0);
-}
-
-.smart-search-activity-line.fade-out {
-    opacity: 0;
-    transform: translateY(-4px);
-}
 /* =========================================================
    END
    ========================================================= */
