@@ -7217,7 +7217,140 @@ body.sidebar-is-pinned .message-box {
     min-height: 18px;
     display: block;
 }
+.smart-search-activity {
+    width: auto !important;
+    max-width: none !important;
 
+    margin: 4px 0 10px 0 !important;
+    padding: 0 !important;
+
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    color: #999 !important;
+
+    font-size: 12px !important;
+    font-weight: 400 !important;
+
+    line-height: 1.8 !important;
+
+    direction: rtl;
+    text-align: right;
+
+    overflow: visible !important;
+}
+
+
+/* =====================================================
+   سطر النشاط
+   ===================================================== */
+
+.smart-search-activity-line {
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    height: 22px;
+
+    opacity: 0;
+
+    transform:
+        translateY(5px);
+
+    transition:
+        opacity 0.65s ease,
+        transform 0.65s ease;
+}
+
+
+/* =====================================================
+   عند الظهور
+   ===================================================== */
+
+.smart-search-activity-line.visible {
+    opacity: 0.48;
+
+    transform:
+        translateY(0);
+}
+
+
+/* =====================================================
+   عند الاختفاء
+   ===================================================== */
+
+.smart-search-activity-line.fade-out {
+    opacity: 0;
+
+    transform:
+        translateY(-5px);
+}
+
+
+/* =====================================================
+   النقطة الصغيرة
+   ===================================================== */
+
+.smart-search-activity-dot {
+    display: inline-flex;
+
+    width: 7px;
+    height: 7px;
+
+    align-items: center;
+    justify-content: center;
+
+    color: #aaa;
+
+    font-size: 16px;
+
+    line-height: 1;
+
+    opacity: 0.6;
+
+    animation:
+        smartSearchPulse 1.5s ease-in-out infinite;
+}
+
+
+/* =====================================================
+   النص
+   ===================================================== */
+
+.smart-search-activity-text {
+    color: #999;
+
+    font-size: 12px;
+
+    font-weight: 400;
+
+    letter-spacing: 0.05px;
+
+    white-space: nowrap;
+}
+
+
+/* =====================================================
+   حركة النقطة
+   ===================================================== */
+
+@keyframes smartSearchPulse {
+
+    0%,
+    100% {
+        opacity: 0.25;
+        transform: scale(0.8);
+    }
+
+    50% {
+        opacity: 0.75;
+        transform: scale(1);
+    }
+
+}
 /* =========================================================
    END
    ========================================================= */
