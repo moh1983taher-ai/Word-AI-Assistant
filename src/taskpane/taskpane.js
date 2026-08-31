@@ -46969,7 +46969,7 @@ function renderRecentChats() {
 
 
             // =================================================
-            // فتح القائمة
+            // فتح قائمة الخيارات مع اختيار الاتجاه تلقائيًا
             // =================================================
 
             menuButton.addEventListener(
@@ -46979,9 +46979,12 @@ function renderRecentChats() {
                 ) {
 
                     event.preventDefault();
-
                     event.stopPropagation();
 
+
+                    // ---------------------------------------------
+                    // إغلاق القوائم الأخرى
+                    // ---------------------------------------------
 
                     document
                         .querySelectorAll(
@@ -46992,24 +46995,114 @@ function renderRecentChats() {
                                 openMenu
                             ) {
 
-                                if (
-                                    openMenu !==
-                                    menu
-                                ) {
+                                openMenu.classList.remove(
+                                    "open"
+                                );
 
-                                    openMenu.classList.remove(
-                                        "open"
-                                    );
-
-                                }
+                                openMenu.classList.remove(
+                                    "open-up"
+                                );
 
                             }
                         );
 
 
-                    menu.classList.toggle(
+                    // ---------------------------------------------
+                    // إذا كانت مفتوحة: أغلقها
+                    // ---------------------------------------------
+
+                    if (
+                        menu.classList.contains(
+                            "open"
+                        )
+                    ) {
+
+                        menu.classList.remove(
+                            "open"
+                        );
+
+                        menu.classList.remove(
+                            "open-up"
+                        );
+
+                        return;
+
+                    }
+
+
+                    // ---------------------------------------------
+                    // نفتحها مؤقتًا لقياس حجمها
+                    // ---------------------------------------------
+
+                    menu.style.visibility =
+                        "hidden";
+
+                    menu.style.display =
+                        "block";
+
+                    menu.classList.add(
                         "open"
                     );
+
+
+                    const itemRect =
+                        item.getBoundingClientRect();
+
+
+                    const menuRect =
+                        menu.getBoundingClientRect();
+
+
+                    const listRect =
+                        recentChatList.getBoundingClientRect();
+
+
+                    // المساحة أسفل العنصر
+                    const spaceBelow =
+                        listRect.bottom -
+                        itemRect.bottom;
+
+
+                    // المساحة أعلى العنصر
+                    const spaceAbove =
+                        itemRect.top -
+                        listRect.top;
+
+
+                    // ---------------------------------------------
+                    // تحديد الاتجاه
+                    // ---------------------------------------------
+
+                    if (
+                        spaceBelow <
+                        menuRect.height + 8 &&
+                        spaceAbove >
+                        menuRect.height + 8
+                    ) {
+
+                        menu.classList.add(
+                            "open-up"
+                        );
+
+                    }
+                    else {
+
+                        menu.classList.remove(
+                            "open-up"
+                        );
+
+                    }
+
+
+                    // ---------------------------------------------
+                    // إعادة الوضع الطبيعي
+                    // ---------------------------------------------
+
+                    menu.style.display =
+                        "";
+
+                    menu.style.visibility =
+                        "";
 
                 }
             );

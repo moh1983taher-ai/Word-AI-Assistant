@@ -6548,6 +6548,39 @@ body.dark #save-settings,
 
 }
 
+.recent-chat-menu {
+    position: absolute;
+
+    left: 8px;
+    top: 34px;
+
+    min-width: 125px;
+
+    display: none;
+
+    padding: 4px;
+
+    background: #ffffff;
+
+    border: 1px solid #dddddd;
+
+    border-radius: 8px;
+
+    box-shadow:
+        0 5px 18px rgba(0, 0, 0, 0.15);
+
+    z-index: 100000;
+}
+
+.recent-chat-menu.open {
+    display: block;
+}
+
+/* فتح القائمة إلى الأعلى */
+.recent-chat-menu.open-up {
+    top: auto;
+    bottom: 34px;
+}
 
 /* =========================================================
    END
