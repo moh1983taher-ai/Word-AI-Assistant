@@ -7243,7 +7243,7 @@ body.sidebar-is-pinned .message-box {
 
 
 /* =====================================================
-   سطر النشاط
+   سطر نشاط البحث الذكي
    ===================================================== */
 
 .smart-search-activity-line {
@@ -7251,18 +7251,20 @@ body.sidebar-is-pinned .message-box {
 
     align-items: center;
 
-    gap: 7px;
+    gap: 8px;
 
-    height: 22px;
+    min-height: 24px;
+
+    margin: 1px 0;
 
     opacity: 0;
 
     transform:
-        translateY(5px);
+        translateY(6px);
 
     transition:
-        opacity 0.65s ease,
-        transform 0.65s ease;
+        opacity 0.55s ease,
+        transform 0.55s ease;
 }
 
 
@@ -7271,7 +7273,7 @@ body.sidebar-is-pinned .message-box {
    ===================================================== */
 
 .smart-search-activity-line.visible {
-    opacity: 0.48;
+    opacity: 0.78;
 
     transform:
         translateY(0);
@@ -7287,45 +7289,53 @@ body.sidebar-is-pinned .message-box {
 
     transform:
         translateY(-5px);
+
+    transition:
+        opacity 0.7s ease,
+        transform 0.7s ease;
 }
 
 
 /* =====================================================
-   النقطة الصغيرة
+   النقطة المتحركة
    ===================================================== */
 
 .smart-search-activity-dot {
     display: inline-flex;
 
-    width: 7px;
-    height: 7px;
-
     align-items: center;
     justify-content: center;
 
-    color: #aaa;
+    flex: 0 0 auto;
 
-    font-size: 16px;
+    width: 6px;
+    height: 6px;
 
-    line-height: 1;
+    margin-top: 1px;
 
-    opacity: 0.6;
+    border-radius: 50%;
+
+    background: #999;
+
+    opacity: 0.75;
 
     animation:
-        smartSearchPulse 1.5s ease-in-out infinite;
+        smartSearchPulse 1.4s ease-in-out infinite;
 }
 
 
 /* =====================================================
-   النص
+   نص النشاط
    ===================================================== */
 
 .smart-search-activity-text {
-    color: #999;
+    color: #777;
 
-    font-size: 12px;
+    font-size: 12.5px;
 
     font-weight: 400;
+
+    line-height: 1.8;
 
     letter-spacing: 0.05px;
 
@@ -7341,13 +7351,17 @@ body.sidebar-is-pinned .message-box {
 
     0%,
     100% {
-        opacity: 0.25;
-        transform: scale(0.8);
+        opacity: 0.35;
+
+        transform:
+            scale(0.75);
     }
 
     50% {
-        opacity: 0.75;
-        transform: scale(1);
+        opacity: 0.9;
+
+        transform:
+            scale(1.15);
     }
 
 }
