@@ -45641,110 +45641,865 @@ function renderSidebarChats() {
         );
 
 
-    if (!list)
-        return;
-
-
-    list.innerHTML =
-        "";
-
-
     if (
-        chats.length ===
-        0
+        !list
     ) {
-
-        list.innerHTML = `
-            <div class="empty-chat">
-                لا توجد محادثات
-            </div>
-        `;
 
         return;
 
     }
 
 
-    chats
-        .slice(
-            0,
-            8
-        )
-        .forEach(
-            function (
-                chat
+    list.innerHTML =
+        "";
+
+
+    // =====================================================
+    // تنظيف التحديد من المحادثات التي لم تعد موجودة
+    // =====================================================
+
+    selectedChatIds =
+        new Set(
+            Array.from(
+                selectedChatIds
+            ).filter(
+                id =>
+                    chats.some(
+                        chat =>
+                            String(
+                                chat.id
+                            ) ===
+                            String(
+                                id
+                            )
+                    )
+            )
+        );
+
+
+    // =====================================================
+    // لا توجد محادثات
+    // =====================================================
+
+    if (
+        !chats.length
+    ) {
+
+        list.innerHTML =
+            `
+            <div class="empty-chat">
+                لا توجد محادثات
+            </div>
+            `;
+
+        return;
+
+    }
+
+
+    // =====================================================
+    // شريط أدوات المحادثات
+    // =====================================================
+
+    const toolbar =
+        document.createElement(
+            "div"
+        );
+
+
+    toolbar.className =
+        "sidebar-chat-toolbar";
+
+
+    toolbar.innerHTML =
+        `
+        <label
+            class="sidebar-chat-select-all">
+
+            <input
+                type="checkbox"
+                class="sidebar-chat-select-all-checkbox">
+
+            <span>
+                تحديد الكل
+            </span>
+
+        </label>
+
+        <button
+            type="button"
+            class="sidebar-chat-delete-selected"
+            disabled>
+
+            حذف المحدد
+
+        </button>
+        `;
+
+
+    list.appendChild(
+        toolbar
+    );
+
+
+    const selectAllCheckbox =
+        toolbar.querySelector(
+            ".sidebar-chat-select-all-checkbox"
+        );
+
+
+    const deleteSelectedButton =
+        toolbar.querySelector(
+            ".sidebar-chat-delete-selected"
+        );
+
+
+    // =====================================================
+    // تحديث حالة شريط الأدوات
+    // =====================================================
+
+    function updateChatSelectionUI() {
+
+        const total =
+            chats.length;
+
+
+        const selectedCount =
+            selectedChatIds.size;
+
+
+        deleteSelectedButton.disabled =
+            selectedCount === 0;
+
+
+        selectAllCheckbox.checked =
+            total > 0 &&
+            selectedCount === total;
+
+
+        selectAllCheckbox.indeterminate =
+            selectedCount > 0 &&
+            selectedCount < total;
+
+
+        deleteSelectedButton.textContent =
+            selectedCount > 0
+                ? `حذف المحدد (${selectedCount})`
+                : "حذف المحدد";
+
+    }
+
+
+    // =====================================================
+    // تحديد الكل
+    // =====================================================
+
+    selectAllCheckbox.onchange =
+        function () {
+
+            if (
+                this.checked
             ) {
 
-                const item =
-                    document.createElement(
-                        "div"
-                    );
+                chats.forEach(
+                    function (
+                        chat
+                    ) {
 
+                        selectedChatIds.add(
+                            String(
+                                chat.id
+                            )
+                        );
 
-                item.className =
-                    "recent-chat-item";
-
-
-                item.innerHTML = `
-                    <span class="chat-title">
-                        ${chatIcon}
-                        ${chat.title}
-                    </span>
-                `;
-
-
-                item.onclick =
-                    function (e) {
-
-                        e.stopPropagation();
-
-
-                        currentChat =
-                            chat;
-
-
-                        currentCitationSources =
-                            [];
-
-
-                        renderChat();
-
-
-                        if (projectsPopup) {
-
-                            projectsPopup.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        if (chatPopup) {
-
-                            chatPopup.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        if (searchPopup) {
-
-                            searchPopup.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-                    };
-
-
-                list.appendChild(
-                    item
+                    }
                 );
 
             }
-        );
+            else {
+
+                selectedChatIds.clear();
+
+            }
+
+
+            renderSidebarChats();
+
+        };
+
+
+    // =====================================================
+    // حذف المحادثات المحددة
+    // =====================================================
+
+    deleteSelectedButton.onclick =
+        function (
+            e
+        ) {
+
+            e.preventDefault();
+            e.stopPropagation();
+
+
+            const ids =
+                Array.from(
+                    selectedChatIds
+                );
+
+
+            if (
+                !ids.length
+            ) {
+
+                return;
+
+            }
+
+
+            const count =
+                ids.length;
+
+
+            const message =
+                count === 1
+                    ? "هل تريد حذف المحادثة المحددة؟"
+                    : `هل تريد حذف ${count} محادثات محددة؟`;
+
+
+            if (
+                !confirm(
+                    message
+                )
+            ) {
+
+                return;
+
+            }
+
+
+            chats =
+                chats.filter(
+                    function (
+                        chat
+                    ) {
+
+                        return !selectedChatIds.has(
+                            String(
+                                chat.id
+                            )
+                        );
+
+                    }
+                );
+
+
+            if (
+                currentChat &&
+                selectedChatIds.has(
+                    String(
+                        currentChat.id
+                    )
+                )
+            ) {
+
+                currentChat =
+                    null;
+
+                renderChat();
+
+            }
+
+
+            selectedChatIds.clear();
+
+
+            saveChats();
+
+
+            renderChatList();
+            renderSidebarChats();
+            renderRecentChats();
+
+        };
+
+
+    // =====================================================
+    // إنشاء جميع المحادثات
+    //
+    // لا يوجد slice(0, 8)
+    // =====================================================
+
+    chats.forEach(
+        function (
+            chat
+        ) {
+
+            if (
+                !chat
+            ) {
+
+                return;
+
+            }
+
+
+            const chatId =
+                String(
+                    chat.id
+                );
+
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "recent-chat-item";
+
+
+            if (
+                currentChat &&
+                String(
+                    currentChat.id
+                ) ===
+                chatId
+            ) {
+
+                item.classList.add(
+                    "active-chat"
+                );
+
+            }
+
+
+            // =================================================
+            // Checkbox
+            // =================================================
+
+            const checkboxWrap =
+                document.createElement(
+                    "label"
+                );
+
+
+            checkboxWrap.className =
+                "sidebar-chat-checkbox-wrap";
+
+
+            const checkbox =
+                document.createElement(
+                    "input"
+                );
+
+
+            checkbox.type =
+                "checkbox";
+
+
+            checkbox.className =
+                "sidebar-chat-checkbox";
+
+
+            checkbox.checked =
+                selectedChatIds.has(
+                    chatId
+                );
+
+
+            checkboxWrap.appendChild(
+                checkbox
+            );
+
+
+            // =================================================
+            // عنوان المحادثة
+            // =================================================
+
+            const title =
+                document.createElement(
+                    "span"
+                );
+
+
+            title.className =
+                "chat-title";
+
+
+            title.innerHTML =
+                chatIcon;
+
+
+            const titleText =
+                document.createElement(
+                    "span"
+                );
+
+
+            titleText.className =
+                "sidebar-chat-title-text";
+
+
+            titleText.textContent =
+                String(
+                    chat.title ||
+                    "محادثة جديدة"
+                );
+
+
+            title.appendChild(
+                titleText
+            );
+
+
+            // =================================================
+            // زر القائمة
+            // =================================================
+
+            const menu =
+                document.createElement(
+                    "button"
+                );
+
+
+            menu.type =
+                "button";
+
+
+            menu.className =
+                "chat-menu";
+
+
+            menu.textContent =
+                "⋮";
+
+
+            menu.setAttribute(
+                "aria-label",
+                "خيارات المحادثة"
+            );
+
+
+            // =================================================
+            // قائمة الخيارات
+            // =================================================
+
+            const options =
+                document.createElement(
+                    "div"
+                );
+
+
+            options.className =
+                "chat-options-menu";
+
+
+            options.innerHTML =
+                `
+                <div
+                    class="rename-chat">
+                    ✏ إعادة تسمية
+                </div>
+
+                <div
+                    class="delete-chat">
+                    🗑 حذف
+                </div>
+                `;
+
+
+            // =================================================
+            // فتح المحادثة
+            // =================================================
+
+            title.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    currentChat =
+                        chat;
+
+
+                    renderChat();
+
+
+                    projectsPopup?.classList.remove(
+                        "open"
+                    );
+
+
+                    chatPopup?.classList.remove(
+                        "open"
+                    );
+
+
+                    searchPopup?.classList.remove(
+                        "open"
+                    );
+
+                };
+
+
+            // =================================================
+            // تحديد المحادثة
+            // =================================================
+
+            checkbox.onclick =
+                function (
+                    e
+                ) {
+
+                    e.stopPropagation();
+
+                };
+
+
+            checkbox.onchange =
+                function () {
+
+                    if (
+                        this.checked
+                    ) {
+
+                        selectedChatIds.add(
+                            chatId
+                        );
+
+                    }
+                    else {
+
+                        selectedChatIds.delete(
+                            chatId
+                        );
+
+                    }
+
+
+                    updateChatSelectionUI();
+
+                };
+
+
+            // =================================================
+            // القائمة
+            // =================================================
+
+            menu.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    document
+                        .querySelectorAll(
+                            ".chat-options-menu.open"
+                        )
+                        .forEach(
+                            function (
+                                menuItem
+                            ) {
+
+                                menuItem.classList.remove(
+                                    "open"
+                                );
+
+                            }
+                        );
+
+
+                    options.classList.add(
+                        "open"
+                    );
+
+                };
+
+
+            // =================================================
+            // إعادة التسمية
+            // =================================================
+
+            const renameButton =
+                options.querySelector(
+                    ".rename-chat"
+                );
+
+
+            renameButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    options.classList.remove(
+                        "open"
+                    );
+
+
+                    const oldTitle =
+                        String(
+                            chat.title ||
+                            "محادثة جديدة"
+                        );
+
+
+                    const edit =
+                        document.createElement(
+                            "input"
+                        );
+
+
+                    edit.type =
+                        "text";
+
+
+                    edit.className =
+                        "edit-chat-title";
+
+
+                    edit.value =
+                        oldTitle;
+
+
+                    title.replaceChildren(
+                        chatIcon,
+                        edit
+                    );
+
+
+                    edit.focus();
+
+
+                    edit.select();
+
+
+                    function finishRename(
+                        save
+                    ) {
+
+                        if (
+                            save
+                        ) {
+
+                            const newTitle =
+                                edit.value.trim();
+
+
+                            chat.title =
+                                newTitle ||
+                                oldTitle;
+
+
+                            saveChats();
+
+                        }
+
+
+                        renderSidebarChats();
+                        renderRecentChats();
+                        renderChatList();
+
+                    }
+
+
+                    edit.onkeydown =
+                        function (
+                            event
+                        ) {
+
+                            if (
+                                event.key ===
+                                "Enter"
+                            ) {
+
+                                event.preventDefault();
+
+
+                                finishRename(
+                                    true
+                                );
+
+                            }
+
+
+                            else if (
+                                event.key ===
+                                "Escape"
+                            ) {
+
+                                event.preventDefault();
+
+
+                                finishRename(
+                                    false
+                                );
+
+                            }
+
+                        };
+
+
+                    edit.onblur =
+                        function () {
+
+                            finishRename(
+                                true
+                            );
+
+                        };
+
+                };
+
+
+            // =================================================
+            // حذف محادثة واحدة
+            // =================================================
+
+            const deleteButton =
+                options.querySelector(
+                    ".delete-chat"
+                );
+
+
+            deleteButton.onclick =
+                function (
+                    e
+                ) {
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+
+                    options.classList.remove(
+                        "open"
+                    );
+
+
+                    if (
+                        !confirm(
+                            `هل تريد حذف المحادثة: ${chat.title || "محادثة جديدة"}؟`
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    chats =
+                        chats.filter(
+                            function (
+                                item
+                            ) {
+
+                                return String(
+                                    item.id
+                                ) !==
+                                chatId;
+
+                            }
+                        );
+
+
+                    selectedChatIds.delete(
+                        chatId
+                    );
+
+
+                    if (
+                        currentChat &&
+                        String(
+                            currentChat.id
+                        ) ===
+                        chatId
+                    ) {
+
+                        currentChat =
+                            null;
+
+                        renderChat();
+
+                    }
+
+
+                    saveChats();
+
+
+                    renderChatList();
+                    renderSidebarChats();
+                    renderRecentChats();
+
+                };
+
+
+            // =================================================
+            // إغلاق القائمة عند النقر خارجها
+            // =================================================
+
+            item.onclick =
+                function (
+                    e
+                ) {
+
+                    if (
+                        e.target.closest(
+                            ".chat-menu"
+                        ) ||
+                        e.target.closest(
+                            ".chat-options-menu"
+                        ) ||
+                        e.target.closest(
+                            ".sidebar-chat-checkbox-wrap"
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+                };
+
+
+            item.appendChild(
+                checkboxWrap
+            );
+
+
+            item.appendChild(
+                title
+            );
+
+
+            item.appendChild(
+                menu
+            );
+
+
+            item.appendChild(
+                options
+            );
+
+
+            list.appendChild(
+                item
+            );
+
+        }
+    );
+
+
+    updateChatSelectionUI();
 
 }
 

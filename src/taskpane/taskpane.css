@@ -7358,6 +7358,71 @@ body.sidebar-is-pinned .message-box {
     }
 
 }
+
+#new-chat-list {
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.sidebar-chat-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+}
+
+.sidebar-chat-select-all {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.sidebar-chat-delete-selected {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.sidebar-chat-delete-selected:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.recent-chat-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sidebar-chat-checkbox-wrap {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.sidebar-chat-checkbox {
+    cursor: pointer;
+}
+
+.sidebar-chat-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recent-chat-item .chat-title {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.recent-chat-item .chat-menu {
+    flex: 0 0 auto;
+}
 /* =========================================================
    END
    ========================================================= */
