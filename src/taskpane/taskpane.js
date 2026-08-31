@@ -33761,7 +33761,6 @@ async function sendMessage() {
 
         }
 
-        showSmartSearchActivity();
 
         const libraryData =
             await searchLibrary(
