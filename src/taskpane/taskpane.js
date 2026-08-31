@@ -25255,6 +25255,772 @@ async function askAI(
 
 }
 
+// =============================================================
+// ذكاء اصطناعي خفيف ومخصص لترشيح نتائج المكتبات
+// يستخدم نفس إعدادات المزود والمفتاح والنموذج
+// دون إدخال سياق المحادثة أو المستندات.
+// =============================================================
+
+async function askAIForLibraryRanking(
+    prompt
+) {
+
+    const data =
+        getActiveAISettings();
+
+
+    if (!data.key.trim()) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
+        );
+
+    }
+
+
+    if (!data.model.trim()) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج الذكاء الاصطناعي من الإعدادات."
+        );
+
+    }
+
+
+    const messages = [
+
+        {
+            role:
+                "system",
+
+            content:
+                "أنت مساعد متخصص في فرز نتائج البحث العلمي العربي. " +
+                "مهمتك اختيار وترتيب النتائج الأكثر صلة بموضوع البحث. " +
+                "لا تخترع نتائج ولا معلومات غير موجودة في النتائج المعطاة. " +
+                "ركز على التطابق المفهومي والموضوعي والحرفي مع السؤال. " +
+                "أعد JSON صالحًا فقط دون أي شرح."
+        },
+
+        {
+            role:
+                "user",
+
+            content:
+                String(
+                    prompt ||
+                    ""
+                )
+
+        }
+
+    ];
+
+
+    // =========================================================
+    // OpenRouter
+    // =========================================================
+
+    if (
+        data.provider ===
+        "openrouter"
+    ) {
+
+        const response =
+            await fetch(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json",
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key,
+
+                        "HTTP-Referer":
+                            window.location.href,
+
+                        "X-Title":
+                            "Research Tools"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                data.model,
+
+                            messages,
+
+                            temperature:
+                                0,
+
+                            max_tokens:
+                                4000
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ OpenRouter."
+                )
+            );
+
+        }
+
+
+        return extractOpenAIStyleAnswer(
+            result,
+            "OpenRouter"
+        );
+
+    }
+
+
+    // =========================================================
+    // OpenAI
+    // =========================================================
+
+    if (
+        data.provider ===
+        "openai"
+    ) {
+
+        const response =
+            await fetch(
+                "https://api.openai.com/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json",
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                data.model,
+
+                            messages,
+
+                            temperature:
+                                0,
+
+                            max_tokens:
+                                4000
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ OpenAI."
+                )
+            );
+
+        }
+
+
+        return extractOpenAIStyleAnswer(
+            result,
+            "OpenAI"
+        );
+
+    }
+
+
+    // =========================================================
+    // Gemini
+    // =========================================================
+
+    if (
+        data.provider ===
+        "gemini"
+    ) {
+
+        const cleanModel =
+            normalizeGeminiModel(
+                data.model
+            );
+
+
+        const url =
+            "https://generativelanguage.googleapis.com/v1beta/models/" +
+            encodeURIComponent(
+                cleanModel
+            ) +
+            ":generateContent?key=" +
+            encodeURIComponent(
+                data.key
+            );
+
+
+        const response =
+            await fetch(
+                url,
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            contents: [
+
+                                {
+
+                                    role:
+                                        "user",
+
+                                    parts: [
+
+                                        {
+
+                                            text:
+                                                messages
+                                                    .map(
+                                                        message =>
+                                                            `${message.role}: ${message.content}`
+                                                    )
+                                                    .join(
+                                                        "\n\n"
+                                                    )
+
+                                        }
+
+                                    ]
+
+                                }
+
+                            ]
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ Gemini."
+                )
+            );
+
+        }
+
+
+        return extractGeminiAnswer(
+            result
+        );
+
+    }
+
+
+    // =========================================================
+    // Groq
+    // =========================================================
+
+    if (
+        data.provider ===
+        "groq"
+    ) {
+
+        const response =
+            await fetch(
+                "https://api.groq.com/openai/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json",
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                data.model,
+
+                            messages,
+
+                            temperature:
+                                0,
+
+                            max_tokens:
+                                4000
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ Groq."
+                )
+            );
+
+        }
+
+
+        return extractOpenAIStyleAnswer(
+            result,
+            "Groq"
+        );
+
+    }
+
+
+    throw new Error(
+        "مزود الذكاء الاصطناعي غير معروف: " +
+        data.provider
+    );
+
+}
+
+
+// =============================================================
+// ترشيح وترتيب نتائج المكتبات بالذكاء الاصطناعي
+// =============================================================
+
+async function rankLibraryResultsWithAI(
+    query,
+    results
+) {
+
+    if (
+        !Array.isArray(results) ||
+        !results.length
+    ) {
+
+        return [];
+
+    }
+
+
+    // ---------------------------------------------------------
+    // لا نرسل كمية ضخمة من البيانات للنموذج.
+    // نمرر فقط المعلومات التي يحتاجها للحكم.
+    // ---------------------------------------------------------
+
+    const candidates =
+        results.map(
+            function (
+                result,
+                index
+            ) {
+
+                return {
+
+                    index,
+
+                    source:
+                        result?.source ||
+                        "",
+
+                    bookId:
+                        result?.bookId ||
+                        "",
+
+                    title:
+                        result?.title ||
+                        "",
+
+                    author:
+                        result?.author ||
+                        "",
+
+                    sectionTitle:
+                        result?.sectionTitle ||
+                        "",
+
+                    text:
+                        String(
+                            result?.text ||
+                            ""
+                        )
+                        .substring(
+                            0,
+                            1200
+                        )
+
+                };
+
+            }
+        );
+
+
+    const prompt =
+        `
+السؤال الأصلي:
+${query}
+
+أمامك نتائج بحث من مكتبتين رقميتين.
+
+مهمتك:
+رتب النتائج من الأكثر صلة إلى الأقل صلة بالسؤال.
+
+اعتمد في الحكم على:
+1. القرب من موضوع السؤال.
+2. التطابق المفهومي.
+3. التطابق الحرفي عند وجوده.
+4. صلة عنوان الكتاب.
+5. صلة عنوان الموضع.
+6. مضمون النص نفسه.
+
+مهم جدًا:
+- لا تفترض أن ترتيب المكتبة الأصلية صحيح.
+- لا تفضل مكتبة على أخرى.
+- لا تحذف نتيجة جيدة لمجرد أنها من مكتبة معينة.
+- لا تخترع أي نتيجة.
+- الباحث سيحكم بنفسه على النتائج؛ أنت مجرد أداة ترشيح.
+- المطلوب ترتيب النتائج الموجودة فقط.
+
+أعد JSON فقط بهذا الشكل:
+
+{
+  "ranking": [
+    {
+      "index": 0,
+      "relevance": 100
+    },
+    {
+      "index": 3,
+      "relevance": 94
+    }
+  ]
+}
+
+بحيث:
+- index هو رقم النتيجة في القائمة أدناه.
+- relevance رقم من 0 إلى 100.
+- أعد جميع النتائج.
+- رتبها تنازليًا بحسب relevance.
+
+النتائج:
+${JSON.stringify(
+    candidates
+)}
+`;
+
+
+    const raw =
+        await askAIForLibraryRanking(
+            prompt
+        );
+
+
+    let parsed;
+
+
+    try {
+
+        parsed =
+            typeof raw ===
+                "string"
+                ? JSON.parse(
+                    raw
+                )
+                : raw;
+
+    }
+    catch {
+
+        // محاولة استخراج JSON من النص
+        const match =
+            String(
+                raw || ""
+            )
+            .match(
+                /\{[\s\S]*\}/
+            );
+
+
+        if (
+            !match
+        ) {
+
+            throw new Error(
+                "لم يُرجع الذكاء الاصطناعي ترتيبًا صالحًا."
+            );
+
+        }
+
+
+        parsed =
+            JSON.parse(
+                match[0]
+            );
+
+    }
+
+
+    if (
+        !parsed ||
+        !Array.isArray(
+            parsed.ranking
+        )
+    ) {
+
+        throw new Error(
+            "صيغة ترتيب نتائج المكتبة غير صالحة."
+        );
+
+    }
+
+
+    const original =
+        results;
+
+
+    const ranked =
+        parsed.ranking
+            .map(
+                function (
+                    item
+                ) {
+
+                    const index =
+                        Number(
+                            item?.index
+                        );
+
+                    const relevance =
+                        Number(
+                            item?.relevance
+                        );
+
+
+                    if (
+                        !Number.isInteger(
+                            index
+                        ) ||
+                        index < 0 ||
+                        index >=
+                            original.length
+                    ) {
+
+                        return null;
+
+                    }
+
+
+                    return {
+
+                        result:
+                            original[index],
+
+                        relevance:
+                            Number.isFinite(
+                                relevance
+                            )
+                                ? Math.max(
+                                    0,
+                                    Math.min(
+                                        100,
+                                        relevance
+                                    )
+                                )
+                                : 0,
+
+                        index
+
+                    };
+
+                }
+            )
+            .filter(
+                Boolean
+            );
+
+
+    // ---------------------------------------------------------
+    // إزالة أي فهرس مكرر أرسله النموذج
+    // ---------------------------------------------------------
+
+    const seen =
+        new Set();
+
+
+    const uniqueRanked =
+        ranked.filter(
+            function (
+                item
+            ) {
+
+                if (
+                    seen.has(
+                        item.index
+                    )
+                ) {
+
+                    return false;
+
+                }
+
+
+                seen.add(
+                    item.index
+                );
+
+
+                return true;
+
+            }
+        );
+
+
+    // ---------------------------------------------------------
+    // النتائج التي لم يذكرها النموذج تبقى موجودة.
+    // لا نفقد أي نتيجة بسبب استجابة ناقصة من الذكاء.
+    // ---------------------------------------------------------
+
+    for (
+        let index = 0;
+        index <
+        original.length;
+        index++
+    ) {
+
+        if (
+            seen.has(
+                index
+            )
+        ) {
+
+            continue;
+
+        }
+
+
+        uniqueRanked.push({
+
+            result:
+                original[index],
+
+            relevance:
+                0,
+
+            index
+
+        });
+
+    }
+
+
+    // ---------------------------------------------------------
+    // الترتيب النهائي
+    // ---------------------------------------------------------
+
+    uniqueRanked.sort(
+        function (
+            a,
+            b
+        ) {
+
+            if (
+                b.relevance !==
+                a.relevance
+            ) {
+
+                return (
+                    b.relevance -
+                    a.relevance
+                );
+
+            }
+
+
+            return (
+                a.index -
+                b.index
+            );
+
+        }
+    );
+
+
+    return uniqueRanked;
+
+}
+
 function escapeHTML(value) {
 
     return String(
@@ -33244,6 +34010,216 @@ async function searchLibrary(
 
 }
 
+async function rankLibraryResultsWithAI(
+    query,
+    results
+) {
+
+    if (
+        !Array.isArray(results) ||
+        !results.length
+    ) {
+        return [];
+    }
+
+    const candidates =
+        results.map(
+            function (
+                result,
+                index
+            ) {
+
+                return {
+                    index,
+                    source:
+                        result.source || "",
+
+                    bookId:
+                        result.bookId || "",
+
+                    title:
+                        result.title || "",
+
+                    sectionTitle:
+                        result.sectionTitle || "",
+
+                    text:
+                        String(
+                            result.text || ""
+                        ).substring(
+                            0,
+                            1800
+                        ),
+
+                    matchedTerms:
+                        Number(
+                            result.matchedTerms || 0
+                        ),
+
+                    totalTerms:
+                        Number(
+                            result.totalTerms || 0
+                        ),
+
+                    importantMatched:
+                        Number(
+                            result.importantMatched || 0
+                        ),
+
+                    importantTotal:
+                        Number(
+                            result.importantTotal || 0
+                        ),
+
+                    proximity:
+                        Number(
+                            result.proximity || 0
+                        )
+                };
+
+            }
+        );
+
+    const prompt = `
+أنت مساعد بحث علمي مهمتك الوحيدة ترشيح وترتيب نتائج البحث.
+
+عبارة الباحث:
+${query}
+
+رتب النتائج بحسب صلتها الحقيقية بموضوع العبارة، مع الاهتمام خصوصًا بـ:
+1. قرب عنوان الكتاب من موضوع البحث.
+2. قرب عنوان الموضع من موضوع البحث.
+3. مطابقة مفاهيم البحث.
+4. المطابقة الحرفية عند وجودها.
+5. مدى اجتماع مفردات البحث في النص.
+6. السياق العلمي للنتيجة.
+
+لا تؤلف نتائج جديدة.
+لا تغيّر نص النتائج.
+لا تستبعد نتيجة لمجرد أن عنوان الكتاب لا يطابق العبارة حرفيًا.
+النتائج مجرد ترشيحات للباحث.
+
+أعد JSON فقط بهذا الشكل:
+
+[
+  {
+    "index": 0,
+    "rank": 1
+  }
+]
+
+ويجب أن تشمل جميع الفهارس التي أرسلت إليك.
+`;
+
+    /*
+     * هنا نستخدم دالة الذكاء الموجودة أصلًا
+     * في المشروع.
+     *
+     * غيّر اسم الدالة في هذا السطر فقط إذا كان
+     * اسم دالة استدعاء الذكاء لديك مختلفًا.
+     */
+    const aiResponse =
+        await askAIForLibraryRanking(
+            prompt,
+            candidates
+        );
+
+    if (
+        !Array.isArray(aiResponse)
+    ) {
+        throw new Error(
+            "استجابة الذكاء الاصطناعي لترتيب نتائج المكتبة غير صالحة."
+        );
+    }
+
+    const orderMap =
+        new Map();
+
+    aiResponse.forEach(
+        function (
+            item
+        ) {
+
+            const index =
+                Number(
+                    item?.index
+                );
+
+            const rank =
+                Number(
+                    item?.rank
+                );
+
+            if (
+                Number.isInteger(index) &&
+                index >= 0 &&
+                index < results.length &&
+                Number.isFinite(rank)
+            ) {
+
+                orderMap.set(
+                    index,
+                    rank
+                );
+
+            }
+
+        }
+    );
+
+    if (
+        !orderMap.size
+    ) {
+        throw new Error(
+            "الذكاء الاصطناعي لم يُرجع ترتيبًا صالحًا للنتائج."
+        );
+    }
+
+    return results
+        .map(
+            function (
+                result,
+                index
+            ) {
+
+                return {
+                    result,
+                    index,
+                    aiRank:
+                        orderMap.has(index)
+                            ? orderMap.get(index)
+                            : Number.MAX_SAFE_INTEGER
+                };
+
+            }
+        )
+        .sort(
+            function (
+                a,
+                b
+            ) {
+
+                if (
+                    a.aiRank !==
+                    b.aiRank
+                ) {
+
+                    return (
+                        a.aiRank -
+                        b.aiRank
+                    );
+
+                }
+
+                return (
+                    a.index -
+                    b.index
+                );
+
+            }
+        );
+
+}
 // =====================================================
 // شاشة نشاط البحث الذكي
 // =====================================================
@@ -33289,7 +34265,7 @@ function showSmartSearchActivity(
 
 
     // =================================================
-    // تهيئة عنصر التحميل نفسه
+    // تهيئة فقاعة التحميل نفسها
     // =================================================
 
     loadingElement.classList.add(
@@ -33301,126 +34277,60 @@ function showSmartSearchActivity(
         "";
 
 
+    // =================================================
+    // إنشاء سطر واحد فقط
+    // =================================================
+
+    const line =
+        document.createElement(
+            "div"
+        );
+
+
+    line.className =
+        "smart-search-activity-line";
+
+
+    line.innerHTML =
+        `
+        <span class="smart-search-activity-dot">
+        </span>
+
+        <span class="smart-search-activity-text">
+        </span>
+        `;
+
+
+    loadingElement.appendChild(
+        line
+    );
+
+
+    const textElement =
+        line.querySelector(
+            ".smart-search-activity-text"
+        );
+
+
+    // =================================================
+    // البداية
+    // =================================================
+
     smartSearchActivityIndex =
         0;
 
 
-    // =================================================
-    // إضافة رسالة نشاط
-    // =================================================
+    function setMessage(
+        message
+    ) {
 
-    function addMessage() {
-
-        const message =
-            SMART_SEARCH_MESSAGES[
-                smartSearchActivityIndex %
-                SMART_SEARCH_MESSAGES.length
-            ];
-
-
-        const line =
-            document.createElement(
-                "div"
-            );
-
-
-        line.className =
-            "smart-search-activity-line";
-
-
-        line.textContent =
-            message;
-
-
-        loadingElement.appendChild(
-            line
-        );
-
-
-        // ---------------------------------------------
-        // ظهور ناعم
-        // ---------------------------------------------
-
-        requestAnimationFrame(
-            () => {
-
-                requestAnimationFrame(
-                    () => {
-
-                        line.classList.add(
-                            "visible"
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-
-        // ---------------------------------------------
-        // اختفاء ناعم
-        // ---------------------------------------------
-
-        setTimeout(
-            () => {
-
-                if (
-                    !line.parentNode
-                ) {
-
-                    return;
-
-                }
-
-
-                line.classList.remove(
-                    "visible"
-                );
-
-
-                line.classList.add(
-                    "fade-out"
-                );
-
-
-                setTimeout(
-                    () => {
-
-                        if (
-                            line.parentNode
-                        ) {
-
-                            line.parentNode.removeChild(
-                                line
-                            );
-
-                        }
-
-                    },
-                    550
-                );
-
-            },
-            1800
-        );
-
-
-        smartSearchActivityIndex++;
-
-
-        // =================================================
-        // إبقاء موضع الدردشة عند آخر سطر
-        // =================================================
-
-        if (
-            chatArea
-        ) {
-
-            chatArea.scrollTop =
-                chatArea.scrollHeight;
-
+        if (!textElement) {
+            return;
         }
+
+
+        textElement.textContent =
+            message;
 
     }
 
@@ -33429,18 +34339,135 @@ function showSmartSearchActivity(
     // الرسالة الأولى
     // =================================================
 
-    addMessage();
+    setMessage(
+        SMART_SEARCH_MESSAGES[0]
+    );
 
 
     // =================================================
-    // الرسائل التالية
+    // ظهور أولي ناعم
+    // =================================================
+
+    requestAnimationFrame(
+        () => {
+
+            requestAnimationFrame(
+                () => {
+
+                    line.classList.add(
+                        "visible"
+                    );
+
+                }
+            );
+
+        }
+    );
+
+
+    // =================================================
+    // تغيير الرسالة بسلاسة
     // =================================================
 
     smartSearchActivityTimer =
         setInterval(
-            addMessage,
-            1100
+            function () {
+
+                // -----------------------------------------
+                // اختفاء الرسالة الحالية
+                // -----------------------------------------
+
+                line.classList.remove(
+                    "visible"
+                );
+
+                line.classList.add(
+                    "fade-out"
+                );
+
+
+                // -----------------------------------------
+                // بعد انتهاء التلاشي نغير النص
+                // -----------------------------------------
+
+                setTimeout(
+                    function () {
+
+                        smartSearchActivityIndex =
+                            (
+                                smartSearchActivityIndex +
+                                1
+                            ) %
+                            SMART_SEARCH_MESSAGES.length;
+
+
+                        setMessage(
+                            SMART_SEARCH_MESSAGES[
+                                smartSearchActivityIndex
+                            ]
+                        );
+
+
+                        // ---------------------------------
+                        // إعادة الظهور
+                        // ---------------------------------
+
+                        line.classList.remove(
+                            "fade-out"
+                        );
+
+
+                        requestAnimationFrame(
+                            () => {
+
+                                requestAnimationFrame(
+                                    () => {
+
+                                        line.classList.add(
+                                            "visible"
+                                        );
+
+                                    }
+                                );
+
+                            }
+                        );
+
+
+                        // ---------------------------------
+                        // تمرير الدردشة تلقائيًا
+                        // ---------------------------------
+
+                        if (
+                            chatArea
+                        ) {
+
+                            chatArea.scrollTop =
+                                chatArea.scrollHeight;
+
+                        }
+
+                    },
+                    650
+                );
+
+            },
+            2600
         );
+
+
+    // =================================================
+    // تمرير الدردشة إلى الأسفل
+    // =================================================
+
+    if (
+        chatArea
+    ) {
+
+        chatArea.scrollTop =
+            chatArea.scrollHeight;
+
+    }
 
 }
 
