@@ -33391,7 +33391,7 @@ async function rankLibraryResultsWithAI(
 // إعادة بناء استجابة المكتبة
 // =====================================================
 
-function rebuildLibraryResponseFromResults(
+async function rebuildLibraryResponseFromResults(
     results,
     query,
     requestedResults,
@@ -33399,22 +33399,238 @@ function rebuildLibraryResponseFromResults(
     meta = {}
 ) {
 
-    const finalResults =
-        results.slice(
-            0,
-            Math.max(
-                1,
-                requestedResults
+    // =========================================================
+    // النتائج النهائية
+    // =========================================================
+
+    let finalResults =
+        Array.isArray(
+            results
+        )
+            ? results.slice(
+                0,
+                Math.max(
+                    1,
+                    requestedResults
+                )
+            )
+            : [];
+
+
+    // =========================================================
+    // إثراء نتائج الشاملة
+    //
+    // نستخدم المسار المثبت:
+    // /shamela-page-info
+    //
+    // ولا نغيّر أي شيء آخر في النتيجة.
+    // =========================================================
+
+    finalResults =
+        await Promise.all(
+            finalResults.map(
+                async function (
+                    result
+                ) {
+
+                    if (
+                        !result
+                    ) {
+
+                        return result;
+
+                    }
+
+
+                    // -------------------------------------------------
+                    // لا نلمس جامع الكتب
+                    // -------------------------------------------------
+
+                    if (
+                        result.source !==
+                        "shamela"
+                    ) {
+
+                        return result;
+
+                    }
+
+
+                    // -------------------------------------------------
+                    // نحتاج bookId + pageId
+                    // -------------------------------------------------
+
+                    if (
+                        !result.bookId ||
+                        !result.pageId
+                    ) {
+
+                        return result;
+
+                    }
+
+
+                    // -------------------------------------------------
+                    // إذا كانت البيانات موجودة أصلًا،
+                    // لا نعيد طلبها.
+                    // -------------------------------------------------
+
+                    const hasPage =
+                        result.page !==
+                            undefined &&
+                        result.page !==
+                            null &&
+                        String(
+                            result.page
+                        ).trim() !==
+                            "";
+
+
+                    const hasPart =
+                        result.part !==
+                            undefined &&
+                        result.part !==
+                            null &&
+                        String(
+                            result.part
+                        ).trim() !==
+                            "";
+
+
+                    if (
+                        hasPage &&
+                        hasPart
+                    ) {
+
+                        return result;
+
+                    }
+
+
+                    try {
+
+                        // =================================================
+                        // نفس الـWorker الذي نستخدمه للبحث
+                        // =================================================
+
+                        const infoURL =
+                            new URL(
+                                "/shamela-page-info",
+                                LIBRARY_API
+                            );
+
+
+                        infoURL.searchParams.set(
+                            "bookId",
+                            String(
+                                result.bookId
+                            )
+                        );
+
+
+                        infoURL.searchParams.set(
+                            "pageId",
+                            String(
+                                result.pageId
+                            )
+                        );
+
+
+                        const response =
+                            await fetch(
+                                infoURL.toString(),
+                                {
+                                    method:
+                                        "GET",
+
+                                    headers: {
+
+                                        "Accept":
+                                            "application/json"
+                                    }
+                                }
+                            );
+
+
+                        if (
+                            !response.ok
+                        ) {
+
+                            return result;
+
+                        }
+
+
+                        const data =
+                            await response.json();
+
+
+                        if (
+                            !data ||
+                            data.ok !==
+                                true
+                        ) {
+
+                            return result;
+
+                        }
+
+
+                        return {
+
+                            ...result,
+
+                            part:
+                                data.part ||
+                                result.part ||
+                                "",
+
+                            page:
+                                data.page ||
+                                result.page ||
+                                "",
+
+                            pageId:
+                                String(
+                                    result.pageId
+                                )
+
+                        };
+
+                    }
+                    catch (
+                        error
+                    ) {
+
+                        console.warn(
+                            "تعذر إثراء نتيجة الشاملة:",
+                            result.bookId,
+                            result.pageId,
+                            error?.message ||
+                            error
+                        );
+
+
+                        return result;
+
+                    }
+
+                }
             )
         );
 
+
+    // =========================================================
+    // الكتب الفريدة
+    // =========================================================
 
     const bookMap =
         new Map();
 
 
     for (
-        const result of finalResults
+        const result
+        of finalResults
     ) {
 
         const key =
@@ -33435,6 +33651,7 @@ function rebuildLibraryResponseFromResults(
         bookMap.set(
             key,
             {
+
                 id:
                     String(
                         result?.bookId ||
@@ -33458,11 +33675,16 @@ function rebuildLibraryResponseFromResults(
                         result?.source ||
                         source
                     )
+
             }
         );
 
     }
 
+
+    // =========================================================
+    // الاستجابة
+    // =========================================================
 
     return {
 
@@ -33538,6 +33760,7 @@ function rebuildLibraryResponseFromResults(
     };
 
 }
+
 
 async function getShamelaRealLocation(
     bookId,
@@ -34054,13 +34277,12 @@ async function searchLibrary(
     // النتيجة النهائية
     // =================================================
 
-    return rebuildLibraryResponseFromResults(
+    return await rebuildLibraryResponseFromResults(
         rankedResults,
         text,
         requestedResults,
         "all",
         {
-
             ketabonlineCount:
                 totalKetabOnline,
 
@@ -34077,7 +34299,6 @@ async function searchLibrary(
                 maxLastPage,
 
             smartQueries
-
         }
     );
 
