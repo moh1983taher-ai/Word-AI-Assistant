@@ -28399,23 +28399,74 @@ function searchSavedReferences(
     scope
 ) {
 
+    const normalizeArabic =
+        function (
+            value
+        ) {
+
+            return String(
+                value ||
+                ""
+            )
+                .toLowerCase()
+                .replace(
+                    /[\u064B-\u065F\u0670]/g,
+                    ""
+                )
+                .replace(
+                    /[إأآٱ]/g,
+                    "ا"
+                )
+                .replace(
+                    /ى/g,
+                    "ي"
+                )
+                .replace(
+                    /ؤ/g,
+                    "و"
+                )
+                .replace(
+                    /ئ/g,
+                    "ي"
+                )
+                .replace(
+                    /ة/g,
+                    "ه"
+                )
+                .replace(
+                    /ـ/g,
+                    ""
+                )
+                .trim();
+
+        };
+
+
     const searchText =
-        String(
-            query ||
-            ""
-        )
-            .trim()
-            .toLowerCase();
+        normalizeArabic(
+            query
+        );
+
+
+    const genericReferenceQuestion =
+        /^(ما|ما هي|ماهو|ما هو|اذكر|اعرض|اعطني|بين|وضح|كم|عدد|من|هل|ما الكتب|ما المراجع|ما المؤلفين|ما المصادر|المراجع|الكتب|المؤلفون)\b/i
+            .test(
+                searchText
+            );
+
 
     const allReferenceRecords =
         [];
+
 
     if (
         !Array.isArray(
             projects
         )
     ) {
+
         return {
+
             found:
                 false,
 
@@ -28427,7 +28478,9 @@ function searchSavedReferences(
 
             text:
                 ""
+
         };
+
     }
 
 
@@ -28442,7 +28495,9 @@ function searchSavedReferences(
                     project.references
                 )
             ) {
+
                 return;
+
             }
 
 
@@ -28457,7 +28512,9 @@ function searchSavedReferences(
                         typeof reference !==
                             "object"
                     ) {
+
                         return;
+
                     }
 
 
@@ -28474,24 +28531,44 @@ function searchSavedReferences(
                             );
 
 
-                    const referenceKey =
-                        String(
-                            project.id
-                        ) +
-                        "::" +
-                        referenceId;
+                    const projectId =
+                        project.id !==
+                            undefined &&
+                        project.id !==
+                            null
+                            ? String(
+                                project.id
+                            )
+                            : "";
 
+
+                    // ==========================================
+                    // المرجع المحدد
+                    // ==========================================
 
                     if (
                         scope &&
                         scope.scope ===
-                            "specific" &&
-                        String(
-                            scope.id
-                        ) !==
-                            referenceKey
+                            "specific"
                     ) {
-                        return;
+
+                        if (
+                            String(
+                                scope.projectId
+                            ) !==
+                                projectId ||
+                            String(
+                                scope.referenceId ??
+                                scope.id ??
+                                ""
+                            ) !==
+                                referenceId
+                        ) {
+
+                            return;
+
+                        }
+
                     }
 
 
@@ -28529,64 +28606,14 @@ function searchSavedReferences(
                         )
                     ) {
 
-                        searchableParts.push(
-                            reference.variants.join(
-                                " "
-                            )
-                        );
-
-                    }
-
-
-                    if (
-                        Array.isArray(
-                            reference.locations
-                        )
-                    ) {
-
-                        searchableParts.push(
-                            reference.locations.join(
-                                " "
-                            )
-                        );
-
-                    }
-
-
-                    if (
-                        Array.isArray(
-                            reference.occurrences
-                        )
-                    ) {
-
-                        reference.occurrences.forEach(
+                        reference.variants.forEach(
                             function (
-                                occurrence
+                                value
                             ) {
 
-                                if (
-                                    occurrence &&
-                                    typeof occurrence ===
-                                        "object"
-                                ) {
-
-                                    searchableParts.push(
-                                        occurrence.source
-                                    );
-
-                                    searchableParts.push(
-                                        occurrence.materialId
-                                    );
-
-                                    searchableParts.push(
-                                        occurrence.page
-                                    );
-
-                                    searchableParts.push(
-                                        occurrence.pageRange
-                                    );
-
-                                }
+                                searchableParts.push(
+                                    value
+                                );
 
                             }
                         );
@@ -28595,40 +28622,73 @@ function searchSavedReferences(
 
 
                     const searchableText =
-                        searchableParts
-                            .filter(
-                                function (
-                                    value
-                                ) {
-                                    return (
-                                        value !==
-                                            undefined &&
-                                        value !==
-                                            null &&
-                                        String(
-                                            value
-                                        ).trim()
-                                    );
-                                }
-                            )
-                            .join(
-                                " "
-                            )
-                            .toLowerCase();
+                        normalizeArabic(
+                            searchableParts
+                                .filter(
+                                    function (
+                                        value
+                                    ) {
+
+                                        return (
+                                            value !==
+                                                undefined &&
+                                            value !==
+                                                null &&
+                                            String(
+                                                value
+                                            ).trim() !==
+                                                ""
+                                        );
+
+                                    }
+                                )
+                                .join(
+                                    " "
+                                )
+                        );
 
 
                     let score =
                         0;
 
 
+                    // ==========================================
+                    // المرجع المحدد:
+                    // لا يحتاج أي تطابق نصي
+                    // ==========================================
+
                     if (
-                        !searchText
+                        scope &&
+                        scope.scope ===
+                            "specific"
+                    ) {
+
+                        score =
+                            100000;
+
+                    }
+
+
+                    // ==========================================
+                    // جميع المراجع
+                    // الأسئلة العامة تعرض المراجع
+                    // ==========================================
+
+                    else if (
+                        !searchText ||
+                        genericReferenceQuestion
                     ) {
 
                         score =
                             1;
 
                     }
+
+
+                    // ==========================================
+                    // البحث النصي الحقيقي
+                    // ==========================================
+
                     else {
 
                         const queryTerms =
@@ -28647,49 +28707,50 @@ function searchSavedReferences(
                             ) {
 
                                 if (
-                                    !term
-                                ) {
-                                    return;
-                                }
-
-
-                                if (
-                                    String(
-                                        reference.title ||
-                                        ""
-                                    )
-                                        .toLowerCase()
-                                        .includes(
-                                            term
-                                        )
-                                ) {
-                                    score +=
-                                        8;
-                                }
-
-
-                                if (
-                                    String(
-                                        reference.author ||
-                                        ""
-                                    )
-                                        .toLowerCase()
-                                        .includes(
-                                            term
-                                        )
-                                ) {
-                                    score +=
-                                        6;
-                                }
-
-
-                                if (
                                     searchableText.includes(
                                         term
                                     )
                                 ) {
+
                                     score +=
                                         2;
+
+                                }
+
+
+                                const title =
+                                    normalizeArabic(
+                                        reference.title
+                                    );
+
+
+                                const author =
+                                    normalizeArabic(
+                                        reference.author
+                                    );
+
+
+                                if (
+                                    title.includes(
+                                        term
+                                    )
+                                ) {
+
+                                    score +=
+                                        10;
+
+                                }
+
+
+                                if (
+                                    author.includes(
+                                        term
+                                    )
+                                ) {
+
+                                    score +=
+                                        8;
+
                                 }
 
                             }
@@ -28702,7 +28763,9 @@ function searchSavedReferences(
                         score <=
                             0
                     ) {
+
                         return;
+
                     }
 
 
@@ -28711,11 +28774,11 @@ function searchSavedReferences(
 
                             ...reference,
 
-                            _researchReferenceKey:
-                                referenceKey,
+                            _researchReferenceId:
+                                referenceId,
 
                             _researchProjectId:
-                                project.id,
+                                projectId,
 
                             _researchProjectName:
                                 project.name ||
@@ -28758,7 +28821,7 @@ function searchSavedReferences(
     const results =
         allReferenceRecords.slice(
             0,
-            30
+            50
         );
 
 
@@ -28767,20 +28830,25 @@ function searchSavedReferences(
             value
         ) {
 
-            return (
+            if (
                 value ===
                     undefined ||
                 value ===
-                    null ||
+                    null
+            ) {
+
+                return "";
+
+            }
+
+
+            const result =
                 String(
                     value
-                ).trim() ===
-                    ""
-            )
-                ? ""
-                : String(
-                    value
                 ).trim();
+
+
+            return result;
 
         };
 
@@ -28792,22 +28860,15 @@ function searchSavedReferences(
                 index
             ) {
 
-                const title =
-                    formatValue(
-                        reference.title
-                    ) ||
-                    "عنوان غير محدد";
-
-
                 const author =
                     formatValue(
                         reference.author
                     );
 
 
-                const year =
+                const title =
                     formatValue(
-                        reference.year
+                        reference.title
                     );
 
 
@@ -28820,6 +28881,12 @@ function searchSavedReferences(
                 const city =
                     formatValue(
                         reference.city
+                    );
+
+
+                const year =
+                    formatValue(
+                        reference.year
                     );
 
 
@@ -28851,6 +28918,7 @@ function searchSavedReferences(
 
 
                 return [
+
                     "=== المرجع " +
                         String(
                             index +
@@ -28868,7 +28936,10 @@ function searchSavedReferences(
                         ),
 
                     "العنوان: " +
-                        title,
+                        (
+                            title ||
+                            "غير محدد"
+                        ),
 
                     "الناشر: " +
                         (
@@ -29335,48 +29406,84 @@ async function buildStreamingContext(
             [];
 
 
-        documentContext = {
-
-            found:
-                false,
-
-            unsupportedScope:
-                true,
-
-            scopeType:
-                "reference",
-
-            query:
+        const referenceSearch =
+            searchSavedReferences(
                 text,
+                scope
+            );
 
-            profile:
-                "general",
 
-            resultCount:
-                0,
+        documentContext =
+            {
 
-            selectedCount:
-                0,
+                found:
+                    referenceSearch.found,
 
-            totalOccurrences:
-                0,
+                scopeType:
+                    "reference",
 
-            matchedTerms:
-                [],
+                scopeName:
+                    scope.name ||
+                    (
+                        scope.scope ===
+                        "specific"
+                            ? "المرجع المحدد"
+                            : "جميع المراجع"
+                    ),
 
-            matchedFamilies:
-                [],
+                query:
+                    text,
 
-            contexts:
-                [],
+                profile:
+                    "reference",
 
-            text:
-                "",
+                resultCount:
+                    referenceSearch.total,
 
-            citations:
-                []
+                selectedCount:
+                    referenceSearch.total,
 
-        };
+                totalOccurrences:
+                    referenceSearch.results.reduce(
+                        function (
+                            total,
+                            reference
+                        ) {
+
+                            return (
+                                total +
+                                (
+                                    Array.isArray(
+                                        reference.occurrences
+                                    )
+                                        ? reference.occurrences.length
+                                        : 0
+                                )
+                            );
+
+                        },
+                        0
+                    ),
+
+                matchedTerms:
+                    [],
+
+                matchedFamilies:
+                    [],
+
+                contexts:
+                    [],
+
+                text:
+                    referenceSearch.text,
+
+                citations:
+                    [],
+
+                references:
+                    referenceSearch.results
+
+            };
 
     }
     else if (
@@ -42898,13 +43005,246 @@ if (
         }
 
 
-        // المراجع غير مبنية بعد في النظام الحالي
-        scopePanelContent.innerHTML =
-            `
-            <div class="scope-empty">
-                لا توجد مراجع متاحة حاليًا
-            </div>
-            `;
+        const referenceItems =
+            [];
+
+
+        if (
+            Array.isArray(
+                projects
+            )
+        ) {
+
+            projects.forEach(
+                function (
+                    project
+                ) {
+
+                    if (
+                        !project ||
+                        !Array.isArray(
+                            project.references
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+
+                    project.references.forEach(
+                        function (
+                            reference,
+                            index
+                        ) {
+
+                            if (
+                                !reference
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            const referenceId =
+                                reference.id !==
+                                    undefined &&
+                                reference.id !==
+                                    null
+                                    ? String(
+                                        reference.id
+                                    )
+                                    : String(
+                                        index
+                                    );
+
+
+                            referenceItems.push(
+                                {
+
+                                    projectId:
+                                        project.id,
+
+                                    projectName:
+                                        project.name ||
+                                        "مشروع غير مسمى",
+
+                                    referenceId:
+                                        referenceId,
+
+                                    reference:
+                                        reference
+
+                                }
+                            );
+
+                        }
+                    );
+
+                }
+            );
+
+        }
+
+
+        if (
+            referenceItems.length ===
+                0
+        ) {
+
+            scopePanelContent.innerHTML =
+                `
+                <div class="scope-empty">
+                    لا توجد مراجع محفوظة حاليًا
+                </div>
+                `;
+
+            return;
+
+        }
+
+
+        referenceItems.forEach(
+            function (
+                item
+            ) {
+
+                const reference =
+                    item.reference;
+
+
+                const button =
+                    document.createElement(
+                        "button"
+                    );
+
+
+                button.type =
+                    "button";
+
+
+                button.className =
+                    "scope-project-item";
+
+
+                const title =
+                    String(
+                        reference.title ||
+                        "عنوان غير محدد"
+                    )
+                        .trim();
+
+
+                const author =
+                    String(
+                        reference.author ||
+                        "مؤلف غير محدد"
+                    )
+                        .trim();
+
+
+                button.innerHTML =
+                    `
+                    <span class="scope-project-icon">
+                        📚
+                    </span>
+
+                    <span
+                        class="scope-project-name"
+                        style="text-align:right;">
+
+                        <strong>
+                            ${escapeReferenceHTML(
+                                title
+                            )}
+                        </strong>
+
+                        <small
+                            style="
+                                display:block;
+                                opacity:.65;
+                                margin-top:3px;
+                            ">
+                            ${escapeReferenceHTML(
+                                author
+                            )}
+
+                            —
+
+                            ${escapeReferenceHTML(
+                                item.projectName
+                            )}
+                        </small>
+
+                    </span>
+                    `;
+
+
+                button.onclick =
+                    function (
+                        e
+                    ) {
+
+                        e.preventDefault();
+                        e.stopPropagation();
+
+
+                        researchScope =
+                            {
+
+                                type:
+                                    "reference",
+
+                                scope:
+                                    "specific",
+
+                                id:
+                                    item.referenceId,
+
+                                referenceId:
+                                    item.referenceId,
+
+                                projectId:
+                                    item.projectId,
+
+                                name:
+                                    title,
+
+                                projectName:
+                                    item.projectName
+
+                            };
+
+
+                        updateScopeStatus();
+
+
+                        scopePanel.classList.remove(
+                            "open"
+                        );
+
+
+                        scopePanel.setAttribute(
+                            "aria-hidden",
+                            "true"
+                        );
+
+
+                        console.log(
+                            "نطاق المرجع المحدد:",
+                            researchScope
+                        );
+
+                    };
+
+
+                scopePanelContent.appendChild(
+                    button
+                );
+
+            }
+        );
 
     }
 
