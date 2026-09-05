@@ -2109,40 +2109,6 @@ function renderProjectReferenceDocuments() {
                 latestUnifiedReferences =
                     finalReferenceResults;
 
-                // حفظ المراجع النهائية تلقائيًا في المشروع المرتبط بالمستند الحالي
-                const referenceProjectId = currentDocument?.projectId ?? currentProject?.id ?? null;
-                const referenceTargetProject = projects.find(function (project) {
-                    return project && String(project.id) === String(referenceProjectId);
-                });
-
-                if (referenceTargetProject) {
-                    referenceTargetProject.references = JSON.parse(JSON.stringify(finalReferenceResults));
-
-                    referenceTargetProject.referenceAnalysis = {
-                        analyzedDocumentIds: currentDocument?.id !== undefined && currentDocument?.id !== null
-                            ? [String(currentDocument.id)]
-                            : [],
-                        stats: {
-                            referenceCount: referenceCount,
-                            multipleReferenceCount: multipleReferenceCount,
-                            ibidCount: ibidCount,
-                            internalReferenceCount: internalReferenceCount,
-                            hadithCount: hadithCount,
-                            explanatoryCount: explanatoryCount,
-                            mixedCount: mixedCount,
-                            reviewCount: reviewCount,
-                            unifiedReferenceCount: finalReferenceResults.length,
-                            totalOccurrences: totalOccurrences
-                        },
-                        updatedAt: new Date().toISOString()
-                    };
-
-                    referenceTargetProject.updatedAt = new Date().toISOString();
-                    currentProject = referenceTargetProject;
-                    saveProjects();
-                    renderProjects();
-                }
-
 
                 // =====================================================
                 // إجمالي مرات الاستشهاد
