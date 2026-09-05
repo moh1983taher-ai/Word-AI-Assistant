@@ -28538,6 +28538,74 @@ async function buildStreamingContext(
 
             }
 
+
+            // =================================================
+            // مشروع محدد بلا مستندات
+            //
+            // يجب عدم السماح بالانتقال إلى الإجابة العامة.
+            // =================================================
+
+            if (
+                Array.isArray(
+                    scopeDocuments
+                ) &&
+                scopeDocuments.length ===
+                    0
+            ) {
+
+                currentCitationSources =
+                    [];
+
+
+                documentContext = {
+
+                    found:
+                        false,
+
+                    emptyProject:
+                        true,
+
+                    scopeType:
+                        "project",
+
+                    scopeName:
+                        scope.name ||
+                        "المشروع المحدد",
+
+                    query:
+                        text,
+
+                    profile:
+                        "general",
+
+                    resultCount:
+                        0,
+
+                    selectedCount:
+                        0,
+
+                    totalOccurrences:
+                        0,
+
+                    matchedTerms:
+                        [],
+
+                    matchedFamilies:
+                        [],
+
+                    contexts:
+                        [],
+
+                    text:
+                        "",
+
+                    citations:
+                        []
+
+                };
+
+            }
+
         }
         else {
 
@@ -28755,7 +28823,7 @@ async function buildStreamingContext(
             scope.type ===
             "document" &&
             scopeDocuments.length ===
-            1
+                1
         )
     ) {
 
@@ -28787,19 +28855,17 @@ async function buildStreamingContext(
         }
 
     }
-
-
-    // =================================================
-    // 3. البحث في مجموعة مستندات
-    // =================================================
-
     else if (
         !documentContext &&
         (
             scope.type ===
                 "document" ||
-            scope.type ===
-                "project"
+            (
+                scope.type ===
+                    "project" &&
+                scope.scope !==
+                    "specific"
+            )
         )
     ) {
 
@@ -28809,8 +28875,10 @@ async function buildStreamingContext(
                 scopeDocuments
             );
 
+
         documentContext.scopeType =
             scope.type;
+
 
         documentContext.scopeName =
             scope.name ||
@@ -28825,7 +28893,7 @@ async function buildStreamingContext(
 
 
     // =================================================
-    // 4. تاريخ المحادثة
+    // 3. تاريخ المحادثة
     // =================================================
 
     const history =
@@ -28835,7 +28903,7 @@ async function buildStreamingContext(
 
 
     // =================================================
-    // 5. السؤال الأصلي
+    // 4. السؤال الأصلي
     // =================================================
 
     let userContent =
@@ -28846,10 +28914,62 @@ async function buildStreamingContext(
 
 
     // =================================================
-    // 6. وجود سياق بحث صالح
+    // 5. مشروع محدد بلا مستندات
+    //
+    // هذه الحالة لا يجوز أن تتحول إلى AI عام.
     // =================================================
 
     if (
+        documentContext &&
+        documentContext.emptyProject ===
+            true
+    ) {
+
+        userContent =
+            [
+
+                "أنت تعمل داخل مشروع بحثي محدد في أداة بحث أكاديمية.",
+
+                "",
+
+                "=== حالة المشروع ===",
+
+                "المشروع المحدد لا يحتوي على أي مستندات.",
+
+                "",
+
+                "=== سؤال المستخدم ===",
+
+                text,
+
+                "",
+
+                "=== قواعد الإجابة ===",
+
+                "لا توجد مادة مستندية يمكن البحث فيها داخل هذا المشروع.",
+
+                "لا تجب عن السؤال اعتمادًا على معرفتك العامة.",
+
+                "لا تفترض وجود مستندات أو معلومات داخل المشروع.",
+
+                "أخبر المستخدم بوضوح أن المشروع المحدد لا يحتوي على مستندات.",
+
+                "يمكنك الإشارة إلى أن إضافة مستندات إلى المشروع ستتيح البحث فيها.",
+
+                "اجعل الرد مختصرًا وواضحًا ومباشرًا."
+
+            ].join(
+                "\n"
+            );
+
+    }
+
+
+    // =================================================
+    // 6. وجود سياق بحث صالح
+    // =================================================
+
+    else if (
         documentContext &&
         documentContext.found
     ) {
