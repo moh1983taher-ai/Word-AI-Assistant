@@ -28549,20 +28549,18 @@ function searchSavedReferences(
                     if (
                         scope &&
                         scope.scope ===
-                            "specific"
+                            "specific" &&
+                        scope.type ===
+                            "reference"
                     ) {
 
                         if (
                             String(
-                                scope.projectId
-                            ) !==
-                                projectId ||
-                            String(
-                                scope.referenceId ??
+                                scope.projectId ??
                                 scope.id ??
                                 ""
                             ) !==
-                                referenceId
+                                projectId
                         ) {
 
                             return;
@@ -42969,7 +42967,7 @@ if (
             </button>
 
             <span>
-                اختيار المرجع
+                اختيار المشروع
             </span>
             `;
 
@@ -43005,98 +43003,38 @@ if (
         }
 
 
-        const referenceItems =
-            [];
-
-
-        if (
+        const projectsWithReferences =
             Array.isArray(
                 projects
             )
-        ) {
-
-            projects.forEach(
-                function (
-                    project
-                ) {
-
-                    if (
-                        !project ||
-                        !Array.isArray(
-                            project.references
-                        )
+                ? projects.filter(
+                    function (
+                        project
                     ) {
 
-                        return;
+                        return (
+                            project &&
+                            Array.isArray(
+                                project.references
+                            ) &&
+                            project.references.length >
+                                0
+                        );
 
                     }
-
-
-                    project.references.forEach(
-                        function (
-                            reference,
-                            index
-                        ) {
-
-                            if (
-                                !reference
-                            ) {
-
-                                return;
-
-                            }
-
-
-                            const referenceId =
-                                reference.id !==
-                                    undefined &&
-                                reference.id !==
-                                    null
-                                    ? String(
-                                        reference.id
-                                    )
-                                    : String(
-                                        index
-                                    );
-
-
-                            referenceItems.push(
-                                {
-
-                                    projectId:
-                                        project.id,
-
-                                    projectName:
-                                        project.name ||
-                                        "مشروع غير مسمى",
-
-                                    referenceId:
-                                        referenceId,
-
-                                    reference:
-                                        reference
-
-                                }
-                            );
-
-                        }
-                    );
-
-                }
-            );
-
-        }
+                )
+                : [];
 
 
         if (
-            referenceItems.length ===
+            projectsWithReferences.length ===
                 0
         ) {
 
             scopePanelContent.innerHTML =
                 `
                 <div class="scope-empty">
-                    لا توجد مراجع محفوظة حاليًا
+                    لا توجد مشاريع تحتوي على مراجع محفوظة
                 </div>
                 `;
 
@@ -43105,14 +43043,10 @@ if (
         }
 
 
-        referenceItems.forEach(
+        projectsWithReferences.forEach(
             function (
-                item
+                project
             ) {
-
-                const reference =
-                    item.reference;
-
 
                 const button =
                     document.createElement(
@@ -43128,20 +43062,8 @@ if (
                     "scope-project-item";
 
 
-                const title =
-                    String(
-                        reference.title ||
-                        "عنوان غير محدد"
-                    )
-                        .trim();
-
-
-                const author =
-                    String(
-                        reference.author ||
-                        "مؤلف غير محدد"
-                    )
-                        .trim();
+                const referenceCount =
+                    project.references.length;
 
 
                 button.innerHTML =
@@ -43156,7 +43078,8 @@ if (
 
                         <strong>
                             ${escapeReferenceHTML(
-                                title
+                                project.name ||
+                                "مشروع غير مسمى"
                             )}
                         </strong>
 
@@ -43166,15 +43089,12 @@ if (
                                 opacity:.65;
                                 margin-top:3px;
                             ">
-                            ${escapeReferenceHTML(
-                                author
-                            )}
-
-                            —
-
-                            ${escapeReferenceHTML(
-                                item.projectName
-                            )}
+                            ${referenceCount}
+                            ${
+                                referenceCount === 1
+                                    ? "مرجع"
+                                    : "مراجع"
+                            }
                         </small>
 
                     </span>
@@ -43200,19 +43120,18 @@ if (
                                     "specific",
 
                                 id:
-                                    item.referenceId,
-
-                                referenceId:
-                                    item.referenceId,
+                                    project.id,
 
                                 projectId:
-                                    item.projectId,
+                                    project.id,
 
                                 name:
-                                    title,
+                                    project.name ||
+                                    "المشروع المحدد",
 
                                 projectName:
-                                    item.projectName
+                                    project.name ||
+                                    "مشروع غير مسمى"
 
                             };
 
@@ -43232,7 +43151,7 @@ if (
 
 
                         console.log(
-                            "نطاق المرجع المحدد:",
+                            "نطاق البحث في مراجع المشروع:",
                             researchScope
                         );
 
