@@ -22221,6 +22221,15 @@ function createNewChat() {
     };
 
 
+    // ==================================
+    // المحادثة العامة لا ترتبط بمستند
+    // ==================================
+
+    setCurrentDocument(
+        null
+    );
+
+
     currentCitationSources =
         [];
 
@@ -45703,6 +45712,21 @@ function renderSidebarChats() {
                             chat;
 
 
+                        // ==================================
+                        // المحادثة العامة لا تحمل سياق مستند
+                        // ==================================
+
+                        if (
+                            !chat.projectId
+                        ) {
+
+                            setCurrentDocument(
+                                null
+                            );
+
+                        }
+
+
                         currentCitationSources =
                             [];
 
@@ -45713,24 +45737,6 @@ function renderSidebarChats() {
                         if (projectsPopup) {
 
                             projectsPopup.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        if (chatPopup) {
-
-                            chatPopup.classList.remove(
-                                "open"
-                            );
-
-                        }
-
-
-                        if (searchPopup) {
-
-                            searchPopup.classList.remove(
                                 "open"
                             );
 
