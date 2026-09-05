@@ -28816,10 +28816,15 @@ function searchSavedReferences(
     );
 
 
+    const totalReferenceCount =
+        allReferenceRecords.length;
+
+    const MAX_REFERENCE_RESULTS = 300;
+
     const results =
         allReferenceRecords.slice(
             0,
-            50
+            MAX_REFERENCE_RESULTS
         );
 
 
@@ -28999,6 +29004,9 @@ function searchSavedReferences(
 
         total:
             results.length,
+
+        totalReferenceCount:
+            totalReferenceCount,
 
         text:
             textParts.join(
@@ -29441,6 +29449,9 @@ async function buildStreamingContext(
                 selectedCount:
                     referenceSearch.total,
 
+                totalReferenceCount:
+                    referenceSearch.totalReferenceCount,
+
                 totalOccurrences:
                     referenceSearch.results.reduce(
                         function (
@@ -29724,6 +29735,16 @@ async function buildStreamingContext(
 
                     "",
 
+                    "=== إحصاءات قاعدة المراجع ===",
+
+                    "العدد الإجمالي للمراجع المحفوظة في نطاق البحث: " +
+                        String(
+                            documentContext.totalReferenceCount ||
+                            0
+                        ),
+
+                    "",
+
                     "=== المراجع المحفوظة ===",
 
                     documentContext.text,
@@ -29743,6 +29764,16 @@ async function buildStreamingContext(
                     "إذا سأل عن مؤلف أو عنوان أو ناشر أو سنة أو طبعة أو مواضع استخدام، فاستخرجها من البيانات المحفوظة فقط.",
 
                     "عند وجود المرجع في أكثر من مشروع، اذكر اسم المشروع عند الحاجة للتمييز.",
+
+                    "عند السؤال عن عدد المراجع، استخدم قيمة «العدد الإجمالي للمراجع المحفوظة في نطاق البحث» كما هي تمامًا.",
+
+                    "لا تحسب عدد المراجع من قائمة النتائج المعروضة.",
+
+                    "لا تقدّر عدد المراجع ولا تستنتجه من النص.",
+
+                    "لا تعتبر عدد النتائج المعروضة هو العدد الإجمالي للمراجع.",
+
+                    "إذا كان العدد الإجمالي للمراجع موجودًا في إحصاءات قاعدة المراجع، فهو القيمة المعتمدة والنهائية.",
 
                     "إذا كانت المعلومة المطلوبة غير موجودة في قاعدة المراجع، صرّح بأنها غير موجودة في المراجع المحفوظة.",
 
