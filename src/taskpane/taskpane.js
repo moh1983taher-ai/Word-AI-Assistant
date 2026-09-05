@@ -28863,8 +28863,11 @@ async function buildStreamingContext(
             (
                 scope.type ===
                     "project" &&
-                scope.scope !==
-                    "specific"
+                Array.isArray(
+                    scopeDocuments
+                ) &&
+                scopeDocuments.length >
+                    0
             )
         )
     ) {
@@ -28875,17 +28878,15 @@ async function buildStreamingContext(
                 scopeDocuments
             );
 
-
         documentContext.scopeType =
             scope.type;
-
 
         documentContext.scopeName =
             scope.name ||
             (
                 scope.type ===
                 "project"
-                    ? "المشاريع"
+                    ? "المشروع المحدد"
                     : "المستندات"
             );
 
