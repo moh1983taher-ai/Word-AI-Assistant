@@ -3276,35 +3276,76 @@ function getProjectDocuments(
     projectId
 ) {
 
-    if (!projectId)
+    if (
+        projectId ===
+        undefined ||
+        projectId ===
+        null ||
+        String(projectId).trim() ===
+        ""
+    ) {
+
         return [];
+
+    }
+
+
+    const normalizedProjectId =
+        String(
+            projectId
+        );
 
 
     return documents
-        .filter(function (
-            documentItem
-        ) {
+        .filter(
+            function (
+                documentItem
+            ) {
 
-            return (
-                documentItem &&
-                documentItem.projectId ===
-                    projectId
-            );
+                if (
+                    !documentItem ||
+                    documentItem.projectId ===
+                        undefined ||
+                    documentItem.projectId ===
+                        null
+                ) {
 
-        })
-        .sort(function (
-            a,
-            b
-        ) {
+                    return false;
 
-            return (
-                a.order -
-                b.order
-            );
+                }
 
-        });
+
+                return (
+                    String(
+                        documentItem.projectId
+                    ) ===
+                    normalizedProjectId
+                );
+
+            }
+        )
+        .sort(
+            function (
+                a,
+                b
+            ) {
+
+                return (
+                    Number(
+                        a.order ||
+                        0
+                    ) -
+                    Number(
+                        b.order ||
+                        0
+                    )
+                );
+
+            }
+        );
 
 }
+
 
 
 // ======================================
