@@ -28817,7 +28817,27 @@ function searchSavedReferences(
 
 
     const totalReferenceCount =
-        allReferenceRecords.length;
+        projects.reduce(
+            function (
+                total,
+                project
+            ) {
+
+                return (
+                    total +
+                    (
+                        project &&
+                        Array.isArray(
+                            project.references
+                        )
+                            ? project.references.length
+                            : 0
+                    )
+                );
+
+            },
+            0
+        );
 
     const MAX_REFERENCE_RESULTS = 300;
 
@@ -29737,11 +29757,17 @@ async function buildStreamingContext(
 
                     "=== إحصاءات قاعدة المراجع ===",
 
-                    "العدد الإجمالي للمراجع المحفوظة في نطاق البحث: " +
+                    "العدد الرسمي للمراجع المحفوظة في نطاق البحث: " +
                         String(
-                            documentContext.totalReferenceCount ||
+                            documentContext.totalReferenceCount ??
                             0
                         ),
+
+                    "مصدر هذا العدد: تم حسابه برمجيًا مباشرة من طول مصفوفات project.references في نطاق البحث.",
+
+                    "هذا العدد هو العدد المعتمد. لا تحسب عدد المراجع من النص المرسل إليك ولا من عدد النتائج المعروضة.",
+
+                    "عند السؤال عن عدد المراجع، أجب بالعدد الرسمي فقط.",
 
                     "",
 
