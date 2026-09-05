@@ -62,17 +62,7 @@ let referencesSourceDocument = null;
 
 let currentCitationSources = [];
 
-let researchScope = {
-
-    type: "project",
-
-    scope: "all",
-
-    id: null,
-
-    name: "جميع المشاريع"
-
-};
+let researchScope = null;
 
 // ======================================
 // Office Initialization
@@ -22229,6 +22219,8 @@ function createNewChat() {
         null
     );
 
+    researchScope =
+        null;
 
     currentCitationSources =
         [];
@@ -28357,32 +28349,74 @@ async function buildStreamingContext(
     text
 ) {
 
+    // =====================================================
+    // تحديد نطاق البحث
+    //
+    // null = محادثة عامة
+    // object = محادثة ذات سياق بحثي
+    // =====================================================
+
     const scope =
         (
             researchScope &&
-            typeof researchScope ===
-                "object"
+            typeof researchScope === "object"
         )
             ? researchScope
-            : {
+            : null;
 
-                type:
-                    "document",
 
-                scope:
-                    "specific",
+    // =====================================================
+    // المحادثة العامة
+    //
+    // لا تستخدم:
+    // - currentDocument
+    // - Orama
+    // - documentContext
+    // - أي مادة مستخرجة من المستندات
+    // =====================================================
 
-                id:
-                    currentDocument
-                        ? currentDocument.id
-                        : null,
+    if (
+        !scope
+    ) {
 
-                name:
-                    currentDocument
-                        ? currentDocument.name
-                        : "المستند الحالي"
+        currentCitationSources =
+            [];
 
-            };
+        const history =
+            buildStreamingHistory(
+                null
+            );
+
+        history.push({
+
+            role:
+                "user",
+
+            content:
+                String(
+                    text ||
+                    ""
+                )
+
+        });
+
+        return {
+
+            documentContext:
+                null,
+
+            messages:
+                history,
+
+            userContent:
+                String(
+                    text ||
+                    ""
+                )
+
+        };
+
+    }
 
 
     let documentContext =
@@ -45723,6 +45757,9 @@ function renderSidebarChats() {
                             setCurrentDocument(
                                 null
                             );
+
+                            researchScope =
+                                null;
 
                         }
 
