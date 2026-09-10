@@ -23033,7 +23033,7 @@ if (
 if (provider) {
 
     provider.onchange =
-        function () {
+        async function () {
 
             updateProviderInfo();
 
@@ -23051,23 +23051,26 @@ if (provider) {
                         </option>
                     `;
 
-                    loadDuckAIModels()
-                        .catch(
-                            function (error) {
 
-                                if (settingsStatus) {
+                    try {
 
-                                    settingsStatus.innerHTML =
-                                        "⚠ " +
-                                        (
-                                            error.message ||
-                                            "تعذر تحميل نماذج Duck.ai."
-                                        );
+                        await loadDuckAIModels();
 
-                                }
+                    }
+                    catch (error) {
 
-                            }
-                        );
+                        if (settingsStatus) {
+
+                            settingsStatus.innerHTML =
+                                "⚠ " +
+                                (
+                                    error.message ||
+                                    "تعذر تحميل نماذج Duck.ai."
+                                );
+
+                        }
+
+                    }
 
                 }
                 else {
@@ -23078,15 +23081,15 @@ if (provider) {
                         </option>
                     `;
 
+
+                    if (settingsStatus) {
+
+                        settingsStatus.innerHTML =
+                            "";
+
+                    }
+
                 }
-
-            }
-
-
-            if (settingsStatus) {
-
-                settingsStatus.innerHTML =
-                    "";
 
             }
 
@@ -24282,116 +24285,150 @@ async function loadDuckAIModels() {
     }
 
 
-    const response =
-        await fetch(
-            "http://127.0.0.1:8080/v1/models",
-            {
+    try {
 
-                method:
-                    "GET",
+        const response =
+            await fetch(
+                "http://127.0.0.1:8080/v1/models",
+                {
 
-                headers: {
+                    method:
+                        "GET",
 
-                    "Content-Type":
-                        "application/json"
+                    headers: {
 
-                }
+                        "Content-Type":
+                            "application/json"
 
-            }
-        );
-
-
-    const result =
-        await readJSON(
-            response
-        );
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بخادم Duck2API."
-            )
-        );
-
-    }
-
-
-    if (
-        !result.data ||
-        !Array.isArray(
-            result.data
-        )
-    ) {
-
-        throw new Error(
-            "لم تصل قائمة نماذج Duck.ai."
-        );
-
-    }
-
-
-    const models =
-        result.data
-            .filter(
-                function (
-                    item
-                ) {
-
-                    return (
-                        item &&
-                        item.id
-                    );
-
-                }
-            )
-            .sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return String(
-                        a.id
-                    ).localeCompare(
-                        String(
-                            b.id
-                        )
-                    );
-
-                }
-            )
-            .map(
-                function (
-                    item
-                ) {
-
-                    return {
-
-                        id:
-                            item.id,
-
-                        name:
-                            item.id
-
-                    };
+                    }
 
                 }
             );
 
 
-    populateModels(
-        models
-    );
+        const result =
+            await readJSON(
+                response
+            );
 
 
-    if (settingsStatus) {
+        if (!response.ok) {
 
-        settingsStatus.innerHTML =
-            "✓ تم تحديث نماذج Duck.ai: " +
-            models.length;
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بخادم Duck2API. HTTP " +
+                    response.status
+                )
+            );
+
+        }
+
+
+        if (
+            !result.data ||
+            !Array.isArray(
+                result.data
+            )
+        ) {
+
+            throw new Error(
+                "وصل الرد من Duck2API لكن قائمة النماذج غير موجودة."
+            );
+
+        }
+
+
+        const models =
+            result.data
+                .filter(
+                    function (
+                        item
+                    ) {
+
+                        return (
+                            item &&
+                            item.id
+                        );
+
+                    }
+                )
+                .sort(
+                    function (
+                        a,
+                        b
+                    ) {
+
+                        return String(
+                            a.id
+                        ).localeCompare(
+                            String(
+                                b.id
+                            )
+                        );
+
+                    }
+                )
+                .map(
+                    function (
+                        item
+                    ) {
+
+                        return {
+
+                            id:
+                                item.id,
+
+                            name:
+                                item.name ||
+                                item.id
+
+                        };
+
+                    }
+                );
+
+
+        if (
+            models.length ===
+            0
+        ) {
+
+            throw new Error(
+                "تم الاتصال بـ Duck2API لكن لم تصل أي نماذج."
+            );
+
+        }
+
+
+        populateModels(
+            models
+        );
+
+
+        if (settingsStatus) {
+
+            settingsStatus.innerHTML =
+                "✓ تم تحديث نماذج Duck.ai: " +
+                models.length;
+
+        }
+
+    }
+    catch (error) {
+
+        if (settingsStatus) {
+
+            settingsStatus.innerHTML =
+                "⚠ " +
+                (
+                    error.message ||
+                    "تعذر تحميل نماذج Duck.ai."
+                );
+
+        }
+
+        throw error;
 
     }
 
