@@ -23040,11 +23040,45 @@ if (provider) {
 
             if (modelSelect) {
 
-                modelSelect.innerHTML = `
-                    <option value="">
-                        أدخل المفتاح ثم حدّث النماذج
-                    </option>
-                `;
+                if (
+                    provider.value ===
+                    "duckai"
+                ) {
+
+                    modelSelect.innerHTML = `
+                        <option value="">
+                            جاري تحميل نماذج Duck.ai...
+                        </option>
+                    `;
+
+                    loadDuckAIModels()
+                        .catch(
+                            function (error) {
+
+                                if (settingsStatus) {
+
+                                    settingsStatus.innerHTML =
+                                        "⚠ " +
+                                        (
+                                            error.message ||
+                                            "تعذر تحميل نماذج Duck.ai."
+                                        );
+
+                                }
+
+                            }
+                        );
+
+                }
+                else {
+
+                    modelSelect.innerHTML = `
+                        <option value="">
+                            أدخل المفتاح ثم حدّث النماذج
+                        </option>
+                    `;
+
+                }
 
             }
 
@@ -23094,7 +23128,11 @@ if (saveSettings) {
             };
 
 
-            if (!settings.key) {
+            if (
+                settings.provider !==
+                "duckai" &&
+                !settings.key
+            ) {
 
                 if (settingsStatus) {
 
@@ -23102,7 +23140,6 @@ if (saveSettings) {
                         "⚠ يرجى إدخال مفتاح API.";
 
                 }
-
 
                 return;
 
