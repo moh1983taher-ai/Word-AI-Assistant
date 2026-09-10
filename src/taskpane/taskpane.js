@@ -4930,7 +4930,11 @@ async function analyzeAndBuildFinalReferencesWithAI(
         ).trim();
 
 
-    if (!key) {
+    if (
+        settings.provider !==
+        "duckai" &&
+        !key
+    ) {
 
         throw new Error(
             "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
@@ -25338,7 +25342,81 @@ async function askAI(
         getActiveAISettings();
 
 
-    if (!data.key.trim()) {
+    if (
+        data.provider !==
+        "duckai" &&
+        !data.key.trim()
+    ) {
+
+        // =================================================
+        // Duck.ai
+        // =================================================
+
+        if (
+            data.provider ===
+            "duckai"
+        ) {
+
+            const response =
+                await fetch(
+                    "http://127.0.0.1:8080/v1/chat/completions",
+                    {
+
+                        method:
+                            "POST",
+
+                        headers: {
+
+                            "Content-Type":
+                                "application/json"
+
+                            },
+
+                        body:
+                            JSON.stringify({
+
+                                model:
+                                    data.model,
+
+                                messages:
+                                    conversationMessages,
+
+                                max_tokens:
+                                    8000,
+
+                                temperature:
+                                    0.2
+
+                            })
+
+                    }
+                );
+
+
+            const result =
+                await readJSON(
+                    response
+                );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    getAPIError(
+                        result,
+                        "فشل الاتصال بخادم Duck2API."
+                    )
+                );
+
+            }
+
+
+            return extractOpenAIStyleAnswer(
+                result,
+                "Duck.ai"
+            );
+
+        }
 
         throw new Error(
             "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
@@ -25727,7 +25805,11 @@ async function askAIForLibraryRanking(
         getActiveAISettings();
 
 
-    if (!data.key.trim()) {
+    if (
+        data.provider !==
+        "duckai" &&
+        !data.key.trim()
+    ) {
 
         throw new Error(
             "لم يتم إدخال مفتاح الذكاء الاصطناعي من الإعدادات."
@@ -26564,6 +26646,8 @@ async function analyzeReferencesWithAI(
 
 
     if (
+        settings?.provider !==
+        "duckai" &&
         !key
     ) {
 
@@ -36894,6 +36978,8 @@ async function sendMessage() {
 
 
     if (
+        settings.provider !==
+        "duckai" &&
         !settings.key.trim()
     ) {
 
