@@ -33328,7 +33328,7 @@ async function streamDuckAI(
                             0.2,
 
                         stream:
-                            true
+                            false
 
                     })
 
@@ -33336,13 +33336,13 @@ async function streamDuckAI(
         );
 
 
+    const result =
+        await readJSON(
+            response
+        );
+
+
     if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
 
         throw new Error(
             getAPIError(
@@ -33354,6 +33354,13 @@ async function streamDuckAI(
     }
 
 
+    const answer =
+        extractOpenAIStyleAnswer(
+            result,
+            "Duck.ai"
+        );
+
+
     AppState.streaming.active =
         true;
 
@@ -33361,38 +33368,22 @@ async function streamDuckAI(
         "duckai";
 
     AppState.streaming.text =
-        "";
+        answer;
 
 
     try {
 
-        const answer =
-            await processOpenAICompatibleStream(
-                response,
-                function (
-                    delta,
-                    fullText
-                ) {
+        if (
+            typeof onChunk ===
+            "function"
+        ) {
 
-                    AppState.streaming.text =
-                        fullText;
-
-
-                    if (
-                        typeof onChunk ===
-                        "function"
-                    ) {
-
-                        onChunk(
-                            delta,
-                            fullText
-                        );
-
-                    }
-
-                },
-                "Duck.ai"
+            onChunk(
+                answer,
+                answer
             );
+
+        }
 
 
         return answer;
@@ -33409,6 +33400,7 @@ async function streamDuckAI(
     }
 
 }
+
 // =====================================================
 // Stream AI
 // واجهة موحدة
