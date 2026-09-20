@@ -32199,7 +32199,8 @@ async function streamGroqAI(
     const data =
         getActiveAISettings();
 
-
+    console.log("TEST PROVIDER:", data.provider, "MODEL:", data.model);
+    
     if (!data.key.trim()) {
 
         throw new Error(
