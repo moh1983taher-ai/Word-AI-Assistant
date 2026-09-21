@@ -32452,7 +32452,7 @@ async function streamOpenRouterAI(
                             streamingContext.messages,
 
                         max_tokens:
-                            3000,
+                            12000,
 
                         temperature:
                             0.2,
@@ -32733,7 +32733,6 @@ async function streamGeminiAI(
         );
 
 
-    
     // ==================================
     // تعليمات النظام
     //
@@ -32964,7 +32963,10 @@ async function streamGeminiAI(
                         generationConfig: {
 
                             temperature:
-                                0.2
+                                0.2,
+
+                            maxOutputTokens:
+                                12000
 
                         }
 
@@ -33026,6 +33028,14 @@ async function streamGeminiAI(
 
 
     let fullAnswer =
+        "";
+
+
+    let finishReason =
+        "";
+
+
+    let finishMessage =
         "";
 
 
@@ -33106,6 +33116,34 @@ async function streamGeminiAI(
 
         const candidate =
             parsed.candidates[0];
+
+
+        // ==================================
+        // سبب انتهاء التوليد
+        // ==================================
+
+        if (
+            candidate.finishReason
+        ) {
+
+            finishReason =
+                String(
+                    candidate.finishReason
+                );
+
+        }
+
+
+        if (
+            candidate.finishMessage
+        ) {
+
+            finishMessage =
+                String(
+                    candidate.finishMessage
+                );
+
+        }
 
 
         if (
@@ -33284,6 +33322,36 @@ async function streamGeminiAI(
 
             throw new Error(
                 "لم يصل نص من Gemini عبر البث المتدفق."
+            );
+
+        }
+
+
+        // ==================================
+        // تشخيص انتهاء الإجابة
+        // ==================================
+
+        if (
+            finishReason ===
+            "MAX_TOKENS"
+        ) {
+
+            console.warn(
+                "Gemini: انتهى التوليد بسبب بلوغ maxOutputTokens.",
+                finishMessage
+            );
+
+        }
+        else if (
+            finishReason &&
+            finishReason !==
+                "STOP"
+        ) {
+
+            console.warn(
+                "Gemini: سبب انتهاء التوليد:",
+                finishReason,
+                finishMessage
             );
 
         }
