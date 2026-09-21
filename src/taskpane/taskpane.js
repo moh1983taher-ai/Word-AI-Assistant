@@ -23879,18 +23879,53 @@ async function loadOpenRouterModels() {
 
 
     const freeModels =
-        result.data.filter(
-            function (
-                item
+    result.data.filter(
+        function (
+            item
+        ) {
+
+            if (
+                !item ||
+                !item.id
             ) {
 
+                return false;
+
+            }
+
+
+            const pricing =
+                item.pricing ||
+                {};
+
+
+            const promptPrice =
+                Number(
+                    pricing.prompt
+                );
+
+
+            const completionPrice =
+                    Number(
+                        pricing.completion
+                    );
+
+
                 return (
-                    item &&
-                    item.id &&
                     String(
                         item.id
                     ).endsWith(
                         ":free"
+                    ) ||
+                    (
+                        Number.isFinite(
+                            promptPrice
+                        ) &&
+                        Number.isFinite(
+                            completionPrice
+                        ) &&
+                        promptPrice === 0 &&
+                        completionPrice === 0
                     )
                 );
 
