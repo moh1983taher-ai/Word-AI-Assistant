@@ -23906,31 +23906,33 @@ async function loadOpenRouterModels() {
 
 
             const completionPrice =
-                    Number(
-                        pricing.completion
-                    );
-
-
-                return (
-                    String(
-                        item.id
-                    ).endsWith(
-                        ":free"
-                    ) ||
-                    (
-                        Number.isFinite(
-                            promptPrice
-                        ) &&
-                        Number.isFinite(
-                            completionPrice
-                        ) &&
-                        promptPrice === 0 &&
-                        completionPrice === 0
-                    )
+                Number(
+                    pricing.completion
                 );
 
-            }
-        );
+
+            return (
+                String(
+                    item.id
+                ).endsWith(
+                    ":free"
+                ) ||
+                (
+                    Number.isFinite(
+                        promptPrice
+                    ) &&
+                    Number.isFinite(
+                        completionPrice
+                    ) &&
+                    promptPrice === 0 &&
+                    completionPrice === 0
+                ) ||
+                item.id ===
+                    "deepseek/deepseek-v4-flash-0731"
+            );
+
+        }
+    );
 
 
     const models =
