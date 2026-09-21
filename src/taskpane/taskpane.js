@@ -21434,21 +21434,25 @@ function renderChat() {
                         }
 
 
-                        // رقم المجلد
-                        if (part) {
+                        // رقم المجلد والصفحة
+                        if (part && page) {
 
                             citationParts.push(
-                                `ج ${part}`
+                                `${part}/${page}`
                             );
 
                         }
-
-
-                        // رقم الصفحة
-                        if (page) {
+                        else if (page) {
 
                             citationParts.push(
                                 `ص ${page}`
+                            );
+
+                        }
+                        else if (part) {
+
+                            citationParts.push(
+                                `ج ${part}`
                             );
 
                         }
