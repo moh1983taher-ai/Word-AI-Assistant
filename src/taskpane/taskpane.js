@@ -33428,13 +33428,13 @@ async function streamDuckAI(
                             streamingContext.messages,
 
                         max_tokens:
-                            3000,
+                            12000,
 
                         temperature:
                             0.2,
 
                         stream:
-                            false
+                            true
 
                     })
 
@@ -33442,13 +33442,12 @@ async function streamDuckAI(
         );
 
 
-    const result =
-        await readJSON(
-            response
-        );
-
-
     if (!response.ok) {
+
+        const result =
+            await readJSON(
+                response
+            );
 
         throw new Error(
             getAPIError(
@@ -33460,13 +33459,6 @@ async function streamDuckAI(
     }
 
 
-    const answer =
-        extractOpenAIStyleAnswer(
-            result,
-            "Duck.ai"
-        );
-
-
     AppState.streaming.active =
         true;
 
@@ -33474,22 +33466,39 @@ async function streamDuckAI(
         "duckai";
 
     AppState.streaming.text =
-        answer;
+        "";
 
 
     try {
 
-        if (
-            typeof onChunk ===
-            "function"
-        ) {
+        const answer =
+            await processOpenAICompatibleStream(
+                response,
 
-            onChunk(
-                answer,
-                answer
+                function(
+                    delta,
+                    fullText
+                ) {
+
+                    AppState.streaming.text =
+                        fullText;
+
+                    if (
+                        typeof onChunk ===
+                        "function"
+                    ) {
+
+                        onChunk(
+                            delta,
+                            fullText
+                        );
+
+                    }
+
+                },
+
+                "Duck.ai"
             );
-
-        }
 
 
         return answer;
