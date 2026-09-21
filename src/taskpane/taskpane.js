@@ -21367,12 +21367,6 @@ function renderChat() {
                             );
 
 
-                        const pageElement =
-                            card.querySelector(
-                                ".library-result-meta span"
-                            );
-
-
                         const textElement =
                             card.querySelector(
                                 ".library-result-text"
@@ -21389,6 +21383,13 @@ function renderChat() {
                             authorElement
                                 ? authorElement.textContent.trim()
                                 : "";
+
+
+                        const part =
+                            card.getAttribute(
+                                "data-library-part"
+                            ) ||
+                            "";
 
 
                         const page =
@@ -21433,6 +21434,17 @@ function renderChat() {
                         }
 
 
+                        // رقم المجلد
+                        if (part) {
+
+                            citationParts.push(
+                                `ج ${part}`
+                            );
+
+                        }
+
+
+                        // رقم الصفحة
                         if (page) {
 
                             citationParts.push(
