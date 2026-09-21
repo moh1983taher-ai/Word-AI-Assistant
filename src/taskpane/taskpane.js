@@ -32290,8 +32290,7 @@ async function streamGroqAI(
                         messages:
                             streamingContext.messages,
 
-                        max_tokens:
-                            3000,
+                        
 
                         temperature:
                             0.2,
