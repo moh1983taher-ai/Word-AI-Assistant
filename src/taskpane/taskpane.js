@@ -36173,13 +36173,14 @@ async function searchLibrary(
 
     const asyncDirectSearch =
         async function (
-            searchTerm
+            searchTerm,
+            searchSource = selectedSource
         ) {
 
             const apiURL =
                 `${LIBRARY_API}/library-search` +
                 `?q=${encodeURIComponent(searchTerm)}` +
-                `&source=${encodeURIComponent(selectedSource)}` +
+                `&source=${encodeURIComponent(searchSource)}` +
                 `&books=${encodeURIComponent(books)}` +
                 `&results=${encodeURIComponent(
                     LIBRARY_AI_FETCH_RESULTS_PER_QUERY
@@ -36586,96 +36587,221 @@ async function searchLibrary(
     }
 
 
-    const smartQueries =
-        Array.isArray(
-            searchPlan.searchQueries
-        )
-            ? searchPlan.searchQueries
-            : [
-                text
-            ];
+        // =========================================================
+        // الاستعلامات التي أنشأها محلل البحث
+        //
+        // الشاملة وجامع الكتب لهما استعلامات مستقلة.
+        // يجب تنفيذ كل استعلام فعليًا في مكتبته.
+        // =========================================================
 
-    const searchContext = {
-        originalQuery: text,
-        intent:
-            String(
-                searchPlan.intent ||
-                ""
-            ).trim(),
-        subject:
-            String(
-                searchPlan.subject ||
-                ""
-            ).trim(),
-        constraints:
+        const shamelaQueries =
             Array.isArray(
-                searchPlan.constraints
+                searchPlan.shamelaQueries
             )
-                ? searchPlan.constraints
-                : []
-    };
+                ? searchPlan.shamelaQueries
+                    .map(
+                        function (item) {
+                            return String(
+                                item ||
+                                ""
+                            ).trim();
+                        }
+                    )
+                    .filter(Boolean)
+                : [];
 
 
-    // =========================================================
-    // البحث المتوازي في المكتبات
-    // =========================================================
+        const ketabQueries =
+            Array.isArray(
+                searchPlan.ketabQueries
+            )
+                ? searchPlan.ketabQueries
+                    .map(
+                        function (item) {
+                            return String(
+                                item ||
+                                ""
+                            ).trim();
+                        }
+                    )
+                    .filter(Boolean)
+                : [];
 
-    const searchTasks =
-        smartQueries.map(
-            function (
-                queryItem
-            ) {
 
-                return asyncDirectSearch(
+        // ---------------------------------------------------------
+        // إذا فشل التحليل أو لم يُرجع استعلامات صالحة،
+        // نعود إلى الاستعلام الأصلي.
+        // ---------------------------------------------------------
+
+        if (
+            !shamelaQueries.length &&
+            !ketabQueries.length
+        ) {
+
+            shamelaQueries.push(
+                text
+            );
+
+            ketabQueries.push(
+                text
+            );
+
+        }
+
+
+        // ---------------------------------------------------------
+        // الاستعلامات التي ستنفذ فعليًا.
+        // نحتفظ بها أيضًا في البيانات النهائية للتشخيص.
+        // ---------------------------------------------------------
+
+        const executedQueries = [];
+
+
+        for (
+            const queryItem of
+                shamelaQueries
+        ) {
+
+            executedQueries.push({
+                source:
+                    "shamela",
+
+                query:
                     queryItem
-                )
-                .then(
-                    function (
-                        data
-                    ) {
+            });
 
-                        return {
+        }
 
-                            query:
-                                queryItem,
 
-                            data,
+        for (
+            const queryItem of
+                ketabQueries
+        ) {
 
-                            error:
-                                null
+            executedQueries.push({
+                source:
+                    "ketabonline",
 
-                        };
+                query:
+                    queryItem
+            });
 
-                    }
-                )
-                .catch(
-                    function (
-                        error
-                    ) {
+        }
 
-                        return {
 
-                            query:
-                                queryItem,
+        console.log(
+            "========== LIBRARY QUERIES TO EXECUTE =========="
+        );
 
-                            data:
-                                null,
+        console.log(
+            JSON.stringify(
+                executedQueries,
+                null,
+                2
+            )
+        );
 
+        console.log(
+            "=================================================="
+        );
+
+
+        // =========================================================
+        // البحث المتوازي في كل مكتبة
+        //
+        // كل استعلام يُرسل إلى مكتبته فقط.
+        // =========================================================
+
+        const searchTasks =
+            executedQueries.map(
+                function (
+                    queryItem
+                ) {
+
+                    console.log(
+                        "LIBRARY QUERY START:",
+                        queryItem.source,
+                        queryItem.query
+                    );
+
+
+                    return asyncDirectSearch(
+                        queryItem.query
+                    )
+                    .then(
+                        function (
+                            data
+                        ) {
+
+                            console.log(
+                                "LIBRARY QUERY DONE:",
+                                queryItem.source,
+                                queryItem.query,
+                                "RESULTS:",
+                                Array.isArray(
+                                    data?.results
+                                )
+                                    ? data.results.length
+                                    : 0
+                            );
+
+
+                            return {
+
+                                query:
+                                    queryItem.query,
+
+                                source:
+                                    queryItem.source,
+
+                                data,
+
+                                error:
+                                    null
+
+                            };
+
+                        }
+                    )
+                    .catch(
+                        function (
                             error
+                        ) {
 
-                        };
+                            console.error(
+                                "LIBRARY QUERY FAILED:",
+                                queryItem.source,
+                                queryItem.query,
+                                error
+                            );
 
-                    }
-                );
 
-            }
-        );
+                            return {
+
+                                query:
+                                    queryItem.query,
+
+                                source:
+                                    queryItem.source,
+
+                                data:
+                                    null,
+
+                                error
+
+                            };
+
+                        }
+                    );
+
+                }
+            );
 
 
-    const searchResponses =
-        await Promise.all(
-            searchTasks
-        );
+        const searchResponses =
+            await Promise.all(
+                searchTasks
+            );
 
 
     const allResults =
