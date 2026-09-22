@@ -35338,7 +35338,7 @@ async function searchLibrary(
     query,
     source = "all",
     books = 100,
-    results = 10
+    results = 30
 ) {
 
     const text =
@@ -35376,8 +35376,8 @@ async function searchLibrary(
                 Number(
                     results
                 ) ||
-                    10,
-                100
+                    30,
+                30
             )
         );
 
@@ -36030,7 +36030,7 @@ async function searchLibrary(
     // =========================================================
     // النتائج التي ستظهر فعليًا
     //
-    // نجهز العدد النهائي أولًا.
+    // الحد الأقصى = 30 نتيجة
     // =========================================================
 
     let finalRankedResults =
