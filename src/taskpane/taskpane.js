@@ -34626,6 +34626,120 @@ async function callLibraryAI(
 
     }
 
+    // ================================================
+    // DuckAI المحلي
+    // ================================================
+
+    if (
+        config.provider ===
+        "duckai"
+    ) {
+
+        const requestPromise =
+            fetch(
+                "http://127.0.0.1:8080/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                config.model,
+
+                            messages: [
+
+                                {
+
+                                    role:
+                                        "system",
+
+                                    content:
+                                        systemPrompt
+
+                                },
+
+                                {
+
+                                    role:
+                                        "user",
+
+                                    content:
+                                        userPrompt
+
+                                }
+
+                            ],
+
+                            temperature,
+
+                            max_tokens:
+                                maxTokens,
+
+                            stream:
+                                false
+
+                        })
+
+                }
+            );
+
+
+        const response =
+            await withLibraryAITimeout(
+                requestPromise
+            );
+
+
+        let result;
+
+        try {
+
+            result =
+                await response.json();
+
+        }
+        catch (_) {
+
+            throw new Error(
+                `استجابة DuckAI غير صالحة: HTTP ${response.status}`
+            );
+
+        }
+
+
+        if (
+            !response.ok
+        ) {
+
+            const message =
+                result?.error?.message ||
+                result?.message ||
+                `فشل الاتصال بـ DuckAI: HTTP ${response.status}`;
+
+            throw new Error(
+                message
+            );
+
+        }
+
+
+        return extractLibraryAIText(
+            result,
+            "duckai"
+        );
+
+    }
+
 
     // ================================================
     // OpenAI / Groq / OpenRouter
