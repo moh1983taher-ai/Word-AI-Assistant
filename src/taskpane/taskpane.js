@@ -26630,12 +26630,33 @@ ${query}
 النتائج:
 
 ${JSON.stringify(
-
     candidates
-
 )}
 
 `;
+
+console.log(
+    "========== AI RANKING REQUEST =========="
+);
+
+console.log(
+    "CANDIDATES COUNT:",
+    candidates.length
+);
+
+console.log(
+    "PROMPT LENGTH:",
+    prompt.length
+);
+
+console.log(
+    "PROMPT UTF8 BYTES:",
+    new TextEncoder().encode(prompt).length
+);
+
+console.log(
+    "========== END AI RANKING REQUEST =========="
+);
 
 
 
