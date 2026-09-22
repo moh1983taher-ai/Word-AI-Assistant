@@ -26387,810 +26387,659 @@ function splitLibraryRankingBatches(
 // =============================================================
 
 async function rankLibraryResultsWithAI(
-query,
-results,
-searchContext = {}
+    query,
+    results,
+    searchContext = {}
 ) {
 
-
-if (
-    !Array.isArray(results) ||
-    !results.length
-) {
-    return [];
-}
-
-
-// ---------------------------------------------------------
-// إعدادات تقسيم النتائج
-// ---------------------------------------------------------
-
-const MAX_BATCH_CHARS = 16000;
-
-const MAX_BATCH_RESULTS = 40;
-
-const TOP_FROM_BATCH = 8;
+    if (
+        !Array.isArray(results) ||
+        results.length === 0
+    ) {
+        return [];
+    }
 
 
-// ---------------------------------------------------------
-// تحويل النتيجة إلى تمثيل مختصر
-// ---------------------------------------------------------
-
-function buildCandidate(
-    result,
-    index
-) {
-
-    return {
-
-        index,
-
-        source:
-            result?.source ||
-            "",
-
-        bookId:
-            result?.bookId ||
-            "",
-
-        title:
-            result?.title ||
-            "",
-
-        author:
-            result?.author ||
-            "",
-
-        sectionTitle:
-            result?.sectionTitle ||
-            "",
-
-        text:
-            String(
-                result?.text ||
-                ""
-            )
-            .substring(
-                0,
-                1200
-            )
-    };
-}
+    /*
+     * حدود آمنة نسبيًا للنماذج المجانية.
+     *
+     * 9000 حرف ≠ 9000 token.
+     * نترك هامشًا كبيرًا للـ prompt نفسه،
+     * ولحدود ITPM في Groq.
+     */
+    const MAX_BATCH_CHARS = 9000;
+    const MAX_BATCH_RESULTS = 20;
 
 
-// ---------------------------------------------------------
-// تقسيم النتائج حسب حجم البيانات
-// ---------------------------------------------------------
+    /*
+     * انتظار بسيط بين الطلبات حتى لا تتراكم
+     * الطلبات داخل نافذة ITPM.
+     */
+    const BATCH_DELAY_MS = 2500;
 
-const batches = [];
 
-let currentBatch = [];
-let currentChars = 0;
+    /*
+     * تحويل النتائج إلى صيغة صغيرة قبل إرسالها
+     * إلى النموذج.
+     */
+    const candidates =
+        results.map(
+            function (
+                result,
+                index
+            ) {
 
-for (
-    let index = 0;
-    index < results.length;
-    index++
-) {
+                return {
+                    index,
+                    source:
+                        result?.source ||
+                        "",
+                    bookId:
+                        result?.bookId ||
+                        "",
+                    title:
+                        result?.title ||
+                        "",
+                    author:
+                        result?.author ||
+                        "",
+                    sectionTitle:
+                        result?.sectionTitle ||
+                        "",
+                    text:
+                        String(
+                            result?.text ||
+                            ""
+                        ).substring(
+                            0,
+                            1000
+                        )
+                };
 
-    const candidate =
-        buildCandidate(
-            results[index],
-            index
+            }
         );
 
-    const candidateSize =
-        JSON.stringify(
+
+    /*
+     * بناء الدفعات.
+     */
+    const batches = [];
+
+    let currentBatch = [];
+    let currentChars = 0;
+
+
+    for (
+        const candidate of candidates
+    ) {
+
+        const candidateText =
+            JSON.stringify(
+                candidate
+            );
+
+        const candidateChars =
+            candidateText.length;
+
+
+        const exceedsChars =
+            currentBatch.length > 0 &&
+            (
+                currentChars +
+                candidateChars >
+                MAX_BATCH_CHARS
+            );
+
+
+        const exceedsCount =
+            currentBatch.length >=
+            MAX_BATCH_RESULTS;
+
+
+        if (
+            exceedsChars ||
+            exceedsCount
+        ) {
+
+            batches.push(
+                currentBatch
+            );
+
+            currentBatch = [];
+            currentChars = 0;
+
+        }
+
+
+        currentBatch.push(
             candidate
-        ).length;
+        );
+
+        currentChars +=
+            candidateChars;
+
+    }
 
 
     if (
-        currentBatch.length &&
-        (
-            currentChars +
-            candidateSize >
-                MAX_BATCH_CHARS ||
-            currentBatch.length >=
-                MAX_BATCH_RESULTS
-        )
+        currentBatch.length > 0
     ) {
 
         batches.push(
             currentBatch
         );
 
-        currentBatch = [];
-        currentChars = 0;
     }
 
 
-    currentBatch.push(
-        candidate
-    );
-
-    currentChars +=
-        candidateSize;
-}
-
-
-if (
-    currentBatch.length
-) {
-
-    batches.push(
-        currentBatch
-    );
-}
-
-
-console.log(
-    "========== AI RANKING BATCHES =========="
-);
-
-console.log(
-    "TOTAL RESULTS:",
-    results.length
-);
-
-console.log(
-    "BATCH COUNT:",
-    batches.length
-);
-
-
-// ---------------------------------------------------------
-// نص التعليمات المشترك
-// ---------------------------------------------------------
-
-const rankingInstructions =
-
-
-`
-السؤال الأصلي:
-
-${query}
-
-تحليل السؤال الذي أعده محلل الاستعلام:
-
-نوع المطلوب (intent):
-${searchContext.intent || "غير محدد"}
-
-الموضوع الأساسي (subject):
-${searchContext.subject || "غير محدد"}
-
-القيود أو الخصائص المطلوبة:
-${
-Array.isArray(searchContext.constraints) &&
-searchContext.constraints.length
-? searchContext.constraints.join("، ")
-: "لا توجد قيود محددة"
-}
-
-أمامك مجموعة من نتائج البحث من مكتبتين رقميتين.
-
-مهمتك ترتيب النتائج الموجودة في هذه المجموعة بحسب صلتها العلمية الحقيقية بالسؤال.
-
-قواعد التقييم:
-
-1. افهم السؤال الأصلي مع intent وsubject وconstraints معًا.
-
-2. قيّم الصلة العلمية الحقيقية، وليس مجرد التشابه اللفظي.
-
-3. إذا كان السؤال يطلب نوعًا محددًا من المعلومات، فاجعل تحقق هذا النوع عاملًا أساسيًا.
-
-4. افحص النص نفسه، فهو أهم من مجرد عنوان الكتاب أو الموضع.
-
-5. ميّز بين الموضوع المطلوب والموضوعات القريبة منه.
-
-6. النتيجة التي تجيب عن المطلوب مباشرة أعلى من نتيجة تذكر المصطلح في سياق آخر.
-
-7. لا تعتمد على ترتيب المكتبة الأصلية أو أي درجة سابقة.
-
-8. لا تفضل مكتبة على أخرى.
-
-9. لا تخترع أي نتيجة أو معلومة.
-
-10. قيّم النتائج الموجودة فقط.
-
-11. استخدم relevance من 0 إلى 100:
-    90–100: مباشرة جدًا وتلبي المطلوب بوضوح.
-    70–89: قوية الصلة.
-    40–69: جزئية أو غير مباشرة.
-    10–39: ضعيفة.
-    0–9: لا صلة حقيقية.
-
-12. لا ترفع الدرجة لمجرد وجود ألفاظ عامة مثل "تعريف" أو "لغة" أو "اصطلاحًا".
-
-13. الصلة العلمية أهم من التطابق اللفظي.
-
-أعد JSON فقط:
-
-{
-"ranking": [
-{
-"index": 0,
-"relevance": 100
-}
-]
-}
-
-يجب ذكر جميع النتائج الموجودة في هذه المجموعة.
-يجب ألا يتكرر أي index.
-يجب أن يكون الترتيب تنازليًا بحسب relevance.
-لا تكتب أي تفسير خارج JSON.
-`;
-
-
-// ---------------------------------------------------------
-// ترتيب كل دفعة
-// ---------------------------------------------------------
-
-const batchRankings = [];
-
-
-for (
-    let batchIndex = 0;
-    batchIndex < batches.length;
-    batchIndex++
-) {
-
-    const candidates =
-        batches[batchIndex];
-
-
-    const prompt =
-        rankingInstructions +
-        "\n\nالنتائج:\n" +
-        JSON.stringify(
-            candidates
-        );
-
-
     console.log(
-        "========== AI RANKING BATCH =========="
-    );
-
-    console.log(
-        "BATCH:",
-        batchIndex + 1,
-        "/",
+        "LIBRARY AI BATCHES:",
         batches.length
     );
 
     console.log(
-        "CANDIDATES COUNT:",
-        candidates.length
-    );
-
-    console.log(
-        "PROMPT LENGTH:",
-        prompt.length
-    );
-
-    console.log(
-        "PROMPT UTF8 BYTES:",
-        new TextEncoder()
-            .encode(prompt)
-            .length
+        "LIBRARY AI BATCH SIZES:",
+        batches.map(
+            batch =>
+                batch.length
+        )
     );
 
 
-    const raw =
-        await askAIForLibraryRanking(
-            prompt
+    /*
+     * استخراج وقت الانتظار من رسالة Groq.
+     *
+     * مثال:
+     * Please try again in 43.26s
+     */
+    function getRetryDelayMs(
+        error
+    ) {
+
+        const message =
+            String(
+                error?.message ||
+                error ||
+                ""
+            );
+
+
+        const secondsMatch =
+            message.match(
+                /try again in\s+([\d.]+)s/i
+            );
+
+
+        if (
+            secondsMatch
+        ) {
+
+            const seconds =
+                Number(
+                    secondsMatch[1]
+                );
+
+
+            if (
+                Number.isFinite(
+                    seconds
+                )
+            ) {
+
+                /*
+                 * نضيف ثانيتين احتياطيتين.
+                 */
+                return (
+                    Math.ceil(
+                        seconds * 1000
+                    ) +
+                    2000
+                );
+
+            }
+
+        }
+
+
+        /*
+         * إذا لم نستطع معرفة المدة
+         * ننتظر 20 ثانية.
+         */
+        return 20000;
+
+    }
+
+
+    function sleep(
+        milliseconds
+    ) {
+
+        return new Promise(
+            resolve =>
+                setTimeout(
+                    resolve,
+                    milliseconds
+                )
+        );
+
+    }
+
+
+    /*
+     * تنفيذ طلب AI مع إعادة المحاولة
+     * تلقائيًا عند 429.
+     */
+    async function askWithRetry(
+        prompt,
+        maxAttempts = 4
+    ) {
+
+        let lastError;
+
+
+        for (
+            let attempt = 1;
+            attempt <= maxAttempts;
+            attempt++
+        ) {
+
+            try {
+
+                return await
+                    askAIForLibraryRanking(
+                        prompt
+                    );
+
+            }
+            catch (error) {
+
+                lastError =
+                    error;
+
+
+                const message =
+                    String(
+                        error?.message ||
+                        error ||
+                        ""
+                    );
+
+
+                const isRateLimit =
+                    /429|rate.?limit|ITPM|too many requests/i
+                        .test(
+                            message
+                        );
+
+
+                if (
+                    !isRateLimit ||
+                    attempt >= maxAttempts
+                ) {
+
+                    throw error;
+
+                }
+
+
+                const delay =
+                    getRetryDelayMs(
+                        error
+                    );
+
+
+                console.warn(
+                    `LIBRARY AI RATE LIMIT: waiting ${Math.ceil(delay / 1000)}s before retry (${attempt}/${maxAttempts - 1})`
+                );
+
+
+                await sleep(
+                    delay
+                );
+
+            }
+
+        }
+
+
+        throw lastError;
+
+    }
+
+
+    /*
+     * ترتيب نتائج كل دفعة.
+     */
+    const rankedCandidates = [];
+
+
+    for (
+        let batchIndex = 0;
+        batchIndex < batches.length;
+        batchIndex++
+    ) {
+
+        const batch =
+            batches[
+                batchIndex
+            ];
+
+
+        console.log(
+            `LIBRARY AI BATCH ${batchIndex + 1}/${batches.length}:`,
+            batch.length,
+            "results"
         );
 
 
-    console.log(
-        "========== RAW AI BATCH RESPONSE =========="
-    );
-
-    console.log(
-        raw
-    );
-
-
-    let parsed;
-
-
-    try {
-
-        parsed =
-            typeof raw ===
-                "string"
-                ? JSON.parse(
-                    raw
+        const prompt =
+            [
+                "أنت مساعد بحث أكاديمي للمكتبات العربية وكتب التراث.",
+                "",
+                "مهمتك ترتيب النتائج الآتية بحسب مدى صلاحيتها للإجابة عن طلب الباحث.",
+                "",
+                "لا تبحث عن مجرد تطابق الكلمات.",
+                "الأولوية للنص الذي يحقق المقصود العلمي من الطلب.",
+                "",
+                "طلب الباحث:",
+                String(
+                    query ||
+                    ""
+                ),
+                "",
+                "نوع المطلوب:",
+                String(
+                    searchContext.intent ||
+                    ""
+                ),
+                "",
+                "الموضوع:",
+                String(
+                    searchContext.subject ||
+                    ""
+                ),
+                "",
+                "القيود:",
+                Array.isArray(
+                    searchContext.constraints
                 )
-                : raw;
-
-    }
-    catch {
-
-        const match =
-            String(
-                raw || ""
-            )
-            .match(
-                /\{[\s\S]*\}/
+                    ? searchContext.constraints.join(
+                        "، "
+                    )
+                    : "",
+                "",
+                "رتب النتائج بحسب:",
+                "1. مدى إجابة النص عن المطلوب.",
+                "2. ارتباط النص بالموضوع المقصود.",
+                "3. وجود نص علمي مباشر يمكن الاستفادة منه.",
+                "4. مناسبة السياق.",
+                "5. لا ترفع نتيجة لمجرد تشابه لفظي عابر.",
+                "",
+                "أعد JSON فقط بهذا الشكل:",
+                "{\"ranked\":[{\"index\":0,\"relevance\":95}]}",
+                "",
+                "النتائج:",
+                JSON.stringify(
+                    batch,
+                    null,
+                    2
+                )
+            ].join(
+                "\n"
             );
 
 
-        if (!match) {
+        console.log(
+            "LIBRARY AI BATCH PROMPT CHARS:",
+            prompt.length
+        );
 
-            console.warn(
-                "تعذر استخراج JSON من دفعة",
-                batchIndex + 1
-            );
 
-            continue;
-        }
+        let answer;
 
 
         try {
 
-            parsed =
-                JSON.parse(
-                    match[0]
+            answer =
+                await askWithRetry(
+                    prompt
                 );
 
         }
-        catch {
+        catch (error) {
 
-            console.warn(
-                "JSON غير صالح في دفعة",
-                batchIndex + 1
+            console.error(
+                "LIBRARY AI BATCH ERROR:",
+                error
             );
 
+            /*
+             * لا نسقط البحث كله بسبب دفعة واحدة.
+             */
             continue;
+
         }
+
+
+        const parsed =
+            parseLibraryAIJSON(
+                answer
+            );
+
+
+        const ranked =
+            Array.isArray(
+                parsed?.ranked
+            )
+                ? parsed.ranked
+                : [];
+
+
+        for (
+            const item of ranked
+        ) {
+
+            const localIndex =
+                Number(
+                    item?.index
+                );
+
+
+            if (
+                !Number.isInteger(
+                    localIndex
+                ) ||
+                localIndex < 0 ||
+                localIndex >=
+                    batch.length
+            ) {
+                continue;
+            }
+
+
+            const candidate =
+                batch[
+                    localIndex
+                ];
+
+
+            rankedCandidates.push(
+                {
+                    ...candidate,
+                    relevance:
+                        Number(
+                            item?.relevance
+                        ) || 0
+                }
+            );
+
+        }
+
+
+        /*
+         * لا نرسل الطلبات متلاحقة.
+         */
+        if (
+            batchIndex <
+            batches.length - 1
+        ) {
+
+            await sleep(
+                BATCH_DELAY_MS
+            );
+
+        }
+
     }
 
 
+    /*
+     * إذا لم يُرجع AI أي ترتيب صالح،
+     * نرجع النتائج الأصلية بدل إسقاط البحث.
+     */
     if (
-        !parsed ||
-        !Array.isArray(
-            parsed.ranking
-        )
+        rankedCandidates.length === 0
     ) {
 
-        console.warn(
-            "صيغة ترتيب غير صالحة في الدفعة",
-            batchIndex + 1
+        return results.map(
+            result => ({
+                ...result,
+                relevance: 0
+            })
         );
 
-        continue;
     }
 
 
-    const localSeen =
+    /*
+     * ترتيب نتائج الدفعات محليًا.
+     */
+    rankedCandidates.sort(
+        function (
+            a,
+            b
+        ) {
+
+            return (
+                b.relevance -
+                a.relevance
+            );
+
+        }
+    );
+
+
+    /*
+     * منع التكرار.
+     */
+    const seen =
         new Set();
+
+    const topCandidates = [];
 
 
     for (
-        const item
-        of parsed.ranking
+        const candidate
+        of rankedCandidates
     ) {
 
-        const localIndex =
-            Number(
-                item?.index
-            );
-
-        const relevance =
-            Number(
-                item?.relevance
-            );
-
-
         if (
-            !Number.isInteger(
-                localIndex
-            ) ||
-            localIndex < 0 ||
-            localIndex >=
-                candidates.length
+            seen.has(
+                candidate.index
+            )
         ) {
-
             continue;
         }
 
 
-        if (
-            localSeen.has(
-                localIndex
-            )
-        ) {
+        seen.add(
+            candidate.index
+        );
 
-            continue;
+
+        topCandidates.push(
+            candidate
+        );
+
+
+        /*
+         * لا نحتاج إرسال عدد ضخم
+         * إلى الترتيب النهائي.
+         */
+        if (
+            topCandidates.length >= 30
+        ) {
+            break;
         }
 
-
-        localSeen.add(
-            localIndex
-        );
-
-
-        batchRankings.push({
-
-            index:
-                candidates[
-                    localIndex
-                ].index,
-
-            relevance:
-                Number.isFinite(
-                    relevance
-                )
-                    ? Math.max(
-                        0,
-                        Math.min(
-                            100,
-                            relevance
-                        )
-                    )
-                    : 0
-        });
     }
-}
 
 
-console.log(
-    "TOTAL BATCH RANKINGS:",
-    batchRankings.length
-);
+    /*
+     * ترتيب نهائي محلي.
+     *
+     * مهم:
+     * لا نرسل طلب AI إضافيًا هنا؛
+     * لأن هذا الطلب هو الذي كان يستهلك
+     * جزءًا كبيرًا من ITPM.
+     */
+    const rankedResults =
+        topCandidates.map(
+            candidate => {
+
+                const original =
+                    results[
+                        candidate.index
+                    ];
 
 
-// ---------------------------------------------------------
-// إذا فشلت كل الدفعات
-// ---------------------------------------------------------
+                return {
+                    ...original,
+                    relevance:
+                        candidate.relevance
+                };
 
-if (
-    !batchRankings.length
-) {
-
-    throw new Error(
-        "لم يُرجع الذكاء الاصطناعي أي ترتيب صالح لدفعات نتائج المكتبة."
-    );
-}
-
-
-// ---------------------------------------------------------
-// أخذ أفضل النتائج من كل دفعة
-// ---------------------------------------------------------
-
-batchRankings.sort(
-    function (
-        a,
-        b
-    ) {
-
-        if (
-            b.relevance !==
-            a.relevance
-        ) {
-
-            return (
-                b.relevance -
-                a.relevance
-            );
-        }
-
-        return (
-            a.index -
-            b.index
-        );
-    }
-);
-
-
-const finalists =
-    batchRankings
-        .slice(
-            0,
-            Math.min(
-                40,
-                batchRankings.length
-            )
+            }
         );
 
 
-// ---------------------------------------------------------
-// الجولة النهائية
-// ---------------------------------------------------------
-
-const finalCandidates =
-    finalists.map(
-        function (
-            item
-        ) {
-
-            return buildCandidate(
-                results[
+    /*
+     * النتائج التي لم تدخل ترتيب AI
+     * تبقى في النهاية بدرجة صفر.
+     */
+    const rankedIndexes =
+        new Set(
+            topCandidates.map(
+                item =>
                     item.index
-                ],
-                item.index
-            );
-        }
-    );
-
-
-const finalPrompt =
-    rankingInstructions +
-    `
-
-
-هذه هي النتائج المرشحة للجولة النهائية.
-رتبها بدقة أكبر بحسب السؤال الأصلي:
-
-` +
-JSON.stringify(
-finalCandidates
-);
-
-
-console.log(
-    "========== FINAL AI RANKING =========="
-);
-
-console.log(
-    "FINAL CANDIDATES:",
-    finalCandidates.length
-);
-
-console.log(
-    "FINAL PROMPT LENGTH:",
-    finalPrompt.length
-);
-
-console.log(
-    "FINAL PROMPT UTF8 BYTES:",
-    new TextEncoder()
-        .encode(finalPrompt)
-        .length
-);
-
-
-const finalRaw =
-    await askAIForLibraryRanking(
-        finalPrompt
-    );
-
-
-let finalParsed;
-
-
-try {
-
-    finalParsed =
-        typeof finalRaw ===
-            "string"
-            ? JSON.parse(
-                finalRaw
             )
-            : finalRaw;
-
-}
-catch {
-
-    const match =
-        String(
-            finalRaw || ""
-        )
-        .match(
-            /\{[\s\S]*\}/
         );
 
 
-    if (!match) {
-
-        throw new Error(
-            "لم يُرجع الذكاء الاصطناعي ترتيبًا نهائيًا صالحًا."
-        );
-    }
-
-
-    finalParsed =
-        JSON.parse(
-            match[0]
-        );
-}
-
-
-if (
-    !finalParsed ||
-    !Array.isArray(
-        finalParsed.ranking
-    )
-) {
-
-    throw new Error(
-        "صيغة الترتيب النهائي غير صالحة."
-    );
-}
-
-
-// ---------------------------------------------------------
-// تحويل الترتيب النهائي إلى النتائج الأصلية
-// ---------------------------------------------------------
-
-const ranked = [];
-
-const seen =
-    new Set();
-
-
-for (
-    const item
-    of finalParsed.ranking
-) {
-
-    const index =
-        Number(
-            item?.index
-        );
-
-    const relevance =
-        Number(
-            item?.relevance
-        );
-
-
-    if (
-        !Number.isInteger(
-            index
-        ) ||
-        index < 0 ||
-        index >=
-            results.length
-    ) {
-
-        continue;
-    }
-
-
-    if (
-        seen.has(
-            index
-        )
-    ) {
-
-        continue;
-    }
-
-
-    seen.add(
-        index
-    );
-
-
-    ranked.push({
-
-        result:
-            results[index],
-
-        relevance:
-            Number.isFinite(
-                relevance
-            )
-                ? Math.max(
-                    0,
-                    Math.min(
-                        100,
-                        relevance
-                    )
-                )
-                : 0,
-
-        index
-    });
-}
-
-
-// ---------------------------------------------------------
-// النتائج التي لم تظهر في الجولة النهائية
-// ---------------------------------------------------------
-
-for (
-    const item
-    of batchRankings
-) {
-
-    if (
-        seen.has(
-            item.index
-        )
-    ) {
-
-        continue;
-    }
-
-
-    seen.add(
-        item.index
-    );
-
-
-    ranked.push({
-
-        result:
-            results[
-                item.index
-            ],
-
-        relevance:
-            item.relevance,
-
-        index:
-            item.index
-    });
-}
-
-
-// ---------------------------------------------------------
-// بقية النتائج تبقى موجودة
-// ---------------------------------------------------------
-
-for (
-    let index = 0;
-    index < results.length;
-    index++
-) {
-
-    if (
-        seen.has(
-            index
-        )
-    ) {
-
-        continue;
-    }
-
-
-    ranked.push({
-
-        result:
-            results[index],
-
-        relevance:
-            0,
-
-        index
-    });
-}
-
-
-// ---------------------------------------------------------
-// الترتيب النهائي
-// ---------------------------------------------------------
-
-ranked.sort(
-    function (
-        a,
-        b
+    for (
+        let i = 0;
+        i < results.length;
+        i++
     ) {
 
         if (
-            b.relevance !==
-            a.relevance
+            rankedIndexes.has(i)
         ) {
-
-            return (
-                b.relevance -
-                a.relevance
-            );
+            continue;
         }
 
 
-        return (
-            a.index -
-            b.index
+        rankedResults.push(
+            {
+                ...results[i],
+                relevance: 0
+            }
         );
+
     }
-);
 
 
-return ranked;
+    return rankedResults;
 
 }
 
