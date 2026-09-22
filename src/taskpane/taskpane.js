@@ -26952,13 +26952,12 @@ for (
     const localSeen =
         new Set();
 
-
     for (
         const item
         of parsed.ranking
     ) {
 
-        const localIndex =
+        const globalIndex =
             Number(
                 item?.index
             );
@@ -26968,41 +26967,44 @@ for (
                 item?.relevance
             );
 
-
         if (
             !Number.isInteger(
-                localIndex
-            ) ||
-            localIndex < 0 ||
-            localIndex >=
-                candidates.length
+                globalIndex
+            )
         ) {
-
             continue;
         }
 
+        const candidate =
+            candidates.find(
+                function (candidate) {
+                    return (
+                        candidate.index ===
+                        globalIndex
+                    );
+                }
+            );
+
+        if (!candidate) {
+            continue;
+        }
 
         if (
             localSeen.has(
-                localIndex
+                globalIndex
             )
         ) {
-
             continue;
         }
 
-
         localSeen.add(
-            localIndex
+            globalIndex
         );
-
 
         batchRankings.push({
 
             index:
-                candidates[
-                    localIndex
-                ].index,
+                globalIndex,
 
             relevance:
                 Number.isFinite(
