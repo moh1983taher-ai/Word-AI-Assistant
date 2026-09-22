@@ -36726,7 +36726,8 @@ async function searchLibrary(
 
 
                     return asyncDirectSearch(
-                        queryItem.query
+                        queryItem.query,
+                        queryItem.source
                     )
                     .then(
                         function (
