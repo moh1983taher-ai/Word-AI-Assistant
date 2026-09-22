@@ -36627,6 +36627,39 @@ async function searchLibrary(
                     .filter(Boolean)
                 : [];
 
+        const searchContext = {
+            originalQuery:
+                text,
+
+            intent:
+                String(
+                    searchPlan.intent ||
+                    ""
+                ).trim(),
+
+            subject:
+                String(
+                    searchPlan.subject ||
+                    ""
+                ).trim(),
+
+            constraints:
+                Array.isArray(
+                    searchPlan.constraints
+                )
+                    ? searchPlan.constraints
+                    : []
+        };
+
+        const smartQueries =
+            executedQueries.map(
+                function (
+                    item
+                ) {
+                    return item.query;
+                }
+            );
+
 
         // ---------------------------------------------------------
         // إذا فشل التحليل أو لم يُرجع استعلامات صالحة،
@@ -36725,7 +36758,7 @@ async function searchLibrary(
                     );
 
 
-                    
+
                     return asyncDirectSearch(
                         queryItem.query,
                         queryItem.source
