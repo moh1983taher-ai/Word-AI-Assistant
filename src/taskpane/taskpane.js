@@ -20855,9 +20855,9 @@ function formatLibraryResults(
                             // درجة الصلة
                             // =================================================
 
-                            const score =
+                            const relevance =
                                 Number(
-                                    item.score ||
+                                    item.relevance ||
                                     0
                                 );
 
@@ -20959,11 +20959,11 @@ function formatLibraryResults(
 
 
                                         ${
-                                            score
+                                            relevance
                                                 ? `
                                                     <span>
                                                         درجة الصلة
-                                                        ${score}
+                                                        ${relevance}
                                                     </span>
                                                 `
                                                 : ""
