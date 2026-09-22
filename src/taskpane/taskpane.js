@@ -26273,6 +26273,71 @@ async function askAIForLibraryRanking(
 
     }
 
+    // DuckAI المحلي
+    if (
+        data.provider ===
+        "duckai"
+    ) {
+
+        const response =
+            await fetch(
+                "http://127.0.0.1:8080/v1/chat/completions",
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+                            model:
+                                data.model,
+
+                            messages,
+
+                            stream:
+                                false,
+
+                            temperature:
+                                0,
+
+                            max_tokens:
+                                4000
+                        })
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (
+            !response.ok
+        ) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ DuckAI المحلي."
+                )
+            );
+
+        }
+
+
+        return extractOpenAIStyleAnswer(
+            result,
+            "DuckAI"
+        );
+
+    }
+
 
     throw new Error(
         "مزود الذكاء الاصطناعي غير معروف: " +
