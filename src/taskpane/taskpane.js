@@ -26582,6 +26582,18 @@ ${JSON.stringify(
 
         );
 
+        console.log(
+            "========== RAW AI LIBRARY RESPONSE =========="
+        );
+
+        console.log(
+            raw
+        );
+
+        console.log(
+            "========== END RAW AI LIBRARY RESPONSE =========="
+        );
+
 
 
     let parsed;
