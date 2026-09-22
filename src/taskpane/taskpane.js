@@ -26405,7 +26405,7 @@ if (
 // إعدادات تقسيم النتائج
 // ---------------------------------------------------------
 
-const MAX_BATCH_CHARS = 24000;
+const MAX_BATCH_CHARS = 16000;
 
 const MAX_BATCH_RESULTS = 40;
 
