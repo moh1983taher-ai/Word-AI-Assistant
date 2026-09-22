@@ -26207,73 +26207,253 @@ async function askAIForLibraryRanking(
         "groq"
     ) {
 
-        const response =
-            await fetch(
-                "https://api.groq.com/openai/v1/chat/completions",
-                {
+        const GROQ_URL =
+            "https://api.groq.com/openai/v1/chat/completions";
 
-                    method:
-                        "POST",
+        const MAX_RETRIES = 4;
 
-                    headers: {
+        const DEFAULT_RETRY_MS =
+            15000;
 
-                        "Content-Type":
-                            "application/json",
-
-                        "Authorization":
-                            "Bearer " +
-                            data.key
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                data.model,
-
-                            messages,
-
-                            temperature:
-                                0,
-
-                            max_tokens:
-                                4000
-
-                        })
-
-                }
-            );
+        const GROQ_MAX_TOKENS =
+            1200;
 
 
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        if (
-            !response.ok
+        function sleep(
+            milliseconds
         ) {
 
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Groq."
-                )
+            return new Promise(
+                function (
+                    resolve
+                ) {
+
+                    setTimeout(
+                        resolve,
+                        milliseconds
+                    );
+
+                }
             );
 
         }
 
 
-        return extractOpenAIStyleAnswer(
-            result,
-            "Groq"
+        function getGroqRetryDelay(
+            response,
+            result
+        ) {
+
+            const retryAfter =
+                response.headers.get(
+                    "retry-after"
+                );
+
+            if (
+                retryAfter
+            ) {
+
+                const seconds =
+                    Number(
+                        retryAfter
+                    );
+
+                if (
+                    Number.isFinite(
+                        seconds
+                    )
+                ) {
+
+                    return Math.max(
+                        1000,
+                        Math.ceil(
+                            seconds * 1000
+                        )
+                    );
+
+                }
+
+            }
+
+
+            const message =
+                String(
+                    result?.error?.message ||
+                    result?.message ||
+                    ""
+                );
+
+
+            const match =
+                message.match(
+                    /try again in\s+([\d.]+)\s*s/i
+                );
+
+
+            if (
+                match
+            ) {
+
+                const seconds =
+                    Number(
+                        match[1]
+                    );
+
+                if (
+                    Number.isFinite(
+                        seconds
+                    )
+                ) {
+
+                    return Math.max(
+                        1000,
+                        Math.ceil(
+                            seconds * 1000
+                        )
+                    );
+
+                }
+
+            }
+
+
+            return DEFAULT_RETRY_MS;
+
+        }
+
+
+        for (
+            let attempt = 0;
+            attempt <= MAX_RETRIES;
+            attempt++
+        ) {
+
+            const response =
+                await fetch(
+                    GROQ_URL,
+                    {
+
+                        method:
+                            "POST",
+
+                        headers: {
+
+                            "Content-Type":
+                                "application/json",
+
+                            "Authorization":
+                                "Bearer " +
+                                data.key
+
+                        },
+
+                        body:
+                            JSON.stringify({
+
+                                model:
+                                    data.model,
+
+                                messages,
+
+                                temperature:
+                                    0,
+
+                                max_tokens:
+                                    GROQ_MAX_TOKENS
+
+                            })
+
+                    }
+                );
+
+
+            const result =
+                await readJSON(
+                    response
+                );
+
+
+            if (
+                response.ok
+            ) {
+
+                return extractOpenAIStyleAnswer(
+                    result,
+                    "Groq"
+                );
+
+            }
+
+
+            const errorMessage =
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ Groq."
+                );
+
+
+            const isRateLimit =
+                response.status ===
+                    429 ||
+                /rate.?limit|ITPM|tokens per minute|try again in/i.test(
+                    String(
+                        errorMessage ||
+                        ""
+                    )
+                );
+
+
+            if (
+                !isRateLimit ||
+                attempt >= MAX_RETRIES
+            ) {
+
+                throw new Error(
+                    errorMessage
+                );
+
+            }
+
+
+            const retryDelay =
+                getGroqRetryDelay(
+                    response,
+                    result
+                );
+
+
+            console.warn(
+                "Groq rate limit.",
+                "المحاولة:",
+                attempt + 1,
+                "/",
+                MAX_RETRIES,
+                "الانتظار:",
+                Math.ceil(
+                    retryDelay / 1000
+                ),
+                "ثانية"
+            );
+
+
+            await sleep(
+                retryDelay
+            );
+
+        }
+
+
+        throw new Error(
+            "تعذر إكمال طلب Groq بعد عدة محاولات."
         );
 
     }
 
+
+    // =========================================================
     // DuckAI المحلي
+    // =========================================================
+
     if (
         data.provider ===
         "duckai"
@@ -26283,16 +26463,20 @@ async function askAIForLibraryRanking(
             await fetch(
                 "http://127.0.0.1:8080/v1/chat/completions",
                 {
+
                     method:
                         "POST",
 
                     headers: {
+
                         "Content-Type":
                             "application/json"
+
                     },
 
                     body:
                         JSON.stringify({
+
                             model:
                                 data.model,
 
@@ -26306,7 +26490,9 @@ async function askAIForLibraryRanking(
 
                             max_tokens:
                                 4000
+
                         })
+
                 }
             );
 
