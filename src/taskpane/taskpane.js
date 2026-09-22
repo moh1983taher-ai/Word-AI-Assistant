@@ -36495,6 +36495,22 @@ async function searchLibrary(
                 text
             );
 
+        console.log(
+            "========== GENERATED LIBRARY SEARCH PLAN =========="
+        );
+
+        console.log(
+            JSON.stringify(
+                searchPlan,
+                null,
+                2
+            )
+        );
+
+        console.log(
+            "===================================================="
+        );
+
     }
     catch (
         error
