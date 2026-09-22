@@ -34293,12 +34293,23 @@ function getLibraryAIProviderConfig() {
 
 
     if (
-        !key ||
+        provider !== "duckai" &&
+        !key
+    ) {
+
+        throw new Error(
+            "لم يتم تحديد مفتاح الذكاء الاصطناعي."
+        );
+
+    }
+
+
+    if (
         !model
     ) {
 
         throw new Error(
-            "لم يتم تحديد مفتاح ونموذج الذكاء الاصطناعي."
+            "لم يتم تحديد نموذج الذكاء الاصطناعي."
         );
 
     }
