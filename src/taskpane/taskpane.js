@@ -36651,15 +36651,6 @@ async function searchLibrary(
                     : []
         };
 
-        const smartQueries =
-            executedQueries.map(
-                function (
-                    item
-                ) {
-                    return item.query;
-                }
-            );
-
 
         // ---------------------------------------------------------
         // إذا فشل التحليل أو لم يُرجع استعلامات صالحة،
@@ -36720,6 +36711,15 @@ async function searchLibrary(
             });
 
         }
+
+        const smartQueries =
+            executedQueries.map(
+                function (
+                    item
+                ) {
+                    return item.query;
+                }
+            );
 
 
         console.log(
