@@ -35878,6 +35878,11 @@ async function searchLibrary(
         error
     ) {
 
+        console.error(
+            "EXPAND LIBRARY QUERY ERROR:",
+            error
+        );
+
         console.warn(
             "تعذر توسيع سؤال بحث المكتبات بالذكاء الاصطناعي:",
             error?.message ||
