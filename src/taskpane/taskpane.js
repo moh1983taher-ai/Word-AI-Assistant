@@ -27028,14 +27028,11 @@ console.log(
     batchRankings.length
 );
 
-
 // ---------------------------------------------------------
-// إذا فشلت كل الدفعات
+// تحويل تقييمات الذكاء الاصطناعي إلى النتائج الأصلية
 // ---------------------------------------------------------
 
-if (
-    !batchRankings.length
-) {
+if (!batchRankings.length) {
 
     throw new Error(
         "لم يُرجع الذكاء الاصطناعي أي ترتيب صالح لدفعات نتائج المكتبة."
@@ -27044,7 +27041,7 @@ if (
 
 
 // ---------------------------------------------------------
-// أخذ أفضل النتائج من كل دفعة
+// ترتيب التقييمات محليًا
 // ---------------------------------------------------------
 
 batchRankings.sort(
@@ -27072,134 +27069,8 @@ batchRankings.sort(
 );
 
 
-const finalists =
-    batchRankings
-        .slice(
-            0,
-            Math.min(
-                40,
-                batchRankings.length
-            )
-        );
-
-
 // ---------------------------------------------------------
-// الجولة النهائية
-// ---------------------------------------------------------
-
-const finalCandidates =
-    finalists.map(
-        function (
-            item
-        ) {
-
-            return buildCandidate(
-                results[
-                    item.index
-                ],
-                item.index
-            );
-        }
-    );
-
-
-const finalPrompt =
-    rankingInstructions +
-    `
-
-
-هذه هي النتائج المرشحة للجولة النهائية.
-رتبها بدقة أكبر بحسب السؤال الأصلي:
-
-` +
-JSON.stringify(
-finalCandidates
-);
-
-
-console.log(
-    "========== FINAL AI RANKING =========="
-);
-
-console.log(
-    "FINAL CANDIDATES:",
-    finalCandidates.length
-);
-
-console.log(
-    "FINAL PROMPT LENGTH:",
-    finalPrompt.length
-);
-
-console.log(
-    "FINAL PROMPT UTF8 BYTES:",
-    new TextEncoder()
-        .encode(finalPrompt)
-        .length
-);
-
-
-const finalRaw =
-    await askAIForLibraryRanking(
-        finalPrompt
-    );
-
-
-let finalParsed;
-
-
-try {
-
-    finalParsed =
-        typeof finalRaw ===
-            "string"
-            ? JSON.parse(
-                finalRaw
-            )
-            : finalRaw;
-
-}
-catch {
-
-    const match =
-        String(
-            finalRaw || ""
-        )
-        .match(
-            /\{[\s\S]*\}/
-        );
-
-
-    if (!match) {
-
-        throw new Error(
-            "لم يُرجع الذكاء الاصطناعي ترتيبًا نهائيًا صالحًا."
-        );
-    }
-
-
-    finalParsed =
-        JSON.parse(
-            match[0]
-        );
-}
-
-
-if (
-    !finalParsed ||
-    !Array.isArray(
-        finalParsed.ranking
-    )
-) {
-
-    throw new Error(
-        "صيغة الترتيب النهائي غير صالحة."
-    );
-}
-
-
-// ---------------------------------------------------------
-// تحويل الترتيب النهائي إلى النتائج الأصلية
+// منع تكرار النتائج
 // ---------------------------------------------------------
 
 const ranked = [];
@@ -27210,27 +27081,16 @@ const seen =
 
 for (
     const item
-    of finalParsed.ranking
+    of batchRankings
 ) {
 
     const index =
-        Number(
-            item?.index
-        );
-
-    const relevance =
-        Number(
-            item?.relevance
-        );
-
+        item.index;
 
     if (
-        !Number.isInteger(
-            index
-        ) ||
+        !Number.isInteger(index) ||
         index < 0 ||
-        index >=
-            results.length
+        index >= results.length
     ) {
 
         continue;
@@ -27238,18 +27098,14 @@ for (
 
 
     if (
-        seen.has(
-            index
-        )
+        seen.has(index)
     ) {
 
         continue;
     }
 
 
-    seen.add(
-        index
-    );
+    seen.add(index);
 
 
     ranked.push({
@@ -27258,17 +27114,7 @@ for (
             results[index],
 
         relevance:
-            Number.isFinite(
-                relevance
-            )
-                ? Math.max(
-                    0,
-                    Math.min(
-                        100,
-                        relevance
-                    )
-                )
-                : 0,
+            item.relevance,
 
         index
     });
@@ -27276,47 +27122,7 @@ for (
 
 
 // ---------------------------------------------------------
-// النتائج التي لم تظهر في الجولة النهائية
-// ---------------------------------------------------------
-
-for (
-    const item
-    of batchRankings
-) {
-
-    if (
-        seen.has(
-            item.index
-        )
-    ) {
-
-        continue;
-    }
-
-
-    seen.add(
-        item.index
-    );
-
-
-    ranked.push({
-
-        result:
-            results[
-                item.index
-            ],
-
-        relevance:
-            item.relevance,
-
-        index:
-            item.index
-    });
-}
-
-
-// ---------------------------------------------------------
-// بقية النتائج تبقى موجودة
+// بقية النتائج التي لم تُقيّم
 // ---------------------------------------------------------
 
 for (
@@ -27326,9 +27132,7 @@ for (
 ) {
 
     if (
-        seen.has(
-            index
-        )
+        seen.has(index)
     ) {
 
         continue;
@@ -27378,7 +27182,27 @@ ranked.sort(
 );
 
 
+console.log(
+    "FINAL RANKED RESULTS:",
+    ranked.length
+);
+
+
 return ranked;
+// ---------------------------------------------------------
+// إذا فشلت كل الدفعات
+// ---------------------------------------------------------
+
+if (
+    !batchRankings.length
+) {
+
+    throw new Error(
+        "لم يُرجع الذكاء الاصطناعي أي ترتيب صالح لدفعات نتائج المكتبة."
+    );
+}
+
+
 
 }
 
