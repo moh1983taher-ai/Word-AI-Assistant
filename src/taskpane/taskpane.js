@@ -37321,47 +37321,435 @@ async function searchLibrary(
 
 
         // =========================================================
-        // المكتبات الأخرى:
-        // تبقى على البحث المباشر حاليًا
+        // KetabOnline:
+        // بحث ذكي متعدد الاستعلامات
         // =========================================================
 
-        const data =
-            await asyncDirectSearch(
-                text,
-                selectedSource
+        if (
+            selectedSource ===
+            "ketabonline"
+        ) {
+
+            let searchPlan = {
+                intent: "",
+                subject: "",
+                constraints: [],
+                ketabQueries: [
+                    text
+                ]
+            };
+
+
+            try {
+
+                searchPlan =
+                    await expandLibrarySearchQuery(
+                        text
+                    );
+
+
+                console.log(
+                    "========== KETABONLINE SEARCH PLAN =========="
+                );
+
+                console.log(
+                    JSON.stringify(
+                        searchPlan,
+                        null,
+                        2
+                    )
+                );
+
+                console.log(
+                    "=============================================="
+                );
+
+            }
+            catch (
+                error
+            ) {
+
+                console.error(
+                    "KETABONLINE QUERY EXPANSION ERROR:",
+                    error
+                );
+
+                searchPlan = {
+
+                    intent: "",
+
+                    subject: "",
+
+                    constraints: [],
+
+                    ketabQueries: [
+                        text
+                    ]
+
+                };
+
+            }
+
+
+            const ketabQueries =
+                Array.isArray(
+                    searchPlan.ketabQueries
+                )
+                    ? searchPlan.ketabQueries
+                        .map(
+                            function (
+                                item
+                            ) {
+
+                                return String(
+                                    item ||
+                                    ""
+                                ).trim();
+
+                            }
+                        )
+                        .filter(Boolean)
+                    : [];
+
+
+            if (
+                !ketabQueries.length
+            ) {
+
+                ketabQueries.push(
+                    text
+                );
+
+            }
+
+
+            const searchContext = {
+
+                originalQuery:
+                    text,
+
+                intent:
+                    String(
+                        searchPlan.intent ||
+                        ""
+                    ).trim(),
+
+                subject:
+                    String(
+                        searchPlan.subject ||
+                        ""
+                    ).trim(),
+
+                constraints:
+                    Array.isArray(
+                        searchPlan.constraints
+                    )
+                        ? searchPlan.constraints
+                        : []
+
+            };
+
+
+            // =========================================================
+            // تنفيذ استعلامات جامع الكتب
+            // =========================================================
+
+            const searchTasks =
+                ketabQueries.map(
+                    function (
+                        queryItem
+                    ) {
+
+                        console.log(
+                            "KETABONLINE QUERY START:",
+                            queryItem
+                        );
+
+
+                        return asyncDirectSearch(
+                            queryItem,
+                            "ketabonline"
+                        )
+                        .then(
+                            function (
+                                data
+                            ) {
+
+                                console.log(
+                                    "KETABONLINE QUERY DONE:",
+                                    queryItem,
+                                    "RESULTS:",
+                                    Array.isArray(
+                                        data?.results
+                                    )
+                                        ? data.results.length
+                                        : 0
+                                );
+
+
+                                return {
+
+                                    query:
+                                        queryItem,
+
+                                    data:
+                                        data,
+
+                                    error:
+                                        null
+
+                                };
+
+                            }
+                        )
+                        .catch(
+                            function (
+                                error
+                            ) {
+
+                                console.error(
+                                    "KETABONLINE QUERY FAILED:",
+                                    queryItem,
+                                    error
+                                );
+
+
+                                return {
+
+                                    query:
+                                        queryItem,
+
+                                    data:
+                                        null,
+
+                                    error
+
+                                };
+
+                            }
+                        );
+
+                    }
+                );
+
+
+            const searchResponses =
+                await Promise.all(
+                    searchTasks
+                );
+
+
+            // =========================================================
+            // تجميع أول 10 نتائج من كل استعلام
+            // =========================================================
+
+            const allResults = [];
+
+            const seen = new Set();
+
+            const TOP_PER_QUERY = 10;
+
+
+            for (
+                const response of
+                    searchResponses
+            ) {
+
+                if (
+                    !response.data
+                ) {
+
+                    continue;
+
+                }
+
+
+                const queryResults =
+                    Array.isArray(
+                        response.data.results
+                    )
+                        ? response.data.results.slice(
+                            0,
+                            TOP_PER_QUERY
+                        )
+                        : [];
+
+
+                for (
+                    const result of
+                        queryResults
+                ) {
+
+                    const key =
+                        libraryResultKey(
+                            result
+                        );
+
+
+                    if (
+                        seen.has(
+                            key
+                        )
+                    ) {
+
+                        continue;
+
+                    }
+
+
+                    seen.add(
+                        key
+                    );
+
+
+                    allResults.push(
+                        result
+                    );
+
+                }
+
+            }
+
+
+            console.log(
+                "========== KETABONLINE LOCAL PRE-RANK =========="
+            );
+
+            console.log(
+                "QUERIES:",
+                ketabQueries.length
+            );
+
+            console.log(
+                "TOP PER QUERY:",
+                TOP_PER_QUERY
+            );
+
+            console.log(
+                "TOTAL UNIQUE RESULTS:",
+                allResults.length
+            );
+
+            console.log(
+                "==============================================="
             );
 
 
-        let finalSpecificResults =
-            Array.isArray(
-                data.results
-            )
-                ? data.results.slice(
+            // =========================================================
+            // لا توجد نتائج
+            // =========================================================
+
+            if (
+                !allResults.length
+            ) {
+
+                return await asyncDirectSearch(
+                    text,
+                    "ketabonline"
+                );
+
+            }
+
+
+            // =========================================================
+            // ترتيب النتائج بالذكاء الاصطناعي
+            // =========================================================
+
+            let rankedResults =
+                allResults;
+
+
+            try {
+
+                const ranked =
+                    await rankLibraryResultsWithAI(
+                        text,
+                        allResults,
+                        searchContext
+                    );
+
+
+                console.log(
+                    "AI KETABONLINE RANKING:",
+                    ranked
+                );
+
+
+                if (
+                    Array.isArray(
+                        ranked
+                    ) &&
+                    ranked.length
+                ) {
+
+                    rankedResults =
+                        ranked.map(
+                            function (
+                                item
+                            ) {
+
+                                return {
+
+                                    ...item.result,
+
+                                    relevance:
+                                        Number(
+                                            item.relevance
+                                        ) || 0
+
+                                };
+
+                            }
+                        );
+
+                }
+
+            }
+            catch (
+                error
+            ) {
+
+                console.error(
+                    "AI KETABONLINE RANKING FAILED:",
+                    error
+                );
+
+
+                rankedResults =
+                    allResults;
+
+            }
+
+
+            // =========================================================
+            // أول النتائج للعرض
+            // =========================================================
+
+            const finalRankedResults =
+                rankedResults.slice(
                     0,
                     requestedResults
-                )
-                : [];
+                );
 
 
-        data.results =
-            finalSpecificResults;
+            // =========================================================
+            // إعادة بناء استجابة جامع الكتب
+            // =========================================================
 
+            return await rebuildLibraryResponseFromResults(
+                finalRankedResults,
+                text,
+                requestedResults,
+                "ketabonline",
+                {
 
-        data.resultsRequested =
-            requestedResults;
+                    smartQueries:
+                        ketabQueries
 
+                }
+            );
 
-        data.count =
-            data.results.length;
-
-
-        data.smartSearch =
-            false;
-
-
-        return data;
-
-    }
+        }
 
 
     // =========================================================
