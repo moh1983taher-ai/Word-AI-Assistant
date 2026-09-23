@@ -26573,669 +26573,1194 @@ function splitLibraryRankingBatches(
 // =============================================================
 
 async function rankLibraryResultsWithAI(
-query,
-results,
-searchContext = {}
+
+    query,
+
+    results,
+
+    searchContext = {}
+
 ) {
 
-
-if (
-    !Array.isArray(results) ||
-    !results.length
-) {
-    return [];
-}
-
-
-// ---------------------------------------------------------
-// إعدادات تقسيم النتائج
-// ---------------------------------------------------------
-
-const MAX_BATCH_CHARS = 9000;
-
-const MAX_BATCH_RESULTS = 20;
-
-const TOP_FROM_BATCH = 8;
-
-
-// ---------------------------------------------------------
-// تحويل النتيجة إلى تمثيل مختصر
-// ---------------------------------------------------------
-
-function buildCandidate(
-    result,
-    index
-) {
-
-    return {
-
-        index,
-
-        source:
-            result?.source ||
-            "",
-
-        bookId:
-            result?.bookId ||
-            "",
-
-        title:
-            result?.title ||
-            "",
-
-        author:
-            result?.author ||
-            "",
-
-        sectionTitle:
-            result?.sectionTitle ||
-            "",
-
-        text:
-            String(
-                result?.text ||
-                ""
-            )
-            .substring(
-                0,
-                1200
-            )
-    };
-}
-
-
-// ---------------------------------------------------------
-// تقسيم النتائج حسب حجم البيانات
-// ---------------------------------------------------------
-
-const batches = [];
-
-let currentBatch = [];
-let currentChars = 0;
-
-for (
-    let index = 0;
-    index < results.length;
-    index++
-) {
-
-    const candidate =
-        buildCandidate(
-            results[index],
-            index
-        );
-
-    const candidateSize =
-        JSON.stringify(
-            candidate
-        ).length;
 
 
     if (
-        currentBatch.length &&
-        (
-            currentChars +
-            candidateSize >
-                MAX_BATCH_CHARS ||
-            currentBatch.length >=
-                MAX_BATCH_RESULTS
-        )
+
+        !Array.isArray(results) ||
+
+        !results.length
+
     ) {
 
-        batches.push(
-            currentBatch
-        );
+        return [];
 
-        currentBatch = [];
-        currentChars = 0;
     }
 
 
-    currentBatch.push(
-        candidate
+
+    // ---------------------------------------------------------
+
+    // إعدادات تقسيم النتائج
+
+    // ---------------------------------------------------------
+
+    const MAX_BATCH_CHARS = 9000;
+
+    const MAX_BATCH_RESULTS = 20;
+
+    const TOP_FROM_BATCH = 8;
+
+
+
+    // ---------------------------------------------------------
+
+    // تحويل النتيجة إلى تمثيل مختصر
+
+    // ---------------------------------------------------------
+
+    function buildCandidate(
+
+        result,
+
+        index
+
+    ) {
+
+        return {
+
+            index,
+
+            source:
+
+                result?.source ||
+
+                "",
+
+            bookId:
+
+                result?.bookId ||
+
+                "",
+
+            title:
+
+                result?.title ||
+
+                "",
+
+            author:
+
+                result?.author ||
+
+                "",
+
+            sectionTitle:
+
+                result?.sectionTitle ||
+
+                "",
+
+            text:
+
+                String(
+
+                    result?.text ||
+
+                    ""
+
+                )
+
+                .substring(
+
+                    0,
+
+                    1200
+
+                )
+
+        };
+
+    }
+
+
+
+    // ---------------------------------------------------------
+
+    // تقسيم النتائج حسب حجم البيانات
+
+    // ---------------------------------------------------------
+
+    const batches = [];
+
+    let currentBatch = [];
+
+    let currentChars = 0;
+
+
+
+    for (
+
+        let index = 0;
+
+        index < results.length;
+
+        index++
+
+    ) {
+
+        const candidate =
+
+            buildCandidate(
+
+                results[index],
+
+                index
+
+            );
+
+
+
+        const candidateSize =
+
+            JSON.stringify(
+
+                candidate
+
+            ).length;
+
+
+
+        if (
+
+            currentBatch.length &&
+
+            (
+
+                currentChars +
+
+                candidateSize >
+
+                    MAX_BATCH_CHARS ||
+
+                currentBatch.length >=
+
+                    MAX_BATCH_RESULTS
+
+            )
+
+        ) {
+
+            batches.push(
+
+                currentBatch
+
+            );
+
+
+
+            currentBatch = [];
+
+            currentChars = 0;
+
+        }
+
+
+
+        currentBatch.push(
+
+            candidate
+
+        );
+
+
+
+        currentChars +=
+
+            candidateSize;
+
+    }
+
+
+
+    if (
+
+        currentBatch.length
+
+    ) {
+
+        batches.push(
+
+            currentBatch
+
+        );
+
+    }
+
+
+
+    console.log(
+
+        "========== AI RANKING BATCHES =========="
+
     );
 
-    currentChars +=
-        candidateSize;
-}
 
 
-if (
-    currentBatch.length
-) {
+    console.log(
 
-    batches.push(
-        currentBatch
+        "TOTAL RESULTS:",
+
+        results.length
+
     );
-}
 
 
-console.log(
-    "========== AI RANKING BATCHES =========="
-);
 
-console.log(
-    "TOTAL RESULTS:",
-    results.length
-);
+    console.log(
 
-console.log(
-    "BATCH COUNT:",
-    batches.length
-);
+        "BATCH COUNT:",
+
+        batches.length
+
+    );
 
 
-// ---------------------------------------------------------
-// نص التعليمات المشترك
-// ---------------------------------------------------------
 
-const rankingInstructions =
+    // ---------------------------------------------------------
 
+    // نص التعليمات المشترك
+
+    // ---------------------------------------------------------
+
+    const rankingInstructions =
 
 `
+
 السؤال الأصلي:
 
 ${query}
 
+
+
 تحليل السؤال الذي أعده محلل الاستعلام:
 
+
+
 نوع المطلوب (intent):
+
 ${searchContext.intent || "غير محدد"}
 
+
+
 الموضوع الأساسي (subject):
+
 ${searchContext.subject || "غير محدد"}
 
+
+
 القيود أو الخصائص المطلوبة:
+
 ${
-Array.isArray(searchContext.constraints) &&
-searchContext.constraints.length
-? searchContext.constraints.join("، ")
-: "لا توجد قيود محددة"
+
+    Array.isArray(searchContext.constraints) &&
+
+    searchContext.constraints.length
+
+    ? searchContext.constraints.join("، ")
+
+    : "لا توجد قيود محددة"
+
 }
+
+
 
 أمامك مجموعة من نتائج البحث من مكتبتين رقميتين.
 
-مهمتك ترتيب النتائج الموجودة في هذه المجموعة بحسب صلتها العلمية الحقيقية بالسؤال.
+
+
+مهمتك ترتيب النتائج الموجودة في هذه المجموعة بحسب صلتها العلمية الحقيقية بالسؤال، مع استبعاد النتائج التي لا علاقة لها بالموضوع.
+
+
 
 قواعد التقييم:
 
+
+
 1. افهم السؤال الأصلي مع intent وsubject وconstraints معًا.
+
+
 
 2. قيّم الصلة العلمية الحقيقية، وليس مجرد التشابه اللفظي.
 
+
+
 3. إذا كان السؤال يطلب نوعًا محددًا من المعلومات، فاجعل تحقق هذا النوع عاملًا أساسيًا.
+
+
 
 4. افحص النص نفسه، فهو أهم من مجرد عنوان الكتاب أو الموضع.
 
+
+
 5. ميّز بين الموضوع المطلوب والموضوعات القريبة منه.
+
+
 
 6. النتيجة التي تجيب عن المطلوب مباشرة أعلى من نتيجة تذكر المصطلح في سياق آخر.
 
+
+
 7. لا تعتمد على ترتيب المكتبة الأصلية أو أي درجة سابقة.
+
+
 
 8. لا تفضل مكتبة على أخرى.
 
+
+
 9. لا تخترع أي نتيجة أو معلومة.
+
+
 
 10. قيّم النتائج الموجودة فقط.
 
+
+
 11. استخدم relevance من 0 إلى 100:
+
+
+
     90–100: مباشرة جدًا وتلبي المطلوب بوضوح.
+
+
+
     70–89: قوية الصلة.
+
+
+
     40–69: جزئية أو غير مباشرة.
+
+
+
     10–39: ضعيفة.
+
+
+
     0–9: لا صلة حقيقية.
+
+
 
 12. لا ترفع الدرجة لمجرد وجود ألفاظ عامة مثل "تعريف" أو "لغة" أو "اصطلاحًا".
 
+
+
 13. الصلة العلمية أهم من التطابق اللفظي.
 
+
+
+14. keep يحدد هل تدخل النتيجة في النتائج النهائية أم تستبعد.
+
+
+
+15. اجعل keep=true إذا كانت النتيجة مرتبطة بموضوع البحث ارتباطًا مباشرًا أو واضحًا، أو كانت ذات قيمة بحثية معتبرة في الموضوع.
+
+
+
+16. اجعل keep=false إذا كانت لا علاقة لها بالموضوع، أو كان ارتباطها عرضيًا جدًا، أو كانت تتحدث عن مصطلح أو موضوع آخر.
+
+
+
+17. إذا كانت النتيجة مرتبطة بالموضوع ولكنها لا تقدم التعريف المباشر، فلا تستبعدها لمجرد ذلك؛ قد تكون مفيدة للباحث.
+
+
+
+18. لا تجعل مجرد وجود كلمة من كلمات السؤال سببًا كافيًا للإبقاء على النتيجة.
+
+
+
 لكل نتيجة:
-- keep=true إذا كانت مرتبطة بموضوع البحث ارتباطًا مباشرًا أو واضحًا، أو كانت ذات قيمة بحثية معتبرة في الموضوع.
-- keep=false إذا كانت لا علاقة لها بموضوع البحث، حتى لو وردت فيها كلمات من الاستعلام.
-- لا تستبعد النتيجة لمجرد أنها لا تقدم تعريفًا مباشرًا؛ يكفي أن تكون مرتبطة بالموضوع ارتباطًا مفيدًا.
-- إذا كان الارتباط ضعيفًا جدًا أو عرضيًا أو يتعلق بمصطلح آخر، فاجعل keep=false.
-- relevance يعبّر عن قوة الصلة العلمية بالاستعلام.
+
+
+
+- keep=true إذا كانت مرتبطة بموضوع البحث ارتباطًا مفيدًا.
+
+
+
+- keep=false إذا كانت غير مرتبطة بالموضوع ارتباطًا علميًا معتبرًا.
+
+
+
+- relevance يعبّر عن قوة الصلة العلمية بالسؤال.
+
+
 
 أعد JSON فقط:
 
+
+
 {
+
   "ranking": [
+
     {
+
       "index": 0,
+
       "relevance": 100,
+
       "keep": true
+
     }
+
   ]
+
 }
 
+
+
 يجب ذكر جميع النتائج الموجودة في هذه المجموعة.
+
+
+
 يجب ألا يتكرر أي index.
+
+
+
 يجب أن يكون الترتيب تنازليًا بحسب relevance.
+
+
+
 لا تكتب أي تفسير خارج JSON.
+
 `;
 
 
-// ---------------------------------------------------------
-// ترتيب كل دفعة
-// ---------------------------------------------------------
 
-const batchRankings = [];
+    // ---------------------------------------------------------
 
+    // ترتيب كل دفعة
 
-for (
-    let batchIndex = 0;
-    batchIndex < batches.length;
-    batchIndex++
-) {
+    // ---------------------------------------------------------
 
-    const candidates =
-        batches[batchIndex];
+    const batchRankings = [];
 
 
-    const prompt =
-        rankingInstructions +
-        "\n\nالنتائج:\n" +
-        JSON.stringify(
-            candidates
-        );
+
+    for (
+
+        let batchIndex = 0;
+
+        batchIndex < batches.length;
+
+        batchIndex++
+
+    ) {
+
+        const candidates =
+
+            batches[batchIndex];
 
 
-    console.log(
-        "========== AI RANKING BATCH =========="
-    );
 
-    console.log(
-        "BATCH:",
-        batchIndex + 1,
-        "/",
-        batches.length
-    );
+        const prompt =
 
-    console.log(
-        "CANDIDATES COUNT:",
-        candidates.length
-    );
+            rankingInstructions +
 
-    console.log(
-        "PROMPT LENGTH:",
-        prompt.length
-    );
+            "\n\nالنتائج:\n" +
 
-    console.log(
-        "PROMPT UTF8 BYTES:",
-        new TextEncoder()
-            .encode(prompt)
-            .length
-    );
+            JSON.stringify(
 
+                candidates
 
-    const raw =
-        await askAIForLibraryRanking(
-            prompt
-        );
-
-
-    console.log(
-        "========== RAW AI BATCH RESPONSE =========="
-    );
-
-    console.log(
-        raw
-    );
-
-
-    let parsed;
-
-
-    try {
-
-        parsed =
-            typeof raw ===
-                "string"
-                ? JSON.parse(
-                    raw
-                )
-                : raw;
-
-    }
-    catch {
-
-        const match =
-            String(
-                raw || ""
-            )
-            .match(
-                /\{[\s\S]*\}/
             );
 
 
-        if (!match) {
 
-            console.warn(
-                "تعذر استخراج JSON من دفعة",
-                batchIndex + 1
+        console.log(
+
+            "========== AI RANKING BATCH =========="
+
+        );
+
+
+
+        console.log(
+
+            "BATCH:",
+
+            batchIndex + 1,
+
+            "/",
+
+            batches.length
+
+        );
+
+
+
+        console.log(
+
+            "CANDIDATES COUNT:",
+
+            candidates.length
+
+        );
+
+
+
+        console.log(
+
+            "PROMPT LENGTH:",
+
+            prompt.length
+
+        );
+
+
+
+        console.log(
+
+            "PROMPT UTF8 BYTES:",
+
+            new TextEncoder()
+
+                .encode(prompt)
+
+                .length
+
+        );
+
+
+
+        const raw =
+
+            await askAIForLibraryRanking(
+
+                prompt
+
             );
 
-            continue;
-        }
+
+
+        console.log(
+
+            "========== RAW AI BATCH RESPONSE =========="
+
+        );
+
+
+
+        console.log(
+
+            raw
+
+        );
+
+
+
+        let parsed;
+
 
 
         try {
 
             parsed =
-                JSON.parse(
-                    match[0]
-                );
+
+                typeof raw ===
+
+                    "string"
+
+                    ? JSON.parse(
+
+                        raw
+
+                    )
+
+                    : raw;
 
         }
+
         catch {
 
+            const match =
+
+                String(
+
+                    raw || ""
+
+                )
+
+                .match(
+
+                    /\{[\s\S]*\}/
+
+                );
+
+
+
+            if (!match) {
+
+                console.warn(
+
+                    "تعذر استخراج JSON من دفعة",
+
+                    batchIndex + 1
+
+                );
+
+
+
+                continue;
+
+            }
+
+
+
+            try {
+
+                parsed =
+
+                    JSON.parse(
+
+                        match[0]
+
+                    );
+
+            }
+
+            catch {
+
+                console.warn(
+
+                    "JSON غير صالح في دفعة",
+
+                    batchIndex + 1
+
+                );
+
+
+
+                continue;
+
+            }
+
+        }
+
+
+
+        if (
+
+            !parsed ||
+
+            !Array.isArray(
+
+                parsed.ranking
+
+            )
+
+        ) {
+
             console.warn(
-                "JSON غير صالح في دفعة",
+
+                "صيغة ترتيب غير صالحة في الدفعة",
+
                 batchIndex + 1
+
             );
 
+
+
             continue;
+
         }
+
+
+
+        const localSeen =
+
+            new Set();
+
+
+
+        for (
+
+            const item
+
+            of parsed.ranking
+
+        ) {
+
+            const globalIndex =
+
+                Number(
+
+                    item?.index
+
+                );
+
+
+
+            const relevance =
+
+                Number(
+
+                    item?.relevance
+
+                );
+
+
+
+            if (
+
+                !Number.isInteger(
+
+                    globalIndex
+
+                )
+
+            ) {
+
+                continue;
+
+            }
+
+
+
+            const candidate =
+
+                candidates.find(
+
+                    function (
+
+                        candidate
+
+                    ) {
+
+                        return (
+
+                            candidate.index ===
+
+                            globalIndex
+
+                        );
+
+                    }
+
+                );
+
+
+
+            if (!candidate) {
+
+                continue;
+
+            }
+
+
+
+            if (
+
+                localSeen.has(
+
+                    globalIndex
+
+                )
+
+            ) {
+
+                continue;
+
+            }
+
+
+
+            localSeen.add(
+
+                globalIndex
+
+            );
+
+
+
+            batchRankings.push({
+
+                index:
+
+                    globalIndex,
+
+                relevance:
+
+                    Number(
+
+                        item.relevance
+
+                    ) || 0,
+
+                keep:
+
+                    item.keep === true
+
+            });
+
+        }
+
     }
 
 
-    if (
-        !parsed ||
-        !Array.isArray(
-            parsed.ranking
-        )
-    ) {
 
-        console.warn(
-            "صيغة ترتيب غير صالحة في الدفعة",
-            batchIndex + 1
+    console.log(
+
+        "TOTAL BATCH RANKINGS:",
+
+        batchRankings.length
+
+    );
+
+
+
+    // ---------------------------------------------------------
+
+    // التأكد من وجود تقييمات
+
+    // ---------------------------------------------------------
+
+    if (!batchRankings.length) {
+
+        throw new Error(
+
+            "لم يُرجع الذكاء الاصطناعي أي ترتيب صالح لدفعات نتائج المكتبة."
+
         );
 
-        continue;
     }
 
 
-    const localSeen =
-        new Set();
+
+    // ---------------------------------------------------------
+
+    // استبعاد النتائج التي قرر الذكاء الاصطناعي عدم إبقائها
+
+    // ---------------------------------------------------------
+
+    const keptRankings =
+
+        batchRankings.filter(
+
+            function (
+
+                item
+
+            ) {
+
+                return (
+
+                    item.keep === true
+
+                );
+
+            }
+
+        );
+
+
+
+    console.log(
+
+        "KEPT RANKINGS:",
+
+        keptRankings.length
+
+    );
+
+
+
+    console.log(
+
+        "EXCLUDED RANKINGS:",
+
+        batchRankings.length -
+
+        keptRankings.length
+
+    );
+
+
+
+    // ---------------------------------------------------------
+
+    // ترتيب التقييمات محليًا
+
+    // ---------------------------------------------------------
+
+    keptRankings.sort(
+
+        function (
+
+            a,
+
+            b
+
+        ) {
+
+            if (
+
+                b.relevance !==
+
+                a.relevance
+
+            ) {
+
+                return (
+
+                    b.relevance -
+
+                    a.relevance
+
+                );
+
+            }
+
+
+
+            return (
+
+                a.index -
+
+                b.index
+
+            );
+
+        }
+
+    );
+
+
+
+    // ---------------------------------------------------------
+
+    // تحويل التقييمات المقبولة إلى النتائج الأصلية
+
+    // ---------------------------------------------------------
+
+    const ranked = [];
+
+    const seen = new Set();
+
+    const seenTexts = new Set();
+
+
 
     for (
+
         const item
-        of parsed.ranking
+
+        of keptRankings
+
     ) {
 
-        const globalIndex =
-            Number(
-                item?.index
-            );
+        const index =
 
-        const relevance =
-            Number(
-                item?.relevance
-            );
+            item.index;
+
+
 
         if (
+
             !Number.isInteger(
-                globalIndex
-            )
+
+                index
+
+            ) ||
+
+            index < 0 ||
+
+            index >= results.length
+
         ) {
+
             continue;
+
         }
 
-        const candidate =
-            candidates.find(
-                function (candidate) {
-                    return (
-                        candidate.index ===
-                        globalIndex
-                    );
-                }
-            );
 
-        if (!candidate) {
-            continue;
-        }
 
         if (
-            localSeen.has(
-                globalIndex
+
+            seen.has(
+
+                index
+
             )
+
         ) {
+
             continue;
+
         }
 
-        localSeen.add(
-            globalIndex
-        );
-
-        batchRankings.push({
-            index: globalIndex,
-            relevance:
-                Number(
-                    item.relevance
-                ) || 0,
-            keep:
-                item.keep === true
-        });
-    }
-}
 
 
-console.log(
-    "TOTAL BATCH RANKINGS:",
-    batchRankings.length
-);
+        const result =
 
-// ---------------------------------------------------------
-// تحويل تقييمات الذكاء الاصطناعي إلى النتائج الأصلية
-// ---------------------------------------------------------
+            results[index];
 
-if (!batchRankings.length) {
 
-    throw new Error(
-        "لم يُرجع الذكاء الاصطناعي أي ترتيب صالح لدفعات نتائج المكتبة."
-    );
-}
 
-batchRankings.splice(
-    0,
-    batchRankings.length,
-    ...batchRankings.filter(
-        function (item) {
-            return item.keep === true;
-        }
-    )
-);
-// ---------------------------------------------------------
-// ترتيب التقييمات محليًا
-// ---------------------------------------------------------
+        const normalizedText =
 
-batchRankings.sort(
-    function (
-        a,
-        b
-    ) {
+            String(
+
+                result?.text ||
+
+                ""
+
+            )
+
+            .replace(
+
+                /\s+/g,
+
+                " "
+
+            )
+
+            .trim()
+
+            .toLowerCase();
+
+
+
+        // -----------------------------------------------------
+
+        // إذا كان النص نفسه موجودًا من قبل،
+
+        // نحتفظ بالنتيجة الأعلى ترتيبًا فقط.
+
+        // -----------------------------------------------------
 
         if (
-            b.relevance !==
-            a.relevance
+
+            normalizedText &&
+
+            seenTexts.has(
+
+                normalizedText
+
+            )
+
         ) {
 
-            return (
-                b.relevance -
-                a.relevance
-            );
+            continue;
+
         }
 
-        return (
-            a.index -
-            b.index
+
+
+        seen.add(
+
+            index
+
         );
-    }
-);
 
 
-// ---------------------------------------------------------
-// منع تكرار النتائج
-// ---------------------------------------------------------
 
-const ranked = [];
-const seen = new Set();
-const seenTexts = new Set();
+        if (
 
-for (const item of batchRankings) {
-
-    const index = item.index;
-
-    if (
-        !Number.isInteger(index) ||
-        index < 0 ||
-        index >= results.length
-    ) {
-        continue;
-    }
-
-    if (seen.has(index)) {
-        continue;
-    }
-
-    const result = results[index];
-
-    const normalizedText =
-        String(
-            result?.text ||
-            ""
-        )
-        .replace(/\s+/g, " ")
-        .trim()
-        .toLowerCase();
-
-    /*
-     * إذا كان النص نفسه موجودًا من قبل،
-     * نحتفظ بالنتيجة الأعلى ترتيبًا فقط.
-     */
-    if (
-        normalizedText &&
-        seenTexts.has(normalizedText)
-    ) {
-        continue;
-    }
-
-    seen.add(index);
-
-    if (normalizedText) {
-        seenTexts.add(normalizedText);
-    }
-
-    ranked.push({
-        result: result,
-        relevance: item.relevance,
-        index: index
-    });
-}
-
-// ---------------------------------------------------------
-// بقية النتائج التي لم تُقيّم
-// ---------------------------------------------------------
-
-for (
-    let index = 0;
-    index < results.length;
-    index++
-) {
-
-    if (
-        seen.has(index)
-    ) {
-
-        continue;
-    }
-
-
-    const result =
-        results[index];
-
-
-    const normalizedText =
-        String(
-            result?.text ||
-            ""
-        )
-        .replace(/\s+/g, " ")
-        .trim()
-        .toLowerCase();
-
-
-    if (
-        normalizedText &&
-        seenTexts.has(normalizedText)
-    ) {
-
-        continue;
-
-    }
-
-
-    if (normalizedText) {
-
-        seenTexts.add(
             normalizedText
-        );
 
-    }
-
-
-    ranked.push({
-
-        result:
-            result,
-
-        relevance:
-            0,
-
-        index
-    });
-}
-
-
-// ---------------------------------------------------------
-// الترتيب النهائي
-// ---------------------------------------------------------
-
-ranked.sort(
-    function (
-        a,
-        b
-    ) {
-
-        if (
-            b.relevance !==
-            a.relevance
         ) {
 
-            return (
-                b.relevance -
-                a.relevance
+            seenTexts.add(
+
+                normalizedText
+
             );
+
         }
 
 
-        return (
-            a.index -
-            b.index
-        );
+
+        ranked.push({
+
+            result:
+
+                result,
+
+            relevance:
+
+                item.relevance,
+
+            index:
+
+                index
+
+        });
+
     }
-);
 
 
-console.log(
-    "FINAL RANKED RESULTS:",
-    ranked.length
-);
+
+    // ---------------------------------------------------------
+
+    // الترتيب النهائي
+
+    // ---------------------------------------------------------
+
+    ranked.sort(
+
+        function (
+
+            a,
+
+            b
+
+        ) {
+
+            if (
+
+                b.relevance !==
+
+                a.relevance
+
+            ) {
+
+                return (
+
+                    b.relevance -
+
+                    a.relevance
+
+                );
+
+            }
 
 
-return ranked;
+
+            return (
+
+                a.index -
+
+                b.index
+
+            );
+
+        }
+
+    );
+
+
+
+    console.log(
+
+        "FINAL RANKED RESULTS:",
+
+        ranked.length
+
+    );
+
+
+
+    return ranked;
 
 
 
