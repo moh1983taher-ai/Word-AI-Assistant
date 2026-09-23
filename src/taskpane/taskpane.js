@@ -27074,52 +27074,59 @@ batchRankings.sort(
 // ---------------------------------------------------------
 
 const ranked = [];
+const seen = new Set();
+const seenTexts = new Set();
 
-const seen =
-    new Set();
+for (const item of batchRankings) {
 
-
-for (
-    const item
-    of batchRankings
-) {
-
-    const index =
-        item.index;
+    const index = item.index;
 
     if (
         !Number.isInteger(index) ||
         index < 0 ||
         index >= results.length
     ) {
-
         continue;
     }
 
+    if (seen.has(index)) {
+        continue;
+    }
 
+    const result = results[index];
+
+    const normalizedText =
+        String(
+            result?.text ||
+            ""
+        )
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+
+    /*
+     * إذا كان النص نفسه موجودًا من قبل،
+     * نحتفظ بالنتيجة الأعلى ترتيبًا فقط.
+     */
     if (
-        seen.has(index)
+        normalizedText &&
+        seenTexts.has(normalizedText)
     ) {
-
         continue;
     }
-
 
     seen.add(index);
 
+    if (normalizedText) {
+        seenTexts.add(normalizedText);
+    }
 
     ranked.push({
-
-        result:
-            results[index],
-
-        relevance:
-            item.relevance,
-
-        index
+        result: result,
+        relevance: item.relevance,
+        index: index
     });
 }
-
 
 // ---------------------------------------------------------
 // بقية النتائج التي لم تُقيّم
@@ -27139,10 +27146,43 @@ for (
     }
 
 
+    const result =
+        results[index];
+
+
+    const normalizedText =
+        String(
+            result?.text ||
+            ""
+        )
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+
+
+    if (
+        normalizedText &&
+        seenTexts.has(normalizedText)
+    ) {
+
+        continue;
+
+    }
+
+
+    if (normalizedText) {
+
+        seenTexts.add(
+            normalizedText
+        );
+
+    }
+
+
     ranked.push({
 
         result:
-            results[index],
+            result,
 
         relevance:
             0,
@@ -27189,35 +27229,6 @@ console.log(
 
 
 return ranked;
-// ---------------------------------------------------------
-// إذا فشلت كل الدفعات
-// ---------------------------------------------------------
-
-if (
-    !batchRankings.length
-) {
-
-    throw new Error(
-        "لم يُرجع الذكاء الاصطناعي أي ترتيب صالح لدفعات نتائج المكتبة."
-    );
-}
-
-
-
-}
-
-
-function escapeHTML(value) {
-
-    return String(
-        value ?? ""
-    )
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
 // =====================================================
 // AI REFERENCE ANALYZER
 // محلل المراجع بالذكاء الاصطناعي
