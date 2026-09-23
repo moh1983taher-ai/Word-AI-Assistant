@@ -27038,12 +27038,15 @@ if (!batchRankings.length) {
     );
 }
 
-batchRankings =
-    batchRankings.filter(
+batchRankings.splice(
+    0,
+    batchRankings.length,
+    ...batchRankings.filter(
         function (item) {
             return item.keep === true;
         }
-    );
+    )
+);
 // ---------------------------------------------------------
 // ترتيب التقييمات محليًا
 // ---------------------------------------------------------
