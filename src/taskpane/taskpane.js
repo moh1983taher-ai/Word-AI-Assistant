@@ -26790,15 +26790,23 @@ searchContext.constraints.length
 
 13. الصلة العلمية أهم من التطابق اللفظي.
 
+لكل نتيجة:
+- keep=true إذا كانت مرتبطة بموضوع البحث ارتباطًا مباشرًا أو واضحًا، أو كانت ذات قيمة بحثية معتبرة في الموضوع.
+- keep=false إذا كانت لا علاقة لها بموضوع البحث، حتى لو وردت فيها كلمات من الاستعلام.
+- لا تستبعد النتيجة لمجرد أنها لا تقدم تعريفًا مباشرًا؛ يكفي أن تكون مرتبطة بالموضوع ارتباطًا مفيدًا.
+- إذا كان الارتباط ضعيفًا جدًا أو عرضيًا أو يتعلق بمصطلح آخر، فاجعل keep=false.
+- relevance يعبّر عن قوة الصلة العلمية بالاستعلام.
+
 أعد JSON فقط:
 
 {
-"ranking": [
-{
-"index": 0,
-"relevance": 100
-}
-]
+  "ranking": [
+    {
+      "index": 0,
+      "relevance": 100,
+      "keep": true
+    }
+  ]
 }
 
 يجب ذكر جميع النتائج الموجودة في هذه المجموعة.
@@ -27002,22 +27010,13 @@ for (
         );
 
         batchRankings.push({
-
-            index:
-                globalIndex,
-
+            index: globalIndex,
             relevance:
-                Number.isFinite(
-                    relevance
-                )
-                    ? Math.max(
-                        0,
-                        Math.min(
-                            100,
-                            relevance
-                        )
-                    )
-                    : 0
+                Number(
+                    item.relevance
+                ) || 0,
+            keep:
+                item.keep === true
         });
     }
 }
@@ -27039,7 +27038,12 @@ if (!batchRankings.length) {
     );
 }
 
-
+batchRankings =
+    batchRankings.filter(
+        function (item) {
+            return item.keep === true;
+        }
+    );
 // ---------------------------------------------------------
 // ترتيب التقييمات محليًا
 // ---------------------------------------------------------
