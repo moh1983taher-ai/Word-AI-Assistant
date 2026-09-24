@@ -24527,14 +24527,14 @@ async function loadPollinationsModels() {
     if (settingsStatus) {
 
         settingsStatus.innerHTML =
-            "⏳ جاري تحميل نماذج Pollinations...";
+            "⏳ جاري تحميل النماذج المجانية المتاحة...";
 
     }
 
 
     const response =
         await fetch(
-            "https://gen.pollinations.ai/v1/models",
+            "https://gen.pollinations.ai/text/models",
             {
 
                 method:
@@ -24573,11 +24573,24 @@ async function loadPollinationsModels() {
     }
 
 
-    if (
-        !result.data ||
-        !Array.isArray(
-            result.data
+    const rawModels =
+        Array.isArray(
+            result
         )
+            ? result
+            : (
+                result &&
+                Array.isArray(
+                    result.data
+                )
+                    ? result.data
+                    : []
+            );
+
+
+    if (
+        rawModels.length ===
+        0
     ) {
 
         throw new Error(
@@ -24588,7 +24601,7 @@ async function loadPollinationsModels() {
 
 
     const models =
-        result.data
+        rawModels
             .filter(
                 function (
                     item
@@ -24644,7 +24657,7 @@ async function loadPollinationsModels() {
     if (settingsStatus) {
 
         settingsStatus.innerHTML =
-            "✓ تم تحديث نماذج Pollinations: " +
+            "✓ تم تحديث نماذج Pollinations المتاحة: " +
             models.length;
 
     }
@@ -33755,6 +33768,12 @@ async function streamPollinationsAI(
         await readJSON(
             response
         );
+
+
+    console.log(
+        "POLLINATIONS RAW RESULT:",
+        result
+    );
 
 
     if (!response.ok) {
