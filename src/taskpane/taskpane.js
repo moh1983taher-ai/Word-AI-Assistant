@@ -33743,7 +33743,7 @@ async function streamPollinationsAI(
                             0.2,
 
                         stream:
-                            true
+                            false
 
                     })
 
@@ -33751,13 +33751,13 @@ async function streamPollinationsAI(
         );
 
 
+    const result =
+        await readJSON(
+            response
+        );
+
+
     if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
 
         throw new Error(
             getAPIError(
@@ -33769,59 +33769,46 @@ async function streamPollinationsAI(
     }
 
 
-    AppState.streaming.active =
-        true;
+    const answer =
+        result &&
+        result.choices &&
+        result.choices[0] &&
+        result.choices[0].message
+            ? result.choices[0].message.content
+            : "";
 
-    AppState.streaming.provider =
-        "pollinations";
+
+    if (
+        typeof answer !==
+            "string" ||
+        !answer.trim()
+    ) {
+
+        throw new Error(
+            "لم يصل نص من Pollinations."
+        );
+
+    }
+
 
     AppState.streaming.text =
-        "";
+        answer;
 
 
-    try {
+    if (
+        typeof onChunk ===
+        "function"
+    ) {
 
-        const answer =
-            await processOpenAICompatibleStream(
-                response,
-                function (
-                    delta,
-                    fullText
-                ) {
-
-                    AppState.streaming.text =
-                        fullText;
-
-
-                    if (
-                        typeof onChunk ===
-                        "function"
-                    ) {
-
-                        onChunk(
-                            delta,
-                            fullText
-                        );
-
-                    }
-
-                },
-                "Pollinations"
-            );
-
-
-        return answer;
+        onChunk(
+            answer,
+            answer
+        );
 
     }
-    finally {
 
-        AppState.streaming.active =
-            false;
 
-        AppState.streaming.provider =
-            "";
-
-    }
+    return answer.trim();
 
 }
 
