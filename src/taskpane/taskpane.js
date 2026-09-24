@@ -22899,7 +22899,7 @@ function updateProviderInfo() {
 
     }
 
-    
+
     if (
         value ===
         "duckai"
@@ -22907,6 +22907,19 @@ function updateProviderInfo() {
 
         providerInfo.innerHTML =
             "Duck.ai: يعمل عبر خادم Duck2API المحلي ولا يحتاج إلى مفتاح API.";
+
+        return;
+
+    }
+
+
+    if (
+        value ===
+        "pollinations"
+    ) {
+
+        providerInfo.innerHTML =
+            "Pollinations: سيتم جلب النماذج المتاحة من حسابك.";
 
         return;
 
@@ -24490,6 +24503,153 @@ async function loadDuckAIModels() {
     }
 
 }
+
+// =====================================================
+// Load loadPollinations
+// =====================================================
+async function loadPollinationsModels() {
+
+    const key =
+        apiKey
+            ? apiKey.value.trim()
+            : "";
+
+
+    if (!key) {
+
+        throw new Error(
+            "يرجى إدخال مفتاح Pollinations أولاً."
+        );
+
+    }
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "⏳ جاري تحميل نماذج Pollinations...";
+
+    }
+
+
+    const response =
+        await fetch(
+            "https://gen.pollinations.ai/v1/models",
+            {
+
+                method:
+                    "GET",
+
+                headers: {
+
+                    "Authorization":
+                        "Bearer " +
+                        key,
+
+                    "Content-Type":
+                        "application/json"
+
+                }
+
+            }
+        );
+
+
+    const result =
+        await readJSON(
+            response
+        );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ Pollinations."
+            )
+        );
+
+    }
+
+
+    if (
+        !result.data ||
+        !Array.isArray(
+            result.data
+        )
+    ) {
+
+        throw new Error(
+            "لم تصل قائمة نماذج Pollinations."
+        );
+
+    }
+
+
+    const models =
+        result.data
+            .filter(
+                function (
+                    item
+                ) {
+
+                    return (
+                        item &&
+                        item.id
+                    );
+
+                }
+            )
+            .sort(
+                function (
+                    a,
+                    b
+                ) {
+
+                    return String(
+                        a.id
+                    ).localeCompare(
+                        String(
+                            b.id
+                        )
+                    );
+
+                }
+            )
+            .map(
+                function (
+                    item
+                ) {
+
+                    return {
+
+                        id:
+                            item.id,
+
+                        name:
+                            item.id
+
+                    };
+
+                }
+            );
+
+
+    populateModels(
+        models
+    );
+
+
+    if (settingsStatus) {
+
+        settingsStatus.innerHTML =
+            "✓ تم تحديث نماذج Pollinations: " +
+            models.length;
+
+    }
+
+}
 // =====================================================
 // Load Models
 // =====================================================
@@ -24560,6 +24720,19 @@ async function loadModels() {
         return;
 
     }
+
+
+    if (
+        selectedProvider ===
+        "pollinations"
+    ) {
+
+        await loadPollinationsModels();
+
+        return;
+
+    }
+
 
     throw new Error(
         "مزود الذكاء الاصطناعي غير معروف."
@@ -25063,6 +25236,86 @@ async function testAIConnection() {
 
 
         return "✓ تم الاتصال بـ Groq بنجاح";
+
+    }
+
+
+    // =================================================
+    // Pollinations
+    // =================================================
+
+    if (
+        data.provider ===
+        "pollinations"
+    ) {
+
+        const response =
+            await fetch(
+                "https://gen.pollinations.ai/v1/chat/completions",
+                {
+
+                    method:
+                        "POST",
+
+                    headers: {
+
+                        "Authorization":
+                            "Bearer " +
+                            data.key,
+
+                        "Content-Type":
+                            "application/json"
+
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            model:
+                                data.model,
+
+                            messages: [
+
+                                {
+
+                                    role:
+                                        "user",
+
+                                    content:
+                                        "أجب بكلمة واحدة فقط: متصل"
+
+                                }
+
+                            ],
+
+                            max_tokens:
+                                10
+
+                        })
+
+                }
+            );
+
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                getAPIError(
+                    result,
+                    "فشل الاتصال بـ Pollinations."
+                )
+            );
+
+        }
+
+
+        return "✓ تم الاتصال بـ Pollinations بنجاح";
 
     }
 
@@ -33418,6 +33671,159 @@ async function processOpenAICompatibleStream(
 
 }
 
+// =====================================================
+// Stream Pollinations AI
+// =====================================================
+
+async function streamPollinationsAI(
+    text,
+    onChunk
+) {
+
+    const data =
+        getActiveAISettings();
+
+
+    if (!data.key.trim()) {
+
+        throw new Error(
+            "لم يتم إدخال مفتاح Pollinations من الإعدادات."
+        );
+
+    }
+
+
+    if (!data.model.trim()) {
+
+        throw new Error(
+            "لم يتم تحديد نموذج Pollinations."
+        );
+
+    }
+
+
+    const streamingContext =
+        await buildStreamingContext(
+            text
+        );
+
+
+    const response =
+        await fetch(
+            "https://gen.pollinations.ai/v1/chat/completions",
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json",
+
+                    "Authorization":
+                        "Bearer " +
+                        data.key
+
+                },
+
+                body:
+                    JSON.stringify({
+
+                        model:
+                            data.model,
+
+                        messages:
+                            streamingContext.messages,
+
+                        max_tokens:
+                            3000,
+
+                        temperature:
+                            0.2,
+
+                        stream:
+                            true
+
+                    })
+
+            }
+        );
+
+
+    if (!response.ok) {
+
+        const result =
+            await readJSON(
+                response
+            );
+
+
+        throw new Error(
+            getAPIError(
+                result,
+                "فشل الاتصال بـ Pollinations."
+            )
+        );
+
+    }
+
+
+    AppState.streaming.active =
+        true;
+
+    AppState.streaming.provider =
+        "pollinations";
+
+    AppState.streaming.text =
+        "";
+
+
+    try {
+
+        const answer =
+            await processOpenAICompatibleStream(
+                response,
+                function (
+                    delta,
+                    fullText
+                ) {
+
+                    AppState.streaming.text =
+                        fullText;
+
+
+                    if (
+                        typeof onChunk ===
+                        "function"
+                    ) {
+
+                        onChunk(
+                            delta,
+                            fullText
+                        );
+
+                    }
+
+                },
+                "Pollinations"
+            );
+
+
+        return answer;
+
+    }
+    finally {
+
+        AppState.streaming.active =
+            false;
+
+        AppState.streaming.provider =
+            "";
+
+    }
+
+}
 
 // =====================================================
 // Stream Groq AI
@@ -34783,6 +35189,7 @@ async function streamAI(
 
     }
 
+
     if (
         selectedProvider ===
         "duckai"
@@ -34794,6 +35201,20 @@ async function streamAI(
         );
 
     }
+
+
+    if (
+        selectedProvider ===
+        "pollinations"
+    ) {
+
+        return await streamPollinationsAI(
+            text,
+            onChunk
+        );
+
+    }
+
 
     throw new Error(
         "مزود الذكاء الاصطناعي غير معروف: " +
