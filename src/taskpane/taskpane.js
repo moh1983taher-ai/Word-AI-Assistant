@@ -36477,386 +36477,740 @@ async function callLibraryAI(
             : 900;
 
 
-    // ================================================
-    // Gemini
-    // ================================================
+    return await withAIRetry(
+        async function () {
 
-    if (
-        config.provider ===
-        "gemini"
-    ) {
+            // ================================================
+            // Gemini
+            // ================================================
 
-        const model =
-            String(
-                config.model
-            )
-            .replace(
-                /^models\//,
-                ""
-            );
+            if (
+                config.provider ===
+                "gemini"
+            ) {
+
+                const model =
+                    String(
+                        config.model
+                    )
+                    .replace(
+                        /^models[\/]+/,
+                        ""
+                    );
 
 
-        const requestPromise =
-            fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(config.key)}`,
-                {
-                    method:
-                        "POST",
+                let response;
 
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
 
-                    body:
-                        JSON.stringify(
+                try {
+
+                    const requestPromise =
+                        fetch(
+                            "https://generativelanguage.googleapis.com/v1beta/models/" +
+                            encodeURIComponent(
+                                model
+                            ) +
+                            ":generateContent?key=" +
+                            encodeURIComponent(
+                                config.key
+                            ),
                             {
-                                systemInstruction: {
-                                    parts: [
-                                        {
-                                            text:
-                                                systemPrompt
-                                        }
-                                    ]
+
+                                method:
+                                    "POST",
+
+                                headers: {
+
+                                    "Content-Type":
+                                        "application/json"
+
                                 },
 
-                                contents: [
-                                    {
-                                        role:
-                                            "user",
+                                body:
+                                    JSON.stringify({
 
-                                        parts: [
+                                        systemInstruction: {
+
+                                            parts: [
+
+                                                {
+
+                                                    text:
+                                                        systemPrompt
+
+                                                }
+
+                                            ]
+
+                                        },
+
+                                        contents: [
+
                                             {
-                                                text:
-                                                    userPrompt
-                                            }
-                                        ]
-                                    }
-                                ],
 
-                                generationConfig: {
-                                    temperature,
-                                    maxOutputTokens:
-                                        maxTokens
-                                }
+                                                role:
+                                                    "user",
+
+                                                parts: [
+
+                                                    {
+
+                                                        text:
+                                                            userPrompt
+
+                                                    }
+
+                                                ]
+
+                                            }
+
+                                        ],
+
+                                        generationConfig: {
+
+                                            temperature,
+
+                                            maxOutputTokens:
+                                                maxTokens
+
+                                        }
+
+                                    })
 
                             }
-                        )
+                        );
+
+
+                    response =
+                        await withLibraryAITimeout(
+                            requestPromise
+                        );
 
                 }
-            );
+                catch (
+                    error
+                ) {
 
+                    error.networkError =
+                        true;
 
-        const response =
-            await withLibraryAITimeout(
-                requestPromise
-            );
-
-
-        let result;
-
-        try {
-
-            result =
-                await response.json();
-
-        }
-        catch (_) {
-
-            throw new Error(
-                `استجابة Gemini غير صالحة: HTTP ${response.status}`
-            );
-
-        }
-
-
-        if (
-            !response.ok
-        ) {
-
-            const message =
-                result?.error?.message ||
-                result?.message ||
-                `فشل الاتصال بـ Gemini: HTTP ${response.status}`;
-
-
-            throw new Error(
-                message
-            );
-
-        }
-
-
-        return extractLibraryAIText(
-            result,
-            "gemini"
-        );
-
-    }
-
-    // ================================================
-    // DuckAI المحلي
-    // ================================================
-
-    if (
-        config.provider ===
-        "duckai"
-    ) {
-
-        const requestPromise =
-            fetch(
-                "http://127.0.0.1:8080/v1/chat/completions",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-
-                        "Content-Type":
-                            "application/json"
-
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            model:
-                                config.model,
-
-                            messages: [
-
-                                {
-
-                                    role:
-                                        "system",
-
-                                    content:
-                                        systemPrompt
-
-                                },
-
-                                {
-
-                                    role:
-                                        "user",
-
-                                    content:
-                                        userPrompt
-
-                                }
-
-                            ],
-
-                            temperature,
-
-                            max_tokens:
-                                maxTokens,
-
-                            stream:
-                                false
-
-                        })
+                    throw error;
 
                 }
-            );
 
 
-        const response =
-            await withLibraryAITimeout(
-                requestPromise
-            );
+                let result;
 
 
-        let result;
+                try {
 
-        try {
+                    result =
+                        await response.json();
 
-            result =
-                await response.json();
+                }
+                catch (
+                    error
+                ) {
 
-        }
-        catch (_) {
-
-            throw new Error(
-                `استجابة DuckAI غير صالحة: HTTP ${response.status}`
-            );
-
-        }
-
-
-        if (
-            !response.ok
-        ) {
-
-            const message =
-                result?.error?.message ||
-                result?.message ||
-                `فشل الاتصال بـ DuckAI: HTTP ${response.status}`;
-
-            throw new Error(
-                message
-            );
-
-        }
+                    const jsonError =
+                        new Error(
+                            "استجابة Gemini غير صالحة: HTTP " +
+                            response.status
+                        );
 
 
-        return extractLibraryAIText(
-            result,
-            "duckai"
-        );
-
-    }
+                    jsonError.response =
+                        response;
 
 
-    // ================================================
-    // OpenAI / Groq / OpenRouter
-    // ================================================
-
-    let endpoint;
+                    jsonError.retryable =
+                        true;
 
 
-    if (
-        config.provider ===
-        "openai"
-    ) {
+                    throw jsonError;
 
-        endpoint =
-            "https://api.openai.com/v1/chat/completions";
-
-    }
-
-    else if (
-        config.provider ===
-        "groq"
-    ) {
-
-        endpoint =
-            "https://api.groq.com/openai/v1/chat/completions";
-
-    }
-
-    else {
-
-        endpoint =
-            "https://openrouter.ai/api/v1/chat/completions";
-
-    }
+                }
 
 
-    const headers = {
+                if (
+                    !response.ok
+                ) {
 
-        "Content-Type":
-            "application/json",
-
-        "Authorization":
-            "Bearer " +
-            config.key
-
-    };
-
-
-    if (
-        config.provider ===
-        "openrouter"
-    ) {
-
-        headers["HTTP-Referer"] =
-            window.location.href;
-
-        headers["X-Title"] =
-            "Research Tools";
-
-    }
+                    const message =
+                        result?.error?.message ||
+                        result?.message ||
+                        "فشل الاتصال بـ Gemini: HTTP " +
+                        response.status;
 
 
-    const requestPromise =
-        fetch(
-            endpoint,
-            {
-                method:
-                    "POST",
+                    const error =
+                        new Error(
+                            message
+                        );
 
-                headers,
 
-                body:
-                    JSON.stringify(
-                        {
-                            model:
-                                config.model,
+                    error.response =
+                        response;
 
-                            messages: [
-                                {
-                                    role:
-                                        "system",
 
-                                    content:
-                                        systemPrompt
-                                },
+                    throw error;
 
-                                {
-                                    role:
-                                        "user",
+                }
 
-                                    content:
-                                        userPrompt
-                                }
-                            ],
 
-                            temperature,
+                try {
 
-                            max_tokens:
-                                maxTokens
-                        }
-                    )
+                    const answer =
+                        extractLibraryAIText(
+                            result,
+                            "gemini"
+                        );
+
+
+                    if (
+                        !answer ||
+                        !String(
+                            answer
+                        ).trim()
+                    ) {
+
+                        const error =
+                            new Error(
+                                "لم يصل رد صالح من gemini."
+                            );
+
+
+                        error.retryable =
+                            true;
+
+
+                        throw error;
+
+                    }
+
+
+                    return answer;
+
+                }
+                catch (
+                    error
+                ) {
+
+                    if (
+                        error.retryable !==
+                        true
+                    ) {
+
+                        error.retryable =
+                            true;
+
+                    }
+
+
+                    throw error;
+
+                }
+
             }
-        );
 
 
-    const response =
-        await withLibraryAITimeout(
-            requestPromise
-        );
+            // ================================================
+            // DuckAI المحلي
+            // ================================================
+
+            if (
+                config.provider ===
+                "duckai"
+            ) {
+
+                let response;
 
 
-    let result;
+                try {
+
+                    const requestPromise =
+                        fetch(
+                            "http://127.0.0.1:8080/v1/chat/completions",
+                            {
+
+                                method:
+                                    "POST",
+
+                                headers: {
+
+                                    "Content-Type":
+                                        "application/json"
+
+                                },
+
+                                body:
+                                    JSON.stringify({
+
+                                        model:
+                                            config.model,
+
+                                        messages: [
+
+                                            {
+
+                                                role:
+                                                    "system",
+
+                                                content:
+                                                    systemPrompt
+
+                                            },
+
+                                            {
+
+                                                role:
+                                                    "user",
+
+                                                content:
+                                                    userPrompt
+
+                                            }
+
+                                        ],
+
+                                        temperature,
+
+                                        max_tokens:
+                                            maxTokens,
+
+                                        stream:
+                                            false
+
+                                    })
+
+                            }
+                        );
 
 
-    try {
+                    response =
+                        await withLibraryAITimeout(
+                            requestPromise
+                        );
 
-        result =
-            await response.json();
+                }
+                catch (
+                    error
+                ) {
 
-    }
-    catch (_) {
+                    error.networkError =
+                        true;
 
-        throw new Error(
-            `استجابة ${config.provider} غير صالحة: HTTP ${response.status}`
-        );
+                    throw error;
 
-    }
-
-
-    if (
-        !response.ok
-    ) {
-
-        const message =
-            result?.error?.message ||
-            result?.message ||
-            `فشل الاتصال بـ ${config.provider}: HTTP ${response.status}`;
+                }
 
 
-        throw new Error(
-            message
-        );
-
-    }
+                let result;
 
 
-    return extractLibraryAIText(
-        result,
-        config.provider
+                try {
+
+                    result =
+                        await response.json();
+
+                }
+                catch (
+                    error
+                ) {
+
+                    const jsonError =
+                        new Error(
+                            "استجابة DuckAI غير صالحة: HTTP " +
+                            response.status
+                        );
+
+
+                    jsonError.response =
+                        response;
+
+
+                    jsonError.retryable =
+                        true;
+
+
+                    throw jsonError;
+
+                }
+
+
+                if (
+                    !response.ok
+                ) {
+
+                    const message =
+                        result?.error?.message ||
+                        result?.message ||
+                        "فشل الاتصال بـ DuckAI: HTTP " +
+                        response.status;
+
+
+                    const error =
+                        new Error(
+                            message
+                        );
+
+
+                    error.response =
+                        response;
+
+
+                    // ==================================
+                    // 418 / no x-vqd-hash-1 token
+                    //
+                    // لا نعيد المحاولة تلقائيًا.
+                    // ==================================
+
+                    if (
+                        Number(
+                            response.status
+                        ) === 418
+                    ) {
+
+                        error.noRetry =
+                            true;
+
+                    }
+
+
+                    throw error;
+
+                }
+
+
+                try {
+
+                    const answer =
+                        extractLibraryAIText(
+                            result,
+                            "duckai"
+                        );
+
+
+                    if (
+                        !answer ||
+                        !String(
+                            answer
+                        ).trim()
+                    ) {
+
+                        const error =
+                            new Error(
+                                "لم يصل رد صالح من duckai."
+                            );
+
+
+                        error.retryable =
+                            true;
+
+
+                        throw error;
+
+                    }
+
+
+                    return answer;
+
+                }
+                catch (
+                    error
+                ) {
+
+                    if (
+                        error.retryable !==
+                        true
+                    ) {
+
+                        error.retryable =
+                            true;
+
+                    }
+
+
+                    throw error;
+
+                }
+
+            }
+
+
+            // ================================================
+            // OpenAI / Groq / OpenRouter
+            // ================================================
+
+            let endpoint;
+
+
+            if (
+                config.provider ===
+                "openai"
+            ) {
+
+                endpoint =
+                    "https://api.openai.com/v1/chat/completions";
+
+            }
+            else if (
+                config.provider ===
+                "groq"
+            ) {
+
+                endpoint =
+                    "https://api.groq.com/openai/v1/chat/completions";
+
+            }
+            else {
+
+                endpoint =
+                    "https://openrouter.ai/api/v1/chat/completions";
+
+            }
+
+
+            const headers = {
+
+                "Content-Type":
+                    "application/json",
+
+                "Authorization":
+                    "Bearer " +
+                    config.key
+
+            };
+
+
+            if (
+                config.provider ===
+                "openrouter"
+            ) {
+
+                headers["HTTP-Referer"] =
+                    window.location.href;
+
+                headers["X-Title"] =
+                    "Research Tools";
+
+            }
+
+
+            let response;
+
+
+            try {
+
+                const requestPromise =
+                    fetch(
+                        endpoint,
+                        {
+
+                            method:
+                                "POST",
+
+                            headers,
+
+                            body:
+                                JSON.stringify({
+
+                                    model:
+                                        config.model,
+
+                                    messages: [
+
+                                        {
+
+                                            role:
+                                                "system",
+
+                                            content:
+                                                systemPrompt
+
+                                        },
+
+                                        {
+
+                                            role:
+                                                "user",
+
+                                            content:
+                                                userPrompt
+
+                                        }
+
+                                    ],
+
+                                    temperature,
+
+                                    max_tokens:
+                                        maxTokens
+
+                                })
+
+                        }
+                    );
+
+
+                response =
+                    await withLibraryAITimeout(
+                        requestPromise
+                    );
+
+            }
+            catch (
+                error
+            ) {
+
+                error.networkError =
+                    true;
+
+                throw error;
+
+            }
+
+
+            let result;
+
+
+            try {
+
+                result =
+                    await response.json();
+
+            }
+            catch (
+                error
+            ) {
+
+                const jsonError =
+                    new Error(
+                        "استجابة " +
+                        config.provider +
+                        " غير صالحة: HTTP " +
+                        response.status
+                    );
+
+
+                jsonError.response =
+                    response;
+
+
+                jsonError.retryable =
+                    true;
+
+
+                throw jsonError;
+
+            }
+
+
+            if (
+                !response.ok
+            ) {
+
+                const message =
+                    result?.error?.message ||
+                    result?.message ||
+                    "فشل الاتصال بـ " +
+                    config.provider +
+                    ": HTTP " +
+                    response.status;
+
+
+                const error =
+                    new Error(
+                        message
+                    );
+
+
+                error.response =
+                    response;
+
+
+                throw error;
+
+            }
+
+
+            try {
+
+                const answer =
+                    extractLibraryAIText(
+                        result,
+                        config.provider
+                    );
+
+
+                if (
+                    !answer ||
+                    !String(
+                        answer
+                    ).trim()
+                ) {
+
+                    const error =
+                        new Error(
+                            "لم يصل رد صالح من " +
+                            config.provider +
+                            "."
+                        );
+
+
+                    error.retryable =
+                        true;
+
+
+                    throw error;
+
+                }
+
+
+                return answer;
+
+            }
+            catch (
+                error
+            ) {
+
+                if (
+                    error.retryable !==
+                    true
+                ) {
+
+                    error.retryable =
+                        true;
+
+                }
+
+
+                throw error;
+
+            }
+
+        },
+
+        config.provider ===
+            "openrouter"
+            ? "OpenRouter"
+            : config.provider ===
+                "openai"
+                ? "OpenAI"
+                : config.provider ===
+                    "groq"
+                    ? "Groq"
+                    : config.provider ===
+                        "gemini"
+                        ? "Gemini"
+                        : config.provider ===
+                            "duckai"
+                            ? "Duck.ai"
+                            : String(
+                                config.provider ||
+                                "Library AI"
+                            )
+
     );
 
 }
