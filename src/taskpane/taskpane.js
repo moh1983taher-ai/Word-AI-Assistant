@@ -36462,22 +36462,19 @@ async function callLibraryAI(
     const config =
         getLibraryAIProviderConfig();
 
-
     const temperature =
-        typeof options.temperature ===
-            "number"
+        typeof options.temperature === "number"
             ? options.temperature
             : 0.1;
 
-
     const maxTokens =
-        typeof options.maxTokens ===
-            "number"
+        typeof options.maxTokens === "number"
             ? options.maxTokens
             : 900;
 
 
     return await withAIRetry(
+
         async function () {
 
             // ================================================
@@ -36485,101 +36482,80 @@ async function callLibraryAI(
             // ================================================
 
             if (
-                config.provider ===
-                "gemini"
+                config.provider === "gemini"
             ) {
 
-                const model =
-                    String(
-                        config.model
-                    )
-                    .replace(
-                        /^models[\/]+/,
-                        ""
+                const endpoint =
+                    "https://generativelanguage.googleapis.com/v1beta/models/" +
+                    config.model +
+                    ":generateContent?key=" +
+                    encodeURIComponent(
+                        config.apiKey
                     );
 
 
-                let response;
+                const body = {
 
+                    systemInstruction: {
+
+                        parts: [
+                            {
+                                text:
+                                    systemPrompt
+                            }
+                        ]
+
+                    },
+
+                    contents: [
+
+                        {
+                            role: "user",
+
+                            parts: [
+                                {
+                                    text:
+                                        userPrompt
+                                }
+                            ]
+                        }
+
+                    ],
+
+                    generationConfig: {
+
+                        temperature:
+                            temperature,
+
+                        maxOutputTokens:
+                            maxTokens
+
+                    }
+
+                };
+
+
+                let response;
 
                 try {
 
                     const requestPromise =
                         fetch(
-                            "https://generativelanguage.googleapis.com/v1beta/models/" +
-                            encodeURIComponent(
-                                model
-                            ) +
-                            ":generateContent?key=" +
-                            encodeURIComponent(
-                                config.key
-                            ),
+                            endpoint,
                             {
-
-                                method:
-                                    "POST",
+                                method: "POST",
 
                                 headers: {
-
                                     "Content-Type":
                                         "application/json"
-
                                 },
 
                                 body:
-                                    JSON.stringify({
-
-                                        systemInstruction: {
-
-                                            parts: [
-
-                                                {
-
-                                                    text:
-                                                        systemPrompt
-
-                                                }
-
-                                            ]
-
-                                        },
-
-                                        contents: [
-
-                                            {
-
-                                                role:
-                                                    "user",
-
-                                                parts: [
-
-                                                    {
-
-                                                        text:
-                                                            userPrompt
-
-                                                    }
-
-                                                ]
-
-                                            }
-
-                                        ],
-
-                                        generationConfig: {
-
-                                            temperature,
-
-                                            maxOutputTokens:
-                                                maxTokens
-
-                                        }
-
-                                    })
-
+                                    JSON.stringify(
+                                        body
+                                    )
                             }
                         );
-
 
                     response =
                         await withLibraryAITimeout(
@@ -36600,7 +36576,6 @@ async function callLibraryAI(
 
 
                 let result;
-
 
                 try {
 
@@ -36620,18 +36595,14 @@ async function callLibraryAI(
 
                     const jsonError =
                         new Error(
-                            "استجابة Gemini غير صالحة: HTTP " +
-                            response.status
+                            "استجابة Gemini غير صالحة."
                         );
-
 
                     jsonError.response =
                         response;
 
-
                     jsonError.retryable =
                         true;
-
 
                     throw jsonError;
 
@@ -36643,155 +36614,127 @@ async function callLibraryAI(
                 ) {
 
                     const message =
-                        result?.error?.message ||
-                        result?.message ||
-                        "فشل الاتصال بـ Gemini: HTTP " +
-                        response.status;
-
+                        result &&
+                        result.error &&
+                        result.error.message
+                            ? result.error.message
+                            : "فشل الاتصال بـ Gemini.";
 
                     const error =
                         new Error(
                             message
                         );
 
-
                     error.response =
                         response;
 
-
                     throw error;
 
                 }
 
 
-                try {
-
-                    const answer =
-                        extractLibraryAIText(
-                            result,
-                            "gemini"
-                        );
+                const answer =
+                    extractLibraryAIText(
+                        result,
+                        config.provider
+                    );
 
 
-                    if (
-                        !answer ||
-                        !String(
-                            answer
-                        ).trim()
-                    ) {
-
-                        const error =
-                            new Error(
-                                "لم يصل رد صالح من gemini."
-                            );
-
-
-                        error.retryable =
-                            true;
-
-
-                        throw error;
-
-                    }
-
-
-                    return answer;
-
-                }
-                catch (
-                    error
+                if (
+                    !answer ||
+                    !String(answer).trim()
                 ) {
 
-                    if (
-                        error.retryable !==
-                        true
-                    ) {
+                    const error =
+                        new Error(
+                            "لم يصل رد صالح من Gemini."
+                        );
 
-                        error.retryable =
-                            true;
-
-                    }
-
+                    error.retryable =
+                        true;
 
                     throw error;
 
                 }
+
+
+                return answer;
 
             }
 
 
             // ================================================
-            // DuckAI المحلي
+            // DuckAI
             // ================================================
 
             if (
-                config.provider ===
-                "duckai"
+                config.provider === "duckai"
             ) {
 
-                let response;
+                const endpoint =
+                    "http://127.0.0.1:8080/v1/chat/completions";
 
+
+                const body = {
+
+                    model:
+                        config.model,
+
+                    messages: [
+
+                        {
+                            role: "system",
+                            content:
+                                systemPrompt
+                        },
+
+                        {
+                            role: "user",
+                            content:
+                                userPrompt
+                        }
+
+                    ],
+
+                    temperature:
+                        temperature,
+
+                    max_tokens:
+                        maxTokens,
+
+                    stream:
+                        false
+
+                };
+
+
+                let response;
 
                 try {
 
                     const requestPromise =
                         fetch(
-                            "http://127.0.0.1:8080/v1/chat/completions",
+                            endpoint,
                             {
-
-                                method:
-                                    "POST",
+                                method: "POST",
 
                                 headers: {
 
                                     "Content-Type":
-                                        "application/json"
+                                        "application/json",
+
+                                    "Authorization":
+                                        "Bearer " +
+                                        config.apiKey
 
                                 },
 
                                 body:
-                                    JSON.stringify({
-
-                                        model:
-                                            config.model,
-
-                                        messages: [
-
-                                            {
-
-                                                role:
-                                                    "system",
-
-                                                content:
-                                                    systemPrompt
-
-                                            },
-
-                                            {
-
-                                                role:
-                                                    "user",
-
-                                                content:
-                                                    userPrompt
-
-                                            }
-
-                                        ],
-
-                                        temperature,
-
-                                        max_tokens:
-                                            maxTokens,
-
-                                        stream:
-                                            false
-
-                                    })
-
+                                    JSON.stringify(
+                                        body
+                                    )
                             }
                         );
-
 
                     response =
                         await withLibraryAITimeout(
@@ -36813,7 +36756,6 @@ async function callLibraryAI(
 
                 let result;
 
-
                 try {
 
                     result =
@@ -36826,18 +36768,14 @@ async function callLibraryAI(
 
                     const jsonError =
                         new Error(
-                            "استجابة DuckAI غير صالحة: HTTP " +
-                            response.status
+                            "استجابة Duck.ai غير صالحة."
                         );
-
 
                     jsonError.response =
                         response;
 
-
                     jsonError.retryable =
                         true;
-
 
                     throw jsonError;
 
@@ -36849,97 +36787,51 @@ async function callLibraryAI(
                 ) {
 
                     const message =
-                        result?.error?.message ||
-                        result?.message ||
-                        "فشل الاتصال بـ DuckAI: HTTP " +
-                        response.status;
-
+                        result &&
+                        result.error &&
+                        result.error.message
+                            ? result.error.message
+                            : "فشل الاتصال بـ Duck.ai.";
 
                     const error =
                         new Error(
                             message
                         );
 
-
                     error.response =
                         response;
 
-
-                    // ==================================
-                    // 418 / no x-vqd-hash-1 token
-                    //
-                    // لا نعيد المحاولة تلقائيًا.
-                    // ==================================
-
-                    if (
-                        Number(
-                            response.status
-                        ) === 418
-                    ) {
-
-                        error.noRetry =
-                            true;
-
-                    }
-
-
                     throw error;
 
                 }
 
 
-                try {
-
-                    const answer =
-                        extractLibraryAIText(
-                            result,
-                            "duckai"
-                        );
+                const answer =
+                    extractLibraryAIText(
+                        result,
+                        config.provider
+                    );
 
 
-                    if (
-                        !answer ||
-                        !String(
-                            answer
-                        ).trim()
-                    ) {
-
-                        const error =
-                            new Error(
-                                "لم يصل رد صالح من duckai."
-                            );
-
-
-                        error.retryable =
-                            true;
-
-
-                        throw error;
-
-                    }
-
-
-                    return answer;
-
-                }
-                catch (
-                    error
+                if (
+                    !answer ||
+                    !String(answer).trim()
                 ) {
 
-                    if (
-                        error.retryable !==
-                        true
-                    ) {
+                    const error =
+                        new Error(
+                            "لم يصل رد صالح من Duck.ai."
+                        );
 
-                        error.retryable =
-                            true;
-
-                    }
-
+                    error.retryable =
+                        true;
 
                     throw error;
 
                 }
+
+
+                return answer;
 
             }
 
@@ -36952,8 +36844,7 @@ async function callLibraryAI(
 
 
             if (
-                config.provider ===
-                "openai"
+                config.provider === "openai"
             ) {
 
                 endpoint =
@@ -36961,46 +36852,59 @@ async function callLibraryAI(
 
             }
             else if (
-                config.provider ===
-                "groq"
+                config.provider === "groq"
             ) {
 
                 endpoint =
                     "https://api.groq.com/openai/v1/chat/completions";
 
             }
-            else {
+            else if (
+                config.provider === "openrouter"
+            ) {
 
                 endpoint =
                     "https://openrouter.ai/api/v1/chat/completions";
 
             }
+            else {
 
-
-            const headers = {
-
-                "Content-Type":
-                    "application/json",
-
-                "Authorization":
-                    "Bearer " +
-                    config.key
-
-            };
-
-
-            if (
-                config.provider ===
-                "openrouter"
-            ) {
-
-                headers["HTTP-Referer"] =
-                    window.location.href;
-
-                headers["X-Title"] =
-                    "Research Tools";
+                throw new Error(
+                    "مزود مكتبة غير معروف: " +
+                    config.provider
+                );
 
             }
+
+
+            const body = {
+
+                model:
+                    config.model,
+
+                messages: [
+
+                    {
+                        role: "system",
+                        content:
+                            systemPrompt
+                    },
+
+                    {
+                        role: "user",
+                        content:
+                            userPrompt
+                    }
+
+                ],
+
+                temperature:
+                    temperature,
+
+                max_tokens:
+                    maxTokens
+
+            };
 
 
             let response;
@@ -37012,49 +36916,23 @@ async function callLibraryAI(
                     fetch(
                         endpoint,
                         {
+                            method: "POST",
 
-                            method:
-                                "POST",
+                            headers: {
 
-                            headers,
+                                "Content-Type":
+                                    "application/json",
+
+                                "Authorization":
+                                    "Bearer " +
+                                    config.apiKey
+
+                            },
 
                             body:
-                                JSON.stringify({
-
-                                    model:
-                                        config.model,
-
-                                    messages: [
-
-                                        {
-
-                                            role:
-                                                "system",
-
-                                            content:
-                                                systemPrompt
-
-                                        },
-
-                                        {
-
-                                            role:
-                                                "user",
-
-                                            content:
-                                                userPrompt
-
-                                        }
-
-                                    ],
-
-                                    temperature,
-
-                                    max_tokens:
-                                        maxTokens
-
-                                })
-
+                                JSON.stringify(
+                                    body
+                                )
                         }
                     );
 
@@ -37085,6 +36963,43 @@ async function callLibraryAI(
                 result =
                     await response.json();
 
+
+                // ============================================
+                // تشخيص الاستجابة الخام
+                // ============================================
+
+                console.log(
+                    "========== LIBRARY AI RAW RESPONSE =========="
+                );
+
+                console.log(
+                    "PROVIDER:",
+                    config.provider
+                );
+
+                console.log(
+                    "HTTP STATUS:",
+                    response.status
+                );
+
+                console.log(
+                    "RESPONSE OBJECT:",
+                    result
+                );
+
+                console.log(
+                    "RESPONSE JSON:",
+                    JSON.stringify(
+                        result,
+                        null,
+                        2
+                    )
+                );
+
+                console.log(
+                    "=============================================="
+                );
+
             }
             catch (
                 error
@@ -37098,14 +37013,11 @@ async function callLibraryAI(
                         response.status
                     );
 
-
                 jsonError.response =
                     response;
 
-
                 jsonError.retryable =
                     true;
-
 
                 throw jsonError;
 
@@ -37117,12 +37029,16 @@ async function callLibraryAI(
             ) {
 
                 const message =
-                    result?.error?.message ||
-                    result?.message ||
-                    "فشل الاتصال بـ " +
-                    config.provider +
-                    ": HTTP " +
-                    response.status;
+                    result &&
+                    result.error &&
+                    result.error.message
+                        ? result.error.message
+                        : result &&
+                          result.message
+                            ? result.message
+                            : "فشل الاتصال بـ " +
+                              config.provider +
+                              ".";
 
 
                 const error =
@@ -37151,9 +37067,7 @@ async function callLibraryAI(
 
                 if (
                     !answer ||
-                    !String(
-                        answer
-                    ).trim()
+                    !String(answer).trim()
                 ) {
 
                     const error =
@@ -37163,10 +37077,8 @@ async function callLibraryAI(
                             "."
                         );
 
-
                     error.retryable =
                         true;
-
 
                     throw error;
 
@@ -37190,27 +37102,22 @@ async function callLibraryAI(
 
                 }
 
-
                 throw error;
 
             }
 
         },
 
-        config.provider ===
-            "openrouter"
+
+        config.provider === "openrouter"
             ? "OpenRouter"
-            : config.provider ===
-                "openai"
+            : config.provider === "openai"
                 ? "OpenAI"
-                : config.provider ===
-                    "groq"
+                : config.provider === "groq"
                     ? "Groq"
-                    : config.provider ===
-                        "gemini"
+                    : config.provider === "gemini"
                         ? "Gemini"
-                        : config.provider ===
-                            "duckai"
+                        : config.provider === "duckai"
                             ? "Duck.ai"
                             : String(
                                 config.provider ||
