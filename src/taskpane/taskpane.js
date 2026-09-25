@@ -37379,7 +37379,7 @@ async function expandLibrarySearchQuery(
                     0.1,
 
                 maxTokens:
-                    650
+                    1500
             }
         );
 
