@@ -25676,7 +25676,7 @@ async function askAI(
                             "Content-Type":
                                 "application/json"
 
-                            },
+                        },
 
                         body:
                             JSON.stringify({
@@ -25797,7 +25797,14 @@ async function askAI(
                                 8000,
 
                             temperature:
-                                0.2
+                                0.2,
+
+                            reasoning: {
+
+                                enabled:
+                                    false
+
+                            }
 
                         })
 
