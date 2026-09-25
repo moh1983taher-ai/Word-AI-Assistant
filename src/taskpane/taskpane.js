@@ -36607,6 +36607,12 @@ async function callLibraryAI(
                     result =
                         await response.json();
 
+                    console.log(
+                        "LIBRARY AI RAW RESPONSE:",
+                        config.provider,
+                        result
+                    );
+
                 }
                 catch (
                     error
