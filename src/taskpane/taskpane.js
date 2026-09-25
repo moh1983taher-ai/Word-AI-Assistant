@@ -33439,11 +33439,19 @@ async function processOpenAICompatibleStream(
 
     if (!response.body) {
 
-        throw new Error(
-            "المتصفح لا يدعم استقبال الرد المتدفق من " +
-            providerName +
-            "."
-        );
+        const error =
+            new Error(
+                "المتصفح لا يدعم استقبال الرد المتدفق من " +
+                providerName +
+                "."
+            );
+
+
+        error.retryable =
+            false;
+
+
+        throw error;
 
     }
 
@@ -33658,11 +33666,23 @@ async function processOpenAICompatibleStream(
         !fullAnswer.trim()
     ) {
 
-        throw new Error(
-            "لم يصل نص من " +
-            providerName +
-            " عبر البث المتدفق."
-        );
+        const error =
+            new Error(
+                "لم يصل نص من " +
+                providerName +
+                " عبر البث المتدفق."
+            );
+
+
+        // ==================================
+        // الرد الفارغ قابل لإعادة المحاولة
+        // ==================================
+
+        error.retryable =
+            true;
+
+
+        throw error;
 
     }
 
@@ -33670,6 +33690,7 @@ async function processOpenAICompatibleStream(
     return fullAnswer.trim();
 
 }
+
 
 // =====================================================
 // Stream Pollinations AI
@@ -33708,119 +33729,193 @@ async function streamPollinationsAI(
         );
 
 
-    const response =
-        await fetch(
-            "https://gen.pollinations.ai/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        data.key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            data.model,
-
-                        messages:
-                            streamingContext.messages,
-
-                        max_tokens:
-                            3000,
-
-                        temperature:
-                            0.2,
-
-                        stream:
-                            false
-
-                    })
-
-            }
-        );
-
-
-    const result =
-        await readJSON(
-            response
-        );
-
-
-    console.log(
-        "POLLINATIONS RAW RESULT:",
-        result
-    );
-
-
-    if (!response.ok) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Pollinations."
-            )
-        );
-
-    }
-
-
     const answer =
-        result &&
-        result.choices &&
-        result.choices[0] &&
-        result.choices[0].message
-            ? result.choices[0].message.content
-            : "";
+        await withAIRetry(
+            async function () {
+
+                let response;
 
 
-    if (
-        typeof answer !==
-            "string" ||
-        !answer.trim()
-    ) {
+                // ==================================
+                // إرسال الطلب
+                // ==================================
 
-        throw new Error(
-            "لم يصل نص من Pollinations."
+                try {
+
+                    response =
+                        await fetch(
+                            "https://gen.pollinations.ai/v1/chat/completions",
+                            {
+
+                                method:
+                                    "POST",
+
+                                headers: {
+
+                                    "Content-Type":
+                                        "application/json",
+
+                                    "Authorization":
+                                        "Bearer " +
+                                        data.key
+
+                                },
+
+                                body:
+                                    JSON.stringify({
+
+                                        model:
+                                            data.model,
+
+                                        messages:
+                                            streamingContext.messages,
+
+                                        max_tokens:
+                                            3000,
+
+                                        temperature:
+                                            0.2,
+
+                                        stream:
+                                            false
+
+                                    })
+
+                            }
+                        );
+
+                }
+                catch (
+                    error
+                ) {
+
+                    // ==================================
+                    // خطأ شبكة
+                    // ==================================
+
+                    error.networkError =
+                        true;
+
+                    throw error;
+
+                }
+
+
+                // ==================================
+                // قراءة الرد
+                // ==================================
+
+                const result =
+                    await readJSON(
+                        response
+                    );
+
+
+                console.log(
+                    "POLLINATIONS RAW RESULT:",
+                    result
+                );
+
+
+                // ==================================
+                // فحص HTTP
+                // ==================================
+
+                if (!response.ok) {
+
+                    const error =
+                        new Error(
+                            getAPIError(
+                                result,
+                                "فشل الاتصال بـ Pollinations."
+                            )
+                        );
+
+
+                    error.response =
+                        response;
+
+
+                    throw error;
+
+                }
+
+
+                // ==================================
+                // استخراج الإجابة
+                // ==================================
+
+                const answer =
+                    result &&
+                    result.choices &&
+                    result.choices[0] &&
+                    result.choices[0].message
+                        ? result.choices[0].message.content
+                        : "";
+
+
+                // ==================================
+                // الرد فارغ
+                // ==================================
+
+                if (
+                    typeof answer !==
+                        "string" ||
+                    !answer.trim()
+                ) {
+
+                    const error =
+                        new Error(
+                            "لم يصل نص من Pollinations."
+                        );
+
+
+                    error.retryable =
+                        true;
+
+
+                    throw error;
+
+                }
+
+
+                // ==================================
+                // تحديث الحالة
+                // ==================================
+
+                AppState.streaming.text =
+                    answer;
+
+
+                if (
+                    typeof onChunk ===
+                    "function"
+                ) {
+
+                    onChunk(
+                        answer,
+                        answer
+                    );
+
+                }
+
+
+                return answer.trim();
+
+            },
+
+            "Pollinations"
         );
 
-    }
 
-
-    AppState.streaming.text =
-        answer;
-
-
-    if (
-        typeof onChunk ===
-        "function"
-    ) {
-
-        onChunk(
-            answer,
-            answer
-        );
-
-    }
-
-
-    return answer.trim();
+    return answer;
 
 }
 
 // =====================================================
 // Stream Groq AI
 // =====================================================
+
 
 async function streamGroqAI(
     text,
@@ -33830,8 +33925,15 @@ async function streamGroqAI(
     const data =
         getActiveAISettings();
 
-    console.log("TEST PROVIDER:", data.provider, "MODEL:", data.model);
-    
+
+    console.log(
+        "TEST PROVIDER:",
+        data.provider,
+        "MODEL:",
+        data.model
+    );
+
+
     if (!data.key.trim()) {
 
         throw new Error(
@@ -33856,67 +33958,6 @@ async function streamGroqAI(
         );
 
 
-    const response =
-        await fetch(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        data.key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            data.model,
-
-                        messages:
-                            streamingContext.messages,
-
-                        temperature:
-                            0.2,
-
-                        max_completion_tokens:
-                            16000,
-
-                        stream:
-                            true
-
-                    })
-
-            }
-        );
-
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Groq."
-            )
-        );
-
-    }
-
-
     AppState.streaming.active =
         true;
 
@@ -33930,30 +33971,150 @@ async function streamGroqAI(
     try {
 
         const answer =
-            await processOpenAICompatibleStream(
-                response,
-                function (
-                    delta,
-                    fullText
-                ) {
+            await withAIRetry(
+                async function () {
 
-                    AppState.streaming.text =
-                        fullText;
+                    let response;
 
 
-                    if (
-                        typeof onChunk ===
-                        "function"
+                    // ==================================
+                    // إرسال الطلب
+                    // ==================================
+
+                    try {
+
+                        response =
+                            await fetch(
+                                "https://api.groq.com/openai/v1/chat/completions",
+                                {
+
+                                    method:
+                                        "POST",
+
+                                    headers: {
+
+                                        "Content-Type":
+                                            "application/json",
+
+                                        "Authorization":
+                                            "Bearer " +
+                                            data.key
+
+                                    },
+
+                                    body:
+                                        JSON.stringify({
+
+                                            model:
+                                                data.model,
+
+                                            messages:
+                                                streamingContext.messages,
+
+                                            temperature:
+                                                0.2,
+
+                                            max_completion_tokens:
+                                                16000,
+
+                                            stream:
+                                                true
+
+                                        })
+
+                                }
+                            );
+
+                    }
+                    catch (
+                        error
                     ) {
 
-                        onChunk(
-                            delta,
-                            fullText
-                        );
+                        // ==================================
+                        // خطأ شبكة
+                        // ==================================
+
+                        error.networkError =
+                            true;
+
+                        throw error;
 
                     }
 
+
+                    // ==================================
+                    // فحص HTTP
+                    // ==================================
+
+                    if (!response.ok) {
+
+                        const result =
+                            await readJSON(
+                                response
+                            );
+
+
+                        const error =
+                            new Error(
+                                getAPIError(
+                                    result,
+                                    "فشل الاتصال بـ Groq."
+                                )
+                            );
+
+
+                        // ==================================
+                        // ربط Response بالخطأ
+                        // ==================================
+
+                        error.response =
+                            response;
+
+
+                        throw error;
+
+                    }
+
+
+                    // ==================================
+                    // معالجة البث
+                    // ==================================
+
+                    const answer =
+                        await processOpenAICompatibleStream(
+                            response,
+
+                            function (
+                                delta,
+                                fullText
+                            ) {
+
+                                AppState.streaming.text =
+                                    fullText;
+
+
+                                if (
+                                    typeof onChunk ===
+                                    "function"
+                                ) {
+
+                                    onChunk(
+                                        delta,
+                                        fullText
+                                    );
+
+                                }
+
+                            },
+
+                            "Groq"
+                        );
+
+
+                    return answer;
+
                 },
+
                 "Groq"
             );
 
@@ -33972,6 +34133,313 @@ async function streamGroqAI(
     }
 
 }
+
+
+// ==========================================
+// إعادة المحاولة العامة لجميع مزودات الذكاء الاصطناعي
+// ==========================================
+
+const AI_RETRY_DELAYS = [
+    2000,
+    5000,
+    10000
+];
+
+
+function isRetryableAIStatus(
+    status
+) {
+
+    return [
+        408,
+        429,
+        500,
+        502,
+        503,
+        504
+    ].includes(
+        Number(status)
+    );
+
+}
+
+
+function sleep(
+    milliseconds
+) {
+
+    return new Promise(
+        function (
+            resolve
+        ) {
+
+            setTimeout(
+                resolve,
+                milliseconds
+            );
+
+        }
+    );
+
+}
+
+
+function getAIRetryDelay(
+    response,
+    attempt
+) {
+
+    // ======================================
+    // إذا أرسل المزود Retry-After
+    // ======================================
+
+    if (
+        response &&
+        response.headers
+    ) {
+
+        const retryAfter =
+            response.headers.get(
+                "Retry-After"
+            );
+
+        if (
+            retryAfter
+        ) {
+
+            const seconds =
+                Number(
+                    retryAfter
+                );
+
+            if (
+                Number.isFinite(
+                    seconds
+                ) &&
+                seconds >= 0
+            ) {
+
+                return Math.min(
+                    seconds * 1000,
+                    30000
+                );
+
+            }
+
+        }
+
+    }
+
+
+    // ======================================
+    // التأخير الافتراضي
+    // ======================================
+
+    return (
+        AI_RETRY_DELAYS[
+            Math.min(
+                attempt,
+                AI_RETRY_DELAYS.length - 1
+            )
+        ]
+    );
+
+}
+
+
+
+async function withAIRetry(
+    operation,
+    providerName,
+    options
+) {
+
+    const settings =
+        options ||
+        {};
+
+
+    const maxAttempts =
+        Number.isInteger(
+            settings.maxAttempts
+        )
+            ? settings.maxAttempts
+            : 4;
+
+
+    let lastError =
+        null;
+
+
+    for (
+        let attempt = 0;
+        attempt < maxAttempts;
+        attempt++
+    ) {
+
+        try {
+
+            return await operation(
+                attempt
+            );
+
+        }
+        catch (
+            error
+        ) {
+
+            lastError =
+                error;
+
+
+            // ==================================
+            // هل طلب الخطأ صراحة عدم إعادة المحاولة؟
+            // ==================================
+
+            if (
+                error &&
+                error.noRetry === true
+            ) {
+
+                throw error;
+
+            }
+
+
+            // ==================================
+            // هل وصلنا للمحاولة الأخيرة؟
+            // ==================================
+
+            if (
+                attempt >=
+                maxAttempts - 1
+            ) {
+
+                throw error;
+
+            }
+
+
+            // ==================================
+            // تحديد قابلية إعادة المحاولة
+            // ==================================
+
+            let retryable =
+                false;
+
+
+            let response =
+                null;
+
+
+            // ==================================
+            // أخطاء HTTP
+            // ==================================
+
+            if (
+                error &&
+                error.response
+            ) {
+
+                response =
+                    error.response;
+
+
+                retryable =
+                    isRetryableAIStatus(
+                        response.status
+                    );
+
+            }
+
+
+            // ==================================
+            // أخطاء الشبكة
+            // ==================================
+
+            if (
+                error &&
+                error.networkError === true
+            ) {
+
+                retryable =
+                    true;
+
+            }
+
+
+            // ==================================
+            // الرد HTTP ناجح لكن البث فارغ
+            // ==================================
+
+            if (
+                error &&
+                error.retryable === true
+            ) {
+
+                retryable =
+                    true;
+
+            }
+
+
+            // ==================================
+            // الأخطاء غير القابلة لإعادة المحاولة
+            // ==================================
+
+            if (
+                !retryable
+            ) {
+
+                throw error;
+
+            }
+
+
+            // ==================================
+            // حساب مدة الانتظار
+            // ==================================
+
+            const delay =
+                getAIRetryDelay(
+                    response,
+                    attempt
+                );
+
+
+            console.warn(
+                providerName +
+                ": فشلت المحاولة " +
+                (attempt + 1) +
+                " من " +
+                maxAttempts +
+                ". إعادة المحاولة بعد " +
+                delay +
+                "ms.",
+                error
+            );
+
+
+            await sleep(
+                delay
+            );
+
+        }
+
+    }
+
+
+    throw (
+        lastError ||
+        new Error(
+            "فشل الاتصال بـ " +
+            providerName
+        )
+    );
+
+}
+
+
 
 
 // =====================================================
@@ -34011,73 +34479,6 @@ async function streamOpenRouterAI(
         );
 
 
-    const response =
-        await fetch(
-            "https://openrouter.ai/api/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        data.key,
-
-                    "HTTP-Referer":
-                        window.location.href,
-
-                    "X-Title":
-                        "Research Tools"
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            data.model,
-
-                        messages:
-                            streamingContext.messages,
-
-                        max_tokens:
-                            12000,
-
-                        temperature:
-                            0.2,
-
-                        stream:
-                            true
-
-                    })
-
-            }
-        );
-
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenRouter."
-            )
-        );
-
-    }
-
-
     AppState.streaming.active =
         true;
 
@@ -34091,30 +34492,158 @@ async function streamOpenRouterAI(
     try {
 
         const answer =
-            await processOpenAICompatibleStream(
-                response,
-                function (
-                    delta,
-                    fullText
-                ) {
+            await withAIRetry(
+                async function () {
 
-                    AppState.streaming.text =
-                        fullText;
+                    let response;
 
 
-                    if (
-                        typeof onChunk ===
-                        "function"
+                    // ==================================
+                    // إرسال الطلب
+                    // ==================================
+
+                    try {
+
+                        response =
+                            await fetch(
+                                "https://openrouter.ai/api/v1/chat/completions",
+                                {
+
+                                    method:
+                                        "POST",
+
+                                    headers: {
+
+                                        "Content-Type":
+                                            "application/json",
+
+                                        "Authorization":
+                                            "Bearer " +
+                                            data.key,
+
+                                        "HTTP-Referer":
+                                            window.location.href,
+
+                                        "X-Title":
+                                            "Research Tools"
+
+                                    },
+
+                                    body:
+                                        JSON.stringify({
+
+                                            model:
+                                                data.model,
+
+                                            messages:
+                                                streamingContext.messages,
+
+                                            max_tokens:
+                                                12000,
+
+                                            temperature:
+                                                0.2,
+
+                                            stream:
+                                                true
+
+                                        })
+
+                                }
+                            );
+
+                    }
+                    catch (
+                        error
                     ) {
 
-                        onChunk(
-                            delta,
-                            fullText
-                        );
+                        // ==================================
+                        // خطأ شبكة
+                        // ==================================
+
+                        error.networkError =
+                            true;
+
+                        throw error;
 
                     }
 
+
+                    // ==================================
+                    // فحص HTTP
+                    // ==================================
+
+                    if (!response.ok) {
+
+                        const result =
+                            await readJSON(
+                                response
+                            );
+
+
+                        const error =
+                            new Error(
+                                getAPIError(
+                                    result,
+                                    "فشل الاتصال بـ OpenRouter."
+                                )
+                            );
+
+
+                        // ==================================
+                        // نربط Response بالخطأ
+                        // لكي تعرف withAIRetry
+                        // هل الخطأ قابل لإعادة المحاولة.
+                        // ==================================
+
+                        error.response =
+                            response;
+
+
+                        throw error;
+
+                    }
+
+
+                    // ==================================
+                    // معالجة البث
+                    // ==================================
+
+                    const answer =
+                        await processOpenAICompatibleStream(
+                            response,
+
+                            function (
+                                delta,
+                                fullText
+                            ) {
+
+                                AppState.streaming.text =
+                                    fullText;
+
+
+                                if (
+                                    typeof onChunk ===
+                                    "function"
+                                ) {
+
+                                    onChunk(
+                                        delta,
+                                        fullText
+                                    );
+
+                                }
+
+                            },
+
+                            "OpenRouter"
+                        );
+
+
+                    return answer;
+
                 },
+
                 "OpenRouter"
             );
 
@@ -34172,67 +34701,6 @@ async function streamOpenAI(
         );
 
 
-    const response =
-        await fetch(
-            "https://api.openai.com/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Authorization":
-                        "Bearer " +
-                        data.key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            data.model,
-
-                        messages:
-                            streamingContext.messages,
-
-                        max_tokens:
-                            3000,
-
-                        temperature:
-                            0.2,
-
-                        stream:
-                            true
-
-                    })
-
-            }
-        );
-
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ OpenAI."
-            )
-        );
-
-    }
-
-
     AppState.streaming.active =
         true;
 
@@ -34246,30 +34714,150 @@ async function streamOpenAI(
     try {
 
         const answer =
-            await processOpenAICompatibleStream(
-                response,
-                function (
-                    delta,
-                    fullText
-                ) {
+            await withAIRetry(
+                async function () {
 
-                    AppState.streaming.text =
-                        fullText;
+                    let response;
 
 
-                    if (
-                        typeof onChunk ===
-                        "function"
+                    // ==================================
+                    // إرسال الطلب
+                    // ==================================
+
+                    try {
+
+                        response =
+                            await fetch(
+                                "https://api.openai.com/v1/chat/completions",
+                                {
+
+                                    method:
+                                        "POST",
+
+                                    headers: {
+
+                                        "Content-Type":
+                                            "application/json",
+
+                                        "Authorization":
+                                            "Bearer " +
+                                            data.key
+
+                                    },
+
+                                    body:
+                                        JSON.stringify({
+
+                                            model:
+                                                data.model,
+
+                                            messages:
+                                                streamingContext.messages,
+
+                                            max_tokens:
+                                                3000,
+
+                                            temperature:
+                                                0.2,
+
+                                            stream:
+                                                true
+
+                                        })
+
+                                }
+                            );
+
+                    }
+                    catch (
+                        error
                     ) {
 
-                        onChunk(
-                            delta,
-                            fullText
-                        );
+                        // ==================================
+                        // خطأ شبكة
+                        // ==================================
+
+                        error.networkError =
+                            true;
+
+                        throw error;
 
                     }
 
+
+                    // ==================================
+                    // فحص HTTP
+                    // ==================================
+
+                    if (!response.ok) {
+
+                        const result =
+                            await readJSON(
+                                response
+                            );
+
+
+                        const error =
+                            new Error(
+                                getAPIError(
+                                    result,
+                                    "فشل الاتصال بـ OpenAI."
+                                )
+                            );
+
+
+                        // ==================================
+                        // ربط Response بالخطأ
+                        // ==================================
+
+                        error.response =
+                            response;
+
+
+                        throw error;
+
+                    }
+
+
+                    // ==================================
+                    // معالجة البث
+                    // ==================================
+
+                    const answer =
+                        await processOpenAICompatibleStream(
+                            response,
+
+                            function (
+                                delta,
+                                fullText
+                            ) {
+
+                                AppState.streaming.text =
+                                    fullText;
+
+
+                                if (
+                                    typeof onChunk ===
+                                    "function"
+                                ) {
+
+                                    onChunk(
+                                        delta,
+                                        fullText
+                                    );
+
+                                }
+
+                            },
+
+                            "OpenAI"
+                        );
+
+
+                    return answer;
+
                 },
+
                 "OpenAI"
             );
 
@@ -34515,88 +35103,6 @@ async function streamGeminiAI(
         ":streamGenerateContent?alt=sse";
 
 
-    const response =
-        await fetch(
-            url,
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json",
-
-                    "x-goog-api-key":
-                        data.key
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        systemInstruction: {
-
-                            parts: [
-
-                                {
-
-                                    text:
-                                        systemInstruction
-
-                                }
-
-                            ]
-
-                        },
-
-                        contents:
-                            conversationMessages,
-
-                        generationConfig: {
-
-                            temperature:
-                                0.2,
-
-                            maxOutputTokens:
-                                12000
-
-                        }
-
-                    })
-
-            }
-        );
-
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Gemini."
-            )
-        );
-
-    }
-
-
-    if (!response.body) {
-
-        throw new Error(
-            "المتصفح لا يدعم استقبال الرد المتدفق من Gemini."
-        );
-
-    }
-
-
     AppState.streaming.active =
         true;
 
@@ -34607,351 +35113,550 @@ async function streamGeminiAI(
         "";
 
 
-    const reader =
-        response.body.getReader();
-
-
-    const decoder =
-        new TextDecoder(
-            "utf-8"
-        );
-
-
-    let buffer =
-        "";
-
-
-    let fullAnswer =
-        "";
-
-
-    let finishReason =
-        "";
-
-
-    let finishMessage =
-        "";
-
-
-    function processGeminiSSELine(
-        line
-    ) {
-
-        const cleanLine =
-            String(
-                line ||
-                ""
-            ).trim();
-
-
-        if (
-            !cleanLine ||
-            !cleanLine.startsWith(
-                "data:"
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        const dataText =
-            cleanLine
-                .substring(
-                    5
-                )
-                .trim();
-
-
-        if (
-            !dataText ||
-            dataText ===
-                "[DONE]"
-        ) {
-
-            return;
-
-        }
-
-
-        let parsed;
-
-
-        try {
-
-            parsed =
-                JSON.parse(
-                    dataText
-                );
-
-        }
-        catch (
-            error
-        ) {
-
-            return;
-
-        }
-
-
-        if (
-            !parsed ||
-            !Array.isArray(
-                parsed.candidates
-            ) ||
-            !parsed.candidates[0]
-        ) {
-
-            return;
-
-        }
-
-
-        const candidate =
-            parsed.candidates[0];
-
-
-        // ==================================
-        // سبب انتهاء التوليد
-        // ==================================
-
-        if (
-            candidate.finishReason
-        ) {
-
-            finishReason =
-                String(
-                    candidate.finishReason
-                );
-
-        }
-
-
-        if (
-            candidate.finishMessage
-        ) {
-
-            finishMessage =
-                String(
-                    candidate.finishMessage
-                );
-
-        }
-
-
-        if (
-            !candidate.content ||
-            !Array.isArray(
-                candidate.content.parts
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        candidate.content.parts.forEach(
-            function (
-                part
-            ) {
-
-                if (
-                    !part ||
-                    typeof part.text !==
-                        "string"
-                ) {
-
-                    return;
-
-                }
-
-
-                // ==================================
-                // تجاهل أجزاء التفكير
-                // ==================================
-
-                if (
-                    part.thought ===
-                    true
-                ) {
-
-                    return;
-
-                }
-
-
-                const delta =
-                    part.text;
-
-
-                if (!delta) {
-
-                    return;
-
-                }
-
-
-                fullAnswer +=
-                    delta;
-
-
-                AppState.streaming.text =
-                    fullAnswer;
-
-
-                if (
-                    typeof onChunk ===
-                    "function"
-                ) {
-
-                    onChunk(
-                        delta,
-                        fullAnswer
-                    );
-
-                }
-
-            }
-        );
-
-    }
-
-
     try {
 
-        while (true) {
+        const answer =
+            await withAIRetry(
+                async function () {
 
-            const streamResult =
-                await reader.read();
+                    // ==================================
+                    // متغيرات المحاولة الحالية
+                    // ==================================
 
-
-            if (
-                streamResult.done
-            ) {
-
-                break;
-
-            }
+                    let response;
 
 
-            buffer +=
-                decoder.decode(
-                    streamResult.value,
-                    {
-                        stream:
-                            true
+                    let buffer =
+                        "";
+
+
+                    let fullAnswer =
+                        "";
+
+
+                    let finishReason =
+                        "";
+
+
+                    let finishMessage =
+                        "";
+
+
+                    // ==================================
+                    // إرسال الطلب
+                    // ==================================
+
+                    try {
+
+                        response =
+                            await fetch(
+                                url,
+                                {
+
+                                    method:
+                                        "POST",
+
+                                    headers: {
+
+                                        "Content-Type":
+                                            "application/json",
+
+                                        "x-goog-api-key":
+                                            data.key
+
+                                    },
+
+                                    body:
+                                        JSON.stringify({
+
+                                            systemInstruction: {
+
+                                                parts: [
+
+                                                    {
+
+                                                        text:
+                                                            systemInstruction
+
+                                                    }
+
+                                                ]
+
+                                            },
+
+                                            contents:
+                                                conversationMessages,
+
+                                            generationConfig: {
+
+                                                temperature:
+                                                    0.2,
+
+                                                maxOutputTokens:
+                                                    12000
+
+                                            }
+
+                                        })
+
+                                }
+                            );
+
                     }
-                );
+                    catch (
+                        error
+                    ) {
+
+                        // ==================================
+                        // خطأ شبكة
+                        // ==================================
+
+                        error.networkError =
+                            true;
+
+                        throw error;
+
+                    }
 
 
-            buffer =
-                buffer.replace(
-                    /\r\n/g,
-                    "\n"
-                );
+                    // ==================================
+                    // فحص HTTP
+                    // ==================================
+
+                    if (!response.ok) {
+
+                        const result =
+                            await readJSON(
+                                response
+                            );
 
 
-            buffer =
-                buffer.replace(
-                    /\r/g,
-                    "\n"
-                );
+                        const error =
+                            new Error(
+                                getAPIError(
+                                    result,
+                                    "فشل الاتصال بـ Gemini."
+                                )
+                            );
 
 
-            let newlineIndex =
-                buffer.indexOf(
-                    "\n"
-                );
+                        error.response =
+                            response;
 
 
-            while (
-                newlineIndex !==
-                -1
-            ) {
+                        throw error;
 
-                const line =
-                    buffer.substring(
-                        0,
-                        newlineIndex
-                    );
+                    }
 
 
-                buffer =
-                    buffer.substring(
-                        newlineIndex + 1
-                    );
+                    // ==================================
+                    // التحقق من دعم البث
+                    // ==================================
+
+                    if (!response.body) {
+
+                        const error =
+                            new Error(
+                                "المتصفح لا يدعم استقبال الرد المتدفق من Gemini."
+                            );
 
 
-                processGeminiSSELine(
-                    line
-                );
+                        error.noRetry =
+                            true;
 
 
-                newlineIndex =
-                    buffer.indexOf(
-                        "\n"
-                    );
+                        throw error;
 
-            }
-
-        }
+                    }
 
 
-        if (
-            buffer.trim()
-        ) {
+                    const reader =
+                        response.body.getReader();
 
-            processGeminiSSELine(
-                buffer
+
+                    const decoder =
+                        new TextDecoder(
+                            "utf-8"
+                        );
+
+
+                    function processGeminiSSELine(
+                        line
+                    ) {
+
+                        const cleanLine =
+                            String(
+                                line ||
+                                ""
+                            ).trim();
+
+
+                        if (
+                            !cleanLine ||
+                            !cleanLine.startsWith(
+                                "data:"
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const dataText =
+                            cleanLine
+                                .substring(
+                                    5
+                                )
+                                .trim();
+
+
+                        if (
+                            !dataText ||
+                            dataText ===
+                                "[DONE]"
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        let parsed;
+
+
+                        try {
+
+                            parsed =
+                                JSON.parse(
+                                    dataText
+                                );
+
+                        }
+                        catch (
+                            error
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        if (
+                            !parsed ||
+                            !Array.isArray(
+                                parsed.candidates
+                            ) ||
+                            !parsed.candidates[0]
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const candidate =
+                            parsed.candidates[0];
+
+
+                        // ==================================
+                        // سبب انتهاء التوليد
+                        // ==================================
+
+                        if (
+                            candidate.finishReason
+                        ) {
+
+                            finishReason =
+                                String(
+                                    candidate.finishReason
+                                );
+
+                        }
+
+
+                        if (
+                            candidate.finishMessage
+                        ) {
+
+                            finishMessage =
+                                String(
+                                    candidate.finishMessage
+                                );
+
+                        }
+
+
+                        if (
+                            !candidate.content ||
+                            !Array.isArray(
+                                candidate.content.parts
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        candidate.content.parts.forEach(
+                            function (
+                                part
+                            ) {
+
+                                if (
+                                    !part ||
+                                    typeof part.text !==
+                                        "string"
+                                ) {
+
+                                    return;
+
+                                }
+
+
+                                // ==================================
+                                // تجاهل أجزاء التفكير
+                                // ==================================
+
+                                if (
+                                    part.thought ===
+                                    true
+                                ) {
+
+                                    return;
+
+                                }
+
+
+                                const delta =
+                                    part.text;
+
+
+                                if (!delta) {
+
+                                    return;
+
+                                }
+
+
+                                fullAnswer +=
+                                    delta;
+
+
+                                AppState.streaming.text =
+                                    fullAnswer;
+
+
+                                if (
+                                    typeof onChunk ===
+                                    "function"
+                                ) {
+
+                                    onChunk(
+                                        delta,
+                                        fullAnswer
+                                    );
+
+                                }
+
+                            }
+                        );
+
+                    }
+
+
+                    // ==================================
+                    // قراءة البث
+                    // ==================================
+
+                    try {
+
+                        while (true) {
+
+                            const streamResult =
+                                await reader.read();
+
+
+                            if (
+                                streamResult.done
+                            ) {
+
+                                break;
+
+                            }
+
+
+                            buffer +=
+                                decoder.decode(
+                                    streamResult.value,
+                                    {
+                                        stream:
+                                            true
+                                    }
+                                );
+
+
+                            buffer =
+                                buffer.replace(
+                                    /\r\n/g,
+                                    "\n"
+                                );
+
+
+                            buffer =
+                                buffer.replace(
+                                    /\r/g,
+                                    "\n"
+                                );
+
+
+                            let newlineIndex =
+                                buffer.indexOf(
+                                    "\n"
+                                );
+
+
+                            while (
+                                newlineIndex !==
+                                -1
+                            ) {
+
+                                const line =
+                                    buffer.substring(
+                                        0,
+                                        newlineIndex
+                                    );
+
+
+                                buffer =
+                                    buffer.substring(
+                                        newlineIndex + 1
+                                    );
+
+
+                                processGeminiSSELine(
+                                    line
+                                );
+
+
+                                newlineIndex =
+                                    buffer.indexOf(
+                                        "\n"
+                                    );
+
+                            }
+
+                        }
+
+                    }
+                    catch (
+                        error
+                    ) {
+
+                        // ==================================
+                        // إذا بدأ النص بالوصول فلا نعيد الطلب
+                        // حتى لا تتكرر الإجابة.
+                        // ==================================
+
+                        if (
+                            fullAnswer.trim()
+                        ) {
+
+                            error.noRetry =
+                                true;
+
+                        }
+                        else {
+
+                            error.retryable =
+                                true;
+
+                        }
+
+
+                        throw error;
+
+                    }
+
+
+                    // ==================================
+                    // معالجة الجزء الأخير من البفر
+                    // ==================================
+
+                    if (
+                        buffer.trim()
+                    ) {
+
+                        processGeminiSSELine(
+                            buffer
+                        );
+
+                    }
+
+
+                    // ==================================
+                    // لم يصل أي نص
+                    // ==================================
+
+                    if (
+                        !fullAnswer.trim()
+                    ) {
+
+                        const error =
+                            new Error(
+                                "لم يصل نص من Gemini عبر البث المتدفق."
+                            );
+
+
+                        error.retryable =
+                            true;
+
+
+                        throw error;
+
+                    }
+
+
+                    // ==================================
+                    // تشخيص انتهاء الإجابة
+                    // ==================================
+
+                    if (
+                        finishReason ===
+                        "MAX_TOKENS"
+                    ) {
+
+                        console.warn(
+                            "Gemini: انتهى التوليد بسبب بلوغ maxOutputTokens.",
+                            finishMessage
+                        );
+
+                    }
+                    else if (
+                        finishReason &&
+                        finishReason !==
+                        "STOP"
+                    ) {
+
+                        console.warn(
+                            "Gemini: سبب انتهاء التوليد:",
+                            finishReason,
+                            finishMessage
+                        );
+
+                    }
+
+
+                    return fullAnswer.trim();
+
+                },
+
+                "Gemini"
             );
 
-        }
 
-
-        if (
-            !fullAnswer.trim()
-        ) {
-
-            throw new Error(
-                "لم يصل نص من Gemini عبر البث المتدفق."
-            );
-
-        }
-
-
-        // ==================================
-        // تشخيص انتهاء الإجابة
-        // ==================================
-
-        if (
-            finishReason ===
-            "MAX_TOKENS"
-        ) {
-
-            console.warn(
-                "Gemini: انتهى التوليد بسبب بلوغ maxOutputTokens.",
-                finishMessage
-            );
-
-        }
-        else if (
-            finishReason &&
-            finishReason !==
-                "STOP"
-        ) {
-
-            console.warn(
-                "Gemini: سبب انتهاء التوليد:",
-                finishReason,
-                finishMessage
-            );
-
-        }
-
-
-        return fullAnswer.trim();
+        return answer;
 
     }
     finally {
@@ -34997,62 +35702,6 @@ async function streamDuckAI(
         );
 
 
-    const response =
-        await fetch(
-            "http://127.0.0.1:8080/v1/chat/completions",
-            {
-
-                method:
-                    "POST",
-
-                headers: {
-
-                    "Content-Type":
-                        "application/json"
-
-                },
-
-                body:
-                    JSON.stringify({
-
-                        model:
-                            data.model,
-
-                        messages:
-                            streamingContext.messages,
-
-                        max_tokens:
-                            12000,
-
-                        temperature:
-                            0.2,
-
-                        stream:
-                            true
-
-                    })
-
-            }
-        );
-
-
-    if (!response.ok) {
-
-        const result =
-            await readJSON(
-                response
-            );
-
-        throw new Error(
-            getAPIError(
-                result,
-                "فشل الاتصال بـ Duck.ai."
-            )
-        );
-
-    }
-
-
     AppState.streaming.active =
         true;
 
@@ -35066,28 +35715,159 @@ async function streamDuckAI(
     try {
 
         const answer =
-            await processOpenAICompatibleStream(
-                response,
+            await withAIRetry(
+                async function () {
 
-                function(
-                    delta,
-                    fullText
-                ) {
+                    let response;
 
-                    AppState.streaming.text =
-                        fullText;
 
-                    if (
-                        typeof onChunk ===
-                        "function"
-                    ) {
+                    // ==================================
+                    // إرسال الطلب إلى Agent المحلي
+                    // ==================================
 
-                        onChunk(
-                            delta,
-                            fullText
-                        );
+                    try {
+
+                        response =
+                            await fetch(
+                                "http://127.0.0.1:8080/v1/chat/completions",
+                                {
+
+                                    method:
+                                        "POST",
+
+                                    headers: {
+
+                                        "Content-Type":
+                                            "application/json"
+
+                                    },
+
+                                    body:
+                                        JSON.stringify({
+
+                                            model:
+                                                data.model,
+
+                                            messages:
+                                                streamingContext.messages,
+
+                                            max_tokens:
+                                                12000,
+
+                                            temperature:
+                                                0.2,
+
+                                            stream:
+                                                true
+
+                                        })
+
+                                }
+                            );
 
                     }
+                    catch (
+                        error
+                    ) {
+
+                        // ==================================
+                        // خطأ اتصال بالـ Agent المحلي
+                        // ==================================
+
+                        error.networkError =
+                            true;
+
+                        throw error;
+
+                    }
+
+
+                    // ==================================
+                    // فحص HTTP
+                    // ==================================
+
+                    if (!response.ok) {
+
+                        const result =
+                            await readJSON(
+                                response
+                            );
+
+
+                        const error =
+                            new Error(
+                                getAPIError(
+                                    result,
+                                    "فشل الاتصال بـ Duck.ai."
+                                )
+                            );
+
+
+                        error.response =
+                            response;
+
+
+                        // ==================================
+                        // Duck.ai / Duck2API
+                        //
+                        // 418 لا نعيد المحاولة تلقائيًا.
+                        // مثال:
+                        // no x-vqd-hash-1 token
+                        // ==================================
+
+                        if (
+                            Number(
+                                response.status
+                            ) === 418
+                        ) {
+
+                            error.noRetry =
+                                true;
+
+                        }
+
+
+                        throw error;
+
+                    }
+
+
+                    // ==================================
+                    // معالجة البث
+                    // ==================================
+
+                    const answer =
+                        await processOpenAICompatibleStream(
+                            response,
+
+                            function(
+                                delta,
+                                fullText
+                            ) {
+
+                                AppState.streaming.text =
+                                    fullText;
+
+
+                                if (
+                                    typeof onChunk ===
+                                    "function"
+                                ) {
+
+                                    onChunk(
+                                        delta,
+                                        fullText
+                                    );
+
+                                }
+
+                            },
+
+                            "Duck.ai"
+                        );
+
+
+                    return answer;
 
                 },
 
