@@ -36490,7 +36490,7 @@ async function callLibraryAI(
                     config.model +
                     ":generateContent?key=" +
                     encodeURIComponent(
-                        config.apiKey
+                        config.key
                     );
 
 
@@ -36725,7 +36725,7 @@ async function callLibraryAI(
 
                                     "Authorization":
                                         "Bearer " +
-                                        config.apiKey
+                                        config.key
 
                                 },
 
@@ -36925,7 +36925,7 @@ async function callLibraryAI(
 
                                 "Authorization":
                                     "Bearer " +
-                                    config.apiKey
+                                    config.key
 
                             },
 
