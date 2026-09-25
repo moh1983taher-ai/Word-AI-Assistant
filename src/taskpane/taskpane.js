@@ -25799,12 +25799,6 @@ async function askAI(
                             temperature:
                                 0.2,
 
-                            reasoning: {
-
-                                enabled:
-                                    false
-
-                            }
 
                         })
 
@@ -36913,25 +36907,6 @@ async function callLibraryAI(
 
             };
 
-
-            // ================================================
-            // OpenRouter فقط:
-            // تعطيل reasoning حتى لا يستهلك النموذج
-            // معظم max_tokens في التفكير الداخلي.
-            // ================================================
-
-            if (
-                config.provider === "openrouter"
-            ) {
-
-                body.reasoning = {
-
-                    enabled:
-                        false
-
-                };
-
-            }
 
 
             let response;
