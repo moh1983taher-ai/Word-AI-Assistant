@@ -34091,6 +34091,11 @@ function sleep(
 }
 
 
+
+// ======================================================
+// حساب مدة الانتظار الذكي قبل إعادة محاولة طلب الذكاء الاصطناعي
+// ======================================================
+
 function getAIRetryDelay(
     response,
     attempt,
@@ -34129,7 +34134,7 @@ function getAIRetryDelay(
 
                 return Math.min(
                     seconds * 1000,
-                    30000
+                    120000
                 );
 
             }
@@ -34140,10 +34145,7 @@ function getAIRetryDelay(
 
 
     // ======================================
-    // 2) إذا ذكر المزود:
-    //
-    // try again in 12.5s
-    // try again in 5 seconds
+    // 2) إذا ذكر المزود مدة الانتظار
     // ======================================
 
     const errorMessage =
@@ -34193,7 +34195,7 @@ function getAIRetryDelay(
 
             return Math.min(
                 milliseconds,
-                30000
+                120000
             );
 
         }
@@ -34202,19 +34204,50 @@ function getAIRetryDelay(
 
 
     // ======================================
-    // 3) التأخير الافتراضي
+    // 3) التأخير الافتراضي الآمن
     // ======================================
 
-    return (
-        AI_RETRY_DELAYS[
+    const defaultDelays =
+        Array.isArray(
+            AI_RETRY_DELAYS
+        ) &&
+        AI_RETRY_DELAYS.length > 0
+            ? AI_RETRY_DELAYS
+            : [
+                2000,
+                5000,
+                10000
+            ];
+
+
+    const safeAttempt =
+        Number.isInteger(
+            attempt
+        ) &&
+        attempt >= 0
+            ? attempt
+            : 0;
+
+
+    const delay =
+        defaultDelays[
             Math.min(
-                attempt,
-                AI_RETRY_DELAYS.length - 1
+                safeAttempt,
+                defaultDelays.length - 1
             )
-        ]
+        ];
+
+
+    return (
+        Number.isFinite(
+            Number(delay)
+        )
+            ? Number(delay)
+            : 2000
     );
 
 }
+
 
 
 
