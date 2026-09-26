@@ -34156,7 +34156,7 @@ function getAIRetryDelay(
 
     const match =
         errorMessage.match(
-            /try again in\s+([\d.]+)\s*(ms|s|seconds?)/i
+            /(?:try again|retry)\s+in\s+([\d.]+)\s*(ms|s|seconds?)/i
         );
 
     if (
