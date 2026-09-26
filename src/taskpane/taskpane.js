@@ -34218,6 +34218,10 @@ function getAIRetryDelay(
 
 
 
+// ======================================================
+// نظام إعادة المحاولة الذكي لجميع مزودي الذكاء الاصطناعي
+// ======================================================
+
 async function withAIRetry(
     operation,
     providerName,
@@ -34320,6 +34324,81 @@ async function withAIRetry(
                         response.status
                     );
 
+
+                // ==================================
+                // 429 = Rate Limit / Quota
+                // ==================================
+
+                if (
+                    Number(
+                        response.status
+                    ) === 429
+                ) {
+
+                    const errorMessage =
+                        String(
+                            error &&
+                            error.message
+                                ? error.message
+                                : ""
+                        );
+
+
+                    const hasRetryInstruction =
+                        /(?:try again|retry)\s+in\s+[\d.]+\s*(ms|s|seconds?)/i
+                            .test(
+                                errorMessage
+                            );
+
+
+                    const isQuotaError =
+                        /quota\s+exceeded|free[_\s-]?tier[_\s-]?requests/i
+                            .test(
+                                errorMessage
+                            );
+
+
+                    // ==================================
+                    // إذا كان Quota ومعه مدة Retry
+                    // نحترم مدة المزود.
+                    // ==================================
+
+                    if (
+                        isQuotaError &&
+                        hasRetryInstruction
+                    ) {
+
+                        retryable =
+                            true;
+
+                    }
+
+
+                    // ==================================
+                    // إذا كان Quota بدون مدة Retry
+                    // لا نكرر الطلبات عشوائيا.
+                    // ==================================
+
+                    else if (
+                        isQuotaError &&
+                        !hasRetryInstruction
+                    ) {
+
+                        console.warn(
+                            providerName +
+                            ": تم الوصول إلى حد الحصة (Quota) " +
+                            "ولا توجد مدة انتظار محددة من المزود. " +
+                            "لن تتم إعادة المحاولة تلقائيا.",
+                            error
+                        );
+
+
+                        throw error;
+
+                    }
+
+                }
+
             }
 
 
@@ -34409,6 +34488,7 @@ async function withAIRetry(
     );
 
 }
+
 
 
 
