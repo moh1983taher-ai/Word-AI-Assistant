@@ -26346,6 +26346,7 @@ async function askAIForLibraryRanking(
     }
 
 
+
     // =========================================================
     // Gemini
     // =========================================================
@@ -26372,81 +26373,118 @@ async function askAIForLibraryRanking(
             );
 
 
-        const response =
-            await fetch(
-                url,
-                {
+        return await withAIRetry(
+            async function () {
 
-                    method:
-                        "POST",
+                try {
 
-                    headers: {
+                    const response =
+                        await fetch(
+                            url,
+                            {
 
-                        "Content-Type":
-                            "application/json"
+                                method:
+                                    "POST",
 
-                    },
+                                headers: {
 
-                    body:
-                        JSON.stringify({
+                                    "Content-Type":
+                                        "application/json"
 
-                            contents: [
+                                },
 
-                                {
+                                body:
+                                    JSON.stringify({
 
-                                    role:
-                                        "user",
+                                        contents: [
 
-                                    parts: [
+                                            {
 
-                                        {
+                                                role:
+                                                    "user",
 
-                                            text:
-                                                messages
-                                                    .map(
-                                                        message =>
-                                                            `${message.role}: ${message.content}`
-                                                    )
-                                                    .join(
-                                                        "\n\n"
-                                                    )
+                                                parts: [
 
-                                        }
+                                                    {
 
-                                    ]
+                                                        text:
+                                                            messages
+                                                                .map(
+                                                                    message =>
+                                                                        `${message.role}: ${message.content}`
+                                                                )
+                                                                .join(
+                                                                    "\n\n"
+                                                                )
 
-                                }
+                                                    }
 
-                            ]
+                                                ]
 
-                        })
+                                            }
+
+                                        ]
+
+                                    })
+
+                            }
+                        );
+
+
+                    const result =
+                        await readJSON(
+                            response
+                        );
+
+
+                    if (
+                        !response.ok
+                    ) {
+
+                        const error =
+                            new Error(
+                                getAPIError(
+                                    result,
+                                    "فشل الاتصال بـ Gemini."
+                                )
+                            );
+
+                        error.response =
+                            response;
+
+                        throw error;
+
+                    }
+
+
+                    return extractGeminiAnswer(
+                        result
+                    );
 
                 }
-            );
+                catch (
+                    error
+                ) {
+
+                    if (
+                        error &&
+                        error.response
+                    ) {
+
+                        throw error;
+
+                    }
 
 
-        const result =
-            await readJSON(
-                response
-            );
+                    error.networkError =
+                        true;
 
+                    throw error;
 
-        if (
-            !response.ok
-        ) {
+                }
 
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Gemini."
-                )
-            );
-
-        }
-
-
-        return extractGeminiAnswer(
-            result
+            },
+            "Gemini"
         );
 
     }
@@ -26464,241 +26502,109 @@ async function askAIForLibraryRanking(
         const GROQ_URL =
             "https://api.groq.com/openai/v1/chat/completions";
 
-        const MAX_RETRIES = 4;
-
-        const DEFAULT_RETRY_MS =
-            15000;
-
         const GROQ_MAX_TOKENS =
             1200;
 
 
-        function sleep(
-            milliseconds
-        ) {
+        return await withAIRetry(
+            async function () {
 
-            return new Promise(
-                function (
-                    resolve
-                ) {
+                try {
 
-                    setTimeout(
-                        resolve,
-                        milliseconds
-                    );
+                    const response =
+                        await fetch(
+                            GROQ_URL,
+                            {
 
-                }
-            );
+                                method:
+                                    "POST",
 
-        }
+                                headers: {
 
+                                    "Content-Type":
+                                        "application/json",
 
-        function getGroqRetryDelay(
-            response,
-            result
-        ) {
+                                    "Authorization":
+                                        "Bearer " +
+                                        data.key
 
-            const retryAfter =
-                response.headers.get(
-                    "retry-after"
-                );
+                                },
 
-            if (
-                retryAfter
-            ) {
+                                body:
+                                    JSON.stringify({
 
-                const seconds =
-                    Number(
-                        retryAfter
-                    );
+                                        model:
+                                            data.model,
 
-                if (
-                    Number.isFinite(
-                        seconds
-                    )
-                ) {
+                                        messages,
 
-                    return Math.max(
-                        1000,
-                        Math.ceil(
-                            seconds * 1000
-                        )
-                    );
+                                        temperature:
+                                            0,
 
-                }
+                                        max_tokens:
+                                            GROQ_MAX_TOKENS
 
-            }
+                                    })
+
+                            }
+                        );
 
 
-            const message =
-                String(
-                    result?.error?.message ||
-                    result?.message ||
-                    ""
-                );
+                    const result =
+                        await readJSON(
+                            response
+                        );
 
 
-            const match =
-                message.match(
-                    /try again in\s+([\d.]+)\s*s/i
-                );
+                    if (
+                        !response.ok
+                    ) {
 
+                        const error =
+                            new Error(
+                                getAPIError(
+                                    result,
+                                    "فشل الاتصال بـ Groq."
+                                )
+                            );
 
-            if (
-                match
-            ) {
+                        error.response =
+                            response;
 
-                const seconds =
-                    Number(
-                        match[1]
-                    );
-
-                if (
-                    Number.isFinite(
-                        seconds
-                    )
-                ) {
-
-                    return Math.max(
-                        1000,
-                        Math.ceil(
-                            seconds * 1000
-                        )
-                    );
-
-                }
-
-            }
-
-
-            return DEFAULT_RETRY_MS;
-
-        }
-
-
-        for (
-            let attempt = 0;
-            attempt <= MAX_RETRIES;
-            attempt++
-        ) {
-
-            const response =
-                await fetch(
-                    GROQ_URL,
-                    {
-
-                        method:
-                            "POST",
-
-                        headers: {
-
-                            "Content-Type":
-                                "application/json",
-
-                            "Authorization":
-                                "Bearer " +
-                                data.key
-
-                        },
-
-                        body:
-                            JSON.stringify({
-
-                                model:
-                                    data.model,
-
-                                messages,
-
-                                temperature:
-                                    0,
-
-                                max_tokens:
-                                    GROQ_MAX_TOKENS
-
-                            })
+                        throw error;
 
                     }
-                );
 
 
-            const result =
-                await readJSON(
-                    response
-                );
+                    return extractOpenAIStyleAnswer(
+                        result,
+                        "Groq"
+                    );
+
+                }
+                catch (
+                    error
+                ) {
+
+                    if (
+                        error &&
+                        error.response
+                    ) {
+
+                        throw error;
+
+                    }
 
 
-            if (
-                response.ok
-            ) {
+                    error.networkError =
+                        true;
 
-                return extractOpenAIStyleAnswer(
-                    result,
-                    "Groq"
-                );
+                    throw error;
 
-            }
+                }
 
-
-            const errorMessage =
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Groq."
-                );
-
-
-            const isRateLimit =
-                response.status ===
-                    429 ||
-                /rate.?limit|ITPM|tokens per minute|try again in/i.test(
-                    String(
-                        errorMessage ||
-                        ""
-                    )
-                );
-
-
-            if (
-                !isRateLimit ||
-                attempt >= MAX_RETRIES
-            ) {
-
-                throw new Error(
-                    errorMessage
-                );
-
-            }
-
-
-            const retryDelay =
-                getGroqRetryDelay(
-                    response,
-                    result
-                );
-
-
-            console.warn(
-                "Groq rate limit.",
-                "المحاولة:",
-                attempt + 1,
-                "/",
-                MAX_RETRIES,
-                "الانتظار:",
-                Math.ceil(
-                    retryDelay / 1000
-                ),
-                "ثانية"
-            );
-
-
-            await sleep(
-                retryDelay
-            );
-
-        }
-
-
-        throw new Error(
-            "تعذر إكمال طلب Groq بعد عدة محاولات."
+            },
+            "Groq"
         );
 
     }
@@ -34187,11 +34093,12 @@ function sleep(
 
 function getAIRetryDelay(
     response,
-    attempt
+    attempt,
+    error
 ) {
 
     // ======================================
-    // إذا أرسل المزود Retry-After
+    // 1) إذا أرسل المزود Retry-After
     // ======================================
 
     if (
@@ -34233,7 +34140,69 @@ function getAIRetryDelay(
 
 
     // ======================================
-    // التأخير الافتراضي
+    // 2) إذا ذكر المزود:
+    //
+    // try again in 12.5s
+    // try again in 5 seconds
+    // ======================================
+
+    const errorMessage =
+        String(
+            error &&
+            error.message
+                ? error.message
+                : ""
+        );
+
+    const match =
+        errorMessage.match(
+            /try again in\s+([\d.]+)\s*(ms|s|seconds?)/i
+        );
+
+    if (
+        match
+    ) {
+
+        const value =
+            Number(
+                match[1]
+            );
+
+        if (
+            Number.isFinite(
+                value
+            )
+        ) {
+
+            const unit =
+                String(
+                    match[2] || "s"
+                ).toLowerCase();
+
+            let milliseconds =
+                value * 1000;
+
+            if (
+                unit === "ms"
+            ) {
+
+                milliseconds =
+                    value;
+
+            }
+
+            return Math.min(
+                milliseconds,
+                30000
+            );
+
+        }
+
+    }
+
+
+    // ======================================
+    // 3) التأخير الافتراضي
     // ======================================
 
     return (
@@ -34404,7 +34373,8 @@ async function withAIRetry(
             const delay =
                 getAIRetryDelay(
                     response,
-                    attempt
+                    attempt,
+                    error
                 );
 
 
