@@ -27445,87 +27445,141 @@ ${
 
 
 
-        const raw =
+        // ---------------------------------------------------------
+        // تنفيذ الدفعة مع إعادة المحاولة عند الرد الفارغ
+        // أو JSON غير الصالح
+        // ---------------------------------------------------------
 
-            await askAIForLibraryRanking(
+        const batchRanking =
+            await withAIRetry(
+                async function () {
 
-                prompt
+                    const raw =
+                        await askAIForLibraryRanking(
+                            prompt
+                        );
 
+
+                    console.log(
+                        "========== RAW AI BATCH RESPONSE =========="
+                    );
+
+                    console.log(
+                        raw
+                    );
+
+
+                    if (
+                        typeof raw !==
+                            "string" ||
+                        !raw.trim()
+                    ) {
+
+                        const error =
+                            new Error(
+                                "عاد رد فارغ من الذكاء الاصطناعي."
+                            );
+
+                        error.retryable =
+                            true;
+
+                        throw error;
+
+                    }
+
+
+                    let parsed;
+
+
+                    try {
+
+                        parsed =
+                            JSON.parse(
+                                raw
+                            );
+
+                    }
+                    catch {
+
+                        const match =
+                            String(
+                                raw
+                            ).match(
+                                /\{[\s\S]*\}/
+                            );
+
+
+                        if (
+                            !match
+                        ) {
+
+                            const error =
+                                new Error(
+                                    "تعذر استخراج JSON من رد الذكاء الاصطناعي."
+                                );
+
+                            error.retryable =
+                                true;
+
+                            throw error;
+
+                        }
+
+
+                        try {
+
+                            parsed =
+                                JSON.parse(
+                                    match[0]
+                                );
+
+                        }
+                        catch {
+
+                            const error =
+                                new Error(
+                                    "JSON غير صالح في رد الذكاء الاصطناعي."
+                                );
+
+                            error.retryable =
+                                true;
+
+                            throw error;
+
+                        }
+
+                    }
+
+
+                    if (
+                        !parsed ||
+                        !Array.isArray(
+                            parsed.ranking
+                        )
+                    ) {
+
+                        const error =
+                            new Error(
+                                "صيغة ترتيب غير صالحة في رد الذكاء الاصطناعي."
+                            );
+
+                        error.retryable =
+                            true;
+
+                        throw error;
+
+                    }
+
+
+                    return parsed;
+
+                },
+                "AI Library Ranking"
             );
 
 
-
-        console.log(
-
-            "========== RAW AI BATCH RESPONSE =========="
-
-        );
-
-
-
-        console.log(
-
-            raw
-
-        );
-
-
-
-        let parsed;
-
-
-
-        try {
-
-            parsed =
-
-                typeof raw ===
-
-                    "string"
-
-                    ? JSON.parse(
-
-                        raw
-
-                    )
-
-                    : raw;
-
-        }
-
-        catch {
-
-            const match =
-
-                String(
-
-                    raw || ""
-
-                )
-
-                .match(
-
-                    /\{[\s\S]*\}/
-
-                );
-
-
-
-            if (!match) {
-
-                console.warn(
-
-                    "تعذر استخراج JSON من دفعة",
-
-                    batchIndex + 1
-
-                );
-
-
-
-                continue;
-
-            }
+        const parsed =
+            batchRanking;
 
 
 
