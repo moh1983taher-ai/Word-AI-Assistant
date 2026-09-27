@@ -26610,6 +26610,122 @@ async function askAIForLibraryRanking(
     }
 
 
+
+    // =========================================================
+    // Pollinations
+    // =========================================================
+
+    if (
+        data.provider ===
+        "pollinations"
+    ) {
+
+        const POLLINATIONS_URL =
+            "https://gen.pollinations.ai/v1/chat/completions";
+
+
+        return await withAIRetry(
+            async function () {
+
+                try {
+
+                    const response =
+                        await fetch(
+                            POLLINATIONS_URL,
+                            {
+
+                                method:
+                                    "POST",
+
+                                headers: {
+
+                                    "Content-Type":
+                                        "application/json",
+
+                                    "Authorization":
+                                        "Bearer " +
+                                        data.key
+
+                                },
+
+                                body:
+                                    JSON.stringify({
+
+                                        model:
+                                            data.model,
+
+                                        messages,
+
+                                        temperature:
+                                            0,
+
+                                        max_tokens:
+                                            4000
+
+                                    })
+
+                            }
+                        );
+
+
+                    const result =
+                        await readJSON(
+                            response
+                        );
+
+
+                    if (
+                        !response.ok
+                    ) {
+
+                        const error =
+                            new Error(
+                                getAPIError(
+                                    result,
+                                    "فشل الاتصال بـ Pollinations."
+                                )
+                            );
+
+                        error.response =
+                            response;
+
+                        throw error;
+
+                    }
+
+
+                    return extractOpenAIStyleAnswer(
+                        result,
+                        "Pollinations"
+                    );
+
+                }
+                catch (
+                    error
+                ) {
+
+                    if (
+                        error &&
+                        error.response
+                    ) {
+
+                        throw error;
+
+                    }
+
+
+                    error.networkError =
+                        true;
+
+                    throw error;
+
+                }
+
+            },
+            "Pollinations"
+        );
+
+    }
     // =========================================================
     // DuckAI المحلي
     // =========================================================
