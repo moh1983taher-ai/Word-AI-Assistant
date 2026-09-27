@@ -36319,9 +36319,13 @@ function getLibraryAIProviderConfig() {
         getLibraryAISavedSettings();
 
 
-    // بحث المكتبة يستخدم DuckAI المحلي دائمًا
     const provider =
-        "duckai";
+        String(
+            settings.provider ||
+            "openrouter"
+        )
+        .trim()
+        .toLowerCase();
 
 
     const key =
@@ -36338,6 +36342,18 @@ function getLibraryAIProviderConfig() {
             ""
         )
         .trim();
+
+
+    if (
+        provider !== "duckai" &&
+        !key
+    ) {
+
+        throw new Error(
+            "لم يتم تحديد مفتاح الذكاء الاصطناعي."
+        );
+
+    }
 
 
     if (
@@ -36905,7 +36921,7 @@ async function callLibraryAI(
 
 
             // ================================================
-            // OpenAI / Groq / OpenRouter
+            // OpenAI / Groq / OpenRouter / Pollinations
             // ================================================
 
             let endpoint;
@@ -36933,6 +36949,14 @@ async function callLibraryAI(
 
                 endpoint =
                     "https://openrouter.ai/api/v1/chat/completions";
+
+            }
+            else if (
+                config.provider === "pollinations"
+            ) {
+
+                endpoint =
+                    "https://gen.pollinations.ai/v1/chat/completions";
 
             }
             else {
