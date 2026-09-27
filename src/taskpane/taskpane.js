@@ -27445,12 +27445,7 @@ ${
 
 
 
-        // ---------------------------------------------------------
-        // تنفيذ الدفعة مع إعادة المحاولة عند الرد الفارغ
-        // أو JSON غير الصالح
-        // ---------------------------------------------------------
-
-        const batchRanking =
+        const parsed =
             await withAIRetry(
                 async function () {
 
@@ -27458,7 +27453,6 @@ ${
                         await askAIForLibraryRanking(
                             prompt
                         );
-
 
                     console.log(
                         "========== RAW AI BATCH RESPONSE =========="
@@ -27468,28 +27462,21 @@ ${
                         raw
                     );
 
-
                     if (
-                        typeof raw !==
-                            "string" ||
+                        typeof raw !== "string" ||
                         !raw.trim()
                     ) {
-
                         const error =
                             new Error(
                                 "عاد رد فارغ من الذكاء الاصطناعي."
                             );
 
-                        error.retryable =
-                            true;
+                        error.retryable = true;
 
                         throw error;
-
                     }
 
-
                     let parsed;
-
 
                     try {
 
@@ -27504,27 +27491,22 @@ ${
                         const match =
                             String(
                                 raw
-                            ).match(
+                            )
+                            .match(
                                 /\{[\s\S]*\}/
                             );
 
-
-                        if (
-                            !match
-                        ) {
+                        if (!match) {
 
                             const error =
                                 new Error(
                                     "تعذر استخراج JSON من رد الذكاء الاصطناعي."
                                 );
 
-                            error.retryable =
-                                true;
+                            error.retryable = true;
 
                             throw error;
-
                         }
-
 
                         try {
 
@@ -27541,15 +27523,11 @@ ${
                                     "JSON غير صالح في رد الذكاء الاصطناعي."
                                 );
 
-                            error.retryable =
-                                true;
+                            error.retryable = true;
 
                             throw error;
-
                         }
-
                     }
-
 
                     if (
                         !parsed ||
@@ -27563,23 +27541,16 @@ ${
                                 "صيغة ترتيب غير صالحة في رد الذكاء الاصطناعي."
                             );
 
-                        error.retryable =
-                            true;
+                        error.retryable = true;
 
                         throw error;
-
                     }
-
 
                     return parsed;
 
                 },
                 "AI Library Ranking"
             );
-
-
-        const parsed =
-            batchRanking;
 
 
 
