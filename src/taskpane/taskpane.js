@@ -23422,18 +23422,45 @@ function extractOpenAIStyleAnswer(
                 "string"
         ) {
 
-            return choice.message.content;
+            const content =
+                choice.message.content.trim();
+
+
+            if (content) {
+
+                return content;
+
+            }
+
+
+            const error =
+                new Error(
+                    "وصل رد فارغ من " +
+                    providerName +
+                    "."
+                );
+
+            error.retryable =
+                true;
+
+            throw error;
 
         }
 
     }
 
 
-    throw new Error(
-        "لم يصل رد صالح من " +
-        providerName +
-        "."
-    );
+    const error =
+        new Error(
+            "لم يصل رد صالح من " +
+            providerName +
+            "."
+        );
+
+    error.retryable =
+        true;
+
+    throw error;
 
 }
 
