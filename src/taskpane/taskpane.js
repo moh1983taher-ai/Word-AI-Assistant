@@ -26870,159 +26870,267 @@ async function rankLibraryResultsWithAI(
 ) {
 
 
+
     if (
+
         !Array.isArray(results) ||
+
         !results.length
+
     ) {
+
         return [];
+
     }
 
 
+
     // ---------------------------------------------------------
+
     // إعدادات تقسيم النتائج
+
     // ---------------------------------------------------------
 
     const MAX_BATCH_CHARS = 9000;
+
     const MAX_BATCH_RESULTS = 20;
+
     const TOP_FROM_BATCH = 8;
 
 
+
     // ---------------------------------------------------------
+
     // تحويل النتيجة إلى تمثيل مختصر
+
     // ---------------------------------------------------------
 
     function buildCandidate(
+
         result,
+
         index
+
     ) {
+
         return {
+
             index,
+
             source:
+
                 result?.source ||
+
                 "",
+
             bookId:
+
                 result?.bookId ||
+
                 "",
+
             title:
+
                 result?.title ||
+
                 "",
+
             author:
+
                 result?.author ||
+
                 "",
+
             sectionTitle:
+
                 result?.sectionTitle ||
+
                 "",
+
             text:
+
                 String(
+
                     result?.text ||
+
                     ""
+
                 )
+
                 .substring(
+
                     0,
+
                     1200
+
                 )
+
         };
+
     }
 
 
+
     // ---------------------------------------------------------
+
     // تقسيم النتائج حسب حجم البيانات
+
     // ---------------------------------------------------------
 
     const batches = [];
+
     let currentBatch = [];
+
     let currentChars = 0;
 
 
+
     for (
+
         let index = 0;
+
         index < results.length;
+
         index++
+
     ) {
 
         const candidate =
+
             buildCandidate(
+
                 results[index],
+
                 index
+
             );
+
 
 
         const candidateSize =
+
             JSON.stringify(
+
                 candidate
+
             ).length;
 
 
+
         if (
+
             currentBatch.length &&
+
             (
+
                 currentChars +
+
                 candidateSize >
+
                     MAX_BATCH_CHARS ||
+
                 currentBatch.length >=
+
                     MAX_BATCH_RESULTS
+
             )
+
         ) {
 
             batches.push(
+
                 currentBatch
+
             );
 
 
+
             currentBatch = [];
+
             currentChars = 0;
+
         }
 
 
+
         currentBatch.push(
+
             candidate
+
         );
+
 
 
         currentChars +=
+
             candidateSize;
+
     }
+
 
 
     if (
+
         currentBatch.length
+
     ) {
 
         batches.push(
+
             currentBatch
+
         );
+
     }
 
 
+
     console.log(
+
         "========== AI RANKING BATCHES =========="
+
     );
 
 
+
     console.log(
+
         "TOTAL RESULTS:",
+
         results.length
+
     );
+
 
 
     console.log(
+
         "BATCH COUNT:",
+
         batches.length
+
     );
 
 
-    // ---------------------------------------------------------
-    // نص التعليمات المشترك
+
     // ---------------------------------------------------------
 
-    const rankingInstructions = `
+    // نص التعليمات المشترك
+
+    // ---------------------------------------------------------
+
+    const rankingInstructions =
+
+`
 
 السؤال الأصلي:
 
 ${query}
 
 
+
 تحليل السؤال الذي أعده محلل الاستعلام:
+
 
 
 نوع المطلوب (intent):
@@ -27030,9 +27138,11 @@ ${query}
 ${searchContext.intent || "غير محدد"}
 
 
+
 الموضوع الأساسي (subject):
 
 ${searchContext.subject || "غير محدد"}
+
 
 
 القيود أو الخصائص المطلوبة:
@@ -27045,19 +27155,25 @@ ${
 }
 
 
+
 أمامك مجموعة من نتائج البحث من مكتبتين رقميتين.
+
 
 
 مهمتك ترتيب النتائج الموجودة في هذه المجموعة بحسب صلتها العلمية الحقيقية بالسؤال، مع استبعاد النتائج التي لا تقدم قيمة علمية معتبرة بالنسبة إلى المطلوب تحديدًا.
 
 
+
 قواعد التقييم:
+
 
 
 1. افهم السؤال الأصلي مع intent وsubject وconstraints معًا، ولا تعتمد على الكلمات المفتاحية وحدها.
 
 
+
 2. حدّد أولًا ما الذي يطلبه السؤال تحديدًا، ثم قيّم كل نتيجة بحسب قدرتها على خدمة هذا المطلوب.
+
 
 
 3. نوع المطلوب (intent) عامل أساسي في التقييم.
@@ -27065,105 +27181,112 @@ ${
 إذا كان المطلوب تعريف مصطلح، فابحث أولًا عن:
 
 - تعريف المصطلح صراحة في الاصطلاح.
-
 - تحديد معناه أو حقيقته أو حده عند أهل العلم.
-
 - عبارة تشرح مفهوم المصطلح شرحًا مباشرًا يمكن أن يفيد في بناء تعريفه.
 
 أما مجرد ورود المصطلح في سياق آخر فلا يعد استجابة للمطلوب.
 
 
+
 4. افحص النص نفسه، فهو أهم من مجرد عنوان الكتاب أو اسم المؤلف أو موضع النتيجة.
+
 
 
 5. ميّز بدقة بين:
 
 - المصطلح المطلوب نفسه.
-
 - المصطلحات المركبة التي يدخل فيها المصطلح.
-
 - المصطلحات القريبة منه.
-
 - مجرد ورود اللفظ في نص آخر.
+
 
 
 6. إذا كان السؤال عن "تعريف الحرج في الاصطلاح" مثلًا:
 
 - التعريف الصريح للحرج في الاصطلاح = صلة مباشرة جدًا.
-
 - شرح معنى الحرج أو حقيقته في الاصطلاح = صلة قوية.
-
 - تعريف مصطلح مركب مثل "رفع الحرج" = صلة جزئية، وقد يبقى إذا كان يفيد في فهم المصطلح المطلوب.
-
 - الكلام عن رفع الحرج دون تعريف أو بيان مفهوم الحرج = صلة ضعيفة.
-
 - مجرد ذكر الحرج في آية أو حديث أو قاعدة أو مسألة فقهية = لا يكفي للإبقاء على النتيجة.
-
 - استعمال كلمة الحرج في سياق لا يشرح المصطلح المقصود = تستبعد النتيجة.
+
 
 
 7. لا تعتبر النتيجة مفيدة لمجرد أنها تحتوي على كلمة من كلمات السؤال.
 
 
+
 8. لا تعتبر مجرد التشابه الموضوعي العام كافيًا للإبقاء على النتيجة.
+
 
 
 9. النتيجة التي تجيب عن المطلوب مباشرة أعلى من النتيجة التي تتحدث عن موضوع قريب منه.
 
 
+
 10. إذا كانت النتيجة لا تحقق نوع المعلومات المطلوب ولا تضيف مادة مفيدة لفهم المطلوب، فاجعل keep=false حتى لو كان فيها تطابق لفظي مع السؤال.
+
 
 
 11. لا تستبعد النتيجة فقط لأنها لا تحتوي على عبارة التعريف بصيغتها الحرفية، إذا كانت تقدم شرحًا مباشرًا لمعنى المصطلح أو حقيقته أو حدوده.
 
 
+
 12. لا تعتمد على ترتيب المكتبة الأصلية أو أي درجة سابقة.
+
 
 
 13. لا تفضل مكتبة على أخرى.
 
 
+
 14. لا تخترع أي نتيجة أو معلومة.
+
 
 
 15. قيّم النتائج الموجودة فقط.
 
 
+
 16. استخدم relevance من 0 إلى 100:
 
 
-90–100:
 
+90–100:
 تجيب عن المطلوب مباشرة، أو تقدم تعريفًا صريحًا ودقيقًا للمصطلح.
 
 
-70–89:
 
+70–89:
 مرتبطة ارتباطًا قويًا بالمطلوب، وتقدم شرحًا مباشرًا أو مادة مهمة لفهم المصطلح، لكنها ليست تعريفًا مباشرًا كاملًا.
 
 
-40–69:
 
+40–69:
 لها صلة مفيدة لكنها جزئية أو غير مباشرة، مثل تعريف مصطلح مركب مرتبط بالمصطلح المطلوب أو شرح جانب مهم منه.
 
 
-10–39:
 
+10–39:
 صلة ضعيفة، مثل مجرد ورود المصطلح في سياق قريب دون إفادة حقيقية للمطلوب.
 
 
-0–9:
 
+0–9:
 لا تقدم قيمة علمية حقيقية للإجابة عن السؤال.
+
 
 
 17. keep يحدد هل تدخل النتيجة في النتائج النهائية أم تستبعد.
 
 
+
 18. اجعل keep=true إذا كانت النتيجة تقدم قيمة علمية حقيقية بالنسبة إلى المطلوب المحدد في السؤال، وليس لمجرد ارتباطها العام بالموضوع.
 
 
+
 19. اجعل keep=false إذا كان ارتباط النتيجة بالموضوع عرضيًا، أو كانت مجرد ذكر للمصطلح، أو كانت تتحدث عن المصطلح في سياق آخر دون أن تقدم مادة مفيدة للمطلوب.
+
 
 
 20. عند الشك بين الإبقاء والاستبعاد، اسأل نفسك:
@@ -27173,310 +27296,421 @@ ${
 إذا كان مجرد ذكر أو كلام عام، فاجعل keep=false.
 
 
+
 21. لا تجعل عدد النتائج كبيرًا لمجرد زيادة التغطية. الجودة والارتباط بالمطلوب أهم من كثرة النتائج.
+
 
 
 لكل نتيجة:
 
 - keep=true إذا كانت تقدم قيمة علمية حقيقية للمطلوب المحدد.
-
 - keep=false إذا كانت لا تقدم قيمة علمية معتبرة للمطلوب.
-
 - relevance يعبّر عن قوة الصلة العلمية بالسؤال.
+
 
 
 أعد JSON فقط:
 
 
+
 {
+
   "ranking": [
+
     {
+
       "index": 0,
+
       "relevance": 100,
+
       "keep": true
+
     }
+
   ]
+
 }
+
 
 
 يجب ذكر جميع النتائج الموجودة في هذه المجموعة.
 
 
+
 يجب ألا يتكرر أي index.
 
 
+
 يجب أن يكون الترتيب تنازليًا بحسب relevance.
+
 
 
 لا تكتب أي تفسير خارج JSON.
 
 `;
 
-
     // ---------------------------------------------------------
+
     // ترتيب كل دفعة
+
     // ---------------------------------------------------------
 
     const batchRankings = [];
 
 
+
     for (
+
         let batchIndex = 0;
+
         batchIndex < batches.length;
+
         batchIndex++
+
     ) {
 
         const candidates =
+
             batches[batchIndex];
 
 
+
         const prompt =
+
             rankingInstructions +
+
             "\n\nالنتائج:\n" +
+
             JSON.stringify(
+
                 candidates
+
             );
 
 
+
         console.log(
+
             "========== AI RANKING BATCH =========="
+
         );
 
 
+
         console.log(
+
             "BATCH:",
+
             batchIndex + 1,
+
             "/",
+
             batches.length
+
         );
 
 
+
         console.log(
+
             "CANDIDATES COUNT:",
+
             candidates.length
+
         );
 
 
+
         console.log(
+
             "PROMPT LENGTH:",
+
             prompt.length
+
         );
+
 
 
         console.log(
+
             "PROMPT UTF8 BYTES:",
+
             new TextEncoder()
+
                 .encode(prompt)
+
                 .length
+
         );
 
 
-        // -----------------------------------------------------
-        // طلب الدفعة مع إعادة المحاولة عند الرد الفارغ
-        // أو الرد غير الصالح
-        // -----------------------------------------------------
 
-        const parsed =
-            await withAIRetry(
-                async function () {
+        const raw =
 
-                    const raw =
-                        await askAIForLibraryRanking(
-                            prompt
-                        );
+            await askAIForLibraryRanking(
 
+                prompt
 
-                    console.log(
-                        "========== RAW AI BATCH RESPONSE =========="
-                    );
-
-
-                    console.log(
-                        raw
-                    );
-
-
-                    if (
-                        typeof raw !== "string" ||
-                        !raw.trim()
-                    ) {
-
-                        const error =
-                            new Error(
-                                "عاد رد فارغ من الذكاء الاصطناعي."
-                            );
-
-
-                        error.retryable = true;
-
-
-                        throw error;
-                    }
-
-
-                    let parsed;
-
-
-                    try {
-
-                        parsed =
-                            JSON.parse(
-                                raw
-                            );
-
-                    }
-                    catch {
-
-                        const match =
-                            String(
-                                raw
-                            )
-                            .match(
-                                /\{[\s\S]*\}/
-                            );
-
-
-                        if (!match) {
-
-                            const error =
-                                new Error(
-                                    "تعذر استخراج JSON من رد الذكاء الاصطناعي."
-                                );
-
-
-                            error.retryable = true;
-
-
-                            throw error;
-                        }
-
-
-                        try {
-
-                            parsed =
-                                JSON.parse(
-                                    match[0]
-                                );
-
-                        }
-                        catch {
-
-                            const error =
-                                new Error(
-                                    "JSON غير صالح في رد الذكاء الاصطناعي."
-                                );
-
-
-                            error.retryable = true;
-
-
-                            throw error;
-                        }
-                    }
-
-
-                    if (
-                        !parsed ||
-                        !Array.isArray(
-                            parsed.ranking
-                        )
-                    ) {
-
-                        const error =
-                            new Error(
-                                "صيغة ترتيب غير صالحة في رد الذكاء الاصطناعي."
-                            );
-
-
-                        error.retryable = true;
-
-
-                        throw error;
-                    }
-
-
-                    return parsed;
-
-                },
-                "AI Library Ranking"
             );
+
+
+
+        console.log(
+
+            "========== RAW AI BATCH RESPONSE =========="
+
+        );
+
+
+
+        console.log(
+
+            raw
+
+        );
+
+
+
+        let parsed;
+
+
+
+        try {
+
+            parsed =
+
+                typeof raw ===
+
+                    "string"
+
+                    ? JSON.parse(
+
+                        raw
+
+                    )
+
+                    : raw;
+
+        }
+
+        catch {
+
+            const match =
+
+                String(
+
+                    raw || ""
+
+                )
+
+                .match(
+
+                    /\{[\s\S]*\}/
+
+                );
+
+
+
+            if (!match) {
+
+                console.warn(
+
+                    "تعذر استخراج JSON من دفعة",
+
+                    batchIndex + 1
+
+                );
+
+
+
+                continue;
+
+            }
+
+
+
+            try {
+
+                parsed =
+
+                    JSON.parse(
+
+                        match[0]
+
+                    );
+
+            }
+
+            catch {
+
+                console.warn(
+
+                    "JSON غير صالح في دفعة",
+
+                    batchIndex + 1
+
+                );
+
+
+
+                continue;
+
+            }
+
+        }
+
+
+
+        if (
+
+            !parsed ||
+
+            !Array.isArray(
+
+                parsed.ranking
+
+            )
+
+        ) {
+
+            console.warn(
+
+                "صيغة ترتيب غير صالحة في الدفعة",
+
+                batchIndex + 1
+
+            );
+
+
+
+            continue;
+
+        }
+
 
 
         const localSeen =
+
             new Set();
 
 
+
         for (
+
             const item
+
             of parsed.ranking
+
         ) {
 
             const globalIndex =
+
                 Number(
+
                     item?.index
+
                 );
+
 
 
             const relevance =
+
                 Number(
+
                     item?.relevance
+
                 );
 
 
+
             if (
+
                 !Number.isInteger(
+
                     globalIndex
+
                 )
+
             ) {
+
                 continue;
+
             }
+
 
 
             const candidate =
+
                 candidates.find(
+
                     function (
+
                         candidate
+
                     ) {
 
                         return (
+
                             candidate.index ===
+
                             globalIndex
+
                         );
 
                     }
+
                 );
 
 
+
             if (!candidate) {
+
                 continue;
+
             }
+
 
 
             if (
+
                 localSeen.has(
+
                     globalIndex
+
                 )
+
             ) {
+
                 continue;
+
             }
 
 
+
             localSeen.add(
+
                 globalIndex
+
             );
+
 
 
             batchRankings.push({
 
                 index:
+
                     globalIndex,
 
                 relevance:
+
                     Number(
+
                         item.relevance
+
                     ) || 0,
 
                 keep:
+
                     item.keep === true
 
             });
@@ -27484,233 +27718,6 @@ ${
         }
 
     }
-
-
-    console.log(
-        "TOTAL BATCH RANKINGS:",
-        batchRankings.length
-    );
-
-
-    // ---------------------------------------------------------
-    // التأكد من وجود تقييمات
-    // ---------------------------------------------------------
-
-    if (!batchRankings.length) {
-
-        throw new Error(
-            "لم يُرجع الذكاء الاصطناعي أي ترتيب صالح لدفعات نتائج المكتبة."
-        );
-
-    }
-
-
-    // ---------------------------------------------------------
-    // استبعاد النتائج التي قرر الذكاء الاصطناعي عدم إبقائها
-    // ---------------------------------------------------------
-
-    const keptRankings =
-        batchRankings.filter(
-            function (
-                item
-            ) {
-
-                return (
-                    item.keep === true
-                );
-
-            }
-        );
-
-
-    console.log(
-        "KEPT RANKINGS:",
-        keptRankings.length
-    );
-
-
-    console.log(
-        "EXCLUDED RANKINGS:",
-        batchRankings.length -
-        keptRankings.length
-    );
-
-
-    // ---------------------------------------------------------
-    // ترتيب التقييمات محليًا
-    // ---------------------------------------------------------
-
-    keptRankings.sort(
-        function (
-            a,
-            b
-        ) {
-
-            if (
-                b.relevance !==
-                a.relevance
-            ) {
-
-                return (
-                    b.relevance -
-                    a.relevance
-                );
-
-            }
-
-
-            return (
-                a.index -
-                b.index
-            );
-
-        }
-    );
-
-
-    // ---------------------------------------------------------
-    // تحويل التقييمات المقبولة إلى النتائج الأصلية
-    // ---------------------------------------------------------
-
-    const ranked = [];
-    const seen = new Set();
-    const seenTexts = new Set();
-
-
-    for (
-        const item
-        of keptRankings
-    ) {
-
-        const index =
-            item.index;
-
-
-        if (
-            !Number.isInteger(
-                index
-            ) ||
-            index < 0 ||
-            index >= results.length
-        ) {
-            continue;
-        }
-
-
-        if (
-            seen.has(
-                index
-            )
-        ) {
-            continue;
-        }
-
-
-        const result =
-            results[index];
-
-
-        const normalizedText =
-            String(
-                result?.text ||
-                ""
-            )
-            .replace(
-                /\s+/g,
-                " "
-            )
-            .trim()
-            .toLowerCase();
-
-
-        // -----------------------------------------------------
-        // إذا كان النص نفسه موجودًا من قبل،
-        // نحتفظ بالنتيجة الأعلى ترتيبًا فقط.
-        // -----------------------------------------------------
-
-        if (
-            normalizedText &&
-            seenTexts.has(
-                normalizedText
-            )
-        ) {
-            continue;
-        }
-
-
-        seen.add(
-            index
-        );
-
-
-        if (
-            normalizedText
-        ) {
-
-            seenTexts.add(
-                normalizedText
-            );
-
-        }
-
-
-        ranked.push({
-
-            result:
-                result,
-
-            relevance:
-                item.relevance,
-
-            index:
-                index
-
-        });
-
-    }
-
-
-    // ---------------------------------------------------------
-    // الترتيب النهائي
-    // ---------------------------------------------------------
-
-    ranked.sort(
-        function (
-            a,
-            b
-        ) {
-
-            if (
-                b.relevance !==
-                a.relevance
-            ) {
-
-                return (
-                    b.relevance -
-                    a.relevance
-                );
-
-            }
-
-
-            return (
-                a.index -
-                b.index
-            );
-
-        }
-    );
-
-
-    console.log(
-        "FINAL RANKED RESULTS:",
-        ranked.length
-    );
-
-
-    return ranked;
-
-}
 
 
 
