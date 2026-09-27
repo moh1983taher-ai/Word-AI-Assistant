@@ -26694,10 +26694,21 @@ async function askAIForLibraryRanking(
                     }
 
 
-                    return extractOpenAIStyleAnswer(
-                        result,
-                        "Pollinations"
-                    );
+                    try {
+
+                        return extractOpenAIStyleAnswer(
+                            result,
+                            "Pollinations"
+                        );
+
+                    }
+                    catch (error) {
+
+                        error.retryable = true;
+
+                        throw error;
+
+                    }
 
                 }
                 catch (
