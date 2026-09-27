@@ -36319,13 +36319,9 @@ function getLibraryAIProviderConfig() {
         getLibraryAISavedSettings();
 
 
+    // بحث المكتبة يستخدم DuckAI المحلي دائمًا
     const provider =
-        String(
-            settings.provider ||
-            "openrouter"
-        )
-        .trim()
-        .toLowerCase();
+        "duckai";
 
 
     const key =
@@ -36342,18 +36338,6 @@ function getLibraryAIProviderConfig() {
             ""
         )
         .trim();
-
-
-    if (
-        provider !== "duckai" &&
-        !key
-    ) {
-
-        throw new Error(
-            "لم يتم تحديد مفتاح الذكاء الاصطناعي."
-        );
-
-    }
 
 
     if (
