@@ -36827,7 +36827,7 @@ function getLibraryAITaskPolicy(
     ) {
 
         result.reasoningMode =
-            "none";
+            "low";
 
     }
 
