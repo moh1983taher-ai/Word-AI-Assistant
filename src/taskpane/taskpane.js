@@ -22315,14 +22315,23 @@ catch (error) {
 // Save Chats
 // =====================================================
 
-function saveChats() {
+async function saveChats() {
 
-    localStorage.setItem(
-        "WORD_AI_CHATS",
-        JSON.stringify(
+    try {
+
+        await saveChatsToIndexedDB(
             chats
-        )
-    );
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "فشل حفظ المحادثات في IndexedDB:",
+            error
+        );
+
+    }
 
 }
 
