@@ -37806,8 +37806,7 @@ async function expandLibrarySearchQuery(
         userPrompt,
         {
             task: "queryExpansion",
-            temperature: 0.1,
-            maxTokens: 700
+            temperature: 0.1
         }
     );
 
