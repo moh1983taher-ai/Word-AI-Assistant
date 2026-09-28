@@ -27543,6 +27543,16 @@ ${
 
         );
 
+        const cleanedRaw =
+            typeof raw === "string"
+                ? raw
+                    .replace(
+                        /[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g,
+                        ""
+                    )
+                    .trim()
+                : raw;
+
 
 
         let parsed;
@@ -27552,29 +27562,19 @@ ${
         try {
 
             parsed =
-
-                typeof raw ===
-
+                typeof cleanedRaw ===
                     "string"
-
                     ? JSON.parse(
-
-                        raw
-
+                        cleanedRaw
                     )
-
-                    : raw;
+                    : cleanedRaw;
 
         }
-
         catch {
 
             const match =
-
                 String(
-
-                    raw || ""
-
+                    cleanedRaw || ""
                 )
 
                 .match(
