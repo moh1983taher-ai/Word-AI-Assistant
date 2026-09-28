@@ -36701,7 +36701,7 @@ function getLibraryAITaskPolicy(
         queryExpansion: {
 
             reasoningMode:
-                "none",
+                "low",
 
             temperature:
                 0.1,
