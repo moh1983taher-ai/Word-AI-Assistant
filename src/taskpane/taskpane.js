@@ -63,12 +63,322 @@ let referencesSourceDocument = null;
 let currentCitationSources = [];
 
 let researchScope = null;
+// =====================================================
+// Chats IndexedDB Storage
+// التخزين الموسع للمحادثات
+// =====================================================
+
+const CHATS_DB_NAME =
+    "ResearchToolsDB";
+
+const CHATS_DB_VERSION =
+    1;
+
+const CHATS_STORE_NAME =
+    "appData";
+
+const CHATS_STORAGE_KEY =
+    "WORD_AI_CHATS";
+
+
+function openChatsDB() {
+
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
+
+            const request =
+                indexedDB.open(
+                    CHATS_DB_NAME,
+                    CHATS_DB_VERSION
+                );
+
+
+            request.onupgradeneeded =
+                function () {
+
+                    const db =
+                        request.result;
+
+
+                    if (
+                        !db.objectStoreNames.contains(
+                            CHATS_STORE_NAME
+                        )
+                    ) {
+
+                        db.createObjectStore(
+                            CHATS_STORE_NAME,
+                            {
+                                keyPath:
+                                    "key"
+                            }
+                        );
+
+                    }
+
+                };
+
+
+            request.onsuccess =
+                function () {
+
+                    resolve(
+                        request.result
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+        }
+    );
+
+}
+
+
+async function loadChatsFromIndexedDB() {
+
+    const db =
+        await openChatsDB();
+
+
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
+
+            const transaction =
+                db.transaction(
+                    CHATS_STORE_NAME,
+                    "readonly"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    CHATS_STORE_NAME
+                );
+
+
+            const request =
+                store.get(
+                    CHATS_STORAGE_KEY
+                );
+
+
+            request.onsuccess =
+                function () {
+
+                    const record =
+                        request.result;
+
+
+                    resolve(
+                        record &&
+                        Array.isArray(
+                            record.value
+                        )
+                            ? record.value
+                            : null
+                    );
+
+                };
+
+
+            request.onerror =
+                function () {
+
+                    reject(
+                        request.error
+                    );
+
+                };
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                };
+
+        }
+    );
+
+}
+
+
+async function saveChatsToIndexedDB(
+    chatsData
+) {
+
+    const db =
+        await openChatsDB();
+
+
+    return new Promise(
+        function (
+            resolve,
+            reject
+        ) {
+
+            const transaction =
+                db.transaction(
+                    CHATS_STORE_NAME,
+                    "readwrite"
+                );
+
+
+            const store =
+                transaction.objectStore(
+                    CHATS_STORE_NAME
+                );
+
+
+            store.put({
+
+                key:
+                    CHATS_STORAGE_KEY,
+
+                value:
+                    Array.isArray(
+                        chatsData
+                    )
+                        ? chatsData
+                        : []
+
+            });
+
+
+            transaction.oncomplete =
+                function () {
+
+                    db.close();
+
+                    resolve();
+
+                };
+
+
+            transaction.onerror =
+                function () {
+
+                    db.close();
+
+                    reject(
+                        transaction.error
+                    );
+
+                };
+
+        }
+    );
+
+}
+
+
+async function migrateChatsToIndexedDB() {
+
+    const existingChats =
+        await loadChatsFromIndexedDB();
+
+
+    // ==========================================
+    // إذا كانت IndexedDB تحتوي على المحادثات
+    // فلا نعيد الترحيل من localStorage.
+    // ==========================================
+
+    if (
+        Array.isArray(
+            existingChats
+        )
+    ) {
+
+        return existingChats;
+
+    }
+
+
+    let oldChats =
+        [];
+
+
+    try {
+
+        const raw =
+            localStorage.getItem(
+                CHATS_STORAGE_KEY
+            );
+
+
+        if (raw) {
+
+            const parsed =
+                JSON.parse(
+                    raw
+                );
+
+
+            if (
+                Array.isArray(
+                    parsed
+                )
+            ) {
+
+                oldChats =
+                    parsed;
+
+            }
+
+        }
+
+    }
+    catch (error) {
+
+        console.warn(
+            "تعذر قراءة المحادثات القديمة:",
+            error
+        );
+
+    }
+
+
+    // ==========================================
+    // حفظ النسخة القديمة في IndexedDB
+    // ==========================================
+
+    await saveChatsToIndexedDB(
+        oldChats
+    );
+
+
+    console.log(
+        "تم ترحيل المحادثات إلى IndexedDB:",
+        oldChats.length
+    );
+
+
+    return oldChats;
+
+}
 
 // ======================================
 // Office Initialization
 // ======================================
 
-Office.onReady(function () {
+Office.onReady(async function () {
 
 
 // ======================================
@@ -21960,21 +22270,43 @@ let currentChat = null;
 try {
 
     chats =
-        JSON.parse(
-            localStorage.getItem(
-                "WORD_AI_CHATS"
-            )
-        ) || [];
+        await migrateChatsToIndexedDB();
 
 }
 catch (error) {
 
-    console.warn(
-        "تعذر تحميل المحادثات:",
+    console.error(
+        "تعذر تحميل المحادثات من IndexedDB:",
         error
     );
 
-    chats = [];
+
+    // ==========================================
+    // احتياط مؤقت:
+    // إذا فشل IndexedDB لأي سبب،
+    // نستخدم النسخة القديمة.
+    // ==========================================
+
+    try {
+
+        chats =
+            JSON.parse(
+                localStorage.getItem(
+                    "WORD_AI_CHATS"
+                )
+            ) || [];
+
+    }
+    catch (fallbackError) {
+
+        console.error(
+            "تعذر تحميل النسخة الاحتياطية للمحادثات:",
+            fallbackError
+        );
+
+        chats = [];
+
+    }
 
 }
 
