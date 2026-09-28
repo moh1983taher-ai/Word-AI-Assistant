@@ -36743,6 +36743,21 @@ function getLibraryAITaskPolicy(
     model
 ) {
 
+    const providerName =
+        String(
+            provider ||
+            ""
+        )
+        .toLowerCase();
+
+    const modelName =
+        String(
+            model ||
+            ""
+        )
+        .toLowerCase();
+
+
     const policy = {
 
         queryExpansion: {
@@ -36780,23 +36795,7 @@ function getLibraryAITaskPolicy(
             : policy.queryExpansion;
 
 
-    const providerName =
-        String(
-            provider ||
-            ""
-        )
-        .toLowerCase();
-
-
-    const modelName =
-        String(
-            model ||
-            ""
-        )
-        .toLowerCase();
-
-
-    return {
+    const result = {
 
         ...selected,
 
@@ -36807,6 +36806,48 @@ function getLibraryAITaskPolicy(
             modelName
 
     };
+
+
+    /*
+     * Query Expansion مهمة بسيطة:
+     * لا نحتاج reasoning مع المزودين
+     * الذين يدعمون إيقافه.
+     *
+     * الهدف:
+     * لا نستهلك حد التوكنات في التفكير
+     * ثم نفشل في إخراج JSON.
+     */
+
+    if (
+        task !== "ranking" &&
+        (
+            providerName === "openrouter" ||
+            providerName === "groq"
+        )
+    ) {
+
+        result.reasoningMode =
+            "none";
+
+    }
+
+
+    /*
+     * Pollinations يحتاج reasoningMode
+     * بصيغة مقبولة لديه، لذلك يبقى low.
+     */
+
+    if (
+        providerName === "pollinations"
+    ) {
+
+        result.reasoningMode =
+            "low";
+
+    }
+
+
+    return result;
 
 }
 // =====================================================
@@ -37295,16 +37336,25 @@ async function callLibraryAI(
 
 
             // =========================================================
-            // تحكم التفكير للنماذج التي تدعمه
+            // تحكم التفكير حسب سياسة المزود والنموذج
             // =========================================================
 
             if (
-                config.provider === "pollinations" &&
+                policy &&
                 policy.reasoningMode
             ) {
 
-                body.reasoning_effort =
-                    policy.reasoningMode;
+                if (
+                    config.provider === "pollinations" ||
+                    config.provider === "openrouter" ||
+                    config.provider === "groq" ||
+                    config.provider === "gemini"
+                ) {
+
+                    body.reasoning_effort =
+                        policy.reasoningMode;
+
+                }
 
             }
 
