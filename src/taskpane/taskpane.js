@@ -36686,7 +36686,82 @@ function extractLibraryAIText(
 
 }
 
+// =========================================================
+// Library AI Task Policy
+// سياسة مهام الذكاء الاصطناعي في المكتبة
+// =========================================================
+function getLibraryAITaskPolicy(
+    task,
+    provider,
+    model
+) {
 
+    const policy = {
+
+        queryExpansion: {
+
+            reasoningMode:
+                "none",
+
+            temperature:
+                0.1,
+
+            maxTokens:
+                700
+
+        },
+
+        ranking: {
+
+            reasoningMode:
+                "minimal",
+
+            temperature:
+                0,
+
+            maxTokens:
+                1200
+
+        }
+
+    };
+
+
+    const selected =
+        task === "ranking"
+            ? policy.ranking
+            : policy.queryExpansion;
+
+
+    const providerName =
+        String(
+            provider ||
+            ""
+        )
+        .toLowerCase();
+
+
+    const modelName =
+        String(
+            model ||
+            ""
+        )
+        .toLowerCase();
+
+
+    return {
+
+        ...selected,
+
+        provider:
+            providerName,
+
+        model:
+            modelName
+
+    };
+
+}
 // =====================================================
 // استدعاء الذكاء الاصطناعي
 // =====================================================
@@ -36700,15 +36775,34 @@ async function callLibraryAI(
     const config =
         getLibraryAIProviderConfig();
 
+    // =========================================================
+    // سياسة مهمة المكتبة
+    // =========================================================
+
+    const task =
+        options.task === "ranking"
+            ? "ranking"
+            : "queryExpansion";
+
+
+    const policy =
+        getLibraryAITaskPolicy(
+            task,
+            config.provider,
+            config.model
+        );
+
+
     const temperature =
         typeof options.temperature === "number"
             ? options.temperature
-            : 0.1;
+            : policy.temperature;
+
 
     const maxTokens =
         typeof options.maxTokens === "number"
             ? options.maxTokens
-            : 900;
+            : policy.maxTokens;
 
 
     return await withAIRetry(
@@ -37153,6 +37247,21 @@ async function callLibraryAI(
             };
 
 
+            // =========================================================
+            // تحكم التفكير للنماذج التي تدعمه
+            // =========================================================
+
+            if (
+                config.provider === "pollinations" &&
+                policy.reasoningMode
+            ) {
+
+                body.reasoning_effort =
+                    policy.reasoningMode;
+
+            }
+
+
 
             let response;
 
@@ -37559,18 +37668,15 @@ async function expandLibrarySearchQuery(
         original;
 
 
-    const answer =
-        await callLibraryAI(
-            systemPrompt,
-            userPrompt,
-            {
-                temperature:
-                    0.1,
-
-                maxTokens:
-                    500
-            }
-        );
+    const answer = await callLibraryAI(
+        systemPrompt,
+        userPrompt,
+        {
+            task: "queryExpansion",
+            temperature: 0.1,
+            maxTokens: 700
+        }
+    );
 
 
     const parsed =
