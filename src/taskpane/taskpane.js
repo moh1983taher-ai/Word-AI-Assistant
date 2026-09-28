@@ -26139,6 +26139,18 @@ async function askAIForLibraryRanking(
         getActiveAISettings();
 
 
+    // =========================================================
+    // سياسة مهمة ترتيب نتائج المكتبة
+    // =========================================================
+
+    const policy =
+        getLibraryAITaskPolicy(
+            "ranking",
+            data.provider,
+            data.model
+        );
+
+
     if (
         data.provider !==
         "duckai" &&
@@ -26656,6 +26668,41 @@ async function askAIForLibraryRanking(
 
                 try {
 
+                    // ============================================
+                    // بناء طلب ترتيب نتائج المكتبة
+                    // ============================================
+
+                    const body = {
+
+                        model:
+                            data.model,
+
+                        messages,
+
+                        temperature:
+                            0,
+
+                        max_tokens:
+                            4000
+
+                    };
+
+
+                    // ============================================
+                    // سياسة التفكير لمهمة ترتيب المكتبة
+                    // ============================================
+
+                    if (
+                        policy &&
+                        policy.reasoningMode
+                    ) {
+
+                        body.reasoning_effort =
+                            policy.reasoningMode;
+
+                    }
+
+
                     const response =
                         await fetch(
                             POLLINATIONS_URL,
@@ -26676,20 +26723,9 @@ async function askAIForLibraryRanking(
                                 },
 
                                 body:
-                                    JSON.stringify({
-
-                                        model:
-                                            data.model,
-
-                                        messages,
-
-                                        temperature:
-                                            0,
-
-                                        max_tokens:
-                                            4000
-
-                                    })
+                                    JSON.stringify(
+                                        body
+                                    )
 
                             }
                         );
@@ -26700,6 +26736,10 @@ async function askAIForLibraryRanking(
                             response
                         );
 
+
+                    // ============================================
+                    // فحص استجابة Pollinations
+                    // ============================================
 
                     if (
                         !response.ok
@@ -26721,6 +26761,10 @@ async function askAIForLibraryRanking(
                     }
 
 
+                    // ============================================
+                    // استخراج النص
+                    // ============================================
+
                     try {
 
                         return extractOpenAIStyleAnswer(
@@ -26729,9 +26773,12 @@ async function askAIForLibraryRanking(
                         );
 
                     }
-                    catch (error) {
+                    catch (
+                        error
+                    ) {
 
-                        error.retryable = true;
+                        error.retryable =
+                            true;
 
                         throw error;
 
@@ -36714,7 +36761,7 @@ function getLibraryAITaskPolicy(
         ranking: {
 
             reasoningMode:
-                "minimal",
+                "low",
 
             temperature:
                 0,
