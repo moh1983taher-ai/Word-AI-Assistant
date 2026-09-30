@@ -40584,11 +40584,33 @@ async function searchLibrary(
         );
 
 
+        const errorMessage =
+            String(
+                error?.message ||
+                ""
+            );
+
+
+        if (
+            errorMessage.includes(
+                "no x-vqd-hash-1 token"
+            )
+        ) {
+
+            throw new Error(
+                "تعذر الاتصال بخدمة الذكاء الاصطناعي مؤقتًا.\n\n" +
+                "يبدو أن الاتصال بالخدمة انقطع أو لم تكتمل تهيئة الجلسة.\n" +
+                "يرجى إعادة تحميل الصفحة ثم إعادة إرسال رسالتك."
+            );
+
+        }
+
+
         console.warn(
             "تعذر ترشيح نتائج المكتبات بالذكاء الاصطناعي؛ لن يتم عرض النتائج غير المفلترة."
         );
 
-        
+
         rankedResults = [];
 
     }
