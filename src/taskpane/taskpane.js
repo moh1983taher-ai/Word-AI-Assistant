@@ -37941,7 +37941,7 @@ async function expandLibrarySearchQuery(
         "subject = موضوع البحث كما ورد.",
         "constraints = نوع الطلب المذكور صراحة.",
         "لا تضف إلى subject أو constraints معلومات أو موضوعات غير واردة في الطلب.",
-
+        "intent = نوع المادة المطلوبة؛ يُستنتج تلقائيًا، وإذا استُخدمت / يُعتمد ما قبلها intent وما بعدها subject.",
         "SHAMELA:",
         "+ = إلزام.",
         "- = استبعاد.",
