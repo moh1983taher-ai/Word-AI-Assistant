@@ -38329,7 +38329,8 @@ async function expandLibrarySearchQuery(
             },
 
             shamelaQueries: [""],
-            ketabQueries: [""]
+            ketabQueries: [""],
+            aljam3Queries: [""]
         };
 
     }
@@ -38411,14 +38412,34 @@ async function expandLibrarySearchQuery(
 
         "لا تجعل الاستعلام سؤالًا.",
 
+        // ====================================================
+        // ALJAM3
+        // ====================================================
 
+        "ALJAM3:",
+
+        "كل استعلام في ALJAM3 صيغة بحثية مستقلة، ولا تستخدم معاملات البحث الخاصة بالشاملة.",
+
+        "الاستعلام الأول: استخدم subject كما هو مباشرة.",
+
+        "الاستعلام الثاني: وسّع المصطلح إلى ألفاظه وصِيَغه القريبة التي يمكن أن تظهر في النصوص العربية.",
+
+        "الاستعلام الثالث: استخدم تركيبًا أو عبارة علمية شائعة مرتبطة مباشرة بالموضوع، مع مراعاة intent وconstraints.",
+
+        "لا تجعل الاستعلام سؤالًا.",
+
+        "لا تستخدم regex أو | أو الأقواس أو معاملات + و -.",
+
+        "اجعل الاستعلامات قصيرة وواضحة ومناسبة للبحث النصي المباشر في الكتب العربية.",
+
+        "لا تكرر الاستعلام نفسه بصيغ شكلية فقط.",
         // ====================================================
         // JSON
         // ====================================================
 
         "أعد JSON فقط:",
 
-        "{\"intent\":\"...\",\"subject\":\"...\",\"constraints\":[],\"primaryCategory\":\"...\",\"secondaryCategory\":\"...\",\"possibleCategory\":\"...\",\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"]}"
+        "{\"intent\":\"...\",\"subject\":\"...\",\"constraints\":[],\"primaryCategory\":\"...\",\"secondaryCategory\":\"...\",\"possibleCategory\":\"...\",\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"],\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
 
     ].join("\n");
 
@@ -38465,6 +38486,10 @@ async function expandLibrarySearchQuery(
             ],
 
             ketabQueries: [
+                original
+            ],
+
+            aljam3Queries: [
                 original
             ]
 
@@ -38660,6 +38685,10 @@ async function expandLibrarySearchQuery(
         normalizeQueries(
             parsed.ketabQueries
         );
+    const aljam3Queries =
+        normalizeQueries(
+            parsed.aljam3Queries
+        );
 
 
     return {
@@ -38682,6 +38711,13 @@ async function expandLibrarySearchQuery(
         ketabQueries:
             ketabQueries.length
                 ? ketabQueries
+                : [
+                    original
+                ],
+
+        aljam3Queries:
+            aljam3Queries.length
+                ? aljam3Queries
                 : [
                     original
                 ]
@@ -40384,15 +40420,27 @@ async function searchLibrary(
             );
 
         }
+        // =========================================================
+        // [ALJAM3-SEARCH] بحث الجامع بنفس معمارية الشاملة
+        // وجامع الكتب: تخطيط → استعلامات → تجميع → AI Ranking
+        // → إعادة بناء الاستجابة.
+        // =========================================================
 
-        // =========================================================
-        // [ALJAM3-SEARCH] بحث الجامع مستقلًا
-        // =========================================================
         if (
-            selectedSource === "aljam3"
+            selectedSource ===
+            "aljam3"
         ) {
 
             let searchPlan = {
+                intent: "",
+                subject: "",
+                constraints: [],
+                shamelaQueries: [
+                    text
+                ],
+                ketabQueries: [
+                    text
+                ],
                 categories: {
                     primary: null,
                     secondary: null,
@@ -40400,36 +40448,183 @@ async function searchLibrary(
                 }
             };
 
+
             try {
+
                 searchPlan =
                     await expandLibrarySearchQuery(
                         text
                     );
+
+
+                console.log(
+                    "========== ALJAM3 SEARCH PLAN =========="
+                );
+
+                console.log(
+                    JSON.stringify(
+                        searchPlan,
+                        null,
+                        2
+                    )
+                );
+
+                console.log(
+                    "========================================="
+                );
+
             }
-            catch (error) {
+            catch (
+                error
+            ) {
+
                 console.error(
                     "ALJAM3 QUERY EXPANSION ERROR:",
                     error
                 );
+
+                searchPlan = {
+
+                    intent:
+                        "",
+
+                    subject:
+                        "",
+
+                    constraints:
+                        [],
+
+                    shamelaQueries: [
+                        text
+                    ],
+
+                    ketabQueries: [
+                        text
+                    ],
+
+                    categories: {
+
+                        primary:
+                            null,
+
+                        secondary:
+                            null,
+
+                        possible:
+                            null
+
+                    }
+
+                };
+
             }
 
+
+            // =========================================================
+            // استعلامات الجامع
+            //
+            // إلى أن نضيف aljam3Queries صراحةً إلى محلل الاستعلام،
+            // نستخدم مجموعة الاستعلامات الأوسع التي ينتجها المحلل.
+            // =========================================================
+
+            const aljam3Queries =
+                (
+                    Array.isArray(
+                        searchPlan.aljam3Queries
+                    )
+                        ? searchPlan.aljam3Queries
+                        : Array.isArray(
+                            searchPlan.ketabQueries
+                        )
+                            ? searchPlan.ketabQueries
+                            : []
+                )
+                .map(
+                    function (
+                        item
+                    ) {
+
+                        return String(
+                            item ||
+                            ""
+                        ).trim();
+
+                    }
+                )
+                .filter(Boolean);
+
+
+            if (
+                !aljam3Queries.length
+            ) {
+
+                aljam3Queries.push(
+                    text
+                );
+
+            }
+
+
+            // =========================================================
+            // سياق البحث للذكاء الاصطناعي
+            // =========================================================
+
+            const searchContext = {
+
+                originalQuery:
+                    text,
+
+                intent:
+                    String(
+                        searchPlan.intent ||
+                        ""
+                    ).trim(),
+
+                subject:
+                    String(
+                        searchPlan.subject ||
+                        ""
+                    ).trim(),
+
+                constraints:
+                    Array.isArray(
+                        searchPlan.constraints
+                    )
+                        ? searchPlan.constraints
+                        : []
+
+            };
+
+
+            // =========================================================
+            // تصنيفات الجامع
+            // =========================================================
+
             const categories =
-                searchPlan?.categories || {};
+                searchPlan?.categories ||
+                {};
+
 
             const primaryId =
                 Number(
-                    categories?.primary?.id || 0
+                    categories?.primary?.id ||
+                    0
                 );
+
 
             const secondaryId =
                 Number(
-                    categories?.secondary?.id || 0
+                    categories?.secondary?.id ||
+                    0
                 );
+
 
             const possibleId =
                 Number(
-                    categories?.possible?.id || 0
+                    categories?.possible?.id ||
+                    0
                 );
+
 
             console.log(
                 "ALJAM3 CATEGORIES:",
@@ -40440,21 +40635,335 @@ async function searchLibrary(
                 }
             );
 
-            const data =
-                await asyncDirectSearch(
-                    text,
-                    "aljam3",
-                    {
-                        primary:
-                            primaryId,
-                        secondary:
-                            secondaryId,
-                        possible:
-                            possibleId
+
+            // =========================================================
+            // تنفيذ استعلامات الجامع
+            // =========================================================
+
+            const searchTasks =
+                aljam3Queries.map(
+                    function (
+                        queryItem
+                    ) {
+
+                        console.log(
+                            "ALJAM3 QUERY START:",
+                            queryItem
+                        );
+
+
+                        return asyncDirectSearch(
+                            queryItem,
+                            "aljam3",
+                            {
+
+                                primary:
+                                    primaryId,
+
+                                secondary:
+                                    secondaryId,
+
+                                possible:
+                                    possibleId
+
+                            }
+                        )
+                        .then(
+                            function (
+                                data
+                            ) {
+
+                                console.log(
+                                    "ALJAM3 QUERY DONE:",
+                                    queryItem,
+                                    "RESULTS:",
+                                    Array.isArray(
+                                        data?.results
+                                    )
+                                        ? data.results.length
+                                        : 0
+                                );
+
+
+                                return {
+
+                                    query:
+                                        queryItem,
+
+                                    data:
+                                        data,
+
+                                    error:
+                                        null
+
+                                };
+
+                            }
+                        )
+                        .catch(
+                            function (
+                                error
+                            ) {
+
+                                console.error(
+                                    "ALJAM3 QUERY FAILED:",
+                                    queryItem,
+                                    error
+                                );
+
+
+                                return {
+
+                                    query:
+                                        queryItem,
+
+                                    data:
+                                        null,
+
+                                    error
+
+                                };
+
+                            }
+                        );
+
                     }
                 );
 
-            return data;
+
+            const searchResponses =
+                await Promise.all(
+                    searchTasks
+                );
+
+
+            // =========================================================
+            // تجميع أول 10 نتائج من كل استعلام
+            // =========================================================
+
+            const allResults = [];
+
+            const seen = new Set();
+
+            const TOP_PER_QUERY = 10;
+
+
+            for (
+                const response of
+                    searchResponses
+            ) {
+
+                if (
+                    !response.data
+                ) {
+
+                    continue;
+
+                }
+
+
+                const queryResults =
+                    Array.isArray(
+                        response.data.results
+                    )
+                        ? response.data.results.slice(
+                            0,
+                            TOP_PER_QUERY
+                        )
+                        : [];
+
+
+                for (
+                    const result of
+                        queryResults
+                ) {
+
+                    const key =
+                        libraryResultKey(
+                            result
+                        );
+
+
+                    if (
+                        seen.has(
+                            key
+                        )
+                    ) {
+
+                        continue;
+
+                    }
+
+
+                    seen.add(
+                        key
+                    );
+
+
+                    allResults.push(
+                        result
+                    );
+
+                }
+
+            }
+
+
+            console.log(
+                "========== ALJAM3 LOCAL PRE-RANK =========="
+            );
+
+            console.log(
+                "QUERIES:",
+                aljam3Queries.length
+            );
+
+            console.log(
+                "TOP PER QUERY:",
+                TOP_PER_QUERY
+            );
+
+            console.log(
+                "TOTAL UNIQUE RESULTS:",
+                allResults.length
+            );
+
+            console.log(
+                "==========================================="
+            );
+
+
+            // =========================================================
+            // لا توجد نتائج
+            // =========================================================
+
+            if (
+                !allResults.length
+            ) {
+
+                return await asyncDirectSearch(
+                    text,
+                    "aljam3",
+                    {
+
+                        primary:
+                            primaryId,
+
+                        secondary:
+                            secondaryId,
+
+                        possible:
+                            possibleId
+
+                    }
+                );
+
+            }
+
+
+            // =========================================================
+            // ترتيب النتائج بالذكاء الاصطناعي
+            // =========================================================
+
+            let rankedResults =
+                allResults;
+
+
+            try {
+
+                const ranked =
+                    await rankLibraryResultsWithAI(
+                        text,
+                        allResults,
+                        searchContext
+                    );
+
+
+                console.log(
+                    "AI ALJAM3 RANKING:",
+                    ranked
+                );
+
+
+                if (
+                    Array.isArray(
+                        ranked
+                    ) &&
+                    ranked.length
+                ) {
+
+                    rankedResults =
+                        ranked.map(
+                            function (
+                                item
+                            ) {
+
+                                return {
+
+                                    ...item.result,
+
+                                    relevance:
+                                        Number(
+                                            item.relevance
+                                        ) || 0
+
+                                };
+
+                            }
+                        );
+
+                }
+
+            }
+            catch (
+                error
+            ) {
+
+                console.error(
+                    "AI ALJAM3 RANKING FAILED:",
+                    error
+                );
+
+
+                rankedResults =
+                    allResults;
+
+            }
+
+
+            // =========================================================
+            // النتائج النهائية
+            // =========================================================
+
+            const finalRankedResults =
+                rankedResults.slice(
+                    0,
+                    requestedResults
+                );
+
+
+            // =========================================================
+            // إعادة بناء استجابة الجامع
+            //
+            // هذه النقطة مهمة جدًا:
+            // لا نعيد data الخام مباشرة كما كان سابقًا.
+            // بل نمرر النتائج عبر نفس طبقة إعادة البناء
+            // التي تستخدمها الشاملة وجامع الكتب.
+            // =========================================================
+
+            return await rebuildLibraryResponseFromResults(
+                finalRankedResults,
+                text,
+                requestedResults,
+                "aljam3",
+                {
+
+                    smartQueries:
+                        aljam3Queries
+
+                }
+            );
+
         }
 
     }
