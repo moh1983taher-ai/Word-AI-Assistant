@@ -38320,6 +38320,7 @@ async function expandLibrarySearchQuery(
         return {
             intent: "",
             subject: "",
+            userSection: "",
             constraints: [],
 
             categories: {
@@ -38336,14 +38337,88 @@ async function expandLibrarySearchQuery(
     }
 
 
+    // ========================================================
+    // تحليل صيغة الباحث الجديدة
+    //
+    // القسم أو المجالات :: موضوع البحث
+    //
+    // مثال:
+    // الفقه، القواعد، الفقه الحنفي :: المشقة
+    // ========================================================
+
+    const separator = "::";
+
+    const separatorIndex =
+        original.indexOf(
+            separator
+        );
+
+    const hasUserSection =
+        separatorIndex >= 0;
+
+
+    const userSection =
+        hasUserSection
+            ? original
+                .slice(
+                    0,
+                    separatorIndex
+                )
+                .trim()
+            : "";
+
+
+    const subjectInput =
+        hasUserSection
+            ? original
+                .slice(
+                    separatorIndex +
+                    separator.length
+                )
+                .trim()
+            : original;
+
+
+    // إذا كتب الباحث :: دون موضوع،
+    // نستخدم النص الأصلي حتى لا يصبح البحث فارغًا.
+    const effectiveSubject =
+        subjectInput ||
+        original;
+
+
     const systemPrompt = [
 
         "مهمتك: توسيع استعلام الباحث لمكتبات عربية نصية، مع الالتزام بالتعليمات التالية حرفيًا.",
 
-        "intent = نوع المعلومات المطلوبة؛ يُستنتج تلقائيًا، وعند وجود / يكون ما قبلها هو intent فقط.",
-        "subject = موضوع البحث كما ورد، ما لم توجد /؛ عند وجودها يكون ما بعدها هو subject فقط.",
-        "constraints = القيود أو الخصائص المطلوبة صراحةً في subject فقط، ولا تستخرج من intent.",
-        "لا تضف إلى subject أو constraints معلومات أو موضوعات غير واردة في الطلب.",
+
+        // ====================================================
+        // USER SECTION / SUBJECT
+        // ====================================================
+
+        "صيغة استعلام الباحث الجديدة هي:",
+        "القسم أو المجالات :: موضوع البحث.",
+
+        "إذا وُجدت العلامة :: في الاستعلام:",
+
+        "userSection = النص الذي يسبق :: كما كتبه الباحث.",
+        "subject = النص الذي يلي :: كما كتبه الباحث.",
+
+        "userSection هو مجال أو مجالات البحث التي حددها الباحث صراحةً.",
+        "لا تعتبر userSection جزءًا من subject.",
+        "لا تعتبر userSection intent.",
+        "لا تستنتج intent من userSection.",
+        "لا تستبدل userSection بتصنيف آخر من عندك.",
+        "إذا احتوى userSection على عدة مجالات مفصولة بالفواصل، فاعتبر جميع هذه المجالات مقصودة من الباحث.",
+
+        "إذا لم توجد العلامة :::",
+        "userSection = فارغ.",
+        "subject = الاستعلام الأصلي.",
+        "في هذه الحالة فقط يمكن استنتاج المجال من موضوع البحث.",
+
+        "intent = نوع المعلومات المطلوبة، ويُستنتج من subject أو من الاستعلام نفسه عند عدم وجود ::.",
+        "constraints = القيود أو الخصائص المطلوبة صراحةً في subject فقط.",
+        "لا تستخرج constraints من userSection.",
+        "لا تضف إلى subject أو constraints معلومات أو موضوعات غير واردة في طلب الباحث.",
 
 
         // ====================================================
@@ -38359,6 +38434,10 @@ async function expandLibrarySearchQuery(
         "secondaryCategory = مجال قريب يمكن أن يحتوي مادة علمية مفيدة للبحث.",
 
         "possibleCategory = مجال محتمل يمكن أن توجد فيه مادة مرتبطة بالموضوع.",
+
+        "إذا كان userSection موجودًا، فاعتبره قيدًا أساسيًا عند تحديد المجالات المناسبة.",
+
+        "إذا ذكر الباحث عدة مجالات في userSection، فلا تهمل أي مجال منها عند توليد الاستعلامات.",
 
         "أعد أسماء المجالات فقط، ولا تذكر أرقام التصنيفات.",
 
@@ -38391,11 +38470,17 @@ async function expandLibrarySearchQuery(
 
         "الثالث: سياقي/تراكيب، استبدل subject بتراكيب بديلة تخدم intent، دون تكرار الأصل أو ألفاظ intent، ثم اختر الأكثر استعمالًا.",
 
+        "إذا كان userSection موجودًا، فاستخدمه لتقييد الاستعلامات الثانية والثالثة عندما يؤدي ذلك إلى زيادة دقة الاسترجاع.",
+
+        "لا تجعل userSection موضوعًا مستقلًا عن subject، بل استخدمه لتحديد المجال الذي ينبغي أن يظهر فيه subject.",
+
+        "إذا كان userSection يحتوي عدة مجالات مفصولة بالفواصل، فاعتبرها كلها قيودًا مقصودة من الباحث.",
+
         "الثاني والثالث: اجمع جميع المقترحات في مجموعة واحدة (...)، وافصل بينها بـ |.",
 
         "في الاستعلام الثالث استخدم عادةً 3–5 بدائل لكل مفهوم قابل للتوسيع، وزدها فقط إذا كانت الزيادة مفيدة ومباشرة الصلة بالموضوع.",
 
-        "استخدم معاملات SHAMELA بقدر ما يزيد الاسترجاع دون إدخال ألفاظ لا تخدم subject أو constraints.",
+        "استخدم معاملات SHAMELA بقدر ما يزيد الاسترجاع دون إدخال ألفاظ لا تخدم subject أو userSection أو constraints.",
 
 
         // ====================================================
@@ -38410,7 +38495,12 @@ async function expandLibrarySearchQuery(
 
         "وسّع الاستعلام وفق intent، وأنتج ثلاث صيغ بحثية مختلفة تعبّر عن subject، واختر منها الأكثر شيوعًا، مع إبقاء الأصل في الاستعلام الأول.",
 
+        "إذا كان userSection موجودًا، فاستخدمه في الاستعلامين الثاني والثالث لتقييد البحث بالمجال الذي حدده الباحث.",
+
+        "لا تجعل userSection موضوعًا مستقلًا عن subject.",
+
         "لا تجعل الاستعلام سؤالًا.",
+
 
         // ====================================================
         // ALJAM3
@@ -38422,9 +38512,17 @@ async function expandLibrarySearchQuery(
 
         "الاستعلام الأول: استخدم subject كما هو مباشرة.",
 
-        "الاستعلام الثاني: وسّع المصطلح إلى ألفاظه وصِيَغه القريبة التي يمكن أن تظهر في النصوص العربية.",
+        "الاستعلام الثاني: وسّع subject إلى ألفاظه وصِيَغه القريبة التي يمكن أن تظهر في النصوص العربية.",
 
-        "الاستعلام الثالث: استخدم تركيبًا أو عبارة علمية شائعة مرتبطة مباشرة بالموضوع، مع مراعاة intent وconstraints.",
+        "إذا كان userSection موجودًا، فأدخل ألفاظه بصورة طبيعية في الاستعلام الثاني لتقييد البحث بالموضوع داخل المجال الذي حدده الباحث.",
+
+        "الاستعلام الثالث: استخدم تركيبًا أو عبارة علمية شائعة مرتبطة مباشرة بالموضوع، مع مراعاة intent وconstraints وuserSection.",
+
+        "إذا كان userSection يحتوي عدة أقسام مفصولة بالفواصل، فاعتبرها كلها قيودًا مقصودة من الباحث.",
+
+        "لا تجعل userSection موضوعًا مستقلًا عن subject، بل استخدمه لتقييد مجال ظهور subject.",
+
+        "استخدم ألفاظ userSection كما كتبها الباحث قدر الإمكان، ويمكن دمجها طبيعيًا مع subject دون تغيير معناها.",
 
         "لا تجعل الاستعلام سؤالًا.",
 
@@ -38433,30 +38531,51 @@ async function expandLibrarySearchQuery(
         "اجعل الاستعلامات قصيرة وواضحة ومناسبة للبحث النصي المباشر في الكتب العربية.",
 
         "لا تكرر الاستعلام نفسه بصيغ شكلية فقط.",
+
+
         // ====================================================
         // JSON
         // ====================================================
 
         "أعد JSON فقط:",
 
-        "{\"intent\":\"...\",\"subject\":\"...\",\"constraints\":[],\"primaryCategory\":\"...\",\"secondaryCategory\":\"...\",\"possibleCategory\":\"...\",\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"],\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
+        "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":\"...\",\"secondaryCategory\":\"...\",\"possibleCategory\":\"...\",\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"],\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
 
     ].join("\n");
 
 
-    const userPrompt =
-        "استعلام الباحث:\n" +
-        original;
+    // ========================================================
+    // إرسال الاستعلام للذكاء الاصطناعي بصورة مفككة
+    // ========================================================
+
+    const userPrompt = [
+
+        "استعلام الباحث الأصلي:",
+        original,
+
+        "",
+
+        "القسم الذي حدده الباحث:",
+        userSection ||
+        "(لم يحدد الباحث قسمًا صريحًا)",
+
+        "",
+
+        "موضوع البحث:",
+        effectiveSubject
+
+    ].join("\n");
 
 
-    const answer = await callLibraryAI(
-        systemPrompt,
-        userPrompt,
-        {
-            task: "queryExpansion",
-            temperature: 0.1
-        }
-    );
+    const answer =
+        await callLibraryAI(
+            systemPrompt,
+            userPrompt,
+            {
+                task: "queryExpansion",
+                temperature: 0.1
+            }
+        );
 
 
     const parsed =
@@ -38465,6 +38584,10 @@ async function expandLibrarySearchQuery(
         );
 
 
+    // ========================================================
+    // FALLBACK
+    // ========================================================
+
     if (
         !parsed ||
         typeof parsed !== "object"
@@ -38472,7 +38595,8 @@ async function expandLibrarySearchQuery(
 
         return {
             intent: "",
-            subject: "",
+            subject: effectiveSubject,
+            userSection: userSection,
             constraints: [],
 
             categories: {
@@ -38482,15 +38606,15 @@ async function expandLibrarySearchQuery(
             },
 
             shamelaQueries: [
-                original
+                effectiveSubject
             ],
 
             ketabQueries: [
-                original
+                effectiveSubject
             ],
 
             aljam3Queries: [
-                original
+                effectiveSubject
             ]
 
         };
@@ -38506,12 +38630,30 @@ async function expandLibrarySearchQuery(
         .trim();
 
 
+    // ========================================================
+    // الموضوع والقسم يؤخذان من صيغة الباحث نفسها
+    //
+    // حتى لا يعيد AI تفسيرهما أو تغييرهُما.
+    // ========================================================
+
     const subject =
-        String(
-            parsed.subject ||
-            ""
-        )
-        .trim();
+        hasUserSection
+            ? effectiveSubject
+            : String(
+                parsed.subject ||
+                effectiveSubject
+            )
+            .trim();
+
+
+    const finalUserSection =
+        hasUserSection
+            ? userSection
+            : String(
+                parsed.userSection ||
+                ""
+            )
+            .trim();
 
 
     const constraints =
@@ -38606,6 +38748,10 @@ async function expandLibrarySearchQuery(
     };
 
 
+    // ========================================================
+    // توحيد الاستعلامات ومنع التكرار
+    // ========================================================
+
     function normalizeQueries(
         value
     ) {
@@ -38654,9 +38800,14 @@ async function expandLibrarySearchQuery(
             }
 
 
-            seen.add(key);
+            seen.add(
+                key
+            );
 
-            unique.push(item);
+
+            unique.push(
+                item
+            );
 
 
             if (
@@ -38685,17 +38836,26 @@ async function expandLibrarySearchQuery(
         normalizeQueries(
             parsed.ketabQueries
         );
+
+
     const aljam3Queries =
         normalizeQueries(
             parsed.aljam3Queries
         );
 
 
+    // ========================================================
+    // النتيجة النهائية
+    // ========================================================
+
     return {
 
         intent,
 
         subject,
+
+        userSection:
+            finalUserSection,
 
         constraints,
 
@@ -38705,21 +38865,21 @@ async function expandLibrarySearchQuery(
             shamelaQueries.length
                 ? shamelaQueries
                 : [
-                    original
+                    subject
                 ],
 
         ketabQueries:
             ketabQueries.length
                 ? ketabQueries
                 : [
-                    original
+                    subject
                 ],
 
         aljam3Queries:
             aljam3Queries.length
                 ? aljam3Queries
                 : [
-                    original
+                    subject
                 ]
 
     };
