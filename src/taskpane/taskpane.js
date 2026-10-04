@@ -48883,6 +48883,58 @@ if (
                 </span>
 
             </button>
+
+
+            <button
+                type="button"
+                class="scope-project-item"
+                data-library-source="aljam3">
+
+                <span class="scope-project-icon">
+
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#000000"
+                        stroke-width="1"
+                        stroke-linecap="round"
+                        stroke-linejoin="round">
+
+                        <rect
+                            x="4"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                        />
+
+                        <rect
+                            x="9.5"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                        />
+
+                        <rect
+                            x="15.5"
+                            y="5"
+                            width="4.5"
+                            height="14"
+                            rx="1.5"
+                            transform="rotate(-5, 17.75, 12)"
+                        />
+
+                    </svg>
+
+                </span>
+
+                <span class="scope-project-name">
+                    الجامع
+                </span>
+
+            </button>
             `;
 
 
