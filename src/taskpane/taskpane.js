@@ -39189,7 +39189,7 @@ async function searchLibrary(
             categoryIds = {}
         ) {
 
-            const apiURL =
+            let apiURL =
                 `${LIBRARY_API}/library-search` +
                 `?q=${encodeURIComponent(searchTerm)}` +
                 `&source=${encodeURIComponent(searchSource)}` +
