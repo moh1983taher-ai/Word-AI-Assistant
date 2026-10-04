@@ -39185,7 +39185,8 @@ async function searchLibrary(
     const asyncDirectSearch =
         async function (
             searchTerm,
-            searchSource = selectedSource
+            searchSource = selectedSource,
+            categoryIds = {}
         ) {
 
             const apiURL =
@@ -39196,6 +39197,34 @@ async function searchLibrary(
                 `&results=${encodeURIComponent(
                     LIBRARY_AI_FETCH_RESULTS_PER_QUERY
                 )}`;
+
+                // =========================================================
+                // [ALJAM3-CATEGORIES] إرسال تصنيفات الجامع
+                // =========================================================
+                if (
+                    searchSource === "aljam3"
+                ) {
+                    if (Number(categoryIds.primary) > 0) {
+                        apiURL +=
+                            `&categoryId=${encodeURIComponent(
+                                categoryIds.primary
+                            )}`;
+                    }
+
+                    if (Number(categoryIds.secondary) > 0) {
+                        apiURL +=
+                            `&secondaryCategoryId=${encodeURIComponent(
+                                categoryIds.secondary
+                            )}`;
+                    }
+
+                    if (Number(categoryIds.possible) > 0) {
+                        apiURL +=
+                            `&possibleCategoryId=${encodeURIComponent(
+                                categoryIds.possible
+                            )}`;
+                    }
+                }
 
 
             const response =
@@ -39924,7 +39953,7 @@ async function searchLibrary(
         // تبقى على البحث المباشر حاليًا
         // =========================================================
 
-                // =========================================================
+        // =========================================================
         // KetabOnline:
         // بحث ذكي متعدد الاستعلامات
         // =========================================================
@@ -40354,6 +40383,78 @@ async function searchLibrary(
                 }
             );
 
+        }
+
+        // =========================================================
+        // [ALJAM3-SEARCH] بحث الجامع مستقلًا
+        // =========================================================
+        if (
+            selectedSource === "aljam3"
+        ) {
+
+            let searchPlan = {
+                categories: {
+                    primary: null,
+                    secondary: null,
+                    possible: null
+                }
+            };
+
+            try {
+                searchPlan =
+                    await expandLibrarySearchQuery(
+                        text
+                    );
+            }
+            catch (error) {
+                console.error(
+                    "ALJAM3 QUERY EXPANSION ERROR:",
+                    error
+                );
+            }
+
+            const categories =
+                searchPlan?.categories || {};
+
+            const primaryId =
+                Number(
+                    categories?.primary?.id || 0
+                );
+
+            const secondaryId =
+                Number(
+                    categories?.secondary?.id || 0
+                );
+
+            const possibleId =
+                Number(
+                    categories?.possible?.id || 0
+                );
+
+            console.log(
+                "ALJAM3 CATEGORIES:",
+                {
+                    primaryId,
+                    secondaryId,
+                    possibleId
+                }
+            );
+
+            const data =
+                await asyncDirectSearch(
+                    text,
+                    "aljam3",
+                    {
+                        primary:
+                            primaryId,
+                        secondary:
+                            secondaryId,
+                        possible:
+                            possibleId
+                    }
+                );
+
+            return data;
         }
 
     }
