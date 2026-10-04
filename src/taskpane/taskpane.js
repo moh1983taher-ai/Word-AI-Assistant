@@ -38672,81 +38672,186 @@ async function expandLibrarySearchQuery(
             : [];
 
 
+
     // ========================================================
-    // تحويل المجالات الثلاثة التي أعادها AI إلى IDs
+    // تحويل المجالات إلى تصنيفات الجامع
+    //
+    // إذا حدد الباحث المجالات صراحةً بعد ::
+    // فكل مجال يحدده الباحث له أولوية، ولا نعتمد
+    // على تصنيف AI وحده.
     // ========================================================
 
-    const primaryCategory =
+    const aiPrimaryCategory =
         matchAljam3Category(
             parsed.primaryCategory
         );
 
 
-    const secondaryCategory =
+    const aiSecondaryCategory =
         matchAljam3Category(
             parsed.secondaryCategory
         );
 
 
-    const possibleCategory =
+    const aiPossibleCategory =
         matchAljam3Category(
             parsed.possibleCategory
         );
 
 
     // ========================================================
-    // منع تكرار نفس التصنيف في أكثر من مستوى
+    // إذا حدد الباحث قسمًا صريحًا:
+    //
+    // الفقه الحنفي، الفقه الشافعي، أصول الفقه والقواعد الفقهية
+    //
+    // نحاول مطابقة كل قسم بصورة مستقلة.
     // ========================================================
 
-    const usedCategoryIds =
+    let explicitCategories = [];
+
+
+    if (hasUserSection) {
+
+        const sectionParts =
+            userSection
+                .split(
+                    /[،,؛;]+/
+                )
+                .map(
+                    part =>
+                        String(
+                            part ||
+                            ""
+                        ).trim()
+                )
+                .filter(Boolean);
+
+
+        explicitCategories =
+            sectionParts
+                .map(
+                    section =>
+                        matchAljam3Category(
+                            section
+                        )
+                )
+                .filter(Boolean);
+
+    }
+
+
+    // ========================================================
+    // إزالة التصنيفات المكررة
+    // ========================================================
+
+    const allMatchedCategories = [];
+
+    const seenCategoryIds =
         new Set();
 
 
-    function uniqueCategory(
+    function addUniqueCategory(
         category
     ) {
 
         if (
             !category ||
-            usedCategoryIds.has(
-                category.id
-            )
+            category.id == null
         ) {
 
-            return null;
+            return;
 
         }
 
 
-        usedCategoryIds.add(
-            category.id
+        const id =
+            Number(
+                category.id
+            );
+
+
+        if (
+            !id ||
+            seenCategoryIds.has(id)
+        ) {
+
+            return;
+
+        }
+
+
+        seenCategoryIds.add(id);
+
+        allMatchedCategories.push(
+            category
         );
-
-
-        return category;
 
     }
 
 
+    // ========================================================
+    // عند وجود userSection:
+    // نستخدم التصنيفات التي حددها الباحث أولًا.
+    // ========================================================
+
+    if (hasUserSection) {
+
+        for (
+            const category
+            of explicitCategories
+        ) {
+
+            addUniqueCategory(
+                category
+            );
+
+        }
+
+    }
+
+
+    // ========================================================
+    // إذا لم يكفِ ذلك، نضيف تصنيفات AI.
+    // هذا يفيد خصوصًا إذا لم يكن هناك تطابق مباشر
+    // مع أحد الأقسام التي كتبها الباحث.
+    // ========================================================
+
+    addUniqueCategory(
+        aiPrimaryCategory
+    );
+
+    addUniqueCategory(
+        aiSecondaryCategory
+    );
+
+    addUniqueCategory(
+        aiPossibleCategory
+    );
+
+
+    // ========================================================
+    // الاحتفاظ بالبنية الحالية:
+    // primary / secondary / possible
+    //
+    // لكن عند وجود userSection تكون الأولوية
+    // للتصنيفات التي حددها الباحث.
+    // ========================================================
+
     const categories = {
 
         primary:
-            uniqueCategory(
-                primaryCategory
-            ),
+            allMatchedCategories[0] ||
+            null,
 
         secondary:
-            uniqueCategory(
-                secondaryCategory
-            ),
+            allMatchedCategories[1] ||
+            null,
 
         possible:
-            uniqueCategory(
-                possibleCategory
-            )
+            allMatchedCategories[2] ||
+            null
 
     };
-
 
     // ========================================================
     // توحيد الاستعلامات ومنع التكرار
