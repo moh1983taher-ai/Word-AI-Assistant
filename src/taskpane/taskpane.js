@@ -39847,7 +39847,7 @@ async function searchLibrary(
                 searchPlan =
                     await expandLibrarySearchQuery(
                         text,
-                            searchSource
+                            selectedSource
                     );
 
 
@@ -40295,7 +40295,7 @@ async function searchLibrary(
                 searchPlan =
                     await expandLibrarySearchQuery(
                         text,
-                            searchSource
+                            selectedSource
                     );
 
 
@@ -40736,7 +40736,7 @@ async function searchLibrary(
                 searchPlan =
                     await expandLibrarySearchQuery(
                         text,
-                            searchSource
+                            selectedSource
                     );
 
 
@@ -41272,7 +41272,7 @@ async function searchLibrary(
         searchPlan =
             await expandLibrarySearchQuery(
                 text,
-                    searchSource
+                    selectedSource
             );
 
         console.log(
