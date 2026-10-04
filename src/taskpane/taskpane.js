@@ -38304,7 +38304,8 @@ function buildAljam3SearchUrl(
 // ============================================================
 
 async function expandLibrarySearchQuery(
-    query
+    query,
+    source = "all"
 ) {
 
     const original =
@@ -38348,14 +38349,14 @@ async function expandLibrarySearchQuery(
 
     const separator = "::";
 
-    const separatorIndex =
-        original.indexOf(
-            separator
-        );
-
     const hasUserSection =
-        separatorIndex >= 0;
+        source === "aljam3" &&
+        original.includes(separator);
 
+    const separatorIndex =
+        hasUserSection
+            ? original.indexOf(separator)
+            : -1;
 
     const userSection =
         hasUserSection
@@ -38366,7 +38367,6 @@ async function expandLibrarySearchQuery(
                 )
                 .trim()
             : "";
-
 
     const subjectInput =
         hasUserSection
@@ -38386,161 +38386,155 @@ async function expandLibrarySearchQuery(
         original;
 
 
-    const systemPrompt = [
+    const commonInstructions = [
+        "مهمتك: توسيع استعلام الباحث لمكتبات عربية نصية، مع الالتزام بالتعليمات التالية حرفيًا."
+    ];
 
-        "مهمتك: توسيع استعلام الباحث لمكتبات عربية نصية، مع الالتزام بالتعليمات التالية حرفيًا.",
-
-
-        // ====================================================
-        // USER SECTION / SUBJECT
-        // ====================================================
-
-        "صيغة استعلام الباحث الجديدة هي:",
-        "القسم أو المجالات :: موضوع البحث.",
-
-        "إذا وُجدت العلامة :: في الاستعلام:",
-
-        "userSection = النص الذي يسبق :: كما كتبه الباحث.",
-        "subject = النص الذي يلي :: كما كتبه الباحث.",
-
-        "userSection هو مجال أو مجالات البحث التي حددها الباحث صراحةً.",
-        "لا تعتبر userSection جزءًا من subject.",
-        "لا تعتبر userSection intent.",
-        "لا تستنتج intent من userSection.",
-        "لا تستبدل userSection بتصنيف آخر من عندك.",
-        "إذا احتوى userSection على عدة مجالات مفصولة بالفواصل، فاعتبر جميع هذه المجالات مقصودة من الباحث.",
-
-        "إذا لم توجد العلامة :::",
-        "userSection = فارغ.",
-        "subject = الاستعلام الأصلي.",
-        "في هذه الحالة فقط يمكن استنتاج المجال من موضوع البحث.",
-
-        "intent = نوع المعلومات المطلوبة، ويُستنتج من subject أو من الاستعلام نفسه عند عدم وجود ::.",
-        "constraints = القيود أو الخصائص المطلوبة صراحةً في subject فقط.",
-        "لا تستخرج constraints من userSection.",
-        "لا تضف إلى subject أو constraints معلومات أو موضوعات غير واردة في طلب الباحث.",
-
-
-        // ====================================================
-        // تصنيف المجال
-        // ====================================================
-
-        "تصنيف المجال:",
-
-        "حدّد المجال العلمي الأقرب إلى استعلام الباحث في ثلاثة مستويات فقط:",
-
-        "primaryCategory = المجال المطابق مباشرة لموضوع البحث.",
-
-        "secondaryCategory = مجال قريب يمكن أن يحتوي مادة علمية مفيدة للبحث.",
-
-        "possibleCategory = مجال محتمل يمكن أن توجد فيه مادة مرتبطة بالموضوع.",
-
-        "إذا كان userSection موجودًا، فاعتبره قيدًا أساسيًا عند تحديد المجالات المناسبة.",
-
-        "إذا ذكر الباحث عدة مجالات في userSection، فلا تهمل أي مجال منها عند توليد الاستعلامات.",
-
-        "أعد أسماء المجالات فقط، ولا تذكر أرقام التصنيفات.",
-
-        "استخدم أسماء المجالات العلمية المألوفة، مثل: أصول الفقه، القواعد الفقهية، الفقه، التفسير، علوم الحديث، شروح الحديث، اللغة، النحو والصرف، العقيدة، الفتاوى وغيرها.",
-
-        "لا تجعل intent نفسه اسمًا للمجال إلا إذا كان ذلك مجالًا علميًا فعلًا.",
-
-        "رتّب المجالات بحسب صلتها بالبحث: مطابق ثم قريب ثم محتمل.",
-
-        "إذا كان المجال واضحًا جدًا، اجعل primaryCategory دقيقًا، ولا تستخدم مجالًا عامًا بدل المجال المتخصص.",
-
-
-        // ====================================================
-        // SHAMELA
-        // ====================================================
-
+    const shamelaInstructions = [
         "SHAMELA:",
-
         "+ = إلزام.",
         "- = استبعاد.",
         "\"...\" = عبارة حرفية.",
         "(...) = مجموعة بدائل.",
         "| = OR بين البدائل.",
-
         "أنشئ 3 استعلامات مختلفة لكل مصدر، متدرجة من الأضيق إلى الأوسع.",
-
         "الأول: مباشر، استخدم subject كما هو دون أي معاملات SHAMELA.",
-
         "الثاني: اشتقاقي/مفردات ≠ تراكيب، وسّع المفردات القابلة للاشتقاق في subject بصيغ من الجذر نفسه فقط، وتجاوز ما ليس بمشتق، باستخدام |.",
-
         "الثالث: سياقي/تراكيب، استبدل subject بتراكيب بديلة تخدم intent، دون تكرار الأصل أو ألفاظ intent، ثم اختر الأكثر استعمالًا.",
-
         "إذا كان userSection موجودًا، فاستخدمه لتقييد الاستعلامات الثانية والثالثة عندما يؤدي ذلك إلى زيادة دقة الاسترجاع.",
-
         "لا تجعل userSection موضوعًا مستقلًا عن subject، بل استخدمه لتحديد المجال الذي ينبغي أن يظهر فيه subject.",
-
         "إذا كان userSection يحتوي عدة مجالات مفصولة بالفواصل، فاعتبرها كلها قيودًا مقصودة من الباحث.",
-
         "الثاني والثالث: اجمع جميع المقترحات في مجموعة واحدة (...)، وافصل بينها بـ |.",
-
         "في الاستعلام الثالث استخدم عادةً 3–5 بدائل لكل مفهوم قابل للتوسيع، وزدها فقط إذا كانت الزيادة مفيدة ومباشرة الصلة بالموضوع.",
+        "استخدم معاملات SHAMELA بقدر ما يزيد الاسترجاع دون إدخال ألفاظ لا تخدم subject أو userSection أو constraints."
+    ];
 
-        "استخدم معاملات SHAMELA بقدر ما يزيد الاسترجاع دون إدخال ألفاظ لا تخدم subject أو userSection أو constraints.",
-
-
-        // ====================================================
-        // KETAB
-        // ====================================================
-
+    const ketabInstructions = [
         "KETAB:",
-
         "كل استعلام في KETAB صيغة بحثية مستقلة، ولا تجمع عدة صيغ في استعلام واحد.",
-
         "لا تستخدم معاملات SHAMELA.",
-
         "وسّع الاستعلام وفق intent، وأنتج ثلاث صيغ بحثية مختلفة تعبّر عن subject، واختر منها الأكثر شيوعًا، مع إبقاء الأصل في الاستعلام الأول.",
-
         "إذا كان userSection موجودًا، فاستخدمه في الاستعلامين الثاني والثالث لتقييد البحث بالمجال الذي حدده الباحث.",
-
         "لا تجعل userSection موضوعًا مستقلًا عن subject.",
+        "لا تجعل الاستعلام سؤالًا."
+    ];
 
-        "لا تجعل الاستعلام سؤالًا.",
-
-
-        // ====================================================
-        // ALJAM3
-        // ====================================================
-
+    const aljam3Instructions = [
+        "صيغة الاستعلام: القسم أو المجالات :: موضوع البحث.",
+        "userSection = ما قبل ::، وsubject = ما بعد ::.",
+        "بدون :: يكون subject هو الاستعلام الأصلي وuserSection فارغًا.",
+        "userSection يحدد نطاق البحث، وsubject هو موضوع البحث.",
+        "إذا حدد الباحث عدة مجالات، فكلها مقصودة.",
+        "intent وconstraints يُستخرجان من subject فقط.",
+        "حدّد primaryCategory وsecondaryCategory وpossibleCategory بحسب صلة subject بالمجال.",
+        "إذا حدد الباحث userSection، فاعتمد مجالاته ولا تُسقط أيًّا منها.",
         "ALJAM3:",
-
-        "كل استعلام في ALJAM3 صيغة بحثية مستقلة، ولا تستخدم معاملات البحث الخاصة بالشاملة.",
-
-        "الاستعلام الأول: استخدم subject كما هو مباشرة.",
-
-        "الاستعلام الثاني: وسّع subject إلى ألفاظه وصِيَغه القريبة التي يمكن أن تظهر في النصوص العربية.",
-
-        "إذا كان userSection موجودًا، فأدخل ألفاظه بصورة طبيعية في الاستعلام الثاني لتقييد البحث بالموضوع داخل المجال الذي حدده الباحث.",
-
-        "الاستعلام الثالث: استخدم تركيبًا أو عبارة علمية شائعة مرتبطة مباشرة بالموضوع، مع مراعاة intent وconstraints وuserSection.",
-
-        "إذا كان userSection يحتوي عدة أقسام مفصولة بالفواصل، فاعتبرها كلها قيودًا مقصودة من الباحث.",
-
-        "لا تجعل userSection موضوعًا مستقلًا عن subject، بل استخدمه لتقييد مجال ظهور subject.",
-
-        "استخدم ألفاظ userSection كما كتبها الباحث قدر الإمكان، ويمكن دمجها طبيعيًا مع subject دون تغيير معناها.",
-
+        "كل استعلام صيغة بحثية مستقلة، ولا تستخدم معاملات البحث الخاصة بالشاملة.",
+        "أنشئ 3 استعلامات مبنية على subject فقط.",
+        "الأول: subject كما هو.",
+        "الثاني: وسّع subject إلى ألفاظه وصِيَغه القريبة.",
+        "الثالث: استخدم تركيبًا علميًا شائعًا مرتبطًا مباشرة بـ subject وintent.",
+        "userSection لا يدخل في نص استعلام ALJAM3، بل يُستخدم لتحديد categoryId فقط.",
         "لا تجعل الاستعلام سؤالًا.",
-
-        "لا تستخدم regex أو | أو الأقواس أو معاملات + و -.",
-
+        "لا تستخدم معاملات SHAMELA.",
         "اجعل الاستعلامات قصيرة وواضحة ومناسبة للبحث النصي المباشر في الكتب العربية.",
+        "لا تكرر الاستعلام نفسه بصيغ شكلية فقط."
+    ];
 
-        "لا تكرر الاستعلام نفسه بصيغ شكلية فقط.",
+
+    // --------------------------------------------------
+    // اختيار تعليمات المكتبة المطلوبة فقط
+    // --------------------------------------------------
+
+    let sourceInstructions = [];
+
+    switch (source) {
+        case "shamela":
+            sourceInstructions = [
+                ...shamelaInstructions
+            ];
+            break;
+
+        case "ketab":
+            sourceInstructions = [
+                ...ketabInstructions
+            ];
+            break;
+
+        case "aljam3":
+            sourceInstructions = [
+                ...aljam3Instructions
+            ];
+            break;
+
+        case "all":
+            sourceInstructions = [
+                ...shamelaInstructions,
+                ...ketabInstructions
+            ];
+            break;
+
+        default:
+            sourceInstructions = [
+                ...shamelaInstructions,
+                ...ketabInstructions
+            ];
+            break;
+    }
 
 
-        // ====================================================
-        // JSON
-        // ====================================================
+    // --------------------------------------------------
+    // تحديد حقول JSON المطلوبة حسب المكتبة
+    // --------------------------------------------------
 
-        "أعد JSON فقط:",
+    let jsonInstruction = [];
 
-        "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":\"...\",\"secondaryCategory\":\"...\",\"possibleCategory\":\"...\",\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"],\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
+    switch (source) {
+        case "shamela":
+            jsonInstruction = [
+                "أعد JSON فقط:",
+                "{\"intent\":\"...\",\"subject\":\"...\",\"shamelaQueries\":[\"...\",\"...\",\"...\"]}"
+            ];
+            break;
 
+        case "ketab":
+            jsonInstruction = [
+                "أعد JSON فقط:",
+                "{\"intent\":\"...\",\"subject\":\"...\",\"ketabQueries\":[\"...\",\"...\",\"...\"]}"
+            ];
+            break;
+
+        case "aljam3":
+            jsonInstruction = [
+                "أعد JSON فقط:",
+                "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":\"...\",\"secondaryCategory\":\"...\",\"possibleCategory\":\"...\",\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
+            ];
+            break;
+
+        case "all":
+            jsonInstruction = [
+                "أعد JSON فقط:",
+                "{\"intent\":\"...\",\"subject\":\"...\",\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"]}"
+            ];
+            break;
+
+        default:
+            jsonInstruction = [
+                "أعد JSON فقط:",
+                "{\"intent\":\"...\",\"subject\":\"...\",\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"]}"
+            ];
+            break;
+    }
+
+
+    // --------------------------------------------------
+    // بناء System Prompt النهائي
+    // --------------------------------------------------
+
+    const systemPrompt = [
+        ...commonInstructions,
+        ...sourceInstructions,
+        ...jsonInstruction
     ].join("\n");
 
 
@@ -38548,23 +38542,44 @@ async function expandLibrarySearchQuery(
     // إرسال الاستعلام للذكاء الاصطناعي بصورة مفككة
     // ========================================================
 
-    const userPrompt = [
+    let userPrompt = [];
 
-        "استعلام الباحث الأصلي:",
-        original,
+        switch (source) {
+            case "aljam3":
+                userPrompt = [
+                    "استعلام الباحث الأصلي:",
+                    original,
 
-        "",
+                    "",
 
-        "القسم الذي حدده الباحث:",
-        userSection ||
-        "(لم يحدد الباحث قسمًا صريحًا)",
+                    "القسم الذي حدده الباحث:",
+                    userSection ||
+                    "(لم يحدد الباحث قسمًا صريحًا)",
 
-        "",
+                    "",
 
-        "موضوع البحث:",
-        effectiveSubject
+                    "موضوع البحث:",
+                    effectiveSubject
+                ];
+                break;
 
-    ].join("\n");
+            case "shamela":
+            case "ketab":
+            case "all":
+            default:
+                userPrompt = [
+                    "استعلام الباحث الأصلي:",
+                    original,
+
+                    "",
+
+                    "موضوع البحث:",
+                    effectiveSubject
+                ];
+                break;
+        }
+
+        userPrompt = userPrompt.join("\n");
 
 
     const answer =
@@ -39831,7 +39846,8 @@ async function searchLibrary(
 
                 searchPlan =
                     await expandLibrarySearchQuery(
-                        text
+                        text,
+                            searchSource
                     );
 
 
@@ -40278,7 +40294,8 @@ async function searchLibrary(
 
                 searchPlan =
                     await expandLibrarySearchQuery(
-                        text
+                        text,
+                            searchSource
                     );
 
 
@@ -40718,7 +40735,8 @@ async function searchLibrary(
 
                 searchPlan =
                     await expandLibrarySearchQuery(
-                        text
+                        text,
+                            searchSource
                     );
 
 
@@ -41253,7 +41271,8 @@ async function searchLibrary(
 
         searchPlan =
             await expandLibrarySearchQuery(
-                text
+                text,
+                    searchSource
             );
 
         console.log(
