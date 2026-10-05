@@ -38431,6 +38431,10 @@ async function expandLibrarySearchQuery(
         subjectInput ||
         original;
 
+    const isGeneralAljam3 =
+    source === "aljam3" &&
+    userSection === "عام";
+
 
     // ========================================================
     // التعليمات العامة
@@ -38514,6 +38518,7 @@ async function expandLibrarySearchQuery(
         "1. صيغة الإدخال:",
         "يستخدم الباحث الصيغة: القسم أو المجالات :: موضوع البحث.",
         "إذا وُجد :: فما قبله هو userSection، وما بعده هو subject.",
+        "إذا كان userSection = عام، فابحث في جميع أقسام المكتبة ولا تحدد أي تصنيف.",
         "إذا لم يوجد :: فـ subject هو الاستعلام الأصلي، وuserSection فارغ.",
 
         "2. نطاق البحث والتصنيفات:",
@@ -38841,24 +38846,30 @@ async function expandLibrarySearchQuery(
     // ========================================================
 
     const aiPrimaryCategory =
-        matchAljam3Category(
-            parsed.primaryCategory
-        );
+        isGeneralAljam3
+            ? null
+            : matchAljam3Category(
+                parsed.primaryCategory
+            );
 
     const aiSecondaryCategory =
-        matchAljam3Category(
-            parsed.secondaryCategory
-        );
+        isGeneralAljam3
+            ? null
+            : matchAljam3Category(
+                parsed.secondaryCategory
+            );
 
     const aiPossibleCategory =
-        matchAljam3Category(
-            parsed.possibleCategory
-        );
+        isGeneralAljam3
+            ? null
+            : matchAljam3Category(
+                parsed.possibleCategory
+            );
 
 
     let explicitCategories = [];
 
-    if (hasUserSection) {
+    if (hasUserSection && !isGeneralAljam3) {
 
         const sectionParts =
             userSection
