@@ -38448,9 +38448,6 @@ async function expandLibrarySearchQuery(
     // تحليل صيغة الباحث الجديدة
     //
     // القسم أو المجالات :: موضوع البحث
-    //
-    // مثال:
-    // الفقه، القواعد، الفقه الحنفي :: المشقة
     // ========================================================
 
     const separator = "::";
@@ -38484,19 +38481,13 @@ async function expandLibrarySearchQuery(
                 .trim()
             : original;
 
-
-    // إذا كتب الباحث :: دون موضوع،
-    // نستخدم النص الأصلي حتى لا يصبح البحث فارغًا.
     const effectiveSubject =
         subjectInput ||
         original;
 
 
     // ========================================================
-    // التعليمات العامة المشتركة بين المصادر
-    //
-    // هذه التعليمات كانت عامة في النظام القديم،
-    // لذلك لا تُوضع داخل SHAMELA أو KETAB أو ALJAM3.
+    // التعليمات العامة
     // ========================================================
 
     const commonInstructions = [
@@ -38515,9 +38506,7 @@ async function expandLibrarySearchQuery(
 
 
     // ========================================================
-    // تعليمات الشاملة فقط
-    //
-    // لا تُرسل إلى KETABONLINE أو ALJAM3 إلا عند اختيار ALL.
+    // الشاملة
     // ========================================================
 
     const shamelaInstructions = [
@@ -38548,9 +38537,7 @@ async function expandLibrarySearchQuery(
 
 
     // ========================================================
-    // تعليمات جامع الكتب فقط
-    //
-    // لا تستخدم معاملات الشاملة.
+    // جامع الكتب
     // ========================================================
 
     const ketabInstructions = [
@@ -38571,10 +38558,11 @@ async function expandLibrarySearchQuery(
 
 
     // ========================================================
-    // تعليمات الجامع ALJAM3 فقط
+    // الجامع ALJAM3
     // ========================================================
 
     const aljam3Instructions = [
+
         "ALJAM3:",
 
         "1. صيغة الإدخال:",
@@ -38586,8 +38574,13 @@ async function expandLibrarySearchQuery(
         "userSection يحدد مجالات البحث، ولا يدخل في نص الاستعلامات.",
         "استخرج intent وconstraints من subject فقط.",
         "إذا حدد الباحث userSection، فاعتمد المجالات المذكورة فيه أساسًا للتصنيف.",
-        "إذا لم يحدد الباحث userSection، فاختر المجالات الأكثر صلة بـ subject وintent، ورتبها بحسب قوة الصلة.",
-        "استخدم primaryCategory للمجال الأقوى صلة، وsecondaryCategory وpossibleCategory للمجالات الأخرى التي تضيف نطاقًا بحثيًا مفيدًا.",
+        "إذا لم يحدد الباحث userSection، فاعتمد على تصنيفات مكتبة الجامع الرسمية لاختيار المجالات المناسبة.",
+        "اقرأ صفحة التصنيفات الرسمية لمكتبة الجامع باستخدام أداة web_fetch المتاحة لك:",
+        "https://aljam3.com/en/categories",
+        "اعتمد أسماء التصنيفات الرسمية الواردة في الصفحة فقط، ولا تخترع تصنيفًا من عندك.",
+        "اختر حتى ثلاثة تصنيفات هي الأقرب إلى subject وintent.",
+        "إذا كان الموضوع واسعًا أو متعدد المجالات بحيث لا يمكن حصره بصورة مفيدة في ثلاثة تصنيفات، فلا تختر تصنيفًا واجعل البحث عامًا.",
+        "استخدم primaryCategory للمجال الأقوى صلة، ثم secondaryCategory وpossibleCategory عند وجود صلة بحثية مفيدة.",
 
         "3. بناء استعلامات البحث:",
         "أنشئ 3 استعلامات مستقلة مبنية على subject فقط، بحيث تضيف كل صيغة قيمة بحثية حقيقية.",
@@ -38596,104 +38589,65 @@ async function expandLibrarySearchQuery(
         "الاستعلام الثالث: صغ تركيبًا علميًا شائعًا ومباشرًا يعبّر عن subject في سياقه العلمي، مع مراعاة intent.",
 
         "4. ضوابط الاستعلامات:",
-        "اجعل كل استعلام قصيرًا وواضحًا ومناسبًا للبحث النصي المباشر في الكتب التراث العربي.",
+        "اجعل كل استعلام قصيرًا وواضحًا ومناسبًا للبحث النصي المباشر في الكتب التراثية العربية.",
         "لا تجعل الاستعلام في صورة سؤال.",
         "لا تضف ألفاظًا بعيدة عن subject لمجرد توسيع البحث.",
         "لا تكرر المعنى نفسه بصيغ شكلية لا تضيف قيمة بحثية.",
         "يُستخدم userSection لتحديد categoryId فقط، ولا يدخل في نص أي استعلام."
+
     ];
 
 
     // ========================================================
-    // اختيار تعليمات المكتبة المطلوبة فقط
-    //
-    // SHAMELA:
-    //   shamela فقط
-    //   أو all
-    //
-    // KETABONLINE:
-    //   ketabonline فقط
-    //   أو all
-    //
-    // ALJAM3:
-    //   aljam3 فقط
-    //
-    // لا تختلط التعليمات بين المصادر.
+    // اختيار التعليمات
     // ========================================================
 
     let sourceInstructions = [];
 
-
     switch (source) {
 
         case "shamela":
-
-            sourceInstructions = [
-                ...shamelaInstructions
-            ];
-
+            sourceInstructions = [...shamelaInstructions];
             break;
-
 
         case "ketabonline":
-
-            sourceInstructions = [
-                ...ketabInstructions
-            ];
-
+            sourceInstructions = [...ketabInstructions];
             break;
-
 
         case "aljam3":
-
-            sourceInstructions = [
-                ...aljam3Instructions
-            ];
-
+            sourceInstructions = [...aljam3Instructions];
             break;
-
 
         case "all":
-
             sourceInstructions = [
                 ...shamelaInstructions,
                 ...ketabInstructions
             ];
-
             break;
 
-
         default:
-
             sourceInstructions = [
                 ...shamelaInstructions,
                 ...ketabInstructions
             ];
-
             break;
 
     }
 
 
     // ========================================================
-    // تحديد حقول JSON المطلوبة حسب المكتبة
-    //
-    // لا نطلب من AI حقول مصدر آخر عندما يكون المصدر محددًا.
+    // JSON
     // ========================================================
 
     let jsonInstruction = [];
 
-
     switch (source) {
 
         case "shamela":
 
             jsonInstruction = [
-
                 "أعد JSON فقط:",
-
                 "{\"intent\":\"...\",\"subject\":\"...\",\"constraints\":[\"...\"],\"shamelaQueries\":[\"...\",\"...\",\"...\"]}"
-
             ];
 
             break;
@@ -38702,11 +38656,8 @@ async function expandLibrarySearchQuery(
         case "ketabonline":
 
             jsonInstruction = [
-
                 "أعد JSON فقط:",
-
                 "{\"intent\":\"...\",\"subject\":\"...\",\"constraints\":[\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"]}"
-
             ];
 
             break;
@@ -38715,11 +38666,8 @@ async function expandLibrarySearchQuery(
         case "aljam3":
 
             jsonInstruction = [
-
                 "أعد JSON فقط:",
-
                 "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":\"...\",\"secondaryCategory\":\"...\",\"possibleCategory\":\"...\",\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
-
             ];
 
             break;
@@ -38728,11 +38676,8 @@ async function expandLibrarySearchQuery(
         case "all":
 
             jsonInstruction = [
-
                 "أعد JSON فقط:",
-
                 "{\"intent\":\"...\",\"subject\":\"...\",\"constraints\":[\"...\"],\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"]}"
-
             ];
 
             break;
@@ -38741,11 +38686,8 @@ async function expandLibrarySearchQuery(
         default:
 
             jsonInstruction = [
-
                 "أعد JSON فقط:",
-
                 "{\"intent\":\"...\",\"subject\":\"...\",\"constraints\":[\"...\"],\"shamelaQueries\":[\"...\",\"...\",\"...\"],\"ketabQueries\":[\"...\",\"...\",\"...\"]}"
-
             ];
 
             break;
@@ -38754,7 +38696,7 @@ async function expandLibrarySearchQuery(
 
 
     // ========================================================
-    // بناء System Prompt النهائي
+    // System Prompt
     // ========================================================
 
     const systemPrompt = [
@@ -38769,11 +38711,10 @@ async function expandLibrarySearchQuery(
 
 
     // ========================================================
-    // إرسال الاستعلام للذكاء الاصطناعي بصورة مفككة
+    // User Prompt
     // ========================================================
 
     let userPrompt = [];
-
 
     switch (source) {
 
@@ -38793,7 +38734,13 @@ async function expandLibrarySearchQuery(
                 "",
 
                 "موضوع البحث:",
-                effectiveSubject
+                effectiveSubject,
+
+                "",
+
+                source === "aljam3"
+                    ? "مهم: اقرأ صفحة تصنيفات مكتبة الجامع الرسمية المذكورة في التعليمات قبل تحديد التصنيفات."
+                    : ""
 
             ];
 
@@ -38829,21 +38776,27 @@ async function expandLibrarySearchQuery(
         userPrompt.join("\n");
 
 
+    // ========================================================
+    // استدعاء AI
+    //
+    // webFetch فقط عند ALJAM3 ومع OpenRouter.
+    // ========================================================
+
     const answer =
         await callLibraryAI(
             systemPrompt,
             userPrompt,
             {
                 task: "queryExpansion",
-                temperature: 0.1
+                temperature: 0.1,
+                enableWebFetch:
+                    source === "aljam3"
             }
         );
 
 
     const parsed =
-        parseLibraryAIJSON(
-            answer
-        );
+        parseLibraryAIJSON(answer);
 
 
     // ========================================================
@@ -38898,12 +38851,6 @@ async function expandLibrarySearchQuery(
         .trim();
 
 
-    // ========================================================
-    // الموضوع والقسم يؤخذان من صيغة الباحث نفسها
-    //
-    // حتى لا يعيد AI تفسيرهما أو تغييرهُما.
-    // ========================================================
-
     const subject =
         hasUserSection
             ? effectiveSubject
@@ -38949,12 +38896,10 @@ async function expandLibrarySearchQuery(
             parsed.primaryCategory
         );
 
-
     const aiSecondaryCategory =
         matchAljam3Category(
             parsed.secondaryCategory
         );
-
 
     const aiPossibleCategory =
         matchAljam3Category(
@@ -38962,24 +38907,13 @@ async function expandLibrarySearchQuery(
         );
 
 
-    // ========================================================
-    // إذا حدد الباحث قسمًا صريحًا:
-    //
-    // الفقه الحنفي، الفقه الشافعي، أصول الفقه والقواعد الفقهية
-    //
-    // نحاول مطابقة كل قسم بصورة مستقلة.
-    // ========================================================
-
     let explicitCategories = [];
-
 
     if (hasUserSection) {
 
         const sectionParts =
             userSection
-                .split(
-                    /[،,؛;]+/
-                )
+                .split(/[،,؛;]+/)
                 .map(
                     part =>
                         String(
@@ -38988,7 +38922,6 @@ async function expandLibrarySearchQuery(
                         ).trim()
                 )
                 .filter(Boolean);
-
 
         explicitCategories =
             sectionParts
@@ -39004,7 +38937,7 @@ async function expandLibrarySearchQuery(
 
 
     // ========================================================
-    // إزالة التصنيفات المكررة
+    // إزالة التكرار
     // ========================================================
 
     const allMatchedCategories = [];
@@ -39026,12 +38959,10 @@ async function expandLibrarySearchQuery(
 
         }
 
-
         const id =
             Number(
                 category.id
             );
-
 
         if (
             !id ||
@@ -39042,7 +38973,6 @@ async function expandLibrarySearchQuery(
 
         }
 
-
         seenCategoryIds.add(id);
 
         allMatchedCategories.push(
@@ -39051,11 +38981,6 @@ async function expandLibrarySearchQuery(
 
     }
 
-
-    // ========================================================
-    // عند وجود userSection:
-    // نستخدم التصنيفات التي حددها الباحث أولًا.
-    // ========================================================
 
     if (hasUserSection) {
 
@@ -39073,10 +38998,6 @@ async function expandLibrarySearchQuery(
     }
 
 
-    // ========================================================
-    // إذا لم يكفِ ذلك، نضيف تصنيفات AI.
-    // ========================================================
-
     addUniqueCategory(
         aiPrimaryCategory
     );
@@ -39089,11 +39010,6 @@ async function expandLibrarySearchQuery(
         aiPossibleCategory
     );
 
-
-    // ========================================================
-    // الاحتفاظ بالبنية الحالية:
-    // primary / secondary / possible
-    // ========================================================
 
     const categories = {
 
@@ -39113,7 +39029,7 @@ async function expandLibrarySearchQuery(
 
 
     // ========================================================
-    // توحيد الاستعلامات ومنع التكرار
+    // توحيد الاستعلامات
     // ========================================================
 
     function normalizeQueries(
@@ -39133,12 +39049,10 @@ async function expandLibrarySearchQuery(
                     .filter(Boolean)
                 : [];
 
-
         const unique = [];
 
         const seen =
             new Set();
-
 
         for (
             const item
@@ -39147,13 +39061,9 @@ async function expandLibrarySearchQuery(
 
             const key =
                 item
-                    .replace(
-                        /\s+/g,
-                        " "
-                    )
+                    .replace(/\s+/g, " ")
                     .trim()
                     .toLowerCase();
-
 
             if (
                 !key ||
@@ -39164,16 +39074,11 @@ async function expandLibrarySearchQuery(
 
             }
 
-
-            seen.add(
-                key
-            );
-
+            seen.add(key);
 
             unique.push(
                 item
             );
-
 
             if (
                 unique.length >= 3
@@ -39185,7 +39090,6 @@ async function expandLibrarySearchQuery(
 
         }
 
-
         return unique;
 
     }
@@ -39196,22 +39100,16 @@ async function expandLibrarySearchQuery(
             parsed.shamelaQueries
         );
 
-
     const ketabQueries =
         normalizeQueries(
             parsed.ketabQueries
         );
-
 
     const aljam3Queries =
         normalizeQueries(
             parsed.aljam3Queries
         );
 
-
-    // ========================================================
-    // النتيجة النهائية
-    // ========================================================
 
     return {
 
@@ -39229,23 +39127,17 @@ async function expandLibrarySearchQuery(
         shamelaQueries:
             shamelaQueries.length
                 ? shamelaQueries
-                : [
-                    subject
-                ],
+                : [subject],
 
         ketabQueries:
             ketabQueries.length
                 ? ketabQueries
-                : [
-                    subject
-                ],
+                : [subject],
 
         aljam3Queries:
             aljam3Queries.length
                 ? aljam3Queries
-                : [
-                    subject
-                ]
+                : [subject]
 
     };
 
