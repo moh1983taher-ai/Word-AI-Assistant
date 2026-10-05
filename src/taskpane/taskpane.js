@@ -37558,11 +37558,20 @@ async function callLibraryAI(
                 config.provider === "openrouter" &&
                 options.enableWebFetch
             ) {
+
                 body.tools = [
                     {
-                        type: "openrouter:web_fetch"
+                        type: "openrouter:web_fetch",
+                        parameters: {
+                            engine: "openrouter",
+                            allowed_domains: [
+                                "aljam3.com"
+                            ],
+                            max_content_tokens: 12000
+                        }
                     }
                 ];
+
             }
 
 
@@ -38089,9 +38098,46 @@ const ALJAM3_CATEGORY_ALIASES = {
 // مع تصنيف الجامع.
 // ============================================================
 
-function matchAljam3Category(
-    value
-) {
+function matchAljam3Category(value) {
+
+    // --------------------------------------------------------
+    // 0. إذا أعاد AI التصنيف مباشرةً ككائن:
+    // { name: "...", id: 21 }
+    // --------------------------------------------------------
+
+    if (
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+    ) {
+
+        const name =
+            String(
+                value.name ||
+                ""
+            )
+            .replace(/\s+/g, " ")
+            .trim();
+
+        const id =
+            Number(
+                value.id
+            );
+
+        if (
+            name &&
+            id > 0
+        ) {
+
+            return {
+                name,
+                id
+            };
+
+        }
+
+    }
+
 
     const original =
         String(
@@ -38106,9 +38152,7 @@ function matchAljam3Category(
 
 
     if (!original) {
-
         return null;
-
     }
 
 
@@ -38141,7 +38185,7 @@ function matchAljam3Category(
 
 
     // --------------------------------------------------------
-    // 1. تطابق مباشر مع اسم التصنيف
+    // 1. تطابق مباشر مع الخريطة الحالية
     // --------------------------------------------------------
 
     for (
@@ -38159,9 +38203,10 @@ function matchAljam3Category(
 
             return {
                 name: categoryName,
-                id: ALJAM3_CATEGORY_MAP[
-                    categoryName
-                ]
+                id:
+                    ALJAM3_CATEGORY_MAP[
+                        categoryName
+                    ]
             };
 
         }
@@ -38170,7 +38215,7 @@ function matchAljam3Category(
 
 
     // --------------------------------------------------------
-    // 2. تطابق مع اسم بديل
+    // 2. التطابق مع الأسماء البديلة
     // --------------------------------------------------------
 
     for (
@@ -38199,9 +38244,10 @@ function matchAljam3Category(
 
                 return {
                     name: categoryName,
-                    id: ALJAM3_CATEGORY_MAP[
-                        categoryName
-                    ]
+                    id:
+                        ALJAM3_CATEGORY_MAP[
+                            categoryName
+                        ]
                 };
 
             }
@@ -38212,7 +38258,7 @@ function matchAljam3Category(
 
 
     // --------------------------------------------------------
-    // 3. محاولة احتياطية: إذا كان أحد الطرفين يحتوي الآخر
+    // 3. المطابقة الجزئية الاحتياطية
     // --------------------------------------------------------
 
     for (
@@ -38229,19 +38275,16 @@ function matchAljam3Category(
 
 
         if (
-            normalizedName.includes(
-                target
-            ) ||
-            target.includes(
-                normalizedName
-            )
+            normalizedName.includes(target) ||
+            target.includes(normalizedName)
         ) {
 
             return {
                 name: categoryName,
-                id: ALJAM3_CATEGORY_MAP[
-                    categoryName
-                ]
+                id:
+                    ALJAM3_CATEGORY_MAP[
+                        categoryName
+                    ]
             };
 
         }
@@ -38569,8 +38612,11 @@ async function expandLibrarySearchQuery(
         case "aljam3":
 
             jsonInstruction = [
+
                 "أعد JSON فقط:",
-                "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":\"...\",\"secondaryCategory\":\"...\",\"possibleCategory\":\"...\",\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
+
+                "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":{\"name\":\"...\",\"id\":0},\"secondaryCategory\":{\"name\":\"...\",\"id\":0},\"possibleCategory\":{\"name\":\"...\",\"id\":0},\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
+
             ];
 
             break;
