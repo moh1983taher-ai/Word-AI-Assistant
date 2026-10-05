@@ -38304,8 +38304,10 @@ function buildAljam3SearchUrl(
 let ALJAM3_CATEGORIES_CACHE = null;
 
 async function loadAljam3Categories() {
-    if (Array.isArray(ALJAM3_CATEGORIES_CACHE) &&
-        ALJAM3_CATEGORIES_CACHE.length) {
+    if (
+        Array.isArray(ALJAM3_CATEGORIES_CACHE) &&
+        ALJAM3_CATEGORIES_CACHE.length
+    ) {
         return ALJAM3_CATEGORIES_CACHE;
     }
 
