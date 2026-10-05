@@ -37554,6 +37554,17 @@ async function callLibraryAI(
 
             };
 
+            if (
+                config.provider === "openrouter" &&
+                options.enableWebFetch
+            ) {
+                body.tools = [
+                    {
+                        type: "openrouter:web_fetch"
+                    }
+                ];
+            }
+
 
             // =========================================================
             // تحكم التفكير حسب سياسة المزود والنموذج
@@ -38296,114 +38307,6 @@ function buildAljam3SearchUrl(
     );
 
 }
-
-// ============================================================
-// ALJAM3 — تحميل قائمة الأقسام الرسمية من مكتبة الجامع
-// ============================================================
-
-let ALJAM3_CATEGORIES_CACHE = null;
-
-async function loadAljam3Categories() {
-    if (
-        Array.isArray(ALJAM3_CATEGORIES_CACHE) &&
-        ALJAM3_CATEGORIES_CACHE.length
-    ) {
-        return ALJAM3_CATEGORIES_CACHE;
-    }
-
-    try {
-        const response = await fetch(
-            "https://aljam3.com/en/categories",
-            {
-                method: "GET",
-                headers: {
-                    "Accept": "text/html"
-                },
-                cache: "no-store"
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(
-                `ALJAM3 categories HTTP ${response.status}`
-            );
-        }
-
-        const html = await response.text();
-
-        const categories = [];
-        const seenIds = new Set();
-
-        const linkRegex =
-            /<a\b[^>]*href=["'](?:https?:\/\/aljam3\.com)?\/en\/categories\/(\d+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-
-        let match;
-
-        while ((match = linkRegex.exec(html)) !== null) {
-            const id = Number(match[1]);
-
-            const name = String(match[2] || "")
-                .replace(/<[^>]*>/g, " ")
-                .replace(/&nbsp;/gi, " ")
-                .replace(/&amp;/gi, "&")
-                .replace(/\s+/g, " ")
-                .trim()
-                .replace(/^\d+\.\s*/, "");
-
-            if (!id || !name || seenIds.has(id)) {
-                continue;
-            }
-
-            seenIds.add(id);
-
-            categories.push({
-                name,
-                id
-            });
-        }
-
-        if (!categories.length) {
-            throw new Error(
-                "ALJAM3 categories: no categories extracted"
-            );
-        }
-
-        categories.sort((a, b) => a.id - b.id);
-
-        ALJAM3_CATEGORIES_CACHE = categories;
-
-        console.log(
-            "ALJAM3 CATEGORIES LOADED:",
-            categories.length,
-            categories
-        );
-
-        return categories;
-
-    } catch (error) {
-        console.warn(
-            "ALJAM3 CATEGORIES LOAD FAILED:",
-            error
-        );
-
-        const fallback =
-            Object.entries(ALJAM3_CATEGORY_MAP)
-                .map(([name, id]) => ({
-                    name,
-                    id: Number(id)
-                }))
-                .filter(item => item.id);
-
-        console.log(
-            "ALJAM3 CATEGORIES FALLBACK:",
-            fallback.length
-        );
-
-        return fallback;
-    }
-}
-// إتاحة الدالة للاختبار من Console
-window.loadAljam3Categories = loadAljam3Categories;
 
 // ============================================================
 // توسيع استعلام الباحث
