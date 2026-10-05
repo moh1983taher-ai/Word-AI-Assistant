@@ -38402,6 +38402,9 @@ async function loadAljam3Categories() {
         return fallback;
     }
 }
+// إتاحة الدالة للاختبار من Console
+window.loadAljam3Categories = loadAljam3Categories;
+
 // ============================================================
 // توسيع استعلام الباحث
 // ============================================================
