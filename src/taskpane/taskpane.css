@@ -6581,10 +6581,12 @@ body.dark #save-settings,
     top: auto;
     bottom: 34px;
 }
-.ai-symbol .research-tools-icon {
+.ai-symbol .research-tools-icon,
+.brand-icon .research-tools-icon {
     width: 32px;
     height: 32px;
     display: block;
+    flex-shrink: 0;
 }
 /* =========================================================
    END
