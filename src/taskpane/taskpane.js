@@ -21350,7 +21350,7 @@ function renderChat() {
 
     if (
         !currentChat ||
-        currentChat.isNew === true
+        currentChat.isTemporary === true
     ) {
 
         chatArea.innerHTML = `
