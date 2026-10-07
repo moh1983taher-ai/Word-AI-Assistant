@@ -21348,7 +21348,10 @@ function renderChat() {
         "";
 
 
-    if (!currentChat) {
+    if (
+        !currentChat ||
+        currentChat.isNew === true
+    ) {
 
         chatArea.innerHTML = `
             <div class="welcome">
