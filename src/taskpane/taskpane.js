@@ -27231,8 +27231,10 @@ async function askAIForLibraryRanking(
         );
 
     }
+    
     // =========================================================
     // DuckAI المحلي
+    // مع إعادة المحاولة عند فشل VQD أو أخطاء الخادم
     // =========================================================
 
     if (
@@ -27240,76 +27242,131 @@ async function askAIForLibraryRanking(
         "duckai"
     ) {
 
-        const response =
-            await fetch(
-                "http://127.0.0.1:8080/v1/chat/completions",
-                {
+        return await withAIRetry(
+            async function () {
 
-                    method:
-                        "POST",
+                let response;
 
-                    headers: {
+                try {
 
-                        "Content-Type":
-                            "application/json"
+                    response =
+                        await fetch(
+                            "http://127.0.0.1:8080/v1/chat/completions",
+                            {
 
-                    },
+                                method:
+                                    "POST",
 
-                    body:
-                        JSON.stringify({
+                                headers: {
 
-                            model:
-                                data.model,
+                                    "Content-Type":
+                                        "application/json"
 
-                            messages,
+                                },
 
-                            stream:
-                                false,
+                                body:
+                                    JSON.stringify({
 
-                            temperature:
-                                0,
+                                        model:
+                                            data.model,
 
-                            max_tokens:
-                                4000
+                                        messages,
 
-                        })
+                                        stream:
+                                            false,
+
+                                        temperature:
+                                            0,
+
+                                        max_tokens:
+                                            4000
+
+                                    })
+
+                            }
+                        );
 
                 }
-            );
+                catch (
+                    error
+                ) {
+
+                    error.networkError =
+                        true;
+
+                    throw error;
+
+                }
 
 
-        const result =
-            await readJSON(
-                response
-            );
+                const result =
+                    await readJSON(
+                        response
+                    );
 
 
-        if (
-            !response.ok
-        ) {
+                if (
+                    !response.ok
+                ) {
 
-            throw new Error(
-                getAPIError(
+                    const message =
+                        getAPIError(
+                            result,
+                            "فشل الاتصال بـ DuckAI المحلي."
+                        );
+
+
+                    const error =
+                        new Error(
+                            message
+                        );
+
+
+                    // مهم جدًا:
+                    // إرفاق الاستجابة حتى يستطيع
+                    // withAIRetry() معرفة أن الخطأ
+                    // HTTP 500 وقابل لإعادة المحاولة.
+
+                    error.response =
+                        response;
+
+
+                    // خطأ VQD قابل لإعادة المحاولة
+                    // وكذلك أخطاء الخادم 5xx.
+
+                    if (
+                        Number(
+                            response.status
+                        ) >= 500 ||
+                        /x-vqd-hash-1|failed to initialize VQD/i.test(
+                            String(
+                                message ||
+                                ""
+                            )
+                        )
+                    ) {
+
+                        error.retryable =
+                            true;
+
+                    }
+
+
+                    throw error;
+
+                }
+
+
+                return extractOpenAIStyleAnswer(
                     result,
-                    "فشل الاتصال بـ DuckAI المحلي."
-                )
-            );
+                    "DuckAI"
+                );
 
-        }
-
-
-        return extractOpenAIStyleAnswer(
-            result,
+            },
             "DuckAI"
         );
 
     }
-
-
-    throw new Error(
-        "مزود الذكاء الاصطناعي غير معروف: " +
-        data.provider
-    );
 
 }
 
