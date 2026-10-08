@@ -36714,7 +36714,7 @@ const LIBRARY_AI_EXPANSION_COUNT = 3;
 const LIBRARY_AI_FETCH_RESULTS_PER_QUERY = 60;
 const LIBRARY_AI_MAX_CANDIDATES = 100;
 const LIBRARY_AI_MIN_RELEVANCE = 68;
-const LIBRARY_AI_TIMEOUT_MS = 15000;
+const LIBRARY_AI_TIMEOUT_MS = 60000;
 
 
 // =====================================================
