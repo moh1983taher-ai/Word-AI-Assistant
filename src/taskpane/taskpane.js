@@ -40226,7 +40226,7 @@ async function searchLibrary(
 
             const seen = new Set();
 
-            const TOP_PER_QUERY = 10;
+            const TOP_PER_QUERY = 30;
 
 
             for (
