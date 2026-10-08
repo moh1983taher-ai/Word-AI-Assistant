@@ -27774,13 +27774,29 @@ async function rankLibraryResultsWithAI(
 
 
 
-        const raw =
+        let raw;
 
-            await askAIForLibraryRanking(
+            try {
 
-                prompt
+                raw =
+                    await askAIForLibraryRanking(
+                        prompt
+                    );
 
-            );
+            }
+            catch (error) {
+
+                console.error(
+                    "AI RANKING BATCH FAILED:",
+                    batchIndex + 1,
+                    "/",
+                    batches.length,
+                    error
+                );
+
+                continue;
+
+            }
 
 
 
