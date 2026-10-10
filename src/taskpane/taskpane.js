@@ -21823,28 +21823,32 @@ function renderChat() {
                         }
 
 
-                        // رقم المجلد والصفحة
-                        if (part && page) {
+                        
+                        // رقم الجزء والصفحة، مع معالجة الصيغة الوصفية
+                        let normalizedPart = part;
+                        let normalizedPage = page;
 
-                            citationParts.push(
-                                `${part}/${page}`
+                        // مثال: "ص 425 من المجلد 1"
+                        if (!normalizedPart && !normalizedPage) {
+                            const locationText = card.textContent || "";
+                            const match = locationText.match(
+                                /ص(?:فحة)?\s*([\d٠-٩]+)\s*من\s*المجلد\s*([\d٠-٩]+)/
                             );
 
+                            if (match) {
+                                normalizedPage = match[1];
+                                normalizedPart = match[2];
+                            }
                         }
-                        else if (page) {
 
-                            citationParts.push(
-                                `ص ${page}`
-                            );
-
+                        if (normalizedPart && normalizedPage) {
+                            citationParts.push(`${normalizedPart}/${normalizedPage}`);
+                        } else if (normalizedPage) {
+                            citationParts.push(`ص ${normalizedPage}`);
+                        } else if (normalizedPart) {
+                            citationParts.push(`ج ${normalizedPart}`);
                         }
-                        else if (part) {
 
-                            citationParts.push(
-                                `ج ${part}`
-                            );
-
-                        }
 
 
                         const citation =
