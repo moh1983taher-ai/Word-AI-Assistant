@@ -21824,30 +21824,52 @@ function renderChat() {
 
 
                         
-                        // رقم الجزء والصفحة، مع معالجة الصيغة الوصفية
+                        
+                        // استخراج أرقام الجزء والصفحة فقط عند النسخ
                         let normalizedPart = part;
                         let normalizedPage = page;
 
-                        // مثال: "ص 425 من المجلد 1"
-                        if (!normalizedPart && !normalizedPage) {
+                        // تحويل الأرقام العربية إلى أرقام غربية
+                        function normalizeDigits(value) {
+                            return String(value || "")
+                                .replace(/[٠-٩]/g, digit =>
+                                    String("٠١٢٣٤٥٦٧٨٩".indexOf(digit))
+                                )
+                                .replace(/[۰-۹]/g, digit =>
+                                    String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit))
+                                );
+                        }
+
+                        // إذا كانت بيانات الجزء والصفحة ناقصة،
+                        // نستخرجها من النص الظاهر في البطاقة.
+                        if (!normalizedPart || !normalizedPage) {
                             const locationText = card.textContent || "";
+
                             const match = locationText.match(
-                                /ص(?:فحة)?\s*([\d٠-٩]+)\s*من\s*المجلد\s*([\d٠-٩]+)/
+                                /ص(?:فحة)?\s*([0-9٠-٩۰-۹]+)\s*من\s*المجلد\s*([0-9٠-٩۰-۹]+)/i
                             );
 
                             if (match) {
-                                normalizedPage = match[1];
-                                normalizedPart = match[2];
+                                if (!normalizedPage) normalizedPage = match[1];
+                                if (!normalizedPart) normalizedPart = match[2];
                             }
                         }
+
+                        // إزالة أي وصف وإبقاء الأرقام فقط
+                        normalizedPart = normalizeDigits(normalizedPart)
+                            .match(/[0-9]+/)?.[0] || "";
+
+                        normalizedPage = normalizeDigits(normalizedPage)
+                            .match(/[0-9]+/)?.[0] || "";
 
                         if (normalizedPart && normalizedPage) {
                             citationParts.push(`${normalizedPart}/${normalizedPage}`);
                         } else if (normalizedPage) {
-                            citationParts.push(`ص ${normalizedPage}`);
+                            citationParts.push(normalizedPage);
                         } else if (normalizedPart) {
-                            citationParts.push(`ج ${normalizedPart}`);
+                            citationParts.push(normalizedPart);
                         }
+
 
 
 
