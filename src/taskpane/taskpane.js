@@ -21865,7 +21865,7 @@ function renderChat() {
                         if (normalizedPart && normalizedPage) {
                             citationParts.push(`${normalizedPart}/${normalizedPage}`);
                         } else if (normalizedPage) {
-                            citationParts.push(normalizedPage);
+                            citationParts.push(`ص${normalizedPage}`);
                         } else if (normalizedPart) {
                             citationParts.push(normalizedPart);
                         }
