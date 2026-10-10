@@ -40062,6 +40062,7 @@ async function searchLibrary(
 
 
 
+    
     // =========================================================
     // عند اختيار مكتبة محددة
     // =========================================================
@@ -40070,6 +40071,24 @@ async function searchLibrary(
         selectedSource !==
         "all"
     ) {
+
+        // =========================================================
+        // Baheth — الشاملة الذكية:
+        // بحث مباشر مستقل دون توسيع الاستعلامات بالذكاء الاصطناعي
+        // =========================================================
+
+        if (
+            selectedSource ===
+            "baheth"
+        ) {
+
+            return await asyncDirectSearch(
+                text,
+                "baheth"
+            );
+
+        }
+
 
         // =========================================================
         // Shamela:
@@ -49926,6 +49945,35 @@ if (
 
             </button>
 
+            
+            <button
+                type="button"
+                class="scope-project-item"
+                data-library-source="baheth">
+
+                <span class="scope-project-icon">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#000000"
+                        stroke-width="1"
+                        stroke-linecap="round"
+                        stroke-linejoin="round">
+
+                        <path d="M12 3 3.5 7.5 12 12l8.5-4.5L12 3Z"/>
+                        <path d="M5 10v5c4.5 3.5 9.5 3.5 14 0v-5"/>
+                        <path d="M20.5 8v7"/>
+                    </svg>
+                </span>
+
+                <span class="scope-project-name">
+                    باحث — الشاملة الذكية
+                </span>
+
+            </button>
+
+
 
             <button
                 type="button"
@@ -50040,7 +50088,10 @@ if (
                                     "المكتبة الشاملة",
 
                                 aljam3:
-                                    "الجامع"
+                                    "الجامع",
+                                
+                                baheth:
+                                    "باحث — الشاملة الذكية"
 
                             };
 
