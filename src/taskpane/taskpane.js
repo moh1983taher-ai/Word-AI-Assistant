@@ -27502,23 +27502,16 @@ async function rankLibraryResultsWithAI(
 
                 "",
 
-            text:
+            
+            text: String(
+                result?.text || ""
+            )
+                .split(/\n\s*\n/)
+                .filter(paragraph => paragraph.trim())
+                .slice(0, 3)
+                .join("\n\n")
+                .trim()
 
-                String(
-
-                    result?.text ||
-
-                    ""
-
-                )
-
-                .substring(
-
-                    0,
-
-                    1200
-
-                )
 
         };
 
@@ -39327,54 +39320,28 @@ function libraryResultKey(
 // تجهيز النتائج للذكاء
 // =====================================================
 
-function trimLibraryCandidateForAI(
-    result
-) {
+
+function trimLibraryCandidateForAI(result) {
+    const text = String(result?.text || "")
+        .replace(/\r\n?/g, "\n")
+        .trim();
+
+    const paragraphs = text
+        .split(/\n\s*\n/)
+        .map(paragraph => paragraph.trim())
+        .filter(Boolean);
 
     return {
-
-        source:
-            String(
-                result?.source ||
-                ""
-            ),
-
-        title:
-            String(
-                result?.title ||
-                ""
-            ),
-
-        author:
-            String(
-                result?.author ||
-                ""
-            ),
-
-        sectionTitle:
-            String(
-                result?.sectionTitle ||
-                ""
-            ),
-
-        text:
-            String(
-                result?.text ||
-                ""
-            )
-            .replace(
-                /\s+/g,
-                " "
-            )
-            .trim()
-            .substring(
-                0,
-                1400
-            )
-
+        source: String(result?.source || ""),
+        title: String(result?.title || ""),
+        author: String(result?.author || ""),
+        sectionTitle: String(result?.sectionTitle || ""),
+        text: paragraphs.length
+            ? paragraphs.slice(0, 3).join("\n\n")
+            : text
     };
-
 }
+
 
 
 // =====================================================
