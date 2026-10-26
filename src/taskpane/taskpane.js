@@ -23846,69 +23846,62 @@ function getAPIError(
 // OpenAI / OpenRouter Answer
 // =====================================================
 
-function extractOpenAIStyleAnswer(
-    result,
-    providerName
-) {
 
-    if (
-        result &&
-        result.choices &&
-        result.choices.length >
-            0
-    ) {
-
-        const choice =
-            result.choices[0];
-
-
-        if (
-            choice.message &&
-            typeof choice.message.content ===
-                "string"
-        ) {
-
-            const content =
-                choice.message.content.trim();
-
-
-            if (content) {
-
-                return content;
-
-            }
-
-
-            const error =
-                new Error(
-                    "وصل رد فارغ من " +
-                    providerName +
-                    "."
-                );
-
-            error.retryable =
-                true;
-
-            throw error;
-
-        }
-
+function extractOpenAIStyleAnswer(result, providerName) {
+    if (!result || typeof result !== "object") {
+        const error = new Error(
+            "لم يصل رد صالح من " + providerName +
+            ": الاستجابة فارغة أو ليست كائنًا صالحًا."
+        );
+        error.retryable = true;
+        throw error;
     }
 
+    // إظهار الخطأ الذي قد تعيده الخدمة داخل جسم الاستجابة
+    if (result.error) {
+        const detail =
+            result.error.message ||
+            result.error.code ||
+            JSON.stringify(result.error);
 
-    const error =
-        new Error(
-            "لم يصل رد صالح من " +
-            providerName +
-            "."
+        const error = new Error(
+            "خطأ من " + providerName + ": " + detail
         );
+        error.retryable = true;
+        throw error;
+    }
 
-    error.retryable =
-        true;
+    const choices = result.choices;
 
+    if (!Array.isArray(choices) || choices.length === 0) {
+        const error = new Error(
+            "لم يُرجع " + providerName +
+            " أي خيارات صالحة. بنية الاستجابة: " +
+            JSON.stringify(result).slice(0, 1200)
+        );
+        error.retryable = true;
+        throw error;
+    }
+
+    const choice = choices[0];
+    const content = choice?.message?.content;
+
+    if (typeof content === "string" && content.trim()) {
+        return content.trim();
+    }
+
+    // بعض الاستجابات قد تشير إلى سبب التوقف دون محتوى نصي
+    const finishReason = choice?.finish_reason || "غير محدد";
+
+    const error = new Error(
+        "وصل رد من " + providerName +
+        " لكنه لا يحتوي على نص قابل للاستخراج." +
+        " سبب التوقف: " + finishReason
+    );
+    error.retryable = true;
     throw error;
-
 }
+
 
 
 // =====================================================
