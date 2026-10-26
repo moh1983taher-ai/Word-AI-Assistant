@@ -29633,6 +29633,28 @@ other
     }
 
 
+    if (provider === "duckai") {
+        console.log("=== DuckAI Reference Analysis ===");
+        console.log("Endpoint:", endpoint);
+        console.log("Model:", model);
+        console.log("Target materials:", payload.length);
+        console.log("Context materials:", contextPayload.length);
+        console.log("System prompt chars:", systemPrompt.length);
+        console.log("User prompt chars:", userPrompt.length);
+        console.log(
+            "Total request chars:",
+            JSON.stringify({
+                model,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature: 0.1,
+                response_format: { type: "json_object" },
+                max_tokens: 12000
+            }).length
+        );
+    }
     const response =
         await fetch(
             endpoint,
