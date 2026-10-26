@@ -36329,220 +36329,92 @@ async function streamGeminiAI(
 // Stream DuckAI
 // =====================================================
 
-async function streamDuckAI(
-    text,
-    onChunk
-) {
 
-    const data =
-        getActiveAISettings();
+async function streamDuckAI(text, onChunk) {
+    const data = getActiveAISettings();
 
-
-    if (
-        !data.model ||
-        !data.model.trim()
-    ) {
-
-        throw new Error(
-            "لم يتم تحديد نموذج Duck.ai."
-        );
-
+    if (!data.model || !data.model.trim()) {
+        throw new Error("لم يتم تحديد نموذج Duck.ai.");
     }
 
+    const streamingContext = await buildStreamingContext(text);
 
-    const streamingContext =
-        await buildStreamingContext(
-            text
-        );
-
-
-    AppState.streaming.active =
-        true;
-
-    AppState.streaming.provider =
-        "duckai";
-
-    AppState.streaming.text =
-        "";
-
+    AppState.streaming.active = true;
+    AppState.streaming.provider = "duckai";
+    AppState.streaming.text = "";
 
     try {
+        const answer = await withAIRetry(
+            async function () {
+                let response;
 
-        const answer =
-            await withAIRetry(
-                async function () {
-
-                    let response;
-
-
-                    // ==================================
-                    // إرسال الطلب إلى Agent المحلي
-                    // ==================================
-
-                    try {
-
-                        response =
-                            await fetch(
-                                "http://127.0.0.1:8080/v1/chat/completions",
-                                {
-
-                                    method:
-                                        "POST",
-
-                                    headers: {
-
-                                        "Content-Type":
-                                            "application/json"
-
-                                    },
-
-                                    body:
-                                        JSON.stringify({
-
-                                            model:
-                                                data.model,
-
-                                            messages:
-                                                streamingContext.messages,
-
-                                            max_tokens:
-                                                12000,
-
-                                            temperature:
-                                                0.2,
-
-                                            stream:
-                                                true
-
-                                        })
-
-                                }
-                            );
-
-                    }
-                    catch (
-                        error
-                    ) {
-
-                        // ==================================
-                        // خطأ اتصال بالـ Agent المحلي
-                        // ==================================
-
-                        error.networkError =
-                            true;
-
-                        throw error;
-
-                    }
-
-
-                    // ==================================
-                    // فحص HTTP
-                    // ==================================
-
-                    if (!response.ok) {
-
-                        const result =
-                            await readJSON(
-                                response
-                            );
-
-
-                        const error =
-                            new Error(
-                                getAPIError(
-                                    result,
-                                    "فشل الاتصال بـ Duck.ai."
-                                )
-                            );
-
-
-                        error.response =
-                            response;
-
-
-                        // ==================================
-                        // Duck.ai / Duck2API
-                        //
-                        // 418 لا نعيد المحاولة تلقائيًا.
-                        // مثال:
-                        // no x-vqd-hash-1 token
-                        // ==================================
-
-                        if (
-                            Number(
-                                response.status
-                            ) === 418
-                        ) {
-
-                            error.noRetry =
-                                true;
-
-                        }
-
-
-                        throw error;
-
-                    }
-
-
-                    // ==================================
-                    // معالجة البث
-                    // ==================================
-
-                    const answer =
-                        await processOpenAICompatibleStream(
-                            response,
-
-                            function(
-                                delta,
-                                fullText
-                            ) {
-
-                                AppState.streaming.text =
-                                    fullText;
-
-
-                                if (
-                                    typeof onChunk ===
-                                    "function"
-                                ) {
-
-                                    onChunk(
-                                        delta,
-                                        fullText
-                                    );
-
-                                }
-
+                try {
+                    response = await fetch(
+                        "http://127.0.0.1:8080/v1/chat/completions",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
                             },
+                            body: JSON.stringify({
+                                model: data.model,
+                                messages: streamingContext.messages,
+                                max_tokens: 12000,
+                                temperature: 0.2,
+                                stream: false
+                            })
+                        }
+                    );
+                } catch (error) {
+                    error.networkError = true;
+                    throw error;
+                }
 
-                            "Duck.ai"
-                        );
+                if (!response.ok) {
+                    const result = await readJSON(response);
 
+                    const error = new Error(
+                        getAPIError(result, "فشل الاتصال بـ Duck.ai.")
+                    );
 
-                    return answer;
+                    error.response = response;
 
-                },
+                    if (Number(response.status) === 418) {
+                        error.noRetry = true;
+                    }
 
-                "Duck.ai"
-            );
+                    throw error;
+                }
 
+                const result = await readJSON(response);
+
+                const answer =
+                    result?.choices?.[0]?.message?.content;
+
+                if (typeof answer !== "string" || !answer.trim()) {
+                    throw new Error(
+                        "استجاب Duck.ai دون نص إجابة صالح."
+                    );
+                }
+
+                AppState.streaming.text = answer;
+
+                if (typeof onChunk === "function") {
+                    onChunk(answer, answer);
+                }
+
+                return answer;
+            },
+            "Duck.ai"
+        );
 
         return answer;
-
+    } finally {
+        AppState.streaming.active = false;
+        AppState.streaming.provider = "";
     }
-    finally {
-
-        AppState.streaming.active =
-            false;
-
-        AppState.streaming.provider =
-            "";
-
-    }
-
 }
+
 
 // =====================================================
 // Stream AI
