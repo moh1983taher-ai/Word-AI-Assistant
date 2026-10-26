@@ -29696,7 +29696,7 @@ other
                             provider === "duckai"
                                 ? 12000
                                 : provider === "groq"
-                                    ? 16000
+                                    ? 4096
                                     : 24000
                         }
                     )
