@@ -46228,38 +46228,28 @@ async function applyFootnoteSuggestions(
 
     }
 
-    function normalizeLocal(
-        value
-    ) {
-
+    
+    function normalizeLocal(value) {
         return toWesternDigits(
-            String(
-                value || ""
-            )
+            String(value ?? "")
         )
-            .replace(
-                /[\u064B-\u065F\u0670]/g,
-                ""
-            )
-            .replace(
-                /[\u200C-\u200F\u202A-\u202E]/g,
-                ""
-            )
-            .replace(
-                /[\u00A0\s]+/g,
-                ""
-            )
-            .replace(
-                /[،,؛:()[\]{}"'`]/g,
-                ""
-            )
-            .replace(
-                /[-–—]/g,
-                "-"
-            )
+            .normalize("NFC")
+            // إزالة التشكيل
+            .replace(/[\u064B-\u065F\u0670]/g, "")
+            // إزالة محارف الاتجاه والتحكم غير المرئية
+            .replace(/[\u200C-\u200F\u202A-\u202E\uFEFF]/g, "")
+            // توحيد صور الألف
+            .replace(/[أإآٱ]/g, "ا")
+            // توحيد الألف المقصورة مع الياء
+            .replace(/ى/g, "ي")
+            // تجاهل المسافات وعلامات الترقيم أثناء المقارنة
+            .replace(/[\s\u00A0]+/g, "")
+            .replace(/[،,؛:()[\]{}"'`]/g, "")
+            // توحيد أشكال الشرطة
+            .replace(/[ـ–—−]/g, "-")
             .toLowerCase();
-
     }
+
 
     /*
      * =========================================================
