@@ -28586,8 +28586,7 @@ async function analyzeReferencesWithAI(
 
 
     if (
-        settings?.provider !==
-        "duckai" &&
+        provider !== "duckai" &&
         !key
     ) {
 
@@ -29598,28 +29597,27 @@ other
     // OpenAI / OpenRouter / Groq
     // =====================================================
 
+    
     const endpoint =
-        provider === "openai"
-
-            ? "https://api.openai.com/v1/chat/completions"
-
-            : provider === "groq"
-
-                ? "https://api.groq.com/openai/v1/chat/completions"
-
-                : "https://openrouter.ai/api/v1/chat/completions";
+        provider === "duckai"
+            ? "http://127.0.0.1:8080/v1/chat/completions"
+            : provider === "openai"
+                ? "https://api.openai.com/v1/chat/completions"
+                : provider === "groq"
+                    ? "https://api.groq.com/openai/v1/chat/completions"
+                    : "https://openrouter.ai/api/v1/chat/completions";
 
 
+
+    
     const headers = {
-
-        "Content-Type":
-            "application/json",
-
-        "Authorization":
-            "Bearer " +
-            key
-
+        "Content-Type": "application/json"
     };
+
+    if (provider !== "duckai") {
+        headers["Authorization"] = "Bearer " + key;
+    }
+
 
 
     if (
@@ -29680,7 +29678,9 @@ other
                                 },
 
                             max_tokens:
-                                provider === "groq"
+                            provider === "duckai"
+                                ? 12000
+                                : provider === "groq"
                                     ? 16000
                                     : 24000
                         }
