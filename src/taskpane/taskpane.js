@@ -43902,6 +43902,7 @@ if (referencesContent) {
                                         );
 
                                     const combinedReferences = [];
+                                    const failedBatches = [];
                                     const combinedStats = {
                                         totalMaterials: 0,
                                         referenceCount: 0,
@@ -43964,7 +43965,9 @@ if (referencesContent) {
                                         }
 
                                         analyzeReferencesBtn.textContent =
-                                            `جارٍ توحيد المراجع — الدفعة ${batchIndex + 1} من ${referenceBatches.length}...`;
+                                            "جارٍ توحيد المراجع — الدفعة " +
+                                            (batchIndex + 1) + " من " +
+                                            referenceBatches.length + "...";
 
                                         console.log("Reference batch sizing:", {
                                             provider: activeProvider,
@@ -43980,21 +43983,83 @@ if (referencesContent) {
                                             contextChars
                                         });
 
-                                        const batchResult =
-                                            await analyzeReferencesWithAI(
-                                                batch,
-                                                addMissingAuthors,
-                                                contextMaterials
+                                        let batchResult = null;
+                                        let batchError = null;
+
+                                        // DuckAI قد يفشل مؤقتًا عند إعادة تهيئة VQD.
+                                        // أعد المحاولة مرة واحدة، ولا تُسقط نتائج الدفعات المكتملة إذا استمر الفشل.
+                                        for (let attempt = 0; attempt < 2; attempt++) {
+                                            try {
+                                                batchResult =
+                                                    await analyzeReferencesWithAI(
+                                                        batch,
+                                                        addMissingAuthors,
+                                                        contextMaterials
+                                                    );
+
+                                                if (
+                                                    !batchResult ||
+                                                    typeof batchResult !== "object" ||
+                                                    !Array.isArray(batchResult.references)
+                                                ) {
+                                                    throw new Error(
+                                                        "لم تصل نتيجة مراجع صحيحة من الدفعة " +
+                                                        (batchIndex + 1) + " من " +
+                                                        referenceBatches.length + "."
+                                                    );
+                                                }
+
+                                                batchError = null;
+                                                break;
+                                            }
+                                            catch (error) {
+                                                batchError = error;
+                                                const batchErrorMessage =
+                                                    String(error?.message || error || "");
+
+                                                const retryableDuckError =
+                                                    activeProvider === "duckai" &&
+                                                    /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error/i.test(
+                                                        batchErrorMessage
+                                                    );
+
+                                                console.warn(
+                                                    "Reference batch attempt failed:",
+                                                    {
+                                                        batch: batchIndex + 1,
+                                                        attempt: attempt + 1,
+                                                        retryableDuckError,
+                                                        error: batchErrorMessage
+                                                    }
+                                                );
+
+                                                if (attempt === 0 && retryableDuckError) {
+                                                    await new Promise(function (resolve) {
+                                                        setTimeout(resolve, 1200);
+                                                    });
+                                                    continue;
+                                                }
+
+                                                break;
+                                            }
+                                        }
+
+                                        if (!batchResult) {
+                                            failedBatches.push({
+                                                index: batchIndex + 1,
+                                                message: String(
+                                                    batchError?.message ||
+                                                    "تعذر الحصول على نتيجة صحيحة."
+                                                )
+                                            });
+
+                                            console.error(
+                                                "Reference batch skipped after retry:",
+                                                failedBatches[failedBatches.length - 1]
                                             );
 
-                                        if (
-                                            !batchResult ||
-                                            typeof batchResult !== "object" ||
-                                            !Array.isArray(batchResult.references)
-                                        ) {
-                                            throw new Error(
-                                                `لم تصل نتيجة مراجع صحيحة من الدفعة ${batchIndex + 1} من ${referenceBatches.length}.`
-                                            );
+                                            // تابع الدفعات الأخرى، واحتفظ بنتائج الدفعات الناجحة.
+                                            continue;
                                         }
 
                                         combinedReferences.push(
@@ -44010,6 +44075,20 @@ if (referencesContent) {
                                         Object.keys(combinedStats).forEach(function (key) {
                                             combinedStats[key] += Number(batchStats[key] || 0);
                                         });
+                                    }
+
+                                    if (
+                                        failedBatches.length > 0 &&
+                                        combinedReferences.length === 0
+                                    ) {
+                                        throw new Error(
+                                            "تعذر تحليل أي دفعة بنجاح. الدفعات التي فشلت: " +
+                                            failedBatches.map(function (item) {
+                                                return item.index;
+                                            }).join("، ") +
+                                            ". آخر خطأ: " +
+                                            failedBatches[failedBatches.length - 1].message
+                                        );
                                     }
 
                                     const aiAnalysisResult = {
@@ -44467,11 +44546,22 @@ if (referencesContent) {
                                             "references-analysis-container"
                                         );
 
+                                    const partialBatchWarningHTML =
+                                        failedBatches.length > 0
+                                            ? '<div class="references-analysis-status error">' +
+                                                '⚠ اكتمل التحليل جزئيًا؛ تعذرت الدفعات: ' +
+                                                failedBatches.map(function (item) {
+                                                    return item.index;
+                                                }).join("، ") +
+                                                '. عُرضت النتائج التي اكتملت فقط. أعد التحليل لاستكمال البقية.</div>'
+                                            : '';
+
                                     if (referencesAnalysisContainer) {
 
                                         referencesAnalysisContainer.innerHTML =
                                             `
                                             <div class="references-analysis-result">
+                                                ${partialBatchWarningHTML}
 
                                                 <div
                                                     class="references-analysis-status success reference-collapsible-header"
@@ -44842,7 +44932,9 @@ if (referencesContent) {
                                     // =================================================
 
                                     analyzeReferencesBtn.textContent =
-                                        "✓ تم التحليل والتوحيد";
+                                        failedBatches.length > 0
+                                            ? "⚠ اكتمل جزئيًا — أعد التحليل لاستكمال الدفعات"
+                                            : "✓ تم التحليل والتوحيد";
 
                                     analyzeReferencesBtn.disabled =
                                         false;
@@ -44868,6 +44960,11 @@ if (referencesContent) {
 
                                             finalReferences:
                                                 finalReferenceResults.length,
+
+                                            failedBatches:
+                                                failedBatches.map(function (item) {
+                                                    return item.index;
+                                                }),
 
                                             referenceCount:
                                                 referenceCount,
