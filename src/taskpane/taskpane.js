@@ -47683,7 +47683,32 @@ async function applyFootnoteSuggestions(
                     }
                 );
 
-            // أولوية التطابق الكامل لنص الحاشية؛ فالمطابقة الجزئية قد تجمع
+            // رقم الحاشية في نتائج Word هو ترتيبها (يبدأ من 1)، وليس بالضرورة
+            // قيمة w:id في XML. نستخدم ترتيب عنصر XML بعد الفرز، بشرط أن يطابق
+            // نص الحاشية، حتى لا تتعارض حواشٍ مكررة في نصها مع اقتراحات مختلفة.
+            const ordinalNoteNumber = index + 1;
+            const ordinalSuggestions =
+                availableSuggestions.filter(function (item) {
+                    if (Number(item.noteNumber) !== ordinalNoteNumber) {
+                        return false;
+                    }
+
+                    if (normalizeLocal(item.originalText) === normalizedNoteText) {
+                        return true;
+                    }
+
+                    const sourceTexts =
+                        Array.isArray(item.sourceTexts) ? item.sourceTexts : [];
+
+                    return sourceTexts.some(function (sourceText) {
+                        const normalizedSource = normalizeLocal(sourceText);
+                        return normalizedSource &&
+                            normalizedNoteText.includes(normalizedSource);
+                    });
+                });
+
+            // أولوية الاقتراح الموافق لترتيب الحاشية ونصها، ثم التطابق الكامل
+            // للنص، وأخيرًا المطابقة الجزئية عند عدم وجود تطابق أقوى.
             // اقتراحات لحواشٍ أخرى لمجرد اشتراكها في عنوان قصير مثل «الرسالة».
             const exactTextSuggestions =
                 availableSuggestions.filter(function (item) {
@@ -47694,9 +47719,11 @@ async function applyFootnoteSuggestions(
                 });
 
             const matchingSuggestions =
-                exactTextSuggestions.length > 0
-                    ? exactTextSuggestions
-                    : availableSuggestions.filter(function (item) {
+                ordinalSuggestions.length > 0
+                    ? ordinalSuggestions
+                    : exactTextSuggestions.length > 0
+                        ? exactTextSuggestions
+                        : availableSuggestions.filter(function (item) {
                         const sourceTexts =
                             Array.isArray(item.sourceTexts)
                                 ? item.sourceTexts
