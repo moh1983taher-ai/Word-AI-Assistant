@@ -47674,32 +47674,27 @@ async function applyFootnoteSuggestions(
              * نربط الاقتراح بمحتوى الحاشية بعد التطبيع، لا برقمها وحده.
              */
             // الاقتراحات تُنشأ أصلًا بحسب ترتيب الحاشية في التحليل.
-            // لذلك نربط كل حاشية باقتراحها مباشرة، بدل البحث عن اقتراحات
-            // أخرى تشبه نصها ثم اعتبارها متعارضة.
+            // نربط كل حاشية باقتراحها مباشرة، ولا نرفضه بسبب تشابه اقتراحات أخرى.
             const ordinalNoteNumber = index + 1;
             let suggestion =
                 suggestionMap.get(`${source}-${ordinalNoteNumber}`) || null;
 
-            // توافق احتياطي إذا اختلف الترتيب لأي سبب: لا نقبل إلا تطابق
-            // النص الأصلي كاملًا، ولا نستخدم المطابقة الجزئية هنا.
-            if (
-                !suggestion ||
-                normalizeLocal(suggestion.originalText) !== normalizedNoteText
-            ) {
+            // احتياط فقط إذا لم يوجد اقتراح بهذا الترتيب: نبحث عن النص الأصلي
+            // الكامل، ولا نعدّ المطابقة الجزئية سببًا لتجاوز الحاشية.
+            if (!suggestion) {
                 const exactCandidates =
                     (suggestionsBySource.get(source) || []).filter(
                         function (item) {
                             return (
                                 !usedSuggestions.has(item) &&
-                                normalizeLocal(item.originalText) === normalizedNoteText
+                                normalizeLocal(item.originalText) ===
+                                    normalizeLocal(originalText)
                             );
                         }
                     );
 
                 if (exactCandidates.length === 1) {
                     suggestion = exactCandidates[0];
-                } else {
-                    suggestion = null;
                 }
             }
 
