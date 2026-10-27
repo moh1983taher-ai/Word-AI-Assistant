@@ -43936,7 +43936,7 @@ if (referencesContent) {
                                                 ? processedReferences.slice(
                                                     Math.max(0, batchStartIndex - 4),
                                                     batchStartIndex
-                                                ).reverse()
+                                                )
                                                 : []),
                                             ...(batchEndIndex < processedReferences.length
                                                 ? processedReferences.slice(
