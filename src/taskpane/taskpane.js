@@ -47670,34 +47670,90 @@ async function applyFootnoteSuggestions(
             }
 
             /*
-             * لا نفترض أن رقم ترتيب الحاشية يساوي w:id في XML.
-             * نربط الاقتراح بمحتوى الحاشية بعد التطبيع، لا برقمها وحده.
+             * ربط الحاشية باقتراحها من محتوى النص، لا من w:id أو ترتيب
+             * قد يختلف بين Word API وملف DOCX.
              */
-            // ربط الاقتراح بمعرّف الحاشية الفعلي في ملف Word، لا بترتيبها
-            // في القائمة؛ فهذا المعرّف هو المفتاح الذي بُنيت عليه خريطة التحليل.
-            let suggestion =
+            const normalizedNoteText =
+                normalizeLocal(originalText);
+
+            const availableSuggestions =
+                (suggestionsBySource.get(source) || []).filter(
+                    function (item) {
+                        return !usedSuggestions.has(item);
+                    }
+                );
+
+            function scoreSuggestion(item) {
+                const normalizedOriginal =
+                    normalizeLocal(item.originalText);
+
+                // التطابق الكامل أقوى هوية ممكنة للحاشية.
+                if (
+                    normalizedOriginal &&
+                    normalizedOriginal === normalizedNoteText
+                ) {
+                    return 1000000;
+                }
+
+                const sourceTexts =
+                    Array.isArray(item.sourceTexts)
+                        ? item.sourceTexts
+                        : [];
+
+                let score = 0;
+
+                sourceTexts.forEach(function (sourceText) {
+                    const normalizedSource =
+                        normalizeLocal(sourceText);
+
+                    if (
+                        normalizedSource &&
+                        normalizedNoteText.includes(normalizedSource)
+                    ) {
+                        // فضّل تطابق النص الأصلي الأطول والأكثر تحديدًا.
+                        score += normalizedSource.length;
+                    }
+                });
+
+                return score;
+            }
+
+            const keyedSuggestion =
                 suggestionMap.get(`${source}-${Number(noteNumber)}`) || null;
 
-            // احتياط عند اختلاف المعرّفات: لا نستخدم إلا تطابق النص الأصلي كاملًا.
-            if (
-                !suggestion ||
-                usedSuggestions.has(suggestion)
-            ) {
-                const exactCandidates =
-                    (suggestionsBySource.get(source) || []).filter(
-                        function (item) {
-                            return (
-                                !usedSuggestions.has(item) &&
-                                normalizeLocal(item.originalText) ===
-                                    normalizeLocal(originalText)
-                            );
-                        }
-                    );
+            // نستخدم المعرّف كإشارة مساعدة فقط إذا كان نص الاقتراح يطابق الحاشية.
+            let suggestion =
+                keyedSuggestion &&
+                !usedSuggestions.has(keyedSuggestion) &&
+                scoreSuggestion(keyedSuggestion) > 0
+                    ? keyedSuggestion
+                    : null;
 
-                suggestion =
-                    exactCandidates.length === 1
-                        ? exactCandidates[0]
-                        : null;
+            if (!suggestion) {
+                const scoredCandidates =
+                    availableSuggestions
+                        .map(function (item) {
+                            return {
+                                item: item,
+                                score: scoreSuggestion(item)
+                            };
+                        })
+                        .filter(function (entry) {
+                            return entry.score > 0;
+                        })
+                        .sort(function (a, b) {
+                            if (a.score !== b.score) {
+                                return b.score - a.score;
+                            }
+
+                            // عند تساوي تطابق النص، حافظ على ترتيب الاقتراحات.
+                            return Number(a.item.noteNumber) -
+                                Number(b.item.noteNumber);
+                        });
+
+                if (scoredCandidates.length > 0) {
+                    suggestion = scoredCandidates[0].item;
+                }
             }
 
             if (!suggestion) {
