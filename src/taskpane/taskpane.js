@@ -47689,20 +47689,32 @@ async function applyFootnoteSuggestions(
             const normalizedNoteText =
                 normalizeLocal(originalText);
 
-            const matchingSuggestions =
+            const availableSuggestions =
                 (suggestionsBySource.get(source) || []).filter(
                     function (item) {
-                        if (usedSuggestions.has(item)) {
-                            return false;
-                        }
+                        return !usedSuggestions.has(item);
+                    }
+                );
 
+            // أولوية التطابق الكامل لنص الحاشية؛ فالمطابقة الجزئية قد تجمع
+            // اقتراحات لحواشٍ أخرى لمجرد اشتراكها في عنوان قصير مثل «الرسالة».
+            const exactTextSuggestions =
+                availableSuggestions.filter(function (item) {
+                    return (
+                        normalizeLocal(item.originalText) ===
+                        normalizedNoteText
+                    );
+                });
+
+            const matchingSuggestions =
+                exactTextSuggestions.length > 0
+                    ? exactTextSuggestions
+                    : availableSuggestions.filter(function (item) {
                         const sourceTexts =
                             Array.isArray(item.sourceTexts)
                                 ? item.sourceTexts
                                 : [];
 
-                        // اربط الاقتراح بموضع النص الأصلي المراد استبداله داخل الحاشية.
-                        // لا تشترط أن يساوي نص الاقتراح الحاشية كاملة.
                         const hasOriginalTarget =
                             sourceTexts.some(function (sourceText) {
                                 const normalizedSource =
@@ -47715,12 +47727,10 @@ async function applyFootnoteSuggestions(
                             });
 
                         // توافق احتياطي للبيانات القديمة التي لا تحمل sourceTexts.
-                        return hasOriginalTarget || (
-                            sourceTexts.length === 0 &&
-                            normalizeLocal(item.originalText) === normalizedNoteText
-                        );
-                    }
-                );
+                        return sourceTexts.length > 0
+                            ? hasOriginalTarget
+                            : normalizeLocal(item.originalText) === normalizedNoteText;
+                    });
 
             let suggestion =
                 matchingSuggestions.length === 1
@@ -47731,12 +47741,13 @@ async function applyFootnoteSuggestions(
                 const signatures = matchingSuggestions.map(
                     function (item) {
                         return JSON.stringify({
+                            // اختلاف صياغة التوثيق (أول ذكر/ذكر لاحق) لا يعني
+                            // اختلاف المرجع؛ هوية المرجع هي المؤلف وعنوان الكتاب.
                             references: (item.references || []).map(
                                 function (reference) {
                                     return getReferenceKey(reference);
                                 }
-                            ),
-                            suggestedTexts: item.suggestedTexts || []
+                            )
                         });
                     }
                 );
