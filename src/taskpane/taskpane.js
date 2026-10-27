@@ -1495,82 +1495,69 @@ async function extractReferenceSourcesFromProjectDocument(
 }
 function splitReferenceMaterialsIntoBatches(
     materials,
-    maxBatchSize
+    maxBatchSize,
+    maxBatchChars = 14000
 ) {
 
     if (
         !Array.isArray(materials) ||
         materials.length === 0
     ) {
-
         return [];
-
     }
 
-
-    const limit =
-        Number.isFinite(
-            Number(maxBatchSize)
-        ) &&
-        Number(maxBatchSize) > 0
+    const countLimit =
+        Number.isFinite(Number(maxBatchSize)) && Number(maxBatchSize) > 0
             ? Number(maxBatchSize)
             : 200;
 
+    const charLimit =
+        Number.isFinite(Number(maxBatchChars)) && Number(maxBatchChars) > 0
+            ? Number(maxBatchChars)
+            : 14000;
 
     const batches = [];
-
     let currentBatch = [];
+    let currentChars = 0;
 
+    for (const material of materials) {
+        if (!material) continue;
 
-    materials.forEach(
-        function (
-            material
-        ) {
+        // تقدير حجم JSON الفعلي للمواد، لا عددها وحده.
+        const materialChars = JSON.stringify(material).length;
 
-            if (
-                !material
-            ) {
-
-                return;
-
-            }
-
-
-            currentBatch.push(
-                material
-            );
-
-
-            if (
-                currentBatch.length >=
-                limit
-            ) {
-
-                batches.push(
-                    currentBatch
-                );
-
+        if (materialChars > charLimit) {
+            if (currentBatch.length) {
+                batches.push(currentBatch);
                 currentBatch = [];
-
+                currentChars = 0;
             }
 
+            // لا نجزّئ المادة الواحدة كيلا نفصل إحالة عن هويتها.
+            // تُرسل منفردة، ويُمنع اعتماد أي رد مبتور.
+            batches.push([material]);
+            continue;
         }
-    );
 
+        if (
+            currentBatch.length > 0 &&
+            (
+                currentBatch.length >= countLimit ||
+                currentChars + materialChars > charLimit
+            )
+        ) {
+            batches.push(currentBatch);
+            currentBatch = [];
+            currentChars = 0;
+        }
 
-    if (
-        currentBatch.length > 0
-    ) {
-
-        batches.push(
-            currentBatch
-        );
-
+        currentBatch.push(material);
+        currentChars += materialChars;
     }
 
+    if (currentBatch.length) batches.push(currentBatch);
 
     return batches;
-
 }
 
 function renderProjectReferenceDocuments() {
@@ -2041,7 +2028,7 @@ function renderProjectReferenceDocuments() {
                 // التحليل الفعلي ولا تُنشأ منها occurrences.
                 // =====================================================
 
-                const PROJECT_REFERENCE_CONTEXT_SIZE = 20;
+                const PROJECT_REFERENCE_CONTEXT_SIZE = 4;
 
 
                 // =====================================================
@@ -28542,11 +28529,23 @@ async function analyzeReferencesWithAI(
 
 
     const safeContextMaterials =
-        Array.isArray(
-            contextMaterials
-        )
+        Array.isArray(contextMaterials)
             ? contextMaterials
             : [];
+
+    const targetSerializedChars =
+        materials.reduce(
+            function (total, material) {
+                return total + JSON.stringify(material || {}).length;
+            },
+            0
+        );
+
+    if (targetSerializedChars > 18000) {
+        throw new Error(
+            "حجم دفعة تحليل المراجع تجاوز الحد الآمن. يجب تقسيمها قبل إرسالها إلى النموذج."
+        );
+    }
 
 
     const settings =
