@@ -47673,115 +47673,38 @@ async function applyFootnoteSuggestions(
              * لا نفترض أن رقم ترتيب الحاشية يساوي w:id في XML.
              * نربط الاقتراح بمحتوى الحاشية بعد التطبيع، لا برقمها وحده.
              */
-            const normalizedNoteText =
-                normalizeLocal(originalText);
-
-            const availableSuggestions =
-                (suggestionsBySource.get(source) || []).filter(
-                    function (item) {
-                        return !usedSuggestions.has(item);
-                    }
-                );
-
-            // رقم الحاشية في نتائج Word هو ترتيبها (يبدأ من 1)، وليس بالضرورة
-            // قيمة w:id في XML. نستخدم ترتيب عنصر XML بعد الفرز، بشرط أن يطابق
-            // نص الحاشية، حتى لا تتعارض حواشٍ مكررة في نصها مع اقتراحات مختلفة.
+            // الاقتراحات تُنشأ أصلًا بحسب ترتيب الحاشية في التحليل.
+            // لذلك نربط كل حاشية باقتراحها مباشرة، بدل البحث عن اقتراحات
+            // أخرى تشبه نصها ثم اعتبارها متعارضة.
             const ordinalNoteNumber = index + 1;
-            const ordinalSuggestions =
-                availableSuggestions.filter(function (item) {
-                    if (Number(item.noteNumber) !== ordinalNoteNumber) {
-                        return false;
-                    }
-
-                    if (normalizeLocal(item.originalText) === normalizedNoteText) {
-                        return true;
-                    }
-
-                    const sourceTexts =
-                        Array.isArray(item.sourceTexts) ? item.sourceTexts : [];
-
-                    return sourceTexts.some(function (sourceText) {
-                        const normalizedSource = normalizeLocal(sourceText);
-                        return normalizedSource &&
-                            normalizedNoteText.includes(normalizedSource);
-                    });
-                });
-
-            // أولوية الاقتراح الموافق لترتيب الحاشية ونصها، ثم التطابق الكامل
-            // للنص، وأخيرًا المطابقة الجزئية عند عدم وجود تطابق أقوى.
-            // اقتراحات لحواشٍ أخرى لمجرد اشتراكها في عنوان قصير مثل «الرسالة».
-            const exactTextSuggestions =
-                availableSuggestions.filter(function (item) {
-                    return (
-                        normalizeLocal(item.originalText) ===
-                        normalizedNoteText
-                    );
-                });
-
-            const matchingSuggestions =
-                ordinalSuggestions.length > 0
-                    ? ordinalSuggestions
-                    : exactTextSuggestions.length > 0
-                        ? exactTextSuggestions
-                        : availableSuggestions.filter(function (item) {
-                        const sourceTexts =
-                            Array.isArray(item.sourceTexts)
-                                ? item.sourceTexts
-                                : [];
-
-                        const hasOriginalTarget =
-                            sourceTexts.some(function (sourceText) {
-                                const normalizedSource =
-                                    normalizeLocal(sourceText);
-
-                                return (
-                                    normalizedSource &&
-                                    normalizedNoteText.includes(normalizedSource)
-                                );
-                            });
-
-                        // توافق احتياطي للبيانات القديمة التي لا تحمل sourceTexts.
-                        return sourceTexts.length > 0
-                            ? hasOriginalTarget
-                            : normalizeLocal(item.originalText) === normalizedNoteText;
-                    });
-
             let suggestion =
-                matchingSuggestions.length === 1
-                    ? matchingSuggestions[0]
-                    : null;
+                suggestionMap.get(`${source}-${ordinalNoteNumber}`) || null;
 
-            if (!suggestion && matchingSuggestions.length > 1) {
-                const signatures = matchingSuggestions.map(
-                    function (item) {
-                        return JSON.stringify({
-                            // اختلاف صياغة التوثيق (أول ذكر/ذكر لاحق) لا يعني
-                            // اختلاف المرجع؛ هوية المرجع هي المؤلف وعنوان الكتاب.
-                            references: (item.references || []).map(
-                                function (reference) {
-                                    return getReferenceKey(reference);
-                                }
-                            )
-                        });
-                    }
-                );
-
-                if (signatures.every(function (signature) {
-                    return signature === signatures[0];
-                })) {
-                    suggestion = matchingSuggestions[0];
-                } else {
-                    console.warn(
-                        "تُركت حاشية لوجود أكثر من اقتراح متعارض للنص نفسه:",
-                        { source: source, noteId: noteNumber, text: originalText }
+            // توافق احتياطي إذا اختلف الترتيب لأي سبب: لا نقبل إلا تطابق
+            // النص الأصلي كاملًا، ولا نستخدم المطابقة الجزئية هنا.
+            if (
+                !suggestion ||
+                normalizeLocal(suggestion.originalText) !== normalizedNoteText
+            ) {
+                const exactCandidates =
+                    (suggestionsBySource.get(source) || []).filter(
+                        function (item) {
+                            return (
+                                !usedSuggestions.has(item) &&
+                                normalizeLocal(item.originalText) === normalizedNoteText
+                            );
+                        }
                     );
-                    skipped++;
-                    continue;
+
+                if (exactCandidates.length === 1) {
+                    suggestion = exactCandidates[0];
+                } else {
+                    suggestion = null;
                 }
             }
 
             if (!suggestion) {
-                // لا نطبّق اقتراحًا على حاشية لم نتحقق من هويتها بالنص.
+                skipped++;
                 continue;
             }
 
