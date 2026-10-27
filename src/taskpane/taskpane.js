@@ -45903,21 +45903,8 @@ async function buildFootnoteSuggestions(
 
                 }
 
-                const id =
-                    String(
-                        reference?.id ||
-                        ""
-                    )
-                        .trim();
-
-                if (
-                    id
-                ) {
-
-                    return `id:${id}`;
-
-                }
-
+                // هوية المرجع نصية: المؤلف وعنوان الكتاب، لا المعرّف الداخلي.
+                // قد تتعدد سجلات الكتاب نفسه أو تختلف أرقامها مع بقاء الهوية واحدة.
                 const author =
                     String(
                         reference?.author ||
