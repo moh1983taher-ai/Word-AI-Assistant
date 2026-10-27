@@ -29557,6 +29557,16 @@ other
         }
 
 
+        // لا نعتمد نتيجة Gemini إذا صرّح بأن التوليد توقف بسبب حدّ الإخراج.
+        const geminiFinishReason =
+            String(result?.candidates?.[0]?.finishReason || "").toUpperCase();
+
+        if (geminiFinishReason === "MAX_TOKENS") {
+            throw new Error(
+                "توقف تحليل المراجع لأن رد Gemini تجاوز حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أعد التحليل بدفعات أصغر."
+            );
+        }
+
         const answer =
             extractGeminiAnswer(
                 result
@@ -29723,6 +29733,16 @@ other
 
     }
 
+
+    // لا نعتمد نتيجة جزئية إذا انتهى التوليد عند حدّ الإخراج.
+    const finishReason =
+        String(result?.choices?.[0]?.finish_reason || "").toLowerCase();
+
+    if (["length", "max_tokens", "max_output_tokens"].includes(finishReason)) {
+        throw new Error(
+            `توقف تحليل المراجع لدى ${provider} بسبب حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أعد التحليل بدفعات أصغر.`
+        );
+    }
 
     const answer =
         extractOpenAIStyleAnswer(
