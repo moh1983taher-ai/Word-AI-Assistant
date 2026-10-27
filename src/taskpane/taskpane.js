@@ -46545,21 +46545,6 @@ async function applyFootnoteSuggestions(
 
         }
 
-        const id =
-            String(
-                reference?.id ||
-                ""
-            )
-                .trim();
-
-        if (
-            id
-        ) {
-
-            return `id:${id}`;
-
-        }
-
         const author =
             String(
                 reference?.author ||
@@ -47707,8 +47692,31 @@ async function applyFootnoteSuggestions(
             const matchingSuggestions =
                 (suggestionsBySource.get(source) || []).filter(
                     function (item) {
-                        return (
-                            !usedSuggestions.has(item) &&
+                        if (usedSuggestions.has(item)) {
+                            return false;
+                        }
+
+                        const sourceTexts =
+                            Array.isArray(item.sourceTexts)
+                                ? item.sourceTexts
+                                : [];
+
+                        // اربط الاقتراح بموضع النص الأصلي المراد استبداله داخل الحاشية.
+                        // لا تشترط أن يساوي نص الاقتراح الحاشية كاملة.
+                        const hasOriginalTarget =
+                            sourceTexts.some(function (sourceText) {
+                                const normalizedSource =
+                                    normalizeLocal(sourceText);
+
+                                return (
+                                    normalizedSource &&
+                                    normalizedNoteText.includes(normalizedSource)
+                                );
+                            });
+
+                        // توافق احتياطي للبيانات القديمة التي لا تحمل sourceTexts.
+                        return hasOriginalTarget || (
+                            sourceTexts.length === 0 &&
                             normalizeLocal(item.originalText) === normalizedNoteText
                         );
                     }
@@ -47830,7 +47838,10 @@ async function applyFootnoteSuggestions(
                                 reference,
 
                             suggestedIdentity:
-                                suggestedIdentity
+                                suggestedIdentity,
+
+                            sourceText:
+                                String(suggestion.sourceTexts?.[i] || "").trim()
 
                         }
                     );
@@ -47865,67 +47876,15 @@ async function applyFootnoteSuggestions(
                      * الموجودة سابقًا، نستخدمها ولا ندخل القاعدة
                      * الجديدة إطلاقًا.
                      */
+                    // الاستبدال مبني على النص الأصلي الذي حُدد في التحليل نفسه.
+                    // لا نبحث عن عنوان بديل أو صيغة مختصرة قد تطابق موضعًا آخر.
                     let identityMatch =
-                        findBestIdentity(
-                            originalText,
-                            candidates
-                        );
-
-                    /*
-                     * =================================================
-                     * القاعدة الوحيدة الجديدة:
-                     *
-                     * إذا لم نجد أي تطابق بالطريقة القديمة،
-                     * نجرب بداية العنوان فقط.
-                     *
-                     * مثال:
-                     *
-                     * العنوان:
-                     * المجموع شرح المهذب
-                     *
-                     * الموجود:
-                     * المجموع
-                     * =================================================
-                     */
-
-                    if (
-                        !identityMatch
-                    ) {
-
-                        identityMatch =
-                            findShortTitleIdentity(
+                        group.sourceText
+                            ? findBestIdentity(
                                 originalText,
-                                group.reference
-                            );
-
-                        if (
-                            identityMatch
-                        ) {
-
-                            /*
-                             * نضم المؤلف القديم إلى المطابقة المختصرة.
-                             *
-                             * مثال:
-                             *
-                             * النووي، المجموع
-                             *
-                             * يصبح نطاق الاستبدال:
-                             *
-                             * النووي، المجموع
-                             */
-                            identityMatch =
-                                expandShortMatchToAuthor(
-                                    originalText,
-                                    identityMatch,
-                                    String(
-                                        group.reference?.author ||
-                                        ""
-                                    ).trim()
-                                );
-
-                        }
-
-                    }
+                                [group.sourceText]
+                            )
+                            : null;
 
                     if (
                         !identityMatch
