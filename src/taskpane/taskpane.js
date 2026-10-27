@@ -47673,15 +47673,16 @@ async function applyFootnoteSuggestions(
              * لا نفترض أن رقم ترتيب الحاشية يساوي w:id في XML.
              * نربط الاقتراح بمحتوى الحاشية بعد التطبيع، لا برقمها وحده.
              */
-            // الاقتراحات تُنشأ أصلًا بحسب ترتيب الحاشية في التحليل.
-            // نربط كل حاشية باقتراحها مباشرة، ولا نرفضه بسبب تشابه اقتراحات أخرى.
-            const ordinalNoteNumber = index + 1;
+            // ربط الاقتراح بمعرّف الحاشية الفعلي في ملف Word، لا بترتيبها
+            // في القائمة؛ فهذا المعرّف هو المفتاح الذي بُنيت عليه خريطة التحليل.
             let suggestion =
-                suggestionMap.get(`${source}-${ordinalNoteNumber}`) || null;
+                suggestionMap.get(`${source}-${Number(noteNumber)}`) || null;
 
-            // احتياط فقط إذا لم يوجد اقتراح بهذا الترتيب: نبحث عن النص الأصلي
-            // الكامل، ولا نعدّ المطابقة الجزئية سببًا لتجاوز الحاشية.
-            if (!suggestion) {
+            // احتياط عند اختلاف المعرّفات: لا نستخدم إلا تطابق النص الأصلي كاملًا.
+            if (
+                !suggestion ||
+                usedSuggestions.has(suggestion)
+            ) {
                 const exactCandidates =
                     (suggestionsBySource.get(source) || []).filter(
                         function (item) {
@@ -47693,9 +47694,10 @@ async function applyFootnoteSuggestions(
                         }
                     );
 
-                if (exactCandidates.length === 1) {
-                    suggestion = exactCandidates[0];
-                }
+                suggestion =
+                    exactCandidates.length === 1
+                        ? exactCandidates[0]
+                        : null;
             }
 
             if (!suggestion) {
