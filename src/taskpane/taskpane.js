@@ -29439,21 +29439,13 @@ other
 
             "المواد المستهدفة:",
 
-            JSON.stringify(
-                payload,
-                null,
-                2
-            ),
+            JSON.stringify(payload),
 
             "",
 
             "مواد السياق:",
 
-            JSON.stringify(
-                contextPayload,
-                null,
-                2
-            ),
+            JSON.stringify(contextPayload),
 
             "",
 
@@ -43870,17 +43862,7 @@ if (referencesContent) {
                                     );
 
                                     // =================================================
-                                    // 3. طلب واحد فقط إلى الذكاء الاصطناعي
-                                    //
-                                    // الدالة الجديدة تقوم بكل شيء:
-                                    // التصنيف
-                                    // استخراج المراجع
-                                    // فصل المتعدد
-                                    // حل المصدر نفسه
-                                    // دمج التكرارات
-                                    // جمع المواقع
-                                    // جمع الصيغ
-                                    // بناء السجلات النهائية
+                                    // 3. تقسيم الطلب بحسب حجمه الفعلي، لا عدد المواد فقط
                                     // =================================================
 
                                     analyzeReferencesBtn.textContent =
@@ -43891,11 +43873,149 @@ if (referencesContent) {
                                             ? referenceAddMissingAuthors.checked
                                             : false;
 
-                                    const aiAnalysisResult =
-                                        await analyzeReferencesWithAI(
+                                    const activeProvider =
+                                        String(
+                                            getSavedSettings()?.provider || "openrouter"
+                                        ).trim().toLowerCase();
+
+                                    // دفعات أصغر لـ Groq لتجنب تجاوز حد الإدخال،
+                                    // مع إبقاء الطلبات أكبر نسبيًا للمزوّدات الأخرى.
+                                    const maxBatchChars =
+                                        activeProvider === "groq"
+                                            ? 4500
+                                            : activeProvider === "duckai"
+                                                ? 7000
+                                                : 9000;
+
+                                    const maxContextChars =
+                                        activeProvider === "groq"
+                                            ? 1400
+                                            : activeProvider === "duckai"
+                                                ? 2200
+                                                : 3000;
+
+                                    const referenceBatches =
+                                        splitReferenceMaterialsIntoBatches(
                                             processedReferences,
-                                            addMissingAuthors
+                                            200,
+                                            maxBatchChars
                                         );
+
+                                    const combinedReferences = [];
+                                    const combinedStats = {
+                                        totalMaterials: 0,
+                                        referenceCount: 0,
+                                        multipleReferenceCount: 0,
+                                        ibidCount: 0,
+                                        internalReferenceCount: 0,
+                                        hadithCount: 0,
+                                        explanatoryCount: 0,
+                                        mixedCount: 0,
+                                        reviewCount: 0
+                                    };
+
+                                    for (
+                                        let batchIndex = 0;
+                                        batchIndex < referenceBatches.length;
+                                        batchIndex++
+                                    ) {
+                                        const batch = referenceBatches[batchIndex];
+                                        const batchStartIndex =
+                                            processedReferences.indexOf(batch[0]);
+                                        const batchEndIndex =
+                                            batchStartIndex >= 0
+                                                ? batchStartIndex + batch.length
+                                                : processedReferences.length;
+
+                                        // نرفق سياقًا سابقًا ولاحقًا محدود الحجم لفهم
+                                        // «المصدر نفسه» دون تضخيم الطلب.
+                                        const contextMaterials = [];
+                                        let contextChars = 0;
+                                        const contextCandidates = [
+                                            ...(batchStartIndex > 0
+                                                ? processedReferences.slice(
+                                                    Math.max(0, batchStartIndex - 4),
+                                                    batchStartIndex
+                                                ).reverse()
+                                                : []),
+                                            ...(batchEndIndex < processedReferences.length
+                                                ? processedReferences.slice(
+                                                    batchEndIndex,
+                                                    Math.min(
+                                                        processedReferences.length,
+                                                        batchEndIndex + 4
+                                                    )
+                                                )
+                                                : [])
+                                        ];
+
+                                        for (const contextMaterial of contextCandidates) {
+                                            const itemChars =
+                                                JSON.stringify(contextMaterial || {}).length;
+
+                                            if (
+                                                contextChars + itemChars > maxContextChars
+                                            ) {
+                                                continue;
+                                            }
+
+                                            contextMaterials.push(contextMaterial);
+                                            contextChars += itemChars;
+                                        }
+
+                                        analyzeReferencesBtn.textContent =
+                                            `جارٍ توحيد المراجع — الدفعة ${batchIndex + 1} من ${referenceBatches.length}...`;
+
+                                        console.log("Reference batch sizing:", {
+                                            provider: activeProvider,
+                                            batch: batchIndex + 1,
+                                            totalBatches: referenceBatches.length,
+                                            materials: batch.length,
+                                            targetChars: batch.reduce(
+                                                (total, material) =>
+                                                    total + JSON.stringify(material || {}).length,
+                                                0
+                                            ),
+                                            contextMaterials: contextMaterials.length,
+                                            contextChars
+                                        });
+
+                                        const batchResult =
+                                            await analyzeReferencesWithAI(
+                                                batch,
+                                                addMissingAuthors,
+                                                contextMaterials
+                                            );
+
+                                        if (
+                                            !batchResult ||
+                                            typeof batchResult !== "object" ||
+                                            !Array.isArray(batchResult.references)
+                                        ) {
+                                            throw new Error(
+                                                `لم تصل نتيجة مراجع صحيحة من الدفعة ${batchIndex + 1} من ${referenceBatches.length}.`
+                                            );
+                                        }
+
+                                        combinedReferences.push(
+                                            ...batchResult.references
+                                        );
+
+                                        const batchStats =
+                                            batchResult.stats &&
+                                            typeof batchResult.stats === "object"
+                                                ? batchResult.stats
+                                                : {};
+
+                                        Object.keys(combinedStats).forEach(function (key) {
+                                            combinedStats[key] += Number(batchStats[key] || 0);
+                                        });
+                                    }
+
+                                    const aiAnalysisResult = {
+                                        references: combinedReferences,
+                                        stats: combinedStats
+                                    };
 
                                     if (
                                         !aiAnalysisResult ||
