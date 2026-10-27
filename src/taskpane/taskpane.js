@@ -44813,7 +44813,9 @@ if (referencesContent) {
                                                                 );
 
                                                             applyFootnoteSuggestionsBtn.textContent =
-                                                                `✓ تم تطبيق التوثيق (${result.applied})`;
+                                                                result.skipped > 0
+                                                                    ? `✓ طُبّق التوثيق على ${result.applied}، وتعذّر تطبيق ${result.skipped}`
+                                                                    : `✓ تم تطبيق التوثيق (${result.applied})`;
 
                                                         }
                                                         catch (error) {
@@ -46267,6 +46269,12 @@ async function applyFootnoteSuggestions(
     const suggestionMap =
         new Map();
 
+    const suggestionsBySource =
+        new Map();
+
+    const usedSuggestions =
+        new Set();
+
     footnoteSuggestions.forEach(
         function (
             item
@@ -46301,6 +46309,12 @@ async function applyFootnoteSuggestions(
                 )}`,
                 item
             );
+
+            if (!suggestionsBySource.has(item.source)) {
+                suggestionsBySource.set(item.source, []);
+            }
+
+            suggestionsBySource.get(item.source).push(item);
 
         }
     );
@@ -46380,6 +46394,39 @@ async function applyFootnoteSuggestions(
             // توحيد أشكال الشرطة
             .replace(/[ـ–—−]/g, "-")
             .toLowerCase();
+    }
+
+    /*
+     * منع مطابقة عنوان داخل كلمة أطول، مع السماح بحروف العطف
+     * والجر المتصلة ببداية العنوان (و/ف/ب/ك/ل).
+     */
+    function hasSafeIdentityBoundaries(text, start, end) {
+        const isWordChar = function (char) {
+            if (!char) return false;
+            const code = char.charCodeAt(0);
+            return (
+                /[A-Za-z0-9]/.test(char) ||
+                (code >= 0x0621 && code <= 0x064A) ||
+                (code >= 0x0660 && code <= 0x0669) ||
+                (code >= 0x066E && code <= 0x06D3) ||
+                (code >= 0x06FA && code <= 0x06FC) ||
+                (code >= 0x0750 && code <= 0x077F) ||
+                (code >= 0x08A0 && code <= 0x08FF)
+            );
+        };
+
+        const previous = text.charAt(start - 1);
+        const beforePrevious = text.charAt(start - 2);
+        const next = text.charAt(end);
+
+        const leftIsAttachedPreposition =
+            /^[وبفكل]$/.test(previous) &&
+            !isWordChar(beforePrevious);
+
+        return (
+            (!isWordChar(previous) || leftIsAttachedPreposition) &&
+            !isWordChar(next)
+        );
     }
 
 
@@ -46705,6 +46752,17 @@ async function applyFootnoteSuggestions(
                             end - 1
                         ] + 1;
 
+                    if (
+                        !hasSafeIdentityBoundaries(
+                            text,
+                            rawStart,
+                            rawEnd
+                        )
+                    ) {
+                        from = position + Math.max(1, target.length);
+                        continue;
+                    }
+
                     const current = {
 
                         start:
@@ -46903,17 +46961,30 @@ async function applyFootnoteSuggestions(
                         map.rawMap.length
                 ) {
 
+                    const rawStart =
+                        map.rawMap[position];
+
+                    const rawEnd =
+                        map.rawMap[end - 1] + 1;
+
+                    if (
+                        !hasSafeIdentityBoundaries(
+                            text,
+                            rawStart,
+                            rawEnd
+                        )
+                    ) {
+                        from = position + Math.max(1, target.length);
+                        continue;
+                    }
+
                     best = {
 
                         start:
-                            map.rawMap[
-                                position
-                            ],
+                            rawStart,
 
                         end:
-                            map.rawMap[
-                                end - 1
-                            ] + 1,
+                            rawEnd,
 
                         length:
                             target.length,
@@ -47513,19 +47584,6 @@ async function applyFootnoteSuggestions(
             const noteNumber =
                 noteEntry.id;
 
-            const suggestion =
-                suggestionMap.get(
-                    `${source}-${noteNumber}`
-                );
-
-            if (
-                !suggestion
-            ) {
-
-                continue;
-
-            }
-
             const noteElement =
                 noteEntry.element;
 
@@ -47541,6 +47599,63 @@ async function applyFootnoteSuggestions(
                 continue;
 
             }
+
+            /*
+             * لا نفترض أن رقم ترتيب الحاشية يساوي w:id في XML.
+             * نربط الاقتراح بمحتوى الحاشية بعد التطبيع، لا برقمها وحده.
+             */
+            const normalizedNoteText =
+                normalizeLocal(originalText);
+
+            const matchingSuggestions =
+                (suggestionsBySource.get(source) || []).filter(
+                    function (item) {
+                        return (
+                            !usedSuggestions.has(item) &&
+                            normalizeLocal(item.originalText) === normalizedNoteText
+                        );
+                    }
+                );
+
+            let suggestion =
+                matchingSuggestions.length === 1
+                    ? matchingSuggestions[0]
+                    : null;
+
+            if (!suggestion && matchingSuggestions.length > 1) {
+                const signatures = matchingSuggestions.map(
+                    function (item) {
+                        return JSON.stringify({
+                            references: (item.references || []).map(
+                                function (reference) {
+                                    return getReferenceKey(reference);
+                                }
+                            ),
+                            suggestedTexts: item.suggestedTexts || []
+                        });
+                    }
+                );
+
+                if (signatures.every(function (signature) {
+                    return signature === signatures[0];
+                })) {
+                    suggestion = matchingSuggestions[0];
+                } else {
+                    console.warn(
+                        "تُركت حاشية لوجود أكثر من اقتراح متعارض للنص نفسه:",
+                        { source: source, noteId: noteNumber, text: originalText }
+                    );
+                    skipped++;
+                    continue;
+                }
+            }
+
+            if (!suggestion) {
+                // لا نطبّق اقتراحًا على حاشية لم نتحقق من هويتها بالنص.
+                continue;
+            }
+
+            usedSuggestions.add(suggestion);
 
             /*
              * =================================================
