@@ -45975,25 +45975,49 @@ async function buildFootnoteSuggestions(
                     ? reference.variants
                     : [];
 
-                // First preserve the exact variant when it is present.
-                for (let i = 0; i < variants.length; i++) {
-                    const candidate = String(variants[i] || "").trim();
-                    if (!candidate) continue;
-
-                    const escaped = candidate
-                        .replace(/[.*+?^$()|[\]\\]/g, "\\$&")
-                        .replace(/\s+/g, "\\s*");
-                    try {
-                        const match = new RegExp(escaped, "i").exec(text);
-                        if (match) return match[0];
-                    } catch (_) {
-                        // Try normalized matching below for punctuation/diacritics differences.
-                    }
+                function getVariantText(item) {
+                    if (typeof item === "string") return item.trim();
+                    if (!item || typeof item !== "object") return "";
+                    return String(
+                        item.text ||
+                        item.originalText ||
+                        item.cleanedText ||
+                        item.citation ||
+                        item.value ||
+                        ""
+                    ).trim();
                 }
 
-                // Normalized fallback: match the source citation despite Arabic
-                // diacritics, alef forms, spacing, or citation punctuation, while
-                // retaining a map back to the exact original character offsets.
+                // Prefer the variant attached to this exact material/note, then
+                // variants from the same note, then other known source spellings.
+                const ranked = variants
+                    .map(function (item, index) {
+                        let score = 0;
+                        if (item && typeof item === "object") {
+                            if (
+                                occurrence?.materialId &&
+                                String(item.materialId || "") === String(occurrence.materialId)
+                            ) score += 100;
+                            if (
+                                occurrence?.source &&
+                                String(item.source || "") === String(occurrence.source)
+                            ) score += 20;
+                            if (
+                                occurrence?.noteNumber != null &&
+                                String(item.noteNumber ?? "") === String(occurrence.noteNumber)
+                            ) score += 10;
+                        }
+                        return { text: getVariantText(item), score: score, index: index };
+                    })
+                    .filter(function (item) {
+                        return item.text &&
+                            item.text !== "[object Object]" &&
+                            item.text.length >= 4;
+                    })
+                    .sort(function (a, b) {
+                        return b.score - a.score || a.index - b.index;
+                    });
+
                 function normalizeWithMap(value) {
                     const raw = String(value || "");
                     let normalized = "";
@@ -46015,9 +46039,19 @@ async function buildFootnoteSuggestions(
                 }
 
                 const sourceMap = normalizeWithMap(text);
-                for (let i = 0; i < variants.length; i++) {
-                    const candidate = String(variants[i] || "").trim();
-                    if (!candidate) continue;
+
+                for (let i = 0; i < ranked.length; i++) {
+                    const candidate = ranked[i].text;
+                    const escaped = candidate
+                        .replace(/[.*+?^$()|[\]\\]/g, "\\$&")
+                        .replace(/\s+/g, "\\s*");
+
+                    try {
+                        const exact = new RegExp(escaped, "i").exec(text);
+                        if (exact) return exact[0];
+                    } catch (_) {
+                        // Continue with normalized matching.
+                    }
 
                     const target = normalizeWithMap(candidate).normalized;
                     if (target.length < 4) continue;
@@ -46027,7 +46061,11 @@ async function buildFootnoteSuggestions(
 
                     const rawStart = sourceMap.rawMap[position];
                     const rawEnd = sourceMap.rawMap[position + target.length - 1] + 1;
-                    if (Number.isInteger(rawStart) && Number.isInteger(rawEnd) && rawEnd > rawStart) {
+                    if (
+                        Number.isInteger(rawStart) &&
+                        Number.isInteger(rawEnd) &&
+                        rawEnd > rawStart
+                    ) {
                         return text.slice(rawStart, rawEnd);
                     }
                 }
@@ -48584,33 +48622,44 @@ function mergeEquivalentReferences(references) {
                     variant
                 ) {
 
-                    const value =
-                        clean(
-                            variant
+                    // Variants may be strings or structured objects such as
+                    // { text, source, noteNumber, materialId }. Never stringify
+                    // an object to "[object Object]" and store that as a citation.
+                    const getVariantText = function (item) {
+                        if (typeof item === "string") return clean(item);
+                        if (!item || typeof item !== "object") return "";
+                        return clean(
+                            item.text ||
+                            item.originalText ||
+                            item.cleanedText ||
+                            item.citation ||
+                            item.value ||
+                            ""
                         );
+                    };
 
-                    if (
-                        value &&
-                        !existing.variants.some(
-                            function (
-                                item
-                            ) {
+                    const value = getVariantText(variant);
+                    if (!value) return;
 
-                                return (
-                                    clean(
-                                        item
-                                    ) ===
-                                    value
-                                );
+                    const key = value
+                        .normalize("NFC")
+                        .replace(/\s+/g, " ")
+                        .toLowerCase();
 
-                            }
-                        )
-                    ) {
+                    const exists = existing.variants.some(function (item) {
+                        const oldValue = getVariantText(item);
+                        return oldValue &&
+                            oldValue.normalize("NFC")
+                                .replace(/\s+/g, " ")
+                                .toLowerCase() === key;
+                    });
 
+                    if (!exists) {
                         existing.variants.push(
-                            value
+                            variant && typeof variant === "object"
+                                ? { ...variant, text: value }
+                                : value
                         );
-
                     }
 
                 }
