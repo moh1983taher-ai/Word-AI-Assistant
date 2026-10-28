@@ -47923,14 +47923,17 @@ async function applyFootnoteSuggestions(
                     skipped++;
                     continue;
                 }
-                // Citation identity is the author/book text, not page or volume
-                // notation. Keep the full source string as the first choice, then
-                // fall back to its identity-only form when Word/XML formatting differs.
+                // The source span can include volume/page data. We use the full
+                // citation to locate its occurrence, but replace only its identity.
                 const identityText = getSuggestedIdentity(sourceText);
+                const hasUnparsedLocationSuffix =
+                    identityText === sourceText &&
+                    /(?:^|[،,؛;\s])(?:ج|جزء|المجلد|المجلدات|ص|صفحة|صفحات)\s*\d|\d+\s*\/\s*\d+\s*$|\b\d+\s*[-–—]\s*\d+\s*$/.test(sourceText);
                 pairs.push({
                     index: i,
                     sourceText: sourceText,
                     identityText: identityText,
+                    hasUnparsedLocationSuffix: hasUnparsedLocationSuffix,
                     replacementText: replacementText,
                     normalizedLength: normalizeLocal(identityText || sourceText).length
                 });
@@ -47945,26 +47948,63 @@ async function applyFootnoteSuggestions(
 
             const claimedRanges = [];
             pairs.forEach(function (pair) {
-                function findUnclaimedMatch(candidateText) {
-                    if (!candidateText) return null;
-                    const matches = findAllIdentityMatches(originalText, candidateText);
-                    return matches.find(function (candidate) {
-                        return !claimedRanges.some(function (claimed) {
-                            return candidate.start < claimed.end && candidate.end > claimed.start;
-                        });
-                    }) || null;
+                function overlapsClaimed(candidate) {
+                    return claimedRanges.some(function (claimed) {
+                        return candidate.start < claimed.end && candidate.end > claimed.start;
+                    });
                 }
 
-                // First replace the exact original citation when present. If page/
-                // volume notation or Word's XML text boundaries differ, locate the
-                // author/book identity instead; never require page numbers to match.
-                const match =
-                    findUnclaimedMatch(pair.sourceText) ||
-                    (
-                        normalizeLocal(pair.identityText).length >= 8
-                            ? findUnclaimedMatch(pair.identityText)
-                            : null
-                    );
+                // Locate the complete original citation first. Within that exact
+                // span, select only the author/book identity and leave page/volume
+                // notation and surrounding punctuation untouched.
+                const fullMatches = findAllIdentityMatches(originalText, pair.sourceText)
+                    .filter(function (candidate) {
+                        return !overlapsClaimed(candidate);
+                    });
+
+                let match = null;
+                if (fullMatches.length > 0 && pair.identityText) {
+                    const identityMatches = findAllIdentityMatches(originalText, pair.identityText);
+                    const contained = identityMatches.filter(function (identityMatch) {
+                        return !overlapsClaimed(identityMatch) &&
+                            fullMatches.some(function (fullMatch) {
+                                return identityMatch.start >= fullMatch.start &&
+                                    identityMatch.end <= fullMatch.end;
+                            });
+                    });
+
+                    if (contained.length === 1) {
+                        match = contained[0];
+                    } else if (
+                        contained.length > 1 &&
+                        pair.identityText !== pair.sourceText
+                    ) {
+                        // If the same identity occurs more than once inside the
+                        // source span, do not guess which occurrence to rewrite.
+                        skipped++;
+                        return;
+                    }
+                }
+
+                // Formatting differences may prevent full-span matching. In that
+                // case, use identity-only matching only if unique in this note.
+                // Never fall back to a full citation that still contains unparsed
+                // page/volume data, because that would erase the location.
+                if (
+                    !match &&
+                    pair.identityText &&
+                    !pair.hasUnparsedLocationSuffix &&
+                    normalizeLocal(pair.identityText).length >= 8
+                ) {
+                    const identityMatches = findAllIdentityMatches(originalText, pair.identityText)
+                        .filter(function (candidate) {
+                            return !overlapsClaimed(candidate);
+                        });
+
+                    if (identityMatches.length === 1) {
+                        match = identityMatches[0];
+                    }
+                }
 
                 if (!match) {
                     skipped++;
@@ -47975,7 +48015,8 @@ async function applyFootnoteSuggestions(
                 replacements.push({
                     start: match.start,
                     end: match.end,
-                    text: pair.replacementText
+                    text: pair.replacementText,
+                    sourceIndex: pair.index
                 });
             });
 
