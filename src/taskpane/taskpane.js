@@ -47758,18 +47758,52 @@ async function applyFootnoteSuggestions(
 
             }
 
-            // GPT/Word analysis stores the original full text of each note.
-            // Match that content against the actual XML note before applying any
-            // suggestion. The note number is deliberately not used as identity.
+            // Prefer exact full-note matching, but do not rely on it alone:
+            // Word API text and XML text can differ in whitespace/run boundaries.
+            // A fallback is allowed only when a citation identity (author/book)
+            // from sourceTexts is found in the actual note. Page/volume numbers
+            // are stripped by getSuggestedIdentity and never establish identity.
             const normalizedNoteText = normalizeLocal(originalText);
             const sourceSuggestions = suggestionsBySource.get(source) || [];
-            const suggestion = sourceSuggestions.find(function (item) {
+            let suggestion = sourceSuggestions.find(function (item) {
                 return !usedSuggestions.has(item) &&
                     normalizeLocal(item.originalText || "") === normalizedNoteText;
             }) || null;
 
-            // If the source note cannot be identified by its original text,
-            // leave it untouched rather than risk changing a different citation.
+            function hasVerifiedCitationIdentity(item) {
+                const sourceTexts = Array.isArray(item.sourceTexts) ? item.sourceTexts : [];
+                return sourceTexts.some(function (candidate) {
+                    const identity = getSuggestedIdentity(candidate);
+                    return identity && findAllIdentityMatches(originalText, identity).length > 0;
+                });
+            }
+
+            if (!suggestion) {
+                // Use the ordinal only as a tie-breaker after textual verification;
+                // never apply a suggestion merely because its note number matches.
+                const numberedCandidates = sourceSuggestions.filter(function (item) {
+                    return !usedSuggestions.has(item) &&
+                        Number(item.noteNumber) === Number(noteNumber) &&
+                        hasVerifiedCitationIdentity(item);
+                });
+
+                if (numberedCandidates.length === 1) {
+                    suggestion = numberedCandidates[0];
+                } else {
+                    // If ordering differs between Word and XML, accept a textual
+                    // fallback only when exactly one unused suggestion is supported
+                    // by a citation identity in this note.
+                    const verifiedCandidates = sourceSuggestions.filter(function (item) {
+                        return !usedSuggestions.has(item) && hasVerifiedCitationIdentity(item);
+                    });
+
+                    if (verifiedCandidates.length === 1) {
+                        suggestion = verifiedCandidates[0];
+                    }
+                }
+            }
+
+            // Ambiguous or unverified matches remain untouched.
             if (!suggestion) {
                 skipped++;
                 continue;
