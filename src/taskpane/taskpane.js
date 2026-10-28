@@ -47683,11 +47683,18 @@ async function applyFootnoteSuggestions(
                     }
                 );
 
+            /*
+             * المطابقة المحافظة:
+             * 1) التطابق الكامل للنص الأصلي له الأولوية.
+             * 2) المطابقة الجزئية لا تُقبل إلا إذا كان النص المطابق
+             *    محددًا بما يكفي (12 محرفًا على الأقل).
+             * 3) لا نختار أول مرشح عند التعادل؛ نترك الحالة متعذرة
+             *    كي لا نربط توثيقًا بحاشية أخرى بالخطأ.
+             */
             function scoreSuggestion(item) {
                 const normalizedOriginal =
                     normalizeLocal(item.originalText);
 
-                // التطابق الكامل أقوى هوية ممكنة للحاشية.
                 if (
                     normalizedOriginal &&
                     normalizedOriginal === normalizedNoteText
@@ -47700,59 +47707,70 @@ async function applyFootnoteSuggestions(
                         ? item.sourceTexts
                         : [];
 
-                let score = 0;
+                let bestPartialScore = 0;
 
                 sourceTexts.forEach(function (sourceText) {
                     const normalizedSource =
                         normalizeLocal(sourceText);
 
                     if (
-                        normalizedSource &&
+                        normalizedSource.length >= 12 &&
                         normalizedNoteText.includes(normalizedSource)
                     ) {
-                        // فضّل تطابق النص الأصلي الأطول والأكثر تحديدًا.
-                        score += normalizedSource.length;
+                        bestPartialScore = Math.max(
+                            bestPartialScore,
+                            normalizedSource.length
+                        );
                     }
                 });
 
-                return score;
+                return bestPartialScore;
             }
 
-            const keyedSuggestion =
-                suggestionMap.get(`${source}-${Number(noteNumber)}`) || null;
+            const availableScoredCandidates =
+                availableSuggestions
+                    .map(function (item) {
+                        return {
+                            item: item,
+                            score: scoreSuggestion(item)
+                        };
+                    })
+                    .filter(function (entry) {
+                        return entry.score > 0;
+                    })
+                    .sort(function (a, b) {
+                        return b.score - a.score;
+                    });
 
-            // نستخدم المعرّف كإشارة مساعدة فقط إذا كان نص الاقتراح يطابق الحاشية.
-            let suggestion =
-                keyedSuggestion &&
-                !usedSuggestions.has(keyedSuggestion) &&
-                scoreSuggestion(keyedSuggestion) > 0
-                    ? keyedSuggestion
-                    : null;
+            let suggestion = null;
 
-            if (!suggestion) {
-                const scoredCandidates =
-                    availableSuggestions
-                        .map(function (item) {
-                            return {
-                                item: item,
-                                score: scoreSuggestion(item)
-                            };
-                        })
-                        .filter(function (entry) {
-                            return entry.score > 0;
-                        })
-                        .sort(function (a, b) {
-                            if (a.score !== b.score) {
-                                return b.score - a.score;
-                            }
+            if (availableScoredCandidates.length > 0) {
+                const best = availableScoredCandidates[0];
+                const second = availableScoredCandidates[1];
 
-                            // عند تساوي تطابق النص، حافظ على ترتيب الاقتراحات.
-                            return Number(a.item.noteNumber) -
-                                Number(b.item.noteNumber);
-                        });
+                // لا نقبل المرشح الأعلى إذا كان هناك تعادل في قوة المطابقة.
+                const isUniqueBest =
+                    !second || best.score > second.score;
 
-                if (scoredCandidates.length > 0) {
-                    suggestion = scoredCandidates[0].item;
+                const keyedSuggestion =
+                    suggestionMap.get(
+                        `${source}-${Number(noteNumber)}`
+                    ) || null;
+
+                const keyedCandidate =
+                    availableScoredCandidates.find(function (entry) {
+                        return entry.item === keyedSuggestion;
+                    });
+
+                // نثق بالمفتاح العددي فقط إذا دعمه النص وكان أفضل مرشح بوضوح.
+                if (
+                    keyedCandidate &&
+                    keyedCandidate === best &&
+                    isUniqueBest
+                ) {
+                    suggestion = keyedCandidate.item;
+                } else if (isUniqueBest) {
+                    suggestion = best.item;
                 }
             }
 
