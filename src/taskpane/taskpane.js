@@ -43915,6 +43915,153 @@ if (referencesContent) {
                                         reviewCount: 0
                                     };
 
+                                    // Recover transient DuckAI empty responses by retrying,
+                                    // then recursively splitting only the failed batch. This
+                                    // prevents one empty completion from dropping every citation
+                                    // in that batch while preserving all successful batch results.
+                                    async function analyzeReferenceBatchWithRecovery(
+                                        targetBatch,
+                                        targetContext,
+                                        batchLabel
+                                    ) {
+                                        let lastError = null;
+
+                                        for (let attempt = 0; attempt < 3; attempt++) {
+                                            try {
+                                                const result = await analyzeReferencesWithAI(
+                                                    targetBatch,
+                                                    addMissingAuthors,
+                                                    targetContext
+                                                );
+
+                                                if (
+                                                    !result ||
+                                                    typeof result !== "object" ||
+                                                    !Array.isArray(result.references)
+                                                ) {
+                                                    const invalidResultError = new Error(
+                                                        "لم تصل نتيجة مراجع صحيحة من الدفعة " +
+                                                        batchLabel + "."
+                                                    );
+                                                    invalidResultError.retryable = true;
+                                                    throw invalidResultError;
+                                                }
+
+                                                return { result: result, failed: [] };
+                                            } catch (error) {
+                                                lastError = error;
+                                                const message = String(error?.message || error || "");
+                                                const retryableDuckError =
+                                                    activeProvider === "duckai" &&
+                                                    (
+                                                        error?.retryable === true ||
+                                                        /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(message)
+                                                    );
+
+                                                console.warn(
+                                                    "Reference batch attempt failed:",
+                                                    {
+                                                        batch: batchLabel,
+                                                        attempt: attempt + 1,
+                                                        retryableDuckError: retryableDuckError,
+                                                        materials: targetBatch.length,
+                                                        error: message
+                                                    }
+                                                );
+
+                                                if (!retryableDuckError || attempt === 2) {
+                                                    break;
+                                                }
+
+                                                await new Promise(function (resolve) {
+                                                    setTimeout(resolve, 900 * (attempt + 1));
+                                                });
+                                            }
+                                        }
+
+                                        const lastMessage = String(
+                                            lastError?.message || lastError || "تعذر الحصول على نتيجة صحيحة."
+                                        );
+                                        const canSplit =
+                                            activeProvider === "duckai" &&
+                                            targetBatch.length > 1 &&
+                                            (
+                                                lastError?.retryable === true ||
+                                                /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(lastMessage)
+                                            );
+
+                                        if (canSplit) {
+                                            const midpoint = Math.ceil(targetBatch.length / 2);
+                                            const leftBatch = targetBatch.slice(0, midpoint);
+                                            const rightBatch = targetBatch.slice(midpoint);
+
+                                            console.warn(
+                                                "Splitting failed DuckAI reference batch:",
+                                                {
+                                                    batch: batchLabel,
+                                                    originalMaterials: targetBatch.length,
+                                                    leftMaterials: leftBatch.length,
+                                                    rightMaterials: rightBatch.length,
+                                                    reason: lastMessage
+                                                }
+                                            );
+
+                                            const left = await analyzeReferenceBatchWithRecovery(
+                                                leftBatch,
+                                                targetContext,
+                                                batchLabel + "a"
+                                            );
+                                            const right = await analyzeReferenceBatchWithRecovery(
+                                                rightBatch,
+                                                targetContext,
+                                                batchLabel + "b"
+                                            );
+
+                                            const recoveredReferences = [];
+                                            const recoveredStats = {
+                                                totalMaterials: 0,
+                                                referenceCount: 0,
+                                                multipleReferenceCount: 0,
+                                                ibidCount: 0,
+                                                internalReferenceCount: 0,
+                                                hadithCount: 0,
+                                                explanatoryCount: 0,
+                                                mixedCount: 0,
+                                                reviewCount: 0
+                                            };
+
+                                            [left.result, right.result].forEach(function (partResult) {
+                                                if (!partResult) return;
+                                                recoveredReferences.push(...partResult.references);
+                                                const partStats =
+                                                    partResult.stats && typeof partResult.stats === "object"
+                                                        ? partResult.stats
+                                                        : {};
+                                                Object.keys(recoveredStats).forEach(function (key) {
+                                                    recoveredStats[key] += Number(partStats[key] || 0);
+                                                });
+                                            });
+
+                                            return {
+                                                result: recoveredReferences.length > 0 || (!left.failed.length && !right.failed.length)
+                                                    ? { references: recoveredReferences, stats: recoveredStats }
+                                                    : null,
+                                                failed: [...left.failed, ...right.failed]
+                                            };
+                                        }
+
+                                        return {
+                                            result: null,
+                                            failed: [{
+                                                index: batchLabel,
+                                                message: lastMessage,
+                                                materialIds: targetBatch.map(function (item) {
+                                                    return String(item?.id || "");
+                                                }).filter(Boolean)
+                                            }]
+                                        };
+                                    }
+
                                     for (
                                         let batchIndex = 0;
                                         batchIndex < referenceBatches.length;
@@ -43983,82 +44130,24 @@ if (referencesContent) {
                                             contextChars
                                         });
 
-                                        let batchResult = null;
-                                        let batchError = null;
+                                        const recovery = await analyzeReferenceBatchWithRecovery(
+                                            batch,
+                                            contextMaterials,
+                                            String(batchIndex + 1)
+                                        );
+                                        const batchResult = recovery.result;
 
-                                        // DuckAI قد يفشل مؤقتًا عند إعادة تهيئة VQD.
-                                        // أعد المحاولة مرة واحدة، ولا تُسقط نتائج الدفعات المكتملة إذا استمر الفشل.
-                                        for (let attempt = 0; attempt < 2; attempt++) {
-                                            try {
-                                                batchResult =
-                                                    await analyzeReferencesWithAI(
-                                                        batch,
-                                                        addMissingAuthors,
-                                                        contextMaterials
-                                                    );
-
-                                                if (
-                                                    !batchResult ||
-                                                    typeof batchResult !== "object" ||
-                                                    !Array.isArray(batchResult.references)
-                                                ) {
-                                                    throw new Error(
-                                                        "لم تصل نتيجة مراجع صحيحة من الدفعة " +
-                                                        (batchIndex + 1) + " من " +
-                                                        referenceBatches.length + "."
-                                                    );
-                                                }
-
-                                                batchError = null;
-                                                break;
-                                            }
-                                            catch (error) {
-                                                batchError = error;
-                                                const batchErrorMessage =
-                                                    String(error?.message || error || "");
-
-                                                const retryableDuckError =
-                                                    activeProvider === "duckai" &&
-                                                    /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error/i.test(
-                                                        batchErrorMessage
-                                                    );
-
-                                                console.warn(
-                                                    "Reference batch attempt failed:",
-                                                    {
-                                                        batch: batchIndex + 1,
-                                                        attempt: attempt + 1,
-                                                        retryableDuckError,
-                                                        error: batchErrorMessage
-                                                    }
-                                                );
-
-                                                if (attempt === 0 && retryableDuckError) {
-                                                    await new Promise(function (resolve) {
-                                                        setTimeout(resolve, 1200);
-                                                    });
-                                                    continue;
-                                                }
-
-                                                break;
-                                            }
+                                        if (recovery.failed.length > 0) {
+                                            failedBatches.push(...recovery.failed);
+                                            console.error(
+                                                "Reference batch had unrecovered materials:",
+                                                recovery.failed
+                                            );
                                         }
 
                                         if (!batchResult) {
-                                            failedBatches.push({
-                                                index: batchIndex + 1,
-                                                message: String(
-                                                    batchError?.message ||
-                                                    "تعذر الحصول على نتيجة صحيحة."
-                                                )
-                                            });
-
-                                            console.error(
-                                                "Reference batch skipped after retry:",
-                                                failedBatches[failedBatches.length - 1]
-                                            );
-
-                                            // تابع الدفعات الأخرى، واحتفظ بنتائج الدفعات الناجحة.
+                                            // Continue processing other batches; the failed
+                                            // material IDs are retained in the diagnostic report.
                                             continue;
                                         }
 
