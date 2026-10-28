@@ -47759,7 +47759,7 @@ async function applyFootnoteSuggestions(
                         normalizeLocal(sourceText);
 
                     if (
-                        normalizedSource.length >= 3 &&
+                        normalizedSource.length >= 12 &&
                         normalizedNoteText.includes(normalizedSource)
                     ) {
                         bestPartialScore = Math.max(
@@ -47851,7 +47851,7 @@ async function applyFootnoteSuggestions(
                 }
 
                 const normalizedSource = normalizeLocal(sourceText);
-                if (normalizedSource.length < 3) {
+                if (normalizedSource.length < 12) {
                     skipped++;
                     continue;
                 }
@@ -47885,7 +47885,13 @@ async function applyFootnoteSuggestions(
                 const replacementText = Array.from(group.replacements)[0];
                 const matches = findAllIdentityMatches(originalText, group.sourceText);
 
-                if (!matches.length) {
+                /*
+                 * لا نستبدل كل ظهور تلقائيًا؛ فقد يتكرر النص نفسه في سياق
+                 * آخر داخل الحاشية. نطبّق فقط إذا تطابق عدد المواضع الفعلية
+                 * مع عدد المقاطع التي أرسلها التحليل لهذا النص. وإلا نترك
+                 * المجموعة دون تغيير لتجنب استبدال زائد أو ربط خاطئ.
+                 */
+                if (matches.length !== group.indexes.length) {
                     skipped += group.indexes.length;
                     return;
                 }
