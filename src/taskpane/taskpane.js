@@ -45968,81 +45968,71 @@ async function buildFootnoteSuggestions(
                 reference,
                 occurrence
             ) {
+                const text = String(originalText || "");
+                if (!text.trim()) return "";
 
-                const text =
-                    String(
-                        originalText || ""
-                    );
+                const variants = Array.isArray(reference?.variants)
+                    ? reference.variants
+                    : [];
 
-                if (
-                    !text.trim()
-                ) {
+                // First preserve the exact variant when it is present.
+                for (let i = 0; i < variants.length; i++) {
+                    const candidate = String(variants[i] || "").trim();
+                    if (!candidate) continue;
 
-                    return "";
-
+                    const escaped = candidate
+                        .replace(/[.*+?^$()|[\]\\]/g, "\\$&")
+                        .replace(/\s+/g, "\\s*");
+                    try {
+                        const match = new RegExp(escaped, "i").exec(text);
+                        if (match) return match[0];
+                    } catch (_) {
+                        // Try normalized matching below for punctuation/diacritics differences.
+                    }
                 }
 
-                const variants =
-                    Array.isArray(
-                        reference?.variants
-                    )
-                        ? reference.variants
-                        : [];
+                // Normalized fallback: match the source citation despite Arabic
+                // diacritics, alef forms, spacing, or citation punctuation, while
+                // retaining a map back to the exact original character offsets.
+                function normalizeWithMap(value) {
+                    const raw = String(value || "");
+                    let normalized = "";
+                    const rawMap = [];
 
-                for (
-                    let i = 0;
-                    i < variants.length;
-                    i++
-                ) {
-
-                    const candidate =
-                        String(
-                            variants[i] || ""
-                        )
-                            .trim();
-
-                    if (
-                        !candidate
-                    ) {
-
-                        continue;
-
+                    for (let i = 0; i < raw.length; i++) {
+                        let ch = raw[i];
+                        if (/[\u064B-\u065F\u0670\u0640]/.test(ch)) continue;
+                        if (/[\u200C-\u200F\u202A-\u202E\uFEFF]/.test(ch)) continue;
+                        if (/[\s\u00A0،,؛:()[\]{}"']/u.test(ch)) continue;
+                        if (/[أإآٱ]/.test(ch)) ch = "ا";
+                        if (ch === "ى") ch = "ي";
+                        ch = ch.toLowerCase();
+                        normalized += ch;
+                        for (let j = 0; j < ch.length; j++) rawMap.push(i);
                     }
 
-                    const escaped =
-                        candidate
-                            .replace(
-                                /[.*+?^${}()|[\]\\]/g,
-                                "\\$&"
-                            )
-                            .replace(
-                                /\s+/g,
-                                "\\s*"
-                            );
+                    return { normalized: normalized, rawMap: rawMap };
+                }
 
-                    const pattern =
-                        new RegExp(
-                            escaped,
-                            "i"
-                        );
+                const sourceMap = normalizeWithMap(text);
+                for (let i = 0; i < variants.length; i++) {
+                    const candidate = String(variants[i] || "").trim();
+                    if (!candidate) continue;
 
-                    const match =
-                        pattern.exec(
-                            text
-                        );
+                    const target = normalizeWithMap(candidate).normalized;
+                    if (target.length < 4) continue;
 
-                    if (
-                        match
-                    ) {
+                    const position = sourceMap.normalized.indexOf(target);
+                    if (position === -1) continue;
 
-                        return match[0];
-
+                    const rawStart = sourceMap.rawMap[position];
+                    const rawEnd = sourceMap.rawMap[position + target.length - 1] + 1;
+                    if (Number.isInteger(rawStart) && Number.isInteger(rawEnd) && rawEnd > rawStart) {
+                        return text.slice(rawStart, rawEnd);
                     }
-
                 }
 
                 return "";
-
             }
 
             /*
@@ -47270,6 +47260,39 @@ async function applyFootnoteSuggestions(
      * =========================================================
      */
 
+    function findAllIdentityMatches(text, candidate) {
+        const target = normalizeLocal(candidate);
+        if (!target) return [];
+
+        const map = buildRawMap(text);
+        const matches = [];
+        let from = 0;
+
+        while (from <= map.normalized.length - target.length) {
+            const position = map.normalized.indexOf(target, from);
+            if (position === -1) break;
+
+            const normalizedEnd = position + target.length;
+            if (position < map.rawMap.length && normalizedEnd - 1 < map.rawMap.length) {
+                const rawStart = map.rawMap[position];
+                const rawEnd = map.rawMap[normalizedEnd - 1] + 1;
+
+                if (
+                    hasSafeIdentityBoundaries(text, rawStart, rawEnd) &&
+                    !matches.some(function (item) {
+                        return item.start === rawStart && item.end === rawEnd;
+                    })
+                ) {
+                    matches.push({ start: rawStart, end: rawEnd });
+                }
+            }
+
+            from = position + Math.max(1, target.length);
+        }
+
+        return matches;
+    }
+
     function getNoteElements(
         xmlDoc,
         localName
@@ -47630,6 +47653,39 @@ async function applyFootnoteSuggestions(
                 localName
             );
 
+        // Order notes by the reference markers in document.xml, which is the
+        // same document order used when the Word API collection is enumerated.
+        // XML note IDs are identifiers, not display/order numbers.
+        const documentFile = zip.file("word/document.xml");
+        if (documentFile) {
+            const documentXmlText = await documentFile.async("text");
+            const documentXml = parser.parseFromString(documentXmlText, "application/xml");
+            if (!documentXml.getElementsByTagName("parsererror").length) {
+                const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+                const referenceName = source === "footnote" ? "footnoteReference" : "endnoteReference";
+                const referenceNodes = Array.from(documentXml.getElementsByTagNameNS(ns, referenceName));
+                const notesById = new Map(notes.map(function (entry) { return [String(entry.id), entry]; }));
+                const orderedNotes = [];
+                const seenIds = new Set();
+
+                referenceNodes.forEach(function (node) {
+                    const id = String(Number(node.getAttributeNS(ns, "id")));
+                    const entry = notesById.get(id);
+                    if (entry && !seenIds.has(id)) {
+                        orderedNotes.push(entry);
+                        seenIds.add(id);
+                    }
+                });
+
+                notes.forEach(function (entry) {
+                    const id = String(entry.id);
+                    if (!seenIds.has(id)) orderedNotes.push(entry);
+                });
+
+                notes.splice(0, notes.length, ...orderedNotes);
+            }
+        }
+
         let modified =
             false;
 
@@ -47650,8 +47706,10 @@ async function applyFootnoteSuggestions(
                     index
                 ];
 
+            // Suggestions use the one-based order of the Word API collection.
+            // Use the document-reference order above, not the XML w:id value.
             const noteNumber =
-                noteEntry.id;
+                index + 1;
 
             const noteElement =
                 noteEntry.element;
@@ -47669,94 +47727,12 @@ async function applyFootnoteSuggestions(
 
             }
 
-            /*
-             * ربط الحاشية باقتراحها من محتوى النص، لا من w:id أو ترتيب
-             * قد يختلف بين Word API وملف DOCX.
-             */
-            const normalizedNoteText =
-                normalizeLocal(originalText);
-
-            const availableSuggestions =
-                (suggestionsBySource.get(source) || []).filter(
-                    function (item) {
-                        return !usedSuggestions.has(item);
-                    }
-                );
-
-            function scoreSuggestion(item) {
-                const normalizedOriginal =
-                    normalizeLocal(item.originalText);
-
-                // التطابق الكامل أقوى هوية ممكنة للحاشية.
-                if (
-                    normalizedOriginal &&
-                    normalizedOriginal === normalizedNoteText
-                ) {
-                    return 1000000;
-                }
-
-                const sourceTexts =
-                    Array.isArray(item.sourceTexts)
-                        ? item.sourceTexts
-                        : [];
-
-                let score = 0;
-
-                sourceTexts.forEach(function (sourceText) {
-                    const normalizedSource =
-                        normalizeLocal(sourceText);
-
-                    if (
-                        normalizedSource &&
-                        normalizedNoteText.includes(normalizedSource)
-                    ) {
-                        // فضّل تطابق النص الأصلي الأطول والأكثر تحديدًا.
-                        score += normalizedSource.length;
-                    }
-                });
-
-                return score;
-            }
-
-            const keyedSuggestion =
+            // Stable association: both the suggestion builder and this XML
+            // pass enumerate notes in document-reference order (one-based).
+            const suggestion =
                 suggestionMap.get(`${source}-${Number(noteNumber)}`) || null;
 
-            // نستخدم المعرّف كإشارة مساعدة فقط إذا كان نص الاقتراح يطابق الحاشية.
-            let suggestion =
-                keyedSuggestion &&
-                !usedSuggestions.has(keyedSuggestion) &&
-                scoreSuggestion(keyedSuggestion) > 0
-                    ? keyedSuggestion
-                    : null;
-
-            if (!suggestion) {
-                const scoredCandidates =
-                    availableSuggestions
-                        .map(function (item) {
-                            return {
-                                item: item,
-                                score: scoreSuggestion(item)
-                            };
-                        })
-                        .filter(function (entry) {
-                            return entry.score > 0;
-                        })
-                        .sort(function (a, b) {
-                            if (a.score !== b.score) {
-                                return b.score - a.score;
-                            }
-
-                            // عند تساوي تطابق النص، حافظ على ترتيب الاقتراحات.
-                            return Number(a.item.noteNumber) -
-                                Number(b.item.noteNumber);
-                        });
-
-                if (scoredCandidates.length > 0) {
-                    suggestion = scoredCandidates[0].item;
-                }
-            }
-
-            if (!suggestion) {
+            if (!suggestion || usedSuggestions.has(suggestion)) {
                 skipped++;
                 continue;
             }
@@ -47769,149 +47745,59 @@ async function applyFootnoteSuggestions(
              * =================================================
              */
 
-            const referenceGroups =
-                new Map();
+            // Each source occurrence gets its own replacement. Do not collapse
+            // by author/title: the same book may be cited multiple times in one note.
+            const replacements = [];
+            const pairCount = Math.min(
+                suggestion.references.length,
+                suggestion.suggestedTexts.length,
+                Array.isArray(suggestion.sourceTexts) ? suggestion.sourceTexts.length : 0
+            );
 
-            const count =
-                Math.min(
-                    suggestion.references.length,
-                    suggestion.suggestedTexts.length
-                );
-
-            for (
-                let i = 0;
-                i < count;
-                i++
-            ) {
-
-                const reference =
-                    suggestion.references[
-                        i
-                    ];
-
-                if (
-                    !reference
-                ) {
-
+            const pairs = [];
+            for (let i = 0; i < pairCount; i++) {
+                const sourceText = String(suggestion.sourceTexts[i] || "").trim();
+                const replacementText = getSuggestedIdentity(suggestion.suggestedTexts[i]);
+                if (!sourceText || !replacementText) {
+                    skipped++;
                     continue;
-
                 }
-
-                const suggestedIdentity =
-                    getSuggestedIdentity(
-                        suggestion.suggestedTexts[
-                            i
-                        ]
-                    );
-
-                if (
-                    !suggestedIdentity
-                ) {
-
-                    continue;
-
-                }
-
-                const referenceKey =
-                    getReferenceKey(
-                        reference
-                    );
-
-                if (
-                    !referenceKey
-                ) {
-
-                    continue;
-
-                }
-
-                if (
-                    !referenceGroups.has(
-                        referenceKey
-                    )
-                ) {
-
-                    referenceGroups.set(
-                        referenceKey,
-                        {
-
-                            reference:
-                                reference,
-
-                            suggestedIdentity:
-                                suggestedIdentity,
-
-                            sourceText:
-                                String(suggestion.sourceTexts?.[i] || "").trim()
-
-                        }
-                    );
-
-                }
-
+                pairs.push({
+                    index: i,
+                    sourceText: sourceText,
+                    replacementText: replacementText,
+                    normalizedLength: normalizeLocal(sourceText).length
+                });
             }
 
-            /*
-             * =================================================
-             * تحديد الاستبدالات
-             * =================================================
-             */
+            // Match longer citation strings first, so a short title cannot claim
+            // a substring that belongs to a fuller citation. No page/volume identity
+            // checks and no all-or-nothing occurrence-count gate.
+            pairs.sort(function (a, b) {
+                return b.normalizedLength - a.normalizedLength || a.index - b.index;
+            });
 
-            const replacements =
-                [];
-
-            referenceGroups.forEach(
-                function (
-                    group
-                ) {
-
-                    const candidates =
-                        getCandidates(
-                            group.reference
-                        );
-
-                    /*
-                     * أولًا: السلوك القديم تمامًا.
-                     *
-                     * إذا وجد العنوان الكامل أو إحدى صيغ الهوية
-                     * الموجودة سابقًا، نستخدمها ولا ندخل القاعدة
-                     * الجديدة إطلاقًا.
-                     */
-                    // الاستبدال مبني على النص الأصلي الذي حُدد في التحليل نفسه.
-                    // لا نبحث عن عنوان بديل أو صيغة مختصرة قد تطابق موضعًا آخر.
-                    let identityMatch =
-                        group.sourceText
-                            ? findBestIdentity(
-                                originalText,
-                                [group.sourceText]
-                            )
-                            : null;
-
-                    if (
-                        !identityMatch
-                    ) {
-
-                        skipped++;
-
-                        return;
-
-                    }
-
-                    replacements.push({
-
-                        start:
-                            identityMatch.start,
-
-                        end:
-                            identityMatch.end,
-
-                        text:
-                            group.suggestedIdentity
-
+            const claimedRanges = [];
+            pairs.forEach(function (pair) {
+                const matches = findAllIdentityMatches(originalText, pair.sourceText);
+                const match = matches.find(function (candidate) {
+                    return !claimedRanges.some(function (claimed) {
+                        return candidate.start < claimed.end && candidate.end > claimed.start;
                     });
+                });
 
+                if (!match) {
+                    skipped++;
+                    return;
                 }
-            );
+
+                claimedRanges.push(match);
+                replacements.push({
+                    start: match.start,
+                    end: match.end,
+                    text: pair.replacementText
+                });
+            });
 
             /*
              * =================================================
