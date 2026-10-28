@@ -47834,11 +47834,16 @@ async function applyFootnoteSuggestions(
                     skipped++;
                     continue;
                 }
+                // Citation identity is the author/book text, not page or volume
+                // notation. Keep the full source string as the first choice, then
+                // fall back to its identity-only form when Word/XML formatting differs.
+                const identityText = getSuggestedIdentity(sourceText);
                 pairs.push({
                     index: i,
                     sourceText: sourceText,
+                    identityText: identityText,
                     replacementText: replacementText,
-                    normalizedLength: normalizeLocal(sourceText).length
+                    normalizedLength: normalizeLocal(identityText || sourceText).length
                 });
             }
 
@@ -47851,12 +47856,26 @@ async function applyFootnoteSuggestions(
 
             const claimedRanges = [];
             pairs.forEach(function (pair) {
-                const matches = findAllIdentityMatches(originalText, pair.sourceText);
-                const match = matches.find(function (candidate) {
-                    return !claimedRanges.some(function (claimed) {
-                        return candidate.start < claimed.end && candidate.end > claimed.start;
-                    });
-                });
+                function findUnclaimedMatch(candidateText) {
+                    if (!candidateText) return null;
+                    const matches = findAllIdentityMatches(originalText, candidateText);
+                    return matches.find(function (candidate) {
+                        return !claimedRanges.some(function (claimed) {
+                            return candidate.start < claimed.end && candidate.end > claimed.start;
+                        });
+                    }) || null;
+                }
+
+                // First replace the exact original citation when present. If page/
+                // volume notation or Word's XML text boundaries differ, locate the
+                // author/book identity instead; never require page numbers to match.
+                const match =
+                    findUnclaimedMatch(pair.sourceText) ||
+                    (
+                        normalizeLocal(pair.identityText).length >= 8
+                            ? findUnclaimedMatch(pair.identityText)
+                            : null
+                    );
 
                 if (!match) {
                     skipped++;
