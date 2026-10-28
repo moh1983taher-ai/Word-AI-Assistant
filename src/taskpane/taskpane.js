@@ -45971,34 +45971,65 @@ async function buildFootnoteSuggestions(
                 const text = String(originalText || "");
                 if (!text.trim()) return "";
 
-                // occurrence.text is tied to this exact occurrence; prefer it
-                // over reference-wide variants that may point to another citation.
-                const candidates = [];
-                const addCandidate = function (value) {
-                    const candidate = String(value || "").trim();
-                    if (candidate && !candidates.includes(candidate)) {
-                        candidates.push(candidate);
-                    }
-                };
+                const variants = Array.isArray(reference?.variants)
+                    ? reference.variants
+                    : [];
 
-                addCandidate(occurrence?.text);
-                (Array.isArray(reference?.variants) ? reference.variants : [])
-                    .forEach(addCandidate);
+                // First preserve the exact variant when it is present.
+                for (let i = 0; i < variants.length; i++) {
+                    const candidate = String(variants[i] || "").trim();
+                    if (!candidate) continue;
 
-                // If the AI returned an exact citation string in the occurrence,
-                // try it first; variants are fallbacks, never a reason to guess.
-                for (let i = 0; i < candidates.length; i++) {
-                    const candidate = candidates[i];
                     const escaped = candidate
-                        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                        .replace(/[.*+?^$()|[\]\\]/g, "\\$&")
                         .replace(/\s+/g, "\\s*");
-                    let match;
                     try {
-                        match = new RegExp(escaped, "i").exec(text);
+                        const match = new RegExp(escaped, "i").exec(text);
+                        if (match) return match[0];
                     } catch (_) {
-                        match = null;
+                        // Try normalized matching below for punctuation/diacritics differences.
                     }
-                    if (match) return match[0];
+                }
+
+                // Normalized fallback: match the source citation despite Arabic
+                // diacritics, alef forms, spacing, or citation punctuation, while
+                // retaining a map back to the exact original character offsets.
+                function normalizeWithMap(value) {
+                    const raw = String(value || "");
+                    let normalized = "";
+                    const rawMap = [];
+
+                    for (let i = 0; i < raw.length; i++) {
+                        let ch = raw[i];
+                        if (/[\u064B-\u065F\u0670\u0640]/.test(ch)) continue;
+                        if (/[\u200C-\u200F\u202A-\u202E\uFEFF]/.test(ch)) continue;
+                        if (/[\s\u00A0،,؛:()[\]{}"']/u.test(ch)) continue;
+                        if (/[أإآٱ]/.test(ch)) ch = "ا";
+                        if (ch === "ى") ch = "ي";
+                        ch = ch.toLowerCase();
+                        normalized += ch;
+                        for (let j = 0; j < ch.length; j++) rawMap.push(i);
+                    }
+
+                    return { normalized: normalized, rawMap: rawMap };
+                }
+
+                const sourceMap = normalizeWithMap(text);
+                for (let i = 0; i < variants.length; i++) {
+                    const candidate = String(variants[i] || "").trim();
+                    if (!candidate) continue;
+
+                    const target = normalizeWithMap(candidate).normalized;
+                    if (target.length < 4) continue;
+
+                    const position = sourceMap.normalized.indexOf(target);
+                    if (position === -1) continue;
+
+                    const rawStart = sourceMap.rawMap[position];
+                    const rawEnd = sourceMap.rawMap[position + target.length - 1] + 1;
+                    if (Number.isInteger(rawStart) && Number.isInteger(rawEnd) && rawEnd > rawStart) {
+                        return text.slice(rawStart, rawEnd);
+                    }
                 }
 
                 return "";
