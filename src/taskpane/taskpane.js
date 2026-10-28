@@ -46378,9 +46378,9 @@ async function applyFootnoteSuggestions(
      * =========================================================
      */
 
-    const suggestionMap =
-        new Map();
-
+    // اربط الاقتراحات بنص الحاشية ومصدرها، لا برقم الحاشية وحده.
+    // قد تختلف أرقام XML عن ترتيب Word API، ولذلك لا يجوز أن يحدد الرقم
+    // وحده الحاشية التي سيُطبّق عليها التوثيق.
     const suggestionsBySource =
         new Map();
 
@@ -46415,13 +46415,6 @@ async function applyFootnoteSuggestions(
 
             }
 
-            suggestionMap.set(
-                `${item.source}-${Number(
-                    item.noteNumber
-                )}`,
-                item
-            );
-
             if (!suggestionsBySource.has(item.source)) {
                 suggestionsBySource.set(item.source, []);
             }
@@ -46432,7 +46425,7 @@ async function applyFootnoteSuggestions(
     );
 
     if (
-        suggestionMap.size === 0
+        suggestionsBySource.size === 0
     ) {
 
         return {
@@ -47765,12 +47758,19 @@ async function applyFootnoteSuggestions(
 
             }
 
-            // Stable association: both the suggestion builder and this XML
-            // pass enumerate notes in document-reference order (one-based).
-            const suggestion =
-                suggestionMap.get(`${source}-${Number(noteNumber)}`) || null;
+            // GPT/Word analysis stores the original full text of each note.
+            // Match that content against the actual XML note before applying any
+            // suggestion. The note number is deliberately not used as identity.
+            const normalizedNoteText = normalizeLocal(originalText);
+            const sourceSuggestions = suggestionsBySource.get(source) || [];
+            const suggestion = sourceSuggestions.find(function (item) {
+                return !usedSuggestions.has(item) &&
+                    normalizeLocal(item.originalText || "") === normalizedNoteText;
+            }) || null;
 
-            if (!suggestion || usedSuggestions.has(suggestion)) {
+            // If the source note cannot be identified by its original text,
+            // leave it untouched rather than risk changing a different citation.
+            if (!suggestion) {
                 skipped++;
                 continue;
             }
