@@ -46888,6 +46888,51 @@ async function applyFootnoteSuggestions(
     }
 
     /*
+     * العثور على جميع مواضع مقطع أصلي، مع إرجاع مواضعه الخام
+     * في النص لا مواضع النص المطبع. تُستخدم المواضع كعلامات داخلية
+     * ثابتة؛ لا نغيّر النص أثناء بناء خطة الاستبدال.
+     */
+    function findAllIdentityMatches(text, candidate) {
+        const target = normalizeLocal(candidate);
+        if (!target) return [];
+
+        const map = buildRawMap(text);
+        const matches = [];
+        let from = 0;
+
+        while (from <= map.normalized.length - target.length) {
+            const position = map.normalized.indexOf(target, from);
+            if (position === -1) break;
+
+            const normalizedEnd = position + target.length;
+            if (
+                position < map.rawMap.length &&
+                normalizedEnd - 1 < map.rawMap.length
+            ) {
+                const rawStart = map.rawMap[position];
+                const rawEnd = map.rawMap[normalizedEnd - 1] + 1;
+
+                if (
+                    hasSafeIdentityBoundaries(text, rawStart, rawEnd) &&
+                    !matches.some(function (item) {
+                        return item.start === rawStart && item.end === rawEnd;
+                    })
+                ) {
+                    matches.push({
+                        start: rawStart,
+                        end: rawEnd,
+                        markerId: "SRC-" + String(matches.length + 1).padStart(5, "0")
+                    });
+                }
+            }
+
+            from = position + Math.max(1, target.length);
+        }
+
+        return matches;
+    }
+
+    /*
      * =========================================================
      * 7. القاعدة الإضافية الوحيدة:
      *
@@ -47714,7 +47759,7 @@ async function applyFootnoteSuggestions(
                         normalizeLocal(sourceText);
 
                     if (
-                        normalizedSource.length >= 12 &&
+                        normalizedSource.length >= 3 &&
                         normalizedNoteText.includes(normalizedSource)
                     ) {
                         bestPartialScore = Math.max(
@@ -47782,154 +47827,78 @@ async function applyFootnoteSuggestions(
             usedSuggestions.add(suggestion);
 
             /*
-             * =================================================
-             * تجميع المرجع نفسه داخل الحاشية.
-             * =================================================
+             * بناء خطة استبدال مستقلة لكل مقطع أصلي.
+             *
+             * لا نجمع المقاطع حسب المؤلف/الكتاب؛ فقد يظهر الكتاب
+             * نفسه أكثر من مرة في الحاشية، ولكل ظهور نص بديل مستقل.
+             * نثبت مواضع المقاطع أولًا ثم نطبّق الاستبدالات من اليمين
+             * إلى اليسار، حتى لا تؤثر تغييرات الأطوال في مواضع غيرها.
              */
+            const segmentGroups = new Map();
+            const pairCount = Math.min(
+                suggestion.references.length,
+                suggestion.suggestedTexts.length,
+                Array.isArray(suggestion.sourceTexts) ? suggestion.sourceTexts.length : 0
+            );
 
-            const referenceGroups =
-                new Map();
+            for (let i = 0; i < pairCount; i++) {
+                const sourceText = String(suggestion.sourceTexts[i] || "").trim();
+                const suggestedIdentity = getSuggestedIdentity(suggestion.suggestedTexts[i]);
 
-            const count =
-                Math.min(
-                    suggestion.references.length,
-                    suggestion.suggestedTexts.length
-                );
-
-            for (
-                let i = 0;
-                i < count;
-                i++
-            ) {
-
-                const reference =
-                    suggestion.references[
-                        i
-                    ];
-
-                if (
-                    !reference
-                ) {
-
+                if (!sourceText || !suggestedIdentity) {
+                    skipped++;
                     continue;
-
                 }
 
-                const suggestedIdentity =
-                    getSuggestedIdentity(
-                        suggestion.suggestedTexts[
-                            i
-                        ]
-                    );
-
-                if (
-                    !suggestedIdentity
-                ) {
-
+                const normalizedSource = normalizeLocal(sourceText);
+                if (normalizedSource.length < 3) {
+                    skipped++;
                     continue;
-
                 }
 
-                const referenceKey =
-                    getReferenceKey(
-                        reference
-                    );
-
-                if (
-                    !referenceKey
-                ) {
-
-                    continue;
-
+                if (!segmentGroups.has(normalizedSource)) {
+                    segmentGroups.set(normalizedSource, {
+                        sourceText: sourceText,
+                        replacements: new Set(),
+                        indexes: [],
+                        markerId: "SEG-" + String(i + 1).padStart(5, "0")
+                    });
                 }
 
-                if (
-                    !referenceGroups.has(
-                        referenceKey
-                    )
-                ) {
-
-                    referenceGroups.set(
-                        referenceKey,
-                        {
-
-                            reference:
-                                reference,
-
-                            suggestedIdentity:
-                                suggestedIdentity,
-
-                            sourceText:
-                                String(suggestion.sourceTexts?.[i] || "").trim()
-
-                        }
-                    );
-
-                }
-
+                const group = segmentGroups.get(normalizedSource);
+                group.replacements.add(suggestedIdentity);
+                group.indexes.push(i);
             }
 
-            /*
-             * =================================================
-             * تحديد الاستبدالات
-             * =================================================
-             */
+            const replacements = [];
 
-            const replacements =
-                [];
-
-            referenceGroups.forEach(
-                function (
-                    group
-                ) {
-
-                    const candidates =
-                        getCandidates(
-                            group.reference
-                        );
-
-                    /*
-                     * أولًا: السلوك القديم تمامًا.
-                     *
-                     * إذا وجد العنوان الكامل أو إحدى صيغ الهوية
-                     * الموجودة سابقًا، نستخدمها ولا ندخل القاعدة
-                     * الجديدة إطلاقًا.
-                     */
-                    // الاستبدال مبني على النص الأصلي الذي حُدد في التحليل نفسه.
-                    // لا نبحث عن عنوان بديل أو صيغة مختصرة قد تطابق موضعًا آخر.
-                    let identityMatch =
-                        group.sourceText
-                            ? findBestIdentity(
-                                originalText,
-                                [group.sourceText]
-                            )
-                            : null;
-
-                    if (
-                        !identityMatch
-                    ) {
-
-                        skipped++;
-
-                        return;
-
-                    }
-
-                    replacements.push({
-
-                        start:
-                            identityMatch.start,
-
-                        end:
-                            identityMatch.end,
-
-                        text:
-                            group.suggestedIdentity
-
-                    });
-
+            segmentGroups.forEach(function (group) {
+                /*
+                 * النص الأصلي الواحد لا يجوز أن يقود إلى بديلين مختلفين؛
+                 * هذه حالة ملتبسة، فنتركها دون تغيير بدل إفساد التوثيق.
+                 */
+                if (group.replacements.size !== 1) {
+                    skipped += group.indexes.length;
+                    return;
                 }
-            );
+
+                const replacementText = Array.from(group.replacements)[0];
+                const matches = findAllIdentityMatches(originalText, group.sourceText);
+
+                if (!matches.length) {
+                    skipped += group.indexes.length;
+                    return;
+                }
+
+                matches.forEach(function (match) {
+                    replacements.push({
+                        start: match.start,
+                        end: match.end,
+                        text: replacementText,
+                        markerId: group.markerId
+                    });
+                });
+            });
 
             /*
              * =================================================
