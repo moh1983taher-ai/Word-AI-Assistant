@@ -36891,86 +36891,98 @@ function extractLibraryAIText(
     provider
 ) {
 
-    if (
-        provider ===
-        "gemini"
-    ) {
+    if (provider === "gemini") {
 
-        const parts =
-            result?.candidates?.[0]
-                ?.content?.parts;
+        const candidates = Array.isArray(result?.candidates)
+            ? result.candidates
+            : [];
 
+        const blockReason =
+            result?.promptFeedback?.blockReason || null;
 
-        if (
-            !Array.isArray(parts)
-        ) {
+        let textPartCount = 0;
+        let thoughtPartCount = 0;
+        const candidateDiagnostics = [];
 
-            throw new Error(
-                "لم يصل رد صالح من Gemini."
-            );
+        for (let i = 0; i < candidates.length; i++) {
 
-        }
+            const candidate = candidates[i] || {};
+            const parts = Array.isArray(candidate?.content?.parts)
+                ? candidate.content.parts
+                : [];
 
+            const finalParts = [];
 
-        const text =
-            parts
-                .filter(
-                    function (
-                        part
-                    ) {
+            for (let j = 0; j < parts.length; j++) {
 
-                        return (
-                            part &&
-                            typeof part.text ===
-                                "string" &&
-                            part.thought !==
-                                true
-                        );
+                const part = parts[j];
 
-                    }
-                )
-                .map(
-                    function (
-                        part
-                    ) {
+                if (!part || typeof part.text !== "string" ||
+                    !part.text.trim()) {
+                    continue;
+                }
 
-                        return part.text;
+                textPartCount++;
 
-                    }
-                )
-                .join("\n")
-                .trim();
+                if (part.thought === true) {
+                    thoughtPartCount++;
+                    continue;
+                }
 
+                finalParts.push(part.text);
 
-        if (!text) {
+            }
 
-            throw new Error(
-                "لم يصل نص صالح من Gemini."
-            );
+            candidateDiagnostics.push({
+                index: i,
+                finishReason: candidate.finishReason || null,
+                partCount: parts.length
+            });
+
+            const candidateText = finalParts.join("\n").trim();
+
+            if (candidateText) {
+                return candidateText;
+            }
 
         }
 
+        const usage = result?.usageMetadata || {};
+        const finishReasons = candidateDiagnostics
+            .map(function (item) {
+                return "candidate[" + item.index + "]=" +
+                    (item.finishReason || "no-finish-reason") +
+                    ", parts=" + item.partCount;
+            })
+            .join("; ");
 
-        return text;
+        const details = [
+            "candidates=" + candidates.length,
+            "textParts=" + textPartCount,
+            "thoughtParts=" + thoughtPartCount,
+            "promptBlockReason=" + (blockReason || "none"),
+            "promptTokens=" + (usage.promptTokenCount ?? "n/a"),
+            "candidateTokens=" + (usage.candidatesTokenCount ?? "n/a"),
+            "thoughtTokens=" + (usage.thoughtsTokenCount ?? "n/a"),
+            finishReasons || "no candidate details"
+        ].join(" | ");
+
+        throw new Error(
+            "لم يُرجع Gemini نصًا نهائيًا صالحًا. " + details
+        );
 
     }
-
 
     const text =
         result?.choices?.[0]
             ?.message?.content;
 
-
     if (
-        typeof text ===
-            "string" &&
+        typeof text === "string" &&
         text.trim()
     ) {
-
         return text.trim();
-
     }
-
 
     throw new Error(
         `لم يصل رد صالح من ${provider}.`
