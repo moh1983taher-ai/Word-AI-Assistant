@@ -36705,6 +36705,7 @@ const LIBRARY_AI_FETCH_RESULTS_PER_QUERY = 60;
 const LIBRARY_AI_MAX_CANDIDATES = 100;
 const LIBRARY_AI_MIN_RELEVANCE = 68;
 const LIBRARY_AI_TIMEOUT_MS = 30000;
+const LIBRARY_AI_GEMINI_TIMEOUT_MS = 45000;
 
 
 // =====================================================
@@ -36829,7 +36830,8 @@ function getLibraryAIProviderConfig() {
 function withLibraryAITimeout(
     promise,
     timeoutMs =
-        LIBRARY_AI_TIMEOUT_MS
+        LIBRARY_AI_TIMEOUT_MS,
+    abortController = null
 ) {
 
     let timer = null;
@@ -36846,10 +36848,44 @@ function withLibraryAITimeout(
                     setTimeout(
                         function () {
 
-                            reject(
+                            const error =
                                 new Error(
-                                    "انتهت مهلة الذكاء الاصطناعي."
-                                )
+                                    "انتهت مهلة الذكاء الاصطناعي بعد " +
+                                    timeoutMs +
+                                    " مللي ثانية."
+                                );
+
+                            error.code =
+                                "LIBRARY_AI_TIMEOUT";
+
+                            error.timeout =
+                                true;
+
+
+                            // إلغاء الطلب الفعلي، لا الاكتفاء بإنهاء الانتظار.
+                            if (
+                                abortController &&
+                                !abortController.signal.aborted
+                            ) {
+
+                                try {
+
+                                    abortController.abort(
+                                        error
+                                    );
+
+                                }
+                                catch (_) {
+
+                                    abortController.abort();
+
+                                }
+
+                            }
+
+
+                            reject(
+                                error
                             );
 
                         },
@@ -37258,6 +37294,14 @@ async function callLibraryAI(
 
                 let response;
 
+                // لكل محاولة متحكم مستقل؛ حتى لا يبقى طلب Gemini
+                // السابق معلقًا عند انتهاء المهلة وبدء المحاولة التالية.
+                const requestController =
+                    new AbortController();
+
+                const requestStartedAt =
+                    Date.now();
+
                 try {
 
                     const requestPromise =
@@ -37274,14 +37318,29 @@ async function callLibraryAI(
                                 body:
                                     JSON.stringify(
                                         body
-                                    )
+                                    ),
+
+                                signal:
+                                    requestController.signal
                             }
                         );
 
                     response =
                         await withLibraryAITimeout(
-                            requestPromise
+                            requestPromise,
+                            LIBRARY_AI_GEMINI_TIMEOUT_MS,
+                            requestController
                         );
+
+                    console.info(
+                        "LIBRARY GEMINI REQUEST COMPLETED:",
+                        {
+                            durationMs:
+                                Date.now() - requestStartedAt,
+                            status:
+                                response.status
+                        }
+                    );
 
                 }
                 catch (
@@ -37290,6 +37349,18 @@ async function callLibraryAI(
 
                     error.networkError =
                         true;
+
+                    console.warn(
+                        "LIBRARY GEMINI REQUEST FAILED:",
+                        {
+                            durationMs:
+                                Date.now() - requestStartedAt,
+                            timeout:
+                                error.code === "LIBRARY_AI_TIMEOUT",
+                            message:
+                                error.message
+                        }
+                    );
 
                     throw error;
 
@@ -37898,6 +37969,12 @@ async function callLibraryAI(
                                 "Library AI"
                             )
 
+    ,
+        config.provider === "gemini"
+            ? {
+                maxAttempts: 2
+            }
+            : undefined
     );
 
 }
