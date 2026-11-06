@@ -37285,7 +37285,14 @@ async function callLibraryAI(
                             temperature,
 
                         maxOutputTokens:
-                            maxTokens
+                            maxTokens,
+
+                        ...(task === "queryExpansion"
+                            ? {
+                                responseMimeType:
+                                    "application/json"
+                            }
+                            : {})
 
                     }
 
@@ -38074,7 +38081,7 @@ function parseLibraryAIJSON(
 
     }
 
-    console.log("EXPAND RAW AI RESPONSE:", rawResponse);
+    console.error("EXPAND RAW AI RESPONSE (INVALID JSON):", raw);
 
     throw new Error(
         "رد الذكاء الاصطناعي ليس JSON صالحًا."
@@ -38259,8 +38266,8 @@ const ALJAM3_CATEGORY_ALIASES = {
 function matchAljam3Category(value) {
 
     // --------------------------------------------------------
-    // 0. إذا أعاد AI التصنيف مباشرةً ككائن:
-    // { name: "...", id: 21 }
+    // إذا أعاد النموذج التصنيف ككائن قديم، نأخذ الاسم فقط.
+    // المعرّف يُستخرج حصريًا من خريطة التصنيفات المحلية.
     // --------------------------------------------------------
 
     if (
@@ -38269,30 +38276,9 @@ function matchAljam3Category(value) {
         !Array.isArray(value)
     ) {
 
-        const name =
-            String(
-                value.name ||
-                ""
-            )
-            .replace(/\s+/g, " ")
-            .trim();
-
-        const id =
-            Number(
-                value.id
-            );
-
-        if (
-            name &&
-            id > 0
-        ) {
-
-            return {
-                name,
-                id
-            };
-
-        }
+        value =
+            value.name ||
+            "";
 
     }
 
@@ -38669,6 +38655,11 @@ async function expandLibrarySearchQuery(
     // الجامع ALJAM3
     // ========================================================
 
+    const supportedAljam3Categories =
+        Object.keys(
+            ALJAM3_CATEGORY_MAP
+        ).join("، ");
+
     const aljam3Instructions = [
 
         "ALJAM3:",
@@ -38683,10 +38674,10 @@ async function expandLibrarySearchQuery(
         "userSection يحدد مجالات البحث، ولا يدخل في نص الاستعلامات.",
         "استخرج intent وconstraints من subject فقط.",
         "إذا حدد الباحث userSection، فاعتمد المجالات المذكورة فيه أساسًا للتصنيف.",
-        "إذا لم يحدد الباحث userSection، فاعتمد على تصنيفات مكتبة الجامع الرسمية لاختيار المجالات المناسبة.",
-        "اقرأ صفحة التصنيفات الرسمية لمكتبة الجامع باستخدام أداة web_fetch المتاحة لك:",
-        "https://aljam3.com/en/categories",
-        "اعتمد أسماء التصنيفات الرسمية الواردة في الصفحة فقط، ولا تخترع تصنيفًا من عندك.",
+        "إذا لم يحدد الباحث userSection، فاختر المجالات من قائمة التصنيفات التي يدعمها التطبيق حاليًا فقط.",
+        "التصنيفات المدعومة حرفيًا هي: " + supportedAljam3Categories + ".",
+        "لا تفترض توفر أداة تصفح أو قراءة صفحات خارجية.",
+        "أعد اسم التصنيف كما ورد في القائمة حرفيًا، ولا تُنشئ رقمًا أو معرّفًا للتصنيف.",
         "اختر حتى ثلاثة تصنيفات هي الأقرب إلى subject وintent.",
         "إذا كان الموضوع واسعًا أو متعدد المجالات بحيث لا يمكن حصره بصورة مفيدة في ثلاثة تصنيفات، فلا تختر تصنيفًا واجعل البحث عامًا.",
         "استخدم primaryCategory للمجال الأقوى صلة، ثم secondaryCategory وpossibleCategory عند وجود صلة بحثية مفيدة.",
@@ -38778,7 +38769,7 @@ async function expandLibrarySearchQuery(
 
                 "أعد JSON فقط:",
 
-                "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":{\"name\":\"...\",\"id\":0},\"secondaryCategory\":{\"name\":\"...\",\"id\":0},\"possibleCategory\":{\"name\":\"...\",\"id\":0},\"aljam3Queries\":[\"...\",\"...\",\"...\"]}"
+                "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":\"اسم التصنيف أو null\",\"secondaryCategory\":\"اسم التصنيف أو null\",\"possibleCategory\":\"اسم التصنيف أو null\",\"aljam3Queries\":[\"الاستعلام الأصلي\",\"صيغة موسعة\",\"صيغة سياقية\"]}"
 
             ];
 
@@ -38909,6 +38900,29 @@ async function expandLibrarySearchQuery(
 
     const parsed =
         parseLibraryAIJSON(answer);
+
+    console.info(
+        "LIBRARY AI EXPANSION RESPONSE CONTRACT:",
+        {
+            source,
+            topLevelKeys:
+                parsed && typeof parsed === "object"
+                    ? Object.keys(parsed)
+                    : [],
+            shamelaQueries:
+                Array.isArray(parsed?.shamelaQueries)
+                    ? parsed.shamelaQueries.length
+                    : 0,
+            ketabQueries:
+                Array.isArray(parsed?.ketabQueries)
+                    ? parsed.ketabQueries.length
+                    : 0,
+            aljam3Queries:
+                Array.isArray(parsed?.aljam3Queries)
+                    ? parsed.aljam3Queries.length
+                    : 0
+        }
+    );
 
 
     // ========================================================
