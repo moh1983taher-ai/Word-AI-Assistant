@@ -37290,7 +37290,14 @@ async function callLibraryAI(
                         ...(task === "queryExpansion"
                             ? {
                                 responseMimeType:
-                                    "application/json"
+                                    "application/json",
+
+                                ...(options.responseSchema
+                                    ? {
+                                        responseSchema:
+                                            options.responseSchema
+                                    }
+                                    : {})
                             }
                             : {})
 
@@ -38769,7 +38776,7 @@ async function expandLibrarySearchQuery(
 
                 "أعد JSON فقط:",
 
-                "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":\"اسم التصنيف أو null\",\"secondaryCategory\":\"اسم التصنيف أو null\",\"possibleCategory\":\"اسم التصنيف أو null\",\"aljam3Queries\":[\"الاستعلام الأصلي\",\"صيغة موسعة\",\"صيغة سياقية\"]}"
+                "{\"intent\":\"...\",\"subject\":\"...\",\"userSection\":\"...\",\"constraints\":[],\"primaryCategory\":\"اسم التصنيف أو نص فارغ عند عدم الاختيار\",\"secondaryCategory\":\"اسم التصنيف أو نص فارغ عند عدم الاختيار\",\"possibleCategory\":\"اسم التصنيف أو نص فارغ عند عدم الاختيار\",\"aljam3Queries\":[\"الاستعلام الأصلي\",\"صيغة موسعة\",\"صيغة سياقية\"]}"
 
             ];
 
@@ -38880,6 +38887,75 @@ async function expandLibrarySearchQuery(
 
 
     // ========================================================
+    // مخطط استجابة صريح لمزود Gemini
+    // يمنع اختلاف أسماء الحقول أو أنواعها عن عقد التطبيق.
+    // ========================================================
+
+    const stringField = {
+        type: "STRING"
+    };
+
+    const stringArrayField = {
+        type: "ARRAY",
+        items: {
+            type: "STRING"
+        }
+    };
+
+    const expansionProperties = {
+        intent: stringField,
+        subject: stringField,
+        constraints: stringArrayField
+    };
+
+    const expansionRequired = [
+        "intent",
+        "subject",
+        "constraints"
+    ];
+
+    if (source === "aljam3") {
+        Object.assign(
+            expansionProperties,
+            {
+                userSection: stringField,
+                primaryCategory: stringField,
+                secondaryCategory: stringField,
+                possibleCategory: stringField,
+                aljam3Queries: stringArrayField
+            }
+        );
+
+        expansionRequired.push(
+            "userSection",
+            "primaryCategory",
+            "secondaryCategory",
+            "possibleCategory",
+            "aljam3Queries"
+        );
+    } else if (source === "shamela") {
+        expansionProperties.shamelaQueries = stringArrayField;
+        expansionRequired.push("shamelaQueries");
+    } else if (source === "ketabonline") {
+        expansionProperties.ketabQueries = stringArrayField;
+        expansionRequired.push("ketabQueries");
+    } else {
+        expansionProperties.shamelaQueries = stringArrayField;
+        expansionProperties.ketabQueries = stringArrayField;
+        expansionRequired.push(
+            "shamelaQueries",
+            "ketabQueries"
+        );
+    }
+
+    const expansionResponseSchema = {
+        type: "OBJECT",
+        properties: expansionProperties,
+        required: expansionRequired
+    };
+
+
+    // ========================================================
     // استدعاء AI
     //
     // webFetch فقط عند ALJAM3 ومع OpenRouter.
@@ -38893,7 +38969,9 @@ async function expandLibrarySearchQuery(
                 task: "queryExpansion",
                 temperature: 0.1,
                 enableWebFetch:
-                    source === "aljam3"
+                    source === "aljam3",
+                responseSchema:
+                    expansionResponseSchema
             }
         );
 
