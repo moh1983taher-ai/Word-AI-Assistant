@@ -38021,97 +38021,107 @@ function parseLibraryAIJSON(
     text
 ) {
 
-    let raw =
-        String(
-            text ||
-            ""
-        )
-        .trim();
+    const raw = String(text || "").trim();
 
+    if (!raw) {
+        throw new Error("رد الذكاء الاصطناعي فارغ.");
+    }
 
-    raw =
-        raw
-            .replace(
-                /^```json\s*/i,
-                ""
-            )
-            .replace(
-                /^```\s*/i,
-                ""
-            )
-            .replace(
-                /\s*```$/i,
-                ""
-            )
-            .trim();
-
-
+    // 1. الاستجابة JSON خالص.
     try {
+        return JSON.parse(raw);
+    } catch (error) {}
 
-        return JSON.parse(
-            raw
-        );
+    // 2. استخراج كتل Markdown، سواء سبقتها أو تبعتها عبارات تفسيرية.
+    const fence = String.fromCharCode(96);
+    const fencePattern = new RegExp(fence + fence + fence + "(?:json)?\\s*([\\s\\S]*?)" + fence + fence + fence, "gi");
+    const fencedBlocks = [];
+    let fenceMatch;
 
-    }
-    catch (_) {}
-
-
-    const objectStart =
-        raw.indexOf(
-            "{"
-        );
-
-    const objectEnd =
-        raw.lastIndexOf(
-            "}"
-        );
-
-
-    const arrayStart =
-        raw.indexOf(
-            "["
-        );
-
-    const arrayEnd =
-        raw.lastIndexOf(
-            "]"
-        );
-
-
-    if (
-        arrayStart >= 0 &&
-        arrayEnd > arrayStart
-    ) {
-
-        return JSON.parse(
-            raw.substring(
-                arrayStart,
-                arrayEnd + 1
-            )
-        );
-
+    while ((fenceMatch = fencePattern.exec(raw)) !== null) {
+        if (fenceMatch[1] && fenceMatch[1].trim()) {
+            fencedBlocks.push(fenceMatch[1].trim());
+        }
     }
 
-
-    if (
-        objectStart >= 0 &&
-        objectEnd > objectStart
-    ) {
-
-        return JSON.parse(
-            raw.substring(
-                objectStart,
-                objectEnd + 1
-            )
-        );
-
+    for (const candidate of fencedBlocks) {
+        try {
+            return JSON.parse(candidate);
+        } catch (error) {}
     }
 
-    console.error("EXPAND RAW AI RESPONSE (INVALID JSON):", raw);
+    // 3. استخراج قيمة JSON متوازنة مع تجاهل الأقواس داخل السلاسل النصية.
+    function parseBalancedValue(source, startIndex, openChar, closeChar) {
+        let depth = 0;
+        let inString = false;
+        let escaped = false;
 
-    throw new Error(
-        "رد الذكاء الاصطناعي ليس JSON صالحًا."
+        for (let i = startIndex; i < source.length; i++) {
+            const ch = source[i];
+
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (ch === "\\") {
+                    escaped = true;
+                } else if (ch === '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (ch === '"') {
+                inString = true;
+                continue;
+            }
+
+            if (ch === openChar) {
+                depth++;
+            } else if (ch === closeChar) {
+                depth--;
+
+                if (depth === 0) {
+                    try {
+                        return JSON.parse(source.slice(startIndex, i + 1));
+                    } catch (error) {
+                        return null;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // مخطط توسيع الاستعلام كائن؛ نبحث عنه أولًا حتى لا نقتطع
+    // مصفوفة داخلية مثل constraints أو aljam3Queries.
+    for (let i = 0; i < raw.length; i++) {
+        if (raw[i] === "{") {
+            const parsed = parseBalancedValue(raw, i, "{", "}");
+
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                return parsed;
+            }
+        }
+    }
+
+    // دعم احتياطي للاستجابات التي يكون جذرها مصفوفة.
+    for (let i = 0; i < raw.length; i++) {
+        if (raw[i] === "[") {
+            const parsed = parseBalancedValue(raw, i, "[", "]");
+
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
+        }
+    }
+
+    console.error(
+        "EXPAND RAW AI RESPONSE (INVALID JSON):",
+        raw.slice(0, 12000)
     );
+
+    throw new Error("تعذر استخراج JSON صالح من رد الذكاء الاصطناعي.");
 
 }
 
