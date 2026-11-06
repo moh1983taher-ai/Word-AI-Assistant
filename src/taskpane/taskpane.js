@@ -37720,6 +37720,25 @@ async function callLibraryAI(
 
             };
 
+            // توحيد تنسيق استجابة توسيع الاستعلامات لدى مزودي
+            // OpenAI-compatible الذين لا يستخدمون Gemini responseSchema.
+            // JSON mode يضمن سلامة صياغة JSON؛ ويظل عقد الحقول موحدًا
+            // ويعالجه التطبيق في مرحلة التحقق اللاحقة.
+            if (
+                task === "queryExpansion" &&
+                (
+                    config.provider === "groq" ||
+                    config.provider === "pollinations"
+                )
+            ) {
+
+                body.response_format = {
+                    type: "json_object"
+                };
+
+            }
+
+
             if (
                 config.provider === "openrouter" &&
                 options.enableWebFetch
