@@ -43664,7 +43664,7 @@ async function sendMessage() {
                     String(text || ""),
 
                 libraryProvider:
-                    String(selectedSource || ""),
+                    String(librarySource || ""),
 
                 createdAt:
                     new Date().toISOString()
@@ -43691,7 +43691,7 @@ async function sendMessage() {
                         libraryData.results,
                         {
                             query: String(text || ""),
-                            provider: String(selectedSource || ""),
+                            provider: String(librarySource || ""),
                             chatId: String(currentChat.id || ""),
                             projectId: String(currentChat.projectId || ""),
                             searchId: researchSearchId
