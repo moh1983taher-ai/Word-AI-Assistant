@@ -30822,110 +30822,136 @@ function buildStreamingHistory(
     documentContext
 ) {
 
-    const messages =
-        [];
-
+    const messages = [];
 
     const historyLimit =
-        documentContext &&
-        documentContext.found
+        documentContext && documentContext.found
             ? 2
             : 4;
 
-
     if (
         !currentChat ||
-        !Array.isArray(
-            currentChat.messages
-        )
+        !Array.isArray(currentChat.messages)
     ) {
-
         return messages;
-
     }
 
+    // الرسالة الحالية أضيفت قبل بناء الطلب؛ لا تُكرر.
+    const previousMessages = currentChat.messages.slice(0, -1);
 
-    // ==================================
-    // الرسالة الحالية موجودة بالفعل
-    // في currentChat بعد sendMessage()
-    // لذلك نستبعد آخر رسالة
-    // ==================================
-
-    const messagesWithoutCurrent =
-        currentChat.messages.slice(
-            0,
-            -1
-        );
-
-
-    const previousMessages =
-        messagesWithoutCurrent.slice(
-            -historyLimit
-        );
-
-
-    previousMessages.forEach(
-        function (
-            msg
-        ) {
-
-            if (
-                !msg ||
-                !msg.text
-            ) {
-
-                return;
-
-            }
-
-
-            let messageText =
-                String(
-                    msg.text
-                ).trim();
-
-
-            const maxHistoryChars =
-                documentContext &&
-                documentContext.found
-                    ? 1000
-                    : 1500;
-
-
-            if (
-                messageText.length >
-                maxHistoryChars
-            ) {
-
-                messageText =
-                    messageText.substring(
-                        0,
-                        maxHistoryChars
-                    ) +
-                    "…";
-
-            }
-
-
-            messages.push({
-
-                role:
-                    msg.role ===
-                    "ai"
-                        ? "assistant"
-                        : "user",
-
-                content:
-                    messageText
-
-            });
-
+    // احتفظ بآخر الرسائل الحوارية، مع إبقاء جميع رسائل المكتبة
+    // السابقة في السجل؛ فهي مصدر السياق البحثي الأصلي.
+    const ordinaryIndexes = [];
+    previousMessages.forEach(function (msg, index) {
+        if (msg && msg.type !== "library" && msg.text) {
+            ordinaryIndexes.push(index);
         }
+    });
+
+    const selectedIndexes = new Set(
+        ordinaryIndexes.slice(-historyLimit)
     );
 
+    previousMessages.forEach(function (msg, index) {
+        if (msg && msg.type === "library") {
+            selectedIndexes.add(index);
+        }
+    });
+
+    previousMessages.forEach(function (msg, index) {
+        if (!msg || !msg.text || !selectedIndexes.has(index)) {
+            return;
+        }
+
+        // تمرير نتائج المكتبة الأصلية، لا النص المختصر المعروض فقط.
+        if (msg.type === "library") {
+            const results = Array.isArray(msg.libraryResults)
+                ? msg.libraryResults
+                : [];
+
+            const parts = [
+                "سياق نتائج بحث سابق في المكتبة",
+                "استعلام البحث: " + String(msg.libraryQuery || "غير محفوظ"),
+                "المكتبة/المزود: " + String(msg.libraryProvider || "غير محدد"),
+                "عدد النتائج المحفوظة: " + String(results.length),
+                "تعامل مع هذه البيانات بوصفها نتائج فعلية من البحث السابق، ولا تستبدلها بنتائج متخيلة."
+            ];
+
+            let remainingChars = 24000;
+
+            results.forEach(function (item, resultIndex) {
+                if (!item || remainingChars <= 0) {
+                    return;
+                }
+
+                const fields = [];
+                [
+                    ["العنوان", "title"],
+                    ["الكتاب", "book"],
+                    ["المؤلف", "author"],
+                    ["المصدر", "source"],
+                    ["المجلد", "volume"],
+                    ["الجزء", "part"],
+                    ["الصفحة", "page"],
+                    ["الفصل", "chapter"]
+                ].forEach(function (field) {
+                    const value = item[field[1]];
+                    if (value !== undefined && value !== null && String(value).trim()) {
+                        fields.push(field[0] + ": " + String(value));
+                    }
+                });
+
+                let excerpt = String(
+                    item.text || item.snippet || item.content || ""
+                ).trim();
+
+                if (excerpt.length > 650) {
+                    excerpt = excerpt.substring(0, 650) + "…";
+                }
+
+                const record = [
+                    "النتيجة " + String(resultIndex + 1),
+                    fields.join(" | "),
+                    excerpt
+                ].filter(Boolean).join("\n");
+
+                const block = "\n\n" + record;
+                if (block.length > remainingChars) {
+                    parts.push(block.substring(0, remainingChars));
+                    remainingChars = 0;
+                } else {
+                    parts.push(block);
+                    remainingChars -= block.length;
+                }
+            });
+
+            if (!results.length) {
+                parts.push(String(msg.text).substring(0, 1200));
+            }
+
+            messages.push({
+                role: "assistant",
+                content: parts.join("\n")
+            });
+
+            return;
+        }
+
+        let messageText = String(msg.text).trim();
+        const maxHistoryChars =
+            documentContext && documentContext.found ? 1000 : 1500;
+
+        if (messageText.length > maxHistoryChars) {
+            messageText = messageText.substring(0, maxHistoryChars) + "…";
+        }
+
+        messages.push({
+            role: msg.role === "ai" ? "assistant" : "user",
+            content: messageText
+        });
+    });
 
     return messages;
-
 }
 
 
@@ -43625,6 +43651,12 @@ async function sendMessage() {
                     )
                         ? libraryData.results
                         : [],
+
+                libraryQuery:
+                    String(text || ""),
+
+                libraryProvider:
+                    String(selectedSource || ""),
 
                 createdAt:
                     new Date().toISOString()
