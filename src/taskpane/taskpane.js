@@ -21552,8 +21552,8 @@ function renderChat() {
                     document.createElement("button");
 
                 copyButton.type = "button";
-                copyButton.className = "ai-message-copy-btn";
-                copyButton.textContent = "⧉ نسخ";
+                copyButton.className = "ai-message-copy-btn library-action-icon";
+                copyButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg>';
                 copyButton.setAttribute("aria-label", "نسخ رد الذكاء الاصطناعي");
                 copyButton.title = "نسخ الرد كاملًا";
 
@@ -21572,24 +21572,24 @@ function renderChat() {
 
                         await navigator.clipboard.writeText(replyText);
 
-                        copyButton.textContent = "✓ تم النسخ";
-
-                        copyButton.classList.add("copied");
+                        copyButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>';
+                        copyButton.title = "تم النسخ";
+                        copyButton.setAttribute("aria-label", "تم نسخ الرد");
+                        copyButton.classList.add("is-copied");
 
                         setTimeout(function () {
-                            copyButton.textContent = "⧉ نسخ";
-                            copyButton.classList.remove("copied");
-                        }, 1500);
+                            copyButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"></rect><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path></svg>';
+                            copyButton.title = "نسخ الرد كاملًا";
+                            copyButton.setAttribute("aria-label", "نسخ رد الذكاء الاصطناعي");
+                            copyButton.classList.remove("is-copied");
+                        }, 1200);
 
                     }
                     catch (error) {
 
                         console.error("تعذر نسخ رد الذكاء الاصطناعي:", error);
-                        copyButton.textContent = "تعذر النسخ";
-
-                        setTimeout(function () {
-                            copyButton.textContent = "⧉ نسخ";
-                        }, 1800);
+                        copyButton.title = "تعذر النسخ";
+                        copyButton.setAttribute("aria-label", "تعذر نسخ الرد");
 
                     }
 
