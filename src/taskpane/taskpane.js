@@ -43698,22 +43698,10 @@ async function sendMessage() {
                         }
                     );
 
-                    // يبدأ بناء الخريطة في الخلفية؛ لا يؤخر عرض نتائج المكتبة.
-                    buildResearchKnowledgeMap(
-                        memoryScope,
-                        String(text || ""),
-                        researchSearchId
-                    ).then(function (mapResult) {
-                        console.log(
-                            "[ResearchMemory] Knowledge map update:",
-                            mapResult
-                        );
-                    }).catch(function (mapError) {
-                        console.warn(
-                            "[ResearchMemory] Knowledge map job failed:",
-                            mapError
-                        );
-                    });
+                    // أُوقف التحليل التلقائي للخريطة المعرفية مؤقتًا.
+                    // تُحفظ النتائج الأصلية كما هي، وتظل متاحة لسياق الدردشة والذاكرة البحثية.
+                    // لا نطلق طلبات AI خلفية من مسار البحث؛ لتجنب تداخلها مع طلبات المستخدم
+                    // وإعادة محاولات Duck.ai المستقلة بعد اكتمال عرض النتائج.
                 } catch (memoryError) {
                     console.warn("[ResearchMemory] Raw result persistence failed:", memoryError);
                 }
