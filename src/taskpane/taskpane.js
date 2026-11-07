@@ -31772,10 +31772,7 @@ async function buildStreamingContext(
                 history,
 
             userContent:
-                String(
-                    text ||
-                    ""
-                )
+                generalUserContent
 
         };
 
