@@ -31750,7 +31750,7 @@ async function buildStreamingContext(
 
         const generalUserContent =
             researchMemoryContext
-                ? researchMemoryContext + "\\n\\n=== سؤال المستخدم الحالي ===\\n" + String(text || "")
+                ? researchMemoryContext + "\n\n=== سؤال المستخدم الحالي ===\n" + String(text || "")
                 : String(text || "");
 
         history.push({
@@ -32624,7 +32624,7 @@ async function buildStreamingContext(
 
         userContent =
             researchMemoryContext +
-            "\\n\\n=== سياق الإجابة الحالي ===\\n" +
+            "\n\n=== سياق الإجابة الحالي ===\n" +
             userContent;
 
     }
