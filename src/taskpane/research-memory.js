@@ -247,19 +247,77 @@
     }
 
     async function search(scope, query, limit) {
-        const rows = await getResults(scope);
+        const scopeId = makeScopeId(scope);
+        const rows = await getResults(scopeId);
         const terms = normalizeArabic(query).split(" ").filter(function (term) {
             return term.length > 1;
         });
 
         if (!terms.length) return [];
 
+        // توسيع الاسترجاع بالمفاهيم والمرادفات والعلاقات التي اعتمدتها الخريطة.
+        let knowledgeMap = { nodes: [], edges: [] };
+
+        try {
+            knowledgeMap = await getKnowledgeMap(scopeId);
+        } catch (error) {
+            console.warn("[ResearchMemory] Knowledge map lookup failed:", error);
+        }
+
+        const semanticEvidence = new Map();
+
+        (knowledgeMap.nodes || []).forEach(function (node) {
+            const conceptText = normalizeArabic([
+                node.label,
+                node.description,
+                ...(Array.isArray(node.aliases) ? node.aliases : [])
+            ].join(" "));
+
+            const matched = terms.filter(function (term) {
+                return conceptText.includes(term);
+            });
+
+            if (!matched.length) return;
+
+            (node.resultIds || []).forEach(function (id) {
+                const key = safeString(id);
+                const previous = semanticEvidence.get(key) || {
+                    score: 0,
+                    concepts: []
+                };
+
+                previous.score += 5 + matched.length * 3;
+                previous.concepts.push(node.label);
+                semanticEvidence.set(key, previous);
+            });
+        });
+
+        (knowledgeMap.edges || []).forEach(function (edge) {
+            const relationText = normalizeArabic(edge.relation);
+            const matched = terms.filter(function (term) {
+                return relationText.includes(term);
+            });
+
+            if (!matched.length) return;
+
+            (edge.evidenceResultIds || []).forEach(function (id) {
+                const key = safeString(id);
+                const previous = semanticEvidence.get(key) || {
+                    score: 0,
+                    concepts: []
+                };
+
+                previous.score += 4 + matched.length * 2;
+                semanticEvidence.set(key, previous);
+            });
+        });
+
         const ranked = rows.map(function (row) {
             const title = normalizeArabic(row.title + " " + row.sectionTitle);
             const author = normalizeArabic(row.author);
             const source = normalizeArabic(row.source);
             const text = normalizeArabic(row.text);
-            let score = 0;
+            let lexicalScore = 0;
             let matched = 0;
 
             terms.forEach(function (term) {
@@ -269,23 +327,40 @@
                 if (source.includes(term)) termScore += 1;
                 if (text.includes(term)) termScore += 2;
                 if (termScore) matched += 1;
-                score += termScore;
+                lexicalScore += termScore;
             });
 
-            return { row: row, score: score, matchedTerms: matched };
+            const semantic = semanticEvidence.get(row.id) || {
+                score: 0,
+                concepts: []
+            };
+
+            return {
+                row: row,
+                score: lexicalScore + semantic.score,
+                lexicalScore: lexicalScore,
+                semanticScore: semantic.score,
+                matchedTerms: matched,
+                matchedConcepts: Array.from(new Set(semantic.concepts))
+            };
         }).filter(function (item) {
             return item.score > 0;
         });
 
         ranked.sort(function (a, b) {
-            return b.score - a.score || b.matchedTerms - a.matchedTerms;
+            return b.score - a.score ||
+                b.matchedTerms - a.matchedTerms ||
+                b.semanticScore - a.semanticScore;
         });
 
         const max = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 30;
         return ranked.slice(0, max).map(function (item) {
             return Object.assign({}, item.row, {
                 retrievalScore: item.score,
-                matchedTerms: item.matchedTerms
+                lexicalScore: item.lexicalScore,
+                semanticScore: item.semanticScore,
+                matchedTerms: item.matchedTerms,
+                matchedConcepts: item.matchedConcepts
             });
         });
     }
