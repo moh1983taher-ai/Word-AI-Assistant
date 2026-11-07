@@ -31573,6 +31573,371 @@ function searchSavedReferences(
 }
 
 // =====================================================
+// =====================================================
+// Research Memory Context
+// استرجاع النصوص الأصلية من عمليات البحث السابقة
+// =====================================================
+
+async function buildResearchMemoryContext(query) {
+
+    if (
+        !window.ResearchMemory ||
+        !currentChat ||
+        currentChat.id === undefined
+    ) {
+        return "";
+    }
+
+    const scope =
+        currentChat.projectId
+            ? {
+                type: "project",
+                id: currentChat.projectId
+            }
+            : {
+                type: "chat",
+                id: currentChat.id
+            };
+
+    try {
+
+        const results =
+            await window.ResearchMemory.search(
+                scope,
+                query,
+                8
+            );
+
+        if (!Array.isArray(results) || !results.length) {
+            return "";
+        }
+
+        const sections = [];
+        let totalChars = 0;
+        const maxChars = 12000;
+
+        results.forEach(function (result, index) {
+
+            if (totalChars >= maxChars) return;
+
+            const sourceText =
+                String(result.text || "").trim();
+
+            if (!sourceText) return;
+
+            const excerpt =
+                sourceText.slice(
+                    0,
+                    Math.min(
+                        sourceText.length,
+                        maxChars - totalChars
+                    )
+                );
+
+            const metadata = [
+                "المصدر: " + String(result.source || "غير محدد"),
+                "الكتاب: " + String(result.title || "غير محدد"),
+                "المؤلف: " + String(result.author || "غير محدد"),
+                result.part ? "الجزء: " + String(result.part) : "",
+                result.page ? "الصفحة: " + String(result.page) : "",
+                result.sectionTitle ? "الموضع: " + String(result.sectionTitle) : ""
+            ].filter(Boolean).join(" | ");
+
+            sections.push(
+                "[نتيجة محفوظة " + (index + 1) + "]\n" +
+                metadata + "\n" +
+                excerpt
+            );
+
+            totalChars += excerpt.length;
+        });
+
+        if (!sections.length) return "";
+
+        return [
+            "=== الذاكرة البحثية المسترجعة من عمليات سابقة ===",
+            "هذه نصوص أصلية محفوظة من نتائج بحث المستخدم السابقة، وليست استنتاجات مولدة.",
+            "استفد منها عند اتصالها بالسؤال، وميّز بين النص المنقول وشرحك التحليلي.",
+            "لا تخترع بيانات كتاب أو مؤلف أو جزء أو صفحة غير ظاهرة في بيانات النتيجة.",
+            "إذا لم تكن النتائج كافية أو وثيقة الصلة، فلا تفرض استخدامها.",
+            "",
+            sections.join("\n\n")
+        ].join("\n");
+
+    }
+    catch (error) {
+
+        console.warn(
+            "[ResearchMemory] تعذر استرجاع الذاكرة البحثية:",
+            error
+        );
+
+        return "";
+
+    }
+
+}
+
+
+// =====================================================
+// Research Knowledge Mapper
+// بناء خريطة معرفية من نتائج المكتبات المحفوظة
+// =====================================================
+
+async function buildResearchKnowledgeMap(scope, query, searchId) {
+
+    if (
+        !window.ResearchMemory ||
+        typeof streamAI !== "function"
+    ) {
+        return { status: "unavailable", batches: 0 };
+    }
+
+    const scopeId =
+        window.ResearchMemory.makeScopeId(scope);
+
+    const allResults =
+        await window.ResearchMemory.getResults(scopeId);
+
+    const pendingResults =
+        allResults.filter(function (item) {
+            return (
+                item &&
+                item.metadata &&
+                String(item.metadata.searchId || "") === String(searchId)
+            );
+        });
+
+    if (!pendingResults.length) {
+        return { status: "empty", batches: 0 };
+    }
+
+    const validIds = new Set(
+        pendingResults.map(function (item) {
+            return item.id;
+        })
+    );
+
+    const batchSize = 6;
+    let completedBatches = 0;
+    let failedBatches = 0;
+
+    for (
+        let offset = 0;
+        offset < pendingResults.length;
+        offset += batchSize
+    ) {
+
+        const batch =
+            pendingResults.slice(
+                offset,
+                offset + batchSize
+            );
+
+        const evidence = batch.map(function (item, index) {
+
+            return {
+                id: item.id,
+                source: item.source,
+                title: item.title,
+                author: item.author,
+                part: item.part,
+                page: item.page,
+                section: item.sectionTitle,
+                text: String(item.text || "").slice(0, 1800)
+            };
+
+        });
+
+        const prompt = [
+            "أنت محلل معرفي لمادة بحثية عربية. استخرج خريطة مفاهيم وعلاقات من الشواهد المرفقة فقط.",
+            "أعد JSON صالحًا فقط دون Markdown أو مقدمات، وفق البنية:",
+            '{"version":1,"summary":"...","nodes":[{"key":"معرف-ثابت-قصير","label":"المفهوم","description":"وصف موجز مستند إلى الشواهد","type":"concept","aliases":[],"resultIds":["معرف نتيجة"]}],"edges":[{"from":"معرف عقدة","to":"معرف عقدة","relation":"نوع العلاقة","evidenceResultIds":["معرف نتيجة"]}]}',
+            "قواعد ملزمة:",
+            "1) لا تستخرج مفهومًا أو علاقة لا يسندها نص النتائج.",
+            "2) اربط كل عقدة بمعرف نتيجة واحد على الأقل من المعرفات المعطاة حرفيًا.",
+            "3) اربط كل علاقة بمعرف شاهد واحد على الأقل.",
+            "4) استخدم مفاتيح قصيرة ثابتة بالعربية أو الإنجليزية، ولا تجعلها عناوين مطولة.",
+            "5) لا تخلط بين نص المصدر وتفسيرك؛ الوصف تلخيص تحليلي لا اقتباس.",
+            "6) لا تنشئ علاقة بين عقدتين إلا إذا كان النص يسندها.",
+            "7) إذا لم تتوافر مادة كافية، أعد عقدًا قليلة أو مصفوفتين فارغتين.",
+            "8) لا تخترع بيانات bibliographic أو صفحات.",
+            "سؤال البحث الأصلي: " + String(query || ""),
+            "الشواهد:",
+            JSON.stringify(evidence)
+        ].join("\n\n");
+
+        try {
+
+            const responseText =
+                await streamAI(
+                    prompt,
+                    function () {}
+                );
+
+            const cleaned =
+                String(responseText || "")
+                    .replace(/^\s*\x60{3}(?:json)?/i, "")
+                    .replace(/\x60{3}\s*$/i, "")
+                    .trim();
+
+            const firstBrace = cleaned.indexOf("{");
+            const lastBrace = cleaned.lastIndexOf("}");
+
+            if (
+                firstBrace < 0 ||
+                lastBrace <= firstBrace
+            ) {
+                throw new Error("لم يُرجع النموذج كائن JSON صالحًا.");
+            }
+
+            const parsed =
+                JSON.parse(
+                    cleaned.slice(firstBrace, lastBrace + 1)
+                );
+
+            const allowedNodes = new Set();
+            const nodes = (
+                Array.isArray(parsed.nodes)
+                    ? parsed.nodes
+                    : []
+            ).map(function (node) {
+
+                const refs = Array.isArray(node.resultIds)
+                    ? node.resultIds.filter(function (id) {
+                        return validIds.has(String(id));
+                    }).map(String)
+                    : [];
+
+                const key = String(node.key || "").trim();
+
+                if (!key || !refs.length) return null;
+
+                allowedNodes.add(key);
+
+                return {
+                    key: key,
+                    label: String(node.label || key).slice(0, 180),
+                    description: String(node.description || "").slice(0, 900),
+                    type: String(node.type || "concept").slice(0, 40),
+                    aliases: Array.isArray(node.aliases)
+                        ? node.aliases.slice(0, 12).map(function (value) {
+                            return String(value).slice(0, 100);
+                        })
+                        : [],
+                    resultIds: refs
+                };
+
+            }).filter(Boolean);
+
+            const edges = (
+                Array.isArray(parsed.edges)
+                    ? parsed.edges
+                    : []
+            ).map(function (edge) {
+
+                const from = String(edge.from || "").trim();
+                const to = String(edge.to || "").trim();
+                const refs = Array.isArray(edge.evidenceResultIds)
+                    ? edge.evidenceResultIds.filter(function (id) {
+                        return validIds.has(String(id));
+                    }).map(String)
+                    : [];
+
+                if (
+                    !from ||
+                    !to ||
+                    from === to ||
+                    !allowedNodes.has(from) ||
+                    !allowedNodes.has(to) ||
+                    !refs.length
+                ) {
+                    return null;
+                }
+
+                return {
+                    from: from,
+                    to: to,
+                    relation: String(edge.relation || "").slice(0, 160),
+                    evidenceResultIds: refs
+                };
+
+            }).filter(function (edge) {
+                return edge && edge.relation;
+            });
+
+            if (nodes.length || edges.length) {
+
+                await window.ResearchMemory.saveKnowledgeMap(
+                    scopeId,
+                    {
+                        version: 1,
+                        summary: String(parsed.summary || "").slice(0, 1800),
+                        nodes: nodes,
+                        edges: edges
+                    },
+                    "partial"
+                );
+
+            }
+
+            completedBatches += 1;
+
+        }
+        catch (error) {
+
+            failedBatches += 1;
+
+            console.warn(
+                "[ResearchMemory] تعذر تحليل دفعة معرفية:",
+                offset / batchSize + 1,
+                error
+            );
+
+        }
+
+    }
+
+    const finalStatus =
+        failedBatches === 0
+            ? "ready"
+            : completedBatches > 0
+                ? "partial"
+                : "failed";
+
+    try {
+
+        await window.ResearchMemory.saveKnowledgeMap(
+            scopeId,
+            {
+                version: 1,
+                summary: "خريطة معرفية محدثة من نتائج البحث المحفوظة.",
+                nodes: [],
+                edges: []
+            },
+            finalStatus
+        );
+
+    }
+    catch (statusError) {
+
+        console.warn(
+            "[ResearchMemory] تعذر تحديث حالة الخريطة:",
+            statusError
+        );
+
+    }
+
+    return {
+        status: finalStatus,
+        batches: completedBatches,
+        failedBatches: failedBatches,
+        results: pendingResults.length
+    };
+
+}
+
+
 // Build Streaming Context
 //
 // المسؤول عن:
@@ -31639,16 +32004,21 @@ async function buildStreamingContext(
                 null
             );
 
+        const researchMemoryContext =
+            await buildResearchMemoryContext(text);
+
+        const generalUserContent =
+            researchMemoryContext
+                ? researchMemoryContext + "\n\n=== سؤال المستخدم الحالي ===\n" + String(text || "")
+                : String(text || "");
+
         history.push({
 
             role:
                 "user",
 
             content:
-                String(
-                    text ||
-                    ""
-                )
+                generalUserContent
 
         });
 
@@ -31661,10 +32031,7 @@ async function buildStreamingContext(
                 history,
 
             userContent:
-                String(
-                    text ||
-                    ""
-                )
+                generalUserContent
 
         };
 
@@ -32503,8 +32870,20 @@ async function buildStreamingContext(
 
 
     // =================================================
-    // 8. السؤال الحالي
+    // 8. دمج الذاكرة البحثية ثم إضافة السؤال الحالي
     // =================================================
+
+    const researchMemoryContext =
+        await buildResearchMemoryContext(text);
+
+    if (researchMemoryContext) {
+
+        userContent =
+            researchMemoryContext +
+            "\n\n=== سياق الإجابة الحالي ===\n" +
+            userContent;
+
+    }
 
     history.push({
 
@@ -43251,6 +43630,54 @@ async function sendMessage() {
                     new Date().toISOString()
 
             });
+
+
+            // Persist raw library results independently of chat rendering.
+            if (
+                window.ResearchMemory &&
+                libraryData &&
+                Array.isArray(libraryData.results) &&
+                libraryData.results.length
+            ) {
+                try {
+                    const memoryScope = currentChat.projectId
+                        ? { type: "project", id: currentChat.projectId }
+                        : { type: "chat", id: currentChat.id };
+
+                    const researchSearchId = String(Date.now());
+
+                    await window.ResearchMemory.saveResults(
+                        memoryScope,
+                        libraryData.results,
+                        {
+                            query: String(text || ""),
+                            provider: String(selectedSource || ""),
+                            chatId: String(currentChat.id || ""),
+                            projectId: String(currentChat.projectId || ""),
+                            searchId: researchSearchId
+                        }
+                    );
+
+                    // يبدأ بناء الخريطة في الخلفية؛ لا يؤخر عرض نتائج المكتبة.
+                    buildResearchKnowledgeMap(
+                        memoryScope,
+                        String(text || ""),
+                        researchSearchId
+                    ).then(function (mapResult) {
+                        console.log(
+                            "[ResearchMemory] Knowledge map update:",
+                            mapResult
+                        );
+                    }).catch(function (mapError) {
+                        console.warn(
+                            "[ResearchMemory] Knowledge map job failed:",
+                            mapError
+                        );
+                    });
+                } catch (memoryError) {
+                    console.warn("[ResearchMemory] Raw result persistence failed:", memoryError);
+                }
+            }
 
 
             currentChat.updatedAt =
