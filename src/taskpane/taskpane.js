@@ -21528,6 +21528,66 @@ function renderChat() {
             }
 
 
+            // زر نسخ رد الذكاء الاصطناعي
+            // لا يظهر في رسائل المستخدم أو بطاقات نتائج المكتبة.
+            if (
+                msg.role !== "user" &&
+                msg.type !== "library" &&
+                !Array.isArray(msg.libraryResults)
+            ) {
+
+                const copyButton =
+                    document.createElement("button");
+
+                copyButton.type = "button";
+                copyButton.className = "ai-message-copy-btn";
+                copyButton.textContent = "⧉ نسخ";
+                copyButton.setAttribute("aria-label", "نسخ رد الذكاء الاصطناعي");
+                copyButton.title = "نسخ الرد كاملًا";
+
+                copyButton.onclick = async function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const replyText = String(msg.text || "");
+
+                    if (!replyText.trim()) {
+                        return;
+                    }
+
+                    try {
+
+                        await navigator.clipboard.writeText(replyText);
+
+                        copyButton.textContent = "✓ تم النسخ";
+
+                        copyButton.classList.add("copied");
+
+                        setTimeout(function () {
+                            copyButton.textContent = "⧉ نسخ";
+                            copyButton.classList.remove("copied");
+                        }, 1500);
+
+                    }
+                    catch (error) {
+
+                        console.error("تعذر نسخ رد الذكاء الاصطناعي:", error);
+                        copyButton.textContent = "تعذر النسخ";
+
+                        setTimeout(function () {
+                            copyButton.textContent = "⧉ نسخ";
+                        }, 1800);
+
+                    }
+
+                };
+
+                div.appendChild(copyButton);
+
+            }
+
+
             chatArea.appendChild(
                 div
             );
