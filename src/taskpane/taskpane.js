@@ -43253,6 +43253,35 @@ async function sendMessage() {
             });
 
 
+            // Persist raw library results independently of chat rendering.
+            if (
+                window.ResearchMemory &&
+                libraryData &&
+                Array.isArray(libraryData.results) &&
+                libraryData.results.length
+            ) {
+                try {
+                    const memoryScope = currentChat.projectId
+                        ? { type: "project", id: currentChat.projectId }
+                        : { type: "chat", id: currentChat.id };
+
+                    await window.ResearchMemory.saveResults(
+                        memoryScope,
+                        libraryData.results,
+                        {
+                            query: String(text || ""),
+                            provider: String(selectedSource || ""),
+                            chatId: String(currentChat.id || ""),
+                            projectId: String(currentChat.projectId || ""),
+                            searchId: String(Date.now())
+                        }
+                    );
+                } catch (memoryError) {
+                    console.warn("[ResearchMemory] Raw result persistence failed:", memoryError);
+                }
+            }
+
+
             currentChat.updatedAt =
                 new Date().toISOString();
 
