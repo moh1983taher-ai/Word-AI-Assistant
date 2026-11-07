@@ -21278,27 +21278,39 @@ function formatLibraryResults(
 
                                     <div
                                         class="library-result-actions"
+                                        aria-label="إجراءات النتيجة"
                                     >
 
                                         <button
                                             type="button"
-                                            class="library-open-btn"
+                                            class="library-open-btn library-action-icon"
                                             data-library-action="open"
                                             data-library-index="${index}"
+                                            title="فتح الموضع"
+                                            aria-label="فتح الموضع"
                                         >
-                                            فتح الموضع
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M14 3h7v7"></path>
+                                                <path d="M10 14 21 3"></path>
+                                                <path d="M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"></path>
+                                            </svg>
                                         </button>
-
 
                                         <button
                                             type="button"
-                                            class="library-copy-btn"
+                                            class="library-copy-btn library-action-icon"
                                             data-library-action="copy"
                                             data-library-index="${index}"
+                                            title="نسخ النص مع التوثيق"
+                                            aria-label="نسخ النص مع التوثيق"
                                         >
-                                            نسخ النص
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <rect x="8" y="8" width="13" height="13" rx="2"></rect>
+                                                <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"></path>
+                                            </svg>
                                         </button>
 
+                                        ${openUrl ? '<span class="library-source-indicator" title="مصدر إلكتروني متاح" aria-label="مصدر إلكتروني متاح"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path></svg></span>' : ""}
                                     </div>
 
                                 </div>
@@ -21939,20 +21951,21 @@ function renderChat() {
                             );
 
 
-                            const originalText =
-                                button.textContent;
+                            const originalContent =
+                                button.innerHTML;
 
-
-                            button.textContent =
-                                "تم النسخ ✓";
-
+                            button.innerHTML =
+                                '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>';
+                            button.title = "تم النسخ";
+                            button.setAttribute("aria-label", "تم النسخ");
+                            button.classList.add("is-copied");
 
                             setTimeout(
                                 function () {
-
-                                    button.textContent =
-                                        originalText;
-
+                                    button.innerHTML = originalContent;
+                                    button.title = "نسخ النص مع التوثيق";
+                                    button.setAttribute("aria-label", "نسخ النص مع التوثيق");
+                                    button.classList.remove("is-copied");
                                 },
                                 1200
                             );
