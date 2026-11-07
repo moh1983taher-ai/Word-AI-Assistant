@@ -31573,6 +31573,112 @@ function searchSavedReferences(
 }
 
 // =====================================================
+// =====================================================
+// Research Memory Context
+// استرجاع النصوص الأصلية من عمليات البحث السابقة
+// =====================================================
+
+async function buildResearchMemoryContext(query) {
+
+    if (
+        !window.ResearchMemory ||
+        !currentChat ||
+        currentChat.id === undefined
+    ) {
+        return "";
+    }
+
+    const scope =
+        currentChat.projectId
+            ? {
+                type: "project",
+                id: currentChat.projectId
+            }
+            : {
+                type: "chat",
+                id: currentChat.id
+            };
+
+    try {
+
+        const results =
+            await window.ResearchMemory.search(
+                scope,
+                query,
+                8
+            );
+
+        if (!Array.isArray(results) || !results.length) {
+            return "";
+        }
+
+        const sections = [];
+        let totalChars = 0;
+        const maxChars = 12000;
+
+        results.forEach(function (result, index) {
+
+            if (totalChars >= maxChars) return;
+
+            const sourceText =
+                String(result.text || "").trim();
+
+            if (!sourceText) return;
+
+            const excerpt =
+                sourceText.slice(
+                    0,
+                    Math.min(
+                        sourceText.length,
+                        maxChars - totalChars
+                    )
+                );
+
+            const metadata = [
+                "المصدر: " + String(result.source || "غير محدد"),
+                "الكتاب: " + String(result.title || "غير محدد"),
+                "المؤلف: " + String(result.author || "غير محدد"),
+                result.part ? "الجزء: " + String(result.part) : "",
+                result.page ? "الصفحة: " + String(result.page) : "",
+                result.sectionTitle ? "الموضع: " + String(result.sectionTitle) : ""
+            ].filter(Boolean).join(" | ");
+
+            sections.push(
+                "[نتيجة محفوظة " + (index + 1) + "]\n" +
+                metadata + "\n" +
+                excerpt
+            );
+
+            totalChars += excerpt.length;
+        });
+
+        if (!sections.length) return "";
+
+        return [
+            "=== الذاكرة البحثية المسترجعة من عمليات سابقة ===",
+            "هذه نصوص أصلية محفوظة من نتائج بحث المستخدم السابقة، وليست استنتاجات مولدة.",
+            "استفد منها عند اتصالها بالسؤال، وميّز بين النص المنقول وشرحك التحليلي.",
+            "لا تخترع بيانات كتاب أو مؤلف أو جزء أو صفحة غير ظاهرة في بيانات النتيجة.",
+            "إذا لم تكن النتائج كافية أو وثيقة الصلة، فلا تفرض استخدامها.",
+            "",
+            sections.join("\n\n")
+        ].join("\n");
+
+    }
+    catch (error) {
+
+        console.warn(
+            "[ResearchMemory] تعذر استرجاع الذاكرة البحثية:",
+            error
+        );
+
+        return "";
+
+    }
+
+}
+
+
 // Build Streaming Context
 //
 // المسؤول عن:
@@ -31639,16 +31745,21 @@ async function buildStreamingContext(
                 null
             );
 
+        const researchMemoryContext =
+            await buildResearchMemoryContext(text);
+
+        const generalUserContent =
+            researchMemoryContext
+                ? researchMemoryContext + "\\n\\n=== سؤال المستخدم الحالي ===\\n" + String(text || "")
+                : String(text || "");
+
         history.push({
 
             role:
                 "user",
 
             content:
-                String(
-                    text ||
-                    ""
-                )
+                generalUserContent
 
         });
 
@@ -32503,8 +32614,20 @@ async function buildStreamingContext(
 
 
     // =================================================
-    // 8. السؤال الحالي
+    // 8. دمج الذاكرة البحثية ثم إضافة السؤال الحالي
     // =================================================
+
+    const researchMemoryContext =
+        await buildResearchMemoryContext(text);
+
+    if (researchMemoryContext) {
+
+        userContent =
+            researchMemoryContext +
+            "\\n\\n=== سياق الإجابة الحالي ===\\n" +
+            userContent;
+
+    }
 
     history.push({
 
