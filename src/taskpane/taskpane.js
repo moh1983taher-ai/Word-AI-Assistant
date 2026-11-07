@@ -22703,6 +22703,14 @@ chats.forEach(
                                                     result.pageId ??
                                                     "",
 
+                                                // Preserve the source URL when chats are normalized
+                                                // after reopening the add-in.
+                                                openUrl:
+                                                    String(
+                                                        result.openUrl ||
+                                                        ""
+                                                    ),
+
                                                 score:
                                                     Number(
                                                         result.score ||
