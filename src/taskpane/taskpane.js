@@ -22590,6 +22590,12 @@ chats.forEach(
 
                                             return {
 
+                                                source:
+                                                    String(
+                                                        result.source ||
+                                                        ""
+                                                    ),
+
                                                 bookId:
                                                     result.bookId ??
                                                     "",
@@ -22603,6 +22609,12 @@ chats.forEach(
                                                 author:
                                                     String(
                                                         result.author ||
+                                                        ""
+                                                    ),
+
+                                                sectionTitle:
+                                                    String(
+                                                        result.sectionTitle ||
                                                         ""
                                                     ),
 
@@ -25865,9 +25877,7 @@ async function buildAIConversationMessages(
 
 
     // ==================================
-    // مهم:
-    // تعريف documentContext تم قبل استخدامه
-    // لإصلاح المشكلة الموجودة في النسخة القديمة
+    // سجل المحادثة السابق
     // ==================================
 
     const historyLimit =
@@ -25949,6 +25959,169 @@ async function buildAIConversationMessages(
 
             }
         );
+
+    }
+
+
+    // ==================================
+    // استعادة نتائج المكتبات من المحادثة
+    // ==================================
+    // تحفظ رسائل المكتبة نتائجها الأصلية داخل currentChat.
+    // يعاد تمرير أحدث النتائج إلى المزود في كل سؤال لاحق،
+    // مع بيانات المصدر والكتاب والمؤلف والجزء والصفحة والنص.
+    // ==================================
+
+    const libraryContextMessages =
+        currentChat &&
+        Array.isArray(
+            currentChat.messages
+        )
+            ? currentChat.messages
+                .filter(
+                    function (msg) {
+                        return (
+                            msg &&
+                            (
+                                msg.type === "library" ||
+                                Array.isArray(msg.libraryResults)
+                            ) &&
+                            Array.isArray(msg.libraryResults) &&
+                            msg.libraryResults.length > 0
+                        );
+                    }
+                )
+                .slice(-3)
+            : [];
+
+
+    const libraryContextEntries = [];
+
+    let libraryContextChars = 0;
+
+    const maxLibraryContextChars = 18000;
+    const maxLibraryContextResults = 10;
+    const maxLibraryResultChars = 2400;
+
+
+    for (
+        let messageIndex = 0;
+        messageIndex < libraryContextMessages.length;
+        messageIndex++
+    ) {
+
+        const libraryMessage =
+            libraryContextMessages[messageIndex];
+
+        const results =
+            libraryMessage.libraryResults;
+
+
+        for (
+            let resultIndex = 0;
+            resultIndex < results.length;
+            resultIndex++
+        ) {
+
+            if (
+                libraryContextEntries.length >=
+                maxLibraryContextResults
+            ) {
+                break;
+            }
+
+
+            const result =
+                results[resultIndex];
+
+
+            if (
+                !result ||
+                typeof result !== "object"
+            ) {
+                continue;
+            }
+
+
+            const resultText =
+                String(
+                    result.text ||
+                    ""
+                )
+                .trim();
+
+
+            if (!resultText) {
+                continue;
+            }
+
+
+            const remainingChars =
+                maxLibraryContextChars -
+                libraryContextChars;
+
+
+            if (remainingChars <= 0) {
+                break;
+            }
+
+
+            const boundedText =
+                resultText.substring(
+                    0,
+                    Math.min(
+                        maxLibraryResultChars,
+                        remainingChars
+                    )
+                );
+
+
+            const metadata = [
+                "المصدر: " + String(result.source || libraryMessage.source || "غير محدد"),
+                "الكتاب: " + String(result.title || "غير محدد"),
+                "المؤلف: " + String(result.author || "غير محدد"),
+                "الجزء: " + String(result.part ?? "غير محدد"),
+                "الصفحة: " + String(result.page || result.pageId || "غير محدد"),
+                "معرّف الكتاب: " + String(result.bookId || "غير محدد")
+            ];
+
+
+            libraryContextEntries.push(
+                [
+                    "نتيجة رقم " + (libraryContextEntries.length + 1),
+                    ...metadata,
+                    "النص المسترجع:",
+                    boundedText
+                ].join("\n")
+            );
+
+
+            libraryContextChars +=
+                boundedText.length +
+                metadata.join("\n").length +
+                100;
+
+        }
+
+    }
+
+
+    if (libraryContextEntries.length > 0) {
+
+        conversationMessages.push({
+
+            role: "user",
+
+            content: [
+                "=== السياق البحثي المحفوظ: نتائج المكتبات السابقة ===",
+                "هذه نتائج فعلية استُرجعت في هذه المحادثة، وليست أمثلة افتراضية.",
+                "استدعها عند الحاجة في المناقشة والتحليل والمقارنة والكتابة العلمية.",
+                "ميّز بين نص المصدر وبياناته المرجعية، ولا تنسب إليه ما لا يثبته النص.",
+                "إذا لم تتضمن النتائج المحفوظة ما يكفي للإجابة، فصرّح بذلك واطلب بحثًا إضافيًا بدل اختلاق الإسناد.",
+                "",
+                libraryContextEntries.join("\n\n--------------------\n\n")
+            ].join("\n")
+
+        });
 
     }
 
