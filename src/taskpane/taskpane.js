@@ -22717,6 +22717,13 @@ chats.forEach(
                                                         0
                                                     ),
 
+                                                // Preserve the relevance value displayed on library result cards.
+                                                relevance:
+                                                    Number(
+                                                        result.relevance ??
+                                                        0
+                                                    ),
+
                                                 matchedTerms:
                                                     Number(
                                                         result.matchedTerms ||
