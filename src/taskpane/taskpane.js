@@ -30858,6 +30858,9 @@ function buildStreamingHistory(
         }
     });
 
+    // سقف موحد يمنع تضخم الطلب عند وجود عمليات بحث متعددة.
+    let libraryContextBudget = 24000;
+
     previousMessages.forEach(function (msg, index) {
         if (!msg || !msg.text || !selectedIndexes.has(index)) {
             return;
@@ -30877,7 +30880,7 @@ function buildStreamingHistory(
                 "تعامل مع هذه البيانات بوصفها نتائج فعلية من البحث السابق، ولا تستبدلها بنتائج متخيلة."
             ];
 
-            let remainingChars = 24000;
+            let remainingChars = Math.min(24000, libraryContextBudget);
 
             results.forEach(function (item, resultIndex) {
                 if (!item || remainingChars <= 0) {
@@ -30933,6 +30936,11 @@ function buildStreamingHistory(
                 role: "assistant",
                 content: parts.join("\n")
             });
+
+            libraryContextBudget = Math.max(
+                0,
+                libraryContextBudget - (Math.min(24000, libraryContextBudget) - remainingChars)
+            );
 
             return;
         }
