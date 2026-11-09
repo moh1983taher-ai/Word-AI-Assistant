@@ -47400,6 +47400,15 @@ async function buildFootnoteSuggestions(
 }
 
 
+function stripReferenceApplicationLocation(value) {
+    const text = String(value || "").trim();
+    const match = text.match(/\\s+(?:(?:ص|صفحة)\\s*)?\\d+(?:\\s*\\/\\s*\\d+)*(?:\\s*[-–—]\\s*\\d+)?(?:\\s*,\\s*\\d+)*(?:\\s*،\\s*\\d+)*\\s*$/);
+    if (match && match.index > 0) {
+        return text.substring(0, match.index).trim().replace(/[،,]+$/g, "").trim();
+    }
+    return text;
+}
+
 function normalizeReferenceApplicationText(value) {
     return String(value ?? "")
         .normalize("NFC")
@@ -47445,7 +47454,7 @@ function getReferenceApplicationIdentityCandidates(reference, sourceText) {
     });
 }
 
-async function getUniqueWordSearchRange(context, container, query) {
+async function getUniqueWordSearchRange(context, container, query, occurrenceIndex = 0) {
     const value = String(query || "").trim();
     if (!value) return null;
     const results = container.search(value, { matchCase: false, matchWholeWord: false });
@@ -47454,7 +47463,7 @@ async function getUniqueWordSearchRange(context, container, query) {
     const matches = results.items.filter(function (range) {
         return normalizeReferenceApplicationText(range.text) === normalizeReferenceApplicationText(value);
     });
-    return matches.length === 1 ? matches[0] : null;
+    return Number.isInteger(occurrenceIndex) && occurrenceIndex >= 0 && occurrenceIndex < matches.length ? matches[occurrenceIndex] : null;
 }
 
 async function buildMainTextSuggestions(unifiedReferences, addMissingAuthors = false) {
@@ -47495,7 +47504,7 @@ async function buildMainTextSuggestions(unifiedReferences, addMissingAuthors = f
             );
             const includeAuthor = Boolean(author) && (Boolean(authorExists) || addMissingAuthors);
             const suggestedText = String(formatFootnoteReference(reference, occurrence, includeAuthor) || "").trim();
-            const replacementText = getSuggestedIdentity(suggestedText);
+            const replacementText = stripReferenceApplicationLocation(suggestedText);
             const identityCandidates = getReferenceApplicationIdentityCandidates(reference, identitySource);
             if (!suggestedText || !replacementText || identityCandidates.length === 0) return;
 
@@ -47526,7 +47535,7 @@ async function buildMainTextSuggestions(unifiedReferences, addMissingAuthors = f
                 { volume: "", page: "", pageRange: "" },
                 false
             );
-            item.replacementText = getSuggestedIdentity(item.suggestedText);
+            item.replacementText = stripReferenceApplicationLocation(item.suggestedText);
         }
     });
 
