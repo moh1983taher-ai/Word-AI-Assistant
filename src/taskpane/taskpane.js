@@ -47402,10 +47402,29 @@ async function buildFootnoteSuggestions(
 
 function stripReferenceApplicationLocation(value) {
     const text = String(value || "").trim();
-    const match = text.match(/\s+(?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*(?:\s*،\s*\d+)*\s*$/);
-    if (match && match.index > 0) {
-        return text.substring(0, match.index).trim().replace(/[،,]+$/g, "").trim();
+    if (!text) return "";
+
+    // Only remove an explicitly marked volume/page suffix. An unmarked
+    // trailing number is ambiguous and must not be silently treated as a page.
+    const locationPatterns = [
+        /\s*(?:[،,؛;]\s*)?(?:جـ?|جزء|المجلد|المجلّد|مجلد|vol(?:ume)?\.?)\s*[:：]?\s*[0-9٠-٩۰-۹]+(?:\s*(?:[،,؛;]\s*)?(?:صـ?|صفحة|صفحات|p{1,2}\.?)\s*[:：]?\s*[0-9٠-٩۰-۹]+(?:\s*[-–—]\s*[0-9٠-٩۰-۹]+)?)?\s*$/iu,
+        /\s*(?:[،,؛;]\s*)?(?:صـ?|صفحة|صفحات|p{1,2}\.?)\s*[:：]?\s*[0-9٠-٩۰-۹]+(?:\s*[-–—]\s*[0-9٠-٩۰-۹]+)?\s*$/iu,
+        /\s*[0-9٠-٩۰-۹]+\s*\/\s*[0-9٠-٩۰-۹]+(?:\s*[-–—]\s*[0-9٠-٩۰-۹]+)?\s*$/u
+    ];
+
+    for (const pattern of locationPatterns) {
+        const match = text.match(pattern);
+        if (match && match.index > 0) {
+            return text.substring(0, match.index).trim().replace(/[،,؛;]+$/g, "").trim();
+        }
     }
+
+    // Do not guess whether a bare final number belongs to the title or the
+    // page notation. Returning an empty identity makes the caller skip it.
+    if (/\s+[0-9٠-٩۰-۹]+(?:\s*[-–—]\s*[0-9٠-٩۰-۹]+)?\s*$/u.test(text)) {
+        return "";
+    }
+
     return text;
 }
 
@@ -47429,22 +47448,26 @@ function getReferenceApplicationIdentityCandidates(reference, sourceText) {
     const add = function (value) {
         const text = String(value || "").trim();
         const normalized = normalizeReferenceApplicationText(text);
-        if (normalized.length >= 4 && !candidates.some(function (item) {
+        // Short title fragments are not reliable identifiers.
+        if (normalized.length >= 8 && !candidates.some(function (item) {
             return normalizeReferenceApplicationText(item) === normalized;
         })) candidates.push(text);
     };
-    add(stripReferenceApplicationLocation(sourceText));
+
+    const identitySource = stripReferenceApplicationLocation(sourceText);
+    add(identitySource);
+
     if (author && title) {
         add(author + "، " + title);
         add(title + "، " + author);
         add(author + " " + title);
         add(title + " " + author);
     }
+
+    // Keep the complete title only when it occurs in the original citation.
+    // Do not manufacture shorter title prefixes that may identify another book.
     add(title);
-    if (title) {
-        const words = title.split(/\s+/).filter(Boolean);
-        for (let count = words.length - 1; count >= 1; count--) add(words.slice(0, count).join(" "));
-    }
+
     const sourceNormalized = normalizeReferenceApplicationText(sourceText);
     return candidates.filter(function (candidate) {
         const normalized = normalizeReferenceApplicationText(candidate);
@@ -47454,16 +47477,25 @@ function getReferenceApplicationIdentityCandidates(reference, sourceText) {
     });
 }
 
-async function getUniqueWordSearchRange(context, container, query, occurrenceIndex = 0) {
+async function getUniqueWordSearchRange(context, container, query, occurrenceIndex) {
     const value = String(query || "").trim();
     if (!value) return null;
+
     const results = container.search(value, { matchCase: false, matchWholeWord: false });
     results.load("items/text");
     await context.sync();
+
     const matches = results.items.filter(function (range) {
         return normalizeReferenceApplicationText(range.text) === normalizeReferenceApplicationText(value);
     });
-    return Number.isInteger(occurrenceIndex) && occurrenceIndex >= 0 && occurrenceIndex < matches.length ? matches[occurrenceIndex] : null;
+
+    // Explicit ordinals are reserved for exact source occurrences. Identity
+    // matches without an ordinal must be unique; never choose the first guess.
+    if (Number.isInteger(occurrenceIndex) && occurrenceIndex >= 0) {
+        return occurrenceIndex < matches.length ? matches[occurrenceIndex] : null;
+    }
+
+    return matches.length === 1 ? matches[0] : null;
 }
 
 async function buildMainTextSuggestions(unifiedReferences, addMissingAuthors = false) {
@@ -47701,6 +47733,13 @@ async function applyFootnoteSuggestions(footnoteSuggestions) {
                 identityRange.insertText(replacementText, Word.InsertLocation.replace);
                 await context.sync();
                 applied++;
+
+                if (
+                    normalizeReferenceApplicationText(sourceText) !==
+                    normalizeReferenceApplicationText(replacementText)
+                ) {
+                    sourceOccurrenceCounters.set(sourceKey, sourceOccurrenceIndex);
+                }
             }
         }
         return { applied: applied, skipped: skipped };
