@@ -48870,6 +48870,14 @@ async function applyFootnoteSuggestions(
                 const hasUnparsedLocationSuffix =
                     identityText === sourceText &&
                     /(?:^|[،,؛;\s])(?:ج|جزء|المجلد|المجلدات|ص|صفحة|صفحات)\s*\d|\d+\s*\/\s*\d+\s*$|\b\d+\s*[-–—]\s*\d+\s*$/.test(sourceText);
+
+                // If location data could not be separated confidently, leave
+                // the citation untouched rather than risk deleting volume/page.
+                if (hasUnparsedLocationSuffix) {
+                    skipped++;
+                    continue;
+                }
+
                 const normalizedSourceText = normalizeLocal(sourceText);
                 const sourceOccurrence = suggestion.sourceTexts
                     .slice(0, i)
