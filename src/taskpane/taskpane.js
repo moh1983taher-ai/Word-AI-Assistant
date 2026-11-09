@@ -47402,7 +47402,7 @@ async function buildFootnoteSuggestions(
 
 function stripReferenceApplicationLocation(value) {
     const text = String(value || "").trim();
-    const match = text.match(/\\s+(?:(?:ص|صفحة)\\s*)?\\d+(?:\\s*\\/\\s*\\d+)*(?:\\s*[-–—]\\s*\\d+)?(?:\\s*,\\s*\\d+)*(?:\\s*،\\s*\\d+)*\\s*$/);
+    const match = text.match(/\s+(?:(?:ص|صفحة)\s*)?\d+(?:\s*\/\s*\d+)*(?:\s*[-–—]\s*\d+)?(?:\s*,\s*\d+)*(?:\s*،\s*\d+)*\s*$/);
     if (match && match.index > 0) {
         return text.substring(0, match.index).trim().replace(/[،,]+$/g, "").trim();
     }
