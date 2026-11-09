@@ -49041,7 +49041,24 @@ async function applyFootnoteSuggestions(
             };
         }
 
-        // جميع النطاقات أعيد تحديدها والتحقق منها قبل إدراج أي نص.
+        // فحص أخير للنطاقات الحية بعد اكتمال التخطيط وقبل أول تعديل.
+        allReplacements.forEach(function (replacement) {
+            replacement.range.load("text");
+        });
+        await context.sync();
+
+        for (const replacement of allReplacements) {
+            if (
+                normalizeLocal(replacement.range.text) !==
+                normalizeLocal(replacement.expectedText)
+            ) {
+                throw new Error(
+                    "تغير أحد مواضع التوثيق أثناء تجهيز الاستبدال؛ أُلغي التنفيذ دون تعديل الحواشي."
+                );
+            }
+        }
+
+        // لا نبدأ الكتابة إلا بعد نجاح التحقق الأخير لجميع النطاقات.
         allReplacements.forEach(function (replacement) {
             replacement.range.insertText(
                 replacement.replacementText,
