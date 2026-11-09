@@ -47635,6 +47635,8 @@ async function applyFootnoteSuggestions(footnoteSuggestions) {
         let skipped = 0;
         const sourceCollections = { footnote: footnotes.items, endnote: endnotes.items };
 
+        const sourceOccurrenceCounters = new Map();
+
         for (const item of footnoteSuggestions) {
             const notes = sourceCollections[item?.source];
             const noteIndex = Number(item?.noteNumber) - 1;
@@ -47662,7 +47664,7 @@ async function applyFootnoteSuggestions(footnoteSuggestions) {
                 const reference = item.references[index];
                 const sourceText = String(sourceTexts[index] || "").trim();
                 const suggestedText = String(item.suggestedTexts[index] || "").trim();
-                const replacementText = getSuggestedIdentity(suggestedText);
+                const replacementText = stripReferenceApplicationLocation(suggestedText);
                 if (!sourceText || !replacementText) {
                     skipped++;
                     continue;
@@ -47675,7 +47677,10 @@ async function applyFootnoteSuggestions(footnoteSuggestions) {
                     continue;
                 }
 
-                const anchorRange = await getUniqueWordSearchRange(context, note.body, sourceText);
+                const sourceKey = String(item.source) + "|" + String(item.noteNumber) + "|" + normalizeReferenceApplicationText(sourceText);
+                const sourceOccurrenceIndex = sourceOccurrenceCounters.get(sourceKey) || 0;
+                sourceOccurrenceCounters.set(sourceKey, sourceOccurrenceIndex + 1);
+                const anchorRange = await getUniqueWordSearchRange(context, note.body, sourceText, sourceOccurrenceIndex);
                 let identityRange = null;
                 if (anchorRange) {
                     for (const candidate of candidates) {
