@@ -45930,11 +45930,23 @@ if (referencesContent) {
                                                                 error
                                                             );
 
+                                                            const errorMessage =
+                                                                error?.message ||
+                                                                String(error);
+
                                                             applyFootnoteSuggestionsBtn.disabled =
                                                                 false;
 
                                                             applyFootnoteSuggestionsBtn.textContent =
-                                                                "تطبيق التوثيق على الحواشي";
+                                                                "تعذر التطبيق — أعد المحاولة";
+
+                                                            applyFootnoteSuggestionsBtn.title =
+                                                                errorMessage;
+
+                                                            alert(
+                                                                "تعذر تطبيق التوثيق مباشرة في Word:\n" +
+                                                                errorMessage
+                                                            );
 
                                                         }
 
@@ -47377,16 +47389,6 @@ async function applyFootnoteSuggestions(
 
     }
 
-    if (
-        typeof JSZip === "undefined"
-    ) {
-
-        throw new Error(
-            "مكتبة JSZip غير محمّلة في الإضافة."
-        );
-
-    }
-
     /*
      * =========================================================
      * 1. فهرس الاقتراحات
@@ -48651,150 +48653,117 @@ async function applyFootnoteSuggestions(
      * =========================================================
      */
 
+    /*
+     * استعادة نطاق الحاشية مباشرة من Word، لا من XML.
+     * نعيد البحث داخل النطاق الحي ونطابق النص قبل إنشاء أي تعديل.
+     */
+    async function resolveReviewedFootnoteRange(
+        context,
+        noteRange,
+        originalText,
+        expectedText,
+        rawStart,
+        rawEnd
+    ) {
+        if (!expectedText || rawStart < 0 || rawEnd <= rawStart) {
+            return null;
+        }
+
+        async function resolveOccurrence(query, occurrence) {
+            if (!query || query.length > 240 || occurrence < 0) {
+                return null;
+            }
+
+            const matches = noteRange.search(
+                query,
+                {
+                    matchCase: false,
+                    matchWholeWord: true
+                }
+            ).load("items");
+
+            await context.sync();
+            matches.items.forEach(function (candidate) {
+                candidate.load("text");
+            });
+            await context.sync();
+
+            const exactMatches = matches.items.filter(function (candidate) {
+                return normalizeLocal(candidate.text) === normalizeLocal(query);
+            });
+
+            if (exactMatches[occurrence]) return exactMatches[occurrence];
+
+            const snapshotMatches = findAllIdentityMatches(originalText, query);
+            if (snapshotMatches.length !== 1 || occurrence !== 0) return null;
+
+            const relaxed = noteRange.search(
+                query,
+                {
+                    matchCase: false,
+                    matchWholeWord: false
+                }
+            ).load("items");
+
+            await context.sync();
+            relaxed.items.forEach(function (candidate) {
+                candidate.load("text");
+            });
+            await context.sync();
+
+            const relaxedExact = relaxed.items.filter(function (candidate) {
+                return normalizeLocal(candidate.text) === normalizeLocal(query);
+            });
+
+            return relaxedExact.length === 1 ? relaxedExact[0] : null;
+        }
+
+        let resolvedRange = null;
+
+        if (expectedText.length <= 240) {
+            const occurrences = findAllIdentityMatches(originalText, expectedText);
+            const occurrence = occurrences.findIndex(function (match) {
+                return match.start === rawStart && match.end === rawEnd;
+            });
+
+            resolvedRange = await resolveOccurrence(expectedText, occurrence);
+        } else {
+            return null;
+        }
+
+        if (!resolvedRange) return null;
+
+        resolvedRange.load("text");
+        await context.sync();
+
+        if (normalizeLocal(resolvedRange.text) !== normalizeLocal(expectedText)) {
+            return null;
+        }
+
+        return resolvedRange;
+    }
+
+    /*
+     * مطابقة الحواشي وفق الهوية والنص الأصليين، ثم إعداد نطاقات Word.
+     * لا تُنفّذ هذه الدالة أي تغيير؛ التطبيق مؤجل حتى التحقق من كل النطاقات.
+     */
     async function processNotesPart(
-        zip,
-        path,
-        localName,
+        context,
+        noteSnapshots,
         source
     ) {
+        let skipped = 0;
+        const plannedReplacements = [];
+        const sourceSuggestions = suggestionsBySource.get(source) || [];
 
-        const file =
-            zip.file(
-                path
-            );
+        for (let index = 0; index < noteSnapshots.length; index++) {
+            const noteSnapshot = noteSnapshots[index];
+            const noteNumber = index + 1;
+            const originalText = noteSnapshot.text;
 
-        if (
-            !file
-        ) {
+            if (!originalText.trim()) continue;
 
-            return {
-
-                modified:
-                    false,
-
-                applied:
-                    0,
-
-                skipped:
-                    0
-
-            };
-
-        }
-
-        const xmlText =
-            await file.async(
-                "text"
-            );
-
-        const parser =
-            new DOMParser();
-
-        const xmlDoc =
-            parser.parseFromString(
-                xmlText,
-                "application/xml"
-            );
-
-        if (
-            xmlDoc.getElementsByTagName(
-                "parsererror"
-            ).length
-        ) {
-
-            throw new Error(
-                `تعذر تحليل ${path}`
-            );
-
-        }
-
-        const notes =
-            getNoteElements(
-                xmlDoc,
-                localName
-            );
-
-        // Order notes by the reference markers in document.xml, which is the
-        // same document order used when the Word API collection is enumerated.
-        // XML note IDs are identifiers, not display/order numbers.
-        const documentFile = zip.file("word/document.xml");
-        if (documentFile) {
-            const documentXmlText = await documentFile.async("text");
-            const documentXml = parser.parseFromString(documentXmlText, "application/xml");
-            if (!documentXml.getElementsByTagName("parsererror").length) {
-                const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-                const referenceName = source === "footnote" ? "footnoteReference" : "endnoteReference";
-                const referenceNodes = Array.from(documentXml.getElementsByTagNameNS(ns, referenceName));
-                const notesById = new Map(notes.map(function (entry) { return [String(entry.id), entry]; }));
-                const orderedNotes = [];
-                const seenIds = new Set();
-
-                referenceNodes.forEach(function (node) {
-                    const id = String(Number(node.getAttributeNS(ns, "id")));
-                    const entry = notesById.get(id);
-                    if (entry && !seenIds.has(id)) {
-                        orderedNotes.push(entry);
-                        seenIds.add(id);
-                    }
-                });
-
-                notes.forEach(function (entry) {
-                    const id = String(entry.id);
-                    if (!seenIds.has(id)) orderedNotes.push(entry);
-                });
-
-                notes.splice(0, notes.length, ...orderedNotes);
-            }
-        }
-
-        let modified =
-            false;
-
-        let applied =
-            0;
-
-        let skipped =
-            0;
-
-        for (
-            let index = 0;
-            index < notes.length;
-            index++
-        ) {
-
-            const noteEntry =
-                notes[
-                    index
-                ];
-
-            // Suggestions use the one-based order of the Word API collection.
-            // Use the document-reference order above, not the XML w:id value.
-            const noteNumber =
-                index + 1;
-
-            const noteElement =
-                noteEntry.element;
-
-            const originalText =
-                getNoteText(
-                    noteElement
-                );
-
-            if (
-                !originalText.trim()
-            ) {
-
-                continue;
-
-            }
-
-            // Prefer exact full-note matching, but do not rely on it alone:
-            // Word API text and XML text can differ in whitespace/run boundaries.
-            // A fallback is allowed only when a citation identity (author/book)
-            // from sourceTexts is found in the actual note. Page/volume numbers
-            // are stripped by getSuggestedIdentity and never establish identity.
             const normalizedNoteText = normalizeLocal(originalText);
-            const sourceSuggestions = suggestionsBySource.get(source) || [];
             let suggestion = sourceSuggestions.find(function (item) {
                 return !usedSuggestions.has(item) &&
                     normalizeLocal(item.originalText || "") === normalizedNoteText;
@@ -48809,8 +48778,6 @@ async function applyFootnoteSuggestions(
             }
 
             if (!suggestion) {
-                // Use the ordinal only as a tie-breaker after textual verification;
-                // never apply a suggestion merely because its note number matches.
                 const numberedCandidates = sourceSuggestions.filter(function (item) {
                     return !usedSuggestions.has(item) &&
                         Number(item.noteNumber) === Number(noteNumber) &&
@@ -48820,9 +48787,6 @@ async function applyFootnoteSuggestions(
                 if (numberedCandidates.length === 1) {
                     suggestion = numberedCandidates[0];
                 } else {
-                    // If ordering differs between Word and XML, accept a textual
-                    // fallback only when exactly one unused suggestion is supported
-                    // by a citation identity in this note.
                     const verifiedCandidates = sourceSuggestions.filter(function (item) {
                         return !usedSuggestions.has(item) && hasVerifiedCitationIdentity(item);
                     });
@@ -48833,7 +48797,6 @@ async function applyFootnoteSuggestions(
                 }
             }
 
-            // Ambiguous or unverified matches remain untouched.
             if (!suggestion) {
                 skipped++;
                 continue;
@@ -48841,14 +48804,6 @@ async function applyFootnoteSuggestions(
 
             usedSuggestions.add(suggestion);
 
-            /*
-             * =================================================
-             * تجميع المرجع نفسه داخل الحاشية.
-             * =================================================
-             */
-
-            // Each source occurrence gets its own replacement. Do not collapse
-            // by author/title: the same book may be cited multiple times in one note.
             const replacements = [];
             const pairCount = Math.min(
                 suggestion.references.length,
@@ -48860,19 +48815,17 @@ async function applyFootnoteSuggestions(
             for (let i = 0; i < pairCount; i++) {
                 const sourceText = String(suggestion.sourceTexts[i] || "").trim();
                 const replacementText = getSuggestedIdentity(suggestion.suggestedTexts[i]);
+
                 if (!sourceText || !replacementText) {
                     skipped++;
                     continue;
                 }
-                // The source span can include volume/page data. We use the full
-                // citation to locate its occurrence, but replace only its identity.
+
                 const identityText = getSuggestedIdentity(sourceText);
                 const hasUnparsedLocationSuffix =
                     identityText === sourceText &&
                     /(?:^|[،,؛;\s])(?:ج|جزء|المجلد|المجلدات|ص|صفحة|صفحات)\s*\d|\d+\s*\/\s*\d+\s*$|\b\d+\s*[-–—]\s*\d+\s*$/.test(sourceText);
 
-                // If location data could not be separated confidently, leave
-                // the citation untouched rather than risk deleting volume/page.
                 if (hasUnparsedLocationSuffix) {
                     skipped++;
                     continue;
@@ -48896,9 +48849,6 @@ async function applyFootnoteSuggestions(
                 });
             }
 
-            // Match longer citation strings first, so a short title cannot claim
-            // a substring that belongs to a fuller citation. No page/volume identity
-            // checks and no all-or-nothing occurrence-count gate.
             pairs.sort(function (a, b) {
                 return b.normalizedLength - a.normalizedLength || a.index - b.index;
             });
@@ -48911,17 +48861,10 @@ async function applyFootnoteSuggestions(
                     });
                 }
 
-                // Locate the complete original citation first. Within that exact
-                // span, select only the author/book identity and leave page/volume
-                // notation and surrounding punctuation untouched.
-                // The reviewed source list preserves occurrence order. Resolve the
-                // exact occurrence of this citation from the immutable note snapshot,
-                // just as the Quran converter resolves an approved text anchor.
-                const sourceOccurrence = pair.sourceOccurrence;
                 const allFullMatches = findAllIdentityMatches(originalText, pair.sourceText);
-                const fullMatch = allFullMatches[sourceOccurrence] || null;
-
+                const fullMatch = allFullMatches[pair.sourceOccurrence] || null;
                 let match = null;
+
                 if (fullMatch && !overlapsClaimed(fullMatch) && pair.identityText) {
                     const identityMatches = findAllIdentityMatches(originalText, pair.identityText);
                     const contained = identityMatches.filter(function (identityMatch) {
@@ -48933,15 +48876,11 @@ async function applyFootnoteSuggestions(
                     if (contained.length === 1) {
                         match = contained[0];
                     } else if (contained.length > 1) {
-                        // More than one identity inside the selected citation is ambiguous.
                         skipped++;
                         return;
                     }
                 }
 
-                // Formatting differences may prevent a complete citation match.
-                // Fall back only when the full citation was not found at all, and
-                // only when the identity is unique in this note.
                 if (
                     !match &&
                     allFullMatches.length === 0 &&
@@ -48954,15 +48893,9 @@ async function applyFootnoteSuggestions(
                             return !overlapsClaimed(candidate);
                         });
 
-                    if (identityMatches.length === 1) {
-                        match = identityMatches[0];
-                    }
+                    if (identityMatches.length === 1) match = identityMatches[0];
                 }
 
-                // Formatting differences may prevent full-span matching. In that
-                // case, use identity-only matching only if unique in this note.
-                // Never fall back to a full citation that still contains unparsed
-                // page/volume data, because that would erase the location.
                 if (
                     !match &&
                     pair.identityText &&
@@ -48974,9 +48907,7 @@ async function applyFootnoteSuggestions(
                             return !overlapsClaimed(candidate);
                         });
 
-                    if (identityMatches.length === 1) {
-                        match = identityMatches[0];
-                    }
+                    if (identityMatches.length === 1) match = identityMatches[0];
                 }
 
                 if (!match) {
@@ -48994,520 +48925,154 @@ async function applyFootnoteSuggestions(
                 });
             });
 
-            /*
-             * =================================================
-             * إزالة التطابقات المتداخلة
-             * =================================================
-             */
+            replacements.sort(function (a, b) {
+                return a.start - b.start || b.end - a.end;
+            });
 
-            replacements.sort(
-                function (
-                    a,
-                    b
-                ) {
+            const selected = [];
+            replacements.forEach(function (replacement) {
+                const overlaps = selected.some(function (existing) {
+                    return replacement.start < existing.end &&
+                        replacement.end > existing.start;
+                });
 
-                    if (
-                        a.start !==
-                        b.start
-                    ) {
+                if (!overlaps) selected.push(replacement);
+                else skipped++;
+            });
 
-                        return (
-                            a.start -
-                            b.start
-                        );
+            selected.sort(function (a, b) {
+                return b.start - a.start;
+            });
 
-                    }
+            for (const replacement of selected) {
+                const range = await resolveReviewedFootnoteRange(
+                    context,
+                    noteSnapshot.range,
+                    originalText,
+                    replacement.expectedText,
+                    replacement.start,
+                    replacement.end
+                );
 
-                    return (
-                        b.end -
-                        a.end
-                    );
-
+                if (!range) {
+                    skipped++;
+                    continue;
                 }
-            );
 
-            const selected =
-                [];
-
-            replacements.forEach(
-                function (
-                    replacement
-                ) {
-
-                    const overlaps =
-                        selected.some(
-                            function (
-                                existing
-                            ) {
-
-                                return (
-                                    replacement.start <
-                                        existing.end &&
-                                    replacement.end >
-                                        existing.start
-                                );
-
-                            }
-                        );
-
-                    if (
-                        !overlaps
-                    ) {
-
-                        selected.push(
-                            replacement
-                        );
-
-                    }
-
-                }
-            );
-
-            /*
-             * =================================================
-             * التطبيق من اليمين إلى اليسار
-             * =================================================
-             */
-
-            selected.sort(
-                function (
-                    a,
-                    b
-                ) {
-
-                    return (
-                        b.start -
-                        a.start
-                    );
-
-                }
-            );
-
-            selected.forEach(
-                function (
-                    replacement
-                ) {
-
-                    if (
-                        replaceXmlText(
-                            noteElement,
-                            replacement.start,
-                            replacement.end,
-                            replacement.text,
-                            replacement.expectedText
-                        )
-                    ) {
-
-                        modified =
-                            true;
-
-                        applied++;
-
-                    }
-                    else {
-
-                        skipped++;
-
-                    }
-
-                }
-            );
-
-        }
-
-        if (
-            modified
-        ) {
-
-            const serializer =
-                new XMLSerializer();
-
-            zip.file(
-                path,
-                serializer.serializeToString(
-                    xmlDoc
-                )
-            );
-
+                plannedReplacements.push({
+                    source: source,
+                    noteIndex: index,
+                    start: replacement.start,
+                    range: range,
+                    expectedText: replacement.expectedText,
+                    replacementText: replacement.text
+                });
+            }
         }
 
         return {
-
-            modified:
-                modified,
-
-            applied:
-                applied,
-
-            skipped:
-                skipped
-
+            replacements: plannedReplacements,
+            skipped: skipped
         };
-
     }
 
     /*
-     * =========================================================
-     * 14. الحصول على DOCX
-     * =========================================================
+     * تطبيق مباشر داخل Word.Range للحواشي والحواشي الختامية.
+     * لا قراءة DOCX، ولا JSZip، ولا إعادة إدراج للمستند.
      */
-
-    const originalBase64 =
-        await new Promise(
-            function (
-                resolve,
-                reject
-            ) {
-
-                Office.context.document.getFileAsync(
-                    Office.FileType.Compressed,
-                    {
-                        sliceSize:
-                            1024 * 1024
-                    },
-                    function (
-                        result
-                    ) {
-
-                        if (
-                            result.status !==
-                            Office.AsyncResultStatus.Succeeded
-                        ) {
-
-                            reject(
-                                new Error(
-                                    result.error?.message ||
-                                    "تعذر قراءة ملف Word."
-                                )
-                            );
-
-                            return;
-
-                        }
-
-                        const file =
-                            result.value;
-
-                        const slices =
-                            new Array(
-                                file.sliceCount
-                            );
-
-                        let completed =
-                            0;
-
-                        function readSlice(
-                            index
-                        ) {
-
-                            file.getSliceAsync(
-                                index,
-                                function (
-                                    sliceResult
-                                ) {
-
-                                    if (
-                                        sliceResult.status !==
-                                        Office.AsyncResultStatus.Succeeded
-                                    ) {
-
-                                        try {
-                                            file.closeAsync();
-                                        }
-                                        catch (_) {}
-
-                                        reject(
-                                            new Error(
-                                                sliceResult.error?.message ||
-                                                "تعذر قراءة جزء من ملف Word."
-                                            )
-                                        );
-
-                                        return;
-
-                                    }
-
-                                    slices[index] =
-                                        new Uint8Array(
-                                            sliceResult.value.data
-                                        );
-
-                                    completed++;
-
-                                    if (
-                                        completed ===
-                                        file.sliceCount
-                                    ) {
-
-                                        try {
-                                            file.closeAsync();
-                                        }
-                                        catch (_) {}
-
-                                        let totalLength =
-                                            0;
-
-                                        slices.forEach(
-                                            function (
-                                                slice
-                                            ) {
-
-                                                totalLength +=
-                                                    slice.length;
-
-                                            }
-                                        );
-
-                                        const allData =
-                                            new Uint8Array(
-                                                totalLength
-                                            );
-
-                                        let offset =
-                                            0;
-
-                                        slices.forEach(
-                                            function (
-                                                slice
-                                            ) {
-
-                                                allData.set(
-                                                    slice,
-                                                    offset
-                                                );
-
-                                                offset +=
-                                                    slice.length;
-
-                                            }
-                                        );
-
-                                        let binary =
-                                            "";
-
-                                        const chunk =
-                                            0x8000;
-
-                                        for (
-                                            let i = 0;
-                                            i < allData.length;
-                                            i += chunk
-                                        ) {
-
-                                            binary +=
-                                                String.fromCharCode.apply(
-                                                    null,
-                                                    allData.subarray(
-                                                        i,
-                                                        Math.min(
-                                                            i + chunk,
-                                                            allData.length
-                                                        )
-                                                    )
-                                                );
-
-                                        }
-
-                                        resolve(
-                                            btoa(
-                                                binary
-                                            )
-                                        );
-
-                                        return;
-
-                                    }
-
-                                    readSlice(
-                                        index + 1
-                                    );
-
-                                }
-                            );
-
-                        }
-
-                        if (
-                            file.sliceCount <= 0
-                        ) {
-
-                            try {
-                                file.closeAsync();
-                            }
-                            catch (_) {}
-
-                            reject(
-                                new Error(
-                                    "ملف Word لا يحتوي على أجزاء."
-                                )
-                            );
-
-                            return;
-
-                        }
-
-                        readSlice(
-                            0
-                        );
-
-                    }
-                );
-
-            }
+    if (
+        !Office.context.requirements.isSetSupported("WordApi", "1.5")
+    ) {
+        throw new Error(
+            "إصدار Word الحالي لا يدعم الوصول المباشر إلى الحواشي (WordApi 1.5). حدّث Word ثم أعد المحاولة."
         );
+    }
 
-    /*
-     * =========================================================
-     * 15. فتح DOCX بواسطة JSZip
-     * =========================================================
-     */
+    return await Word.run(async function (context) {
+        const footnotes = context.document.body.footnotes;
+        const endnotes = context.document.body.endnotes;
 
-    const zip =
-        await JSZip.loadAsync(
-            originalBase64,
-            {
-                base64:
-                    true
-            }
-        );
+        footnotes.load("items/body");
+        endnotes.load("items/body");
+        await context.sync();
 
-    /*
-     * =========================================================
-     * 16. معالجة الحواشي
-     * =========================================================
-     */
+        function captureNoteSnapshots(items) {
+            return items.map(function (item) {
+                const range = item.body.getRange("Content").load("text");
+                return { item: item, range: range };
+            });
+        }
 
-    const footnoteResult =
-        await processNotesPart(
-            zip,
-            "word/footnotes.xml",
-            "footnote",
+        const footnoteSnapshots = captureNoteSnapshots(footnotes.items);
+        const endnoteSnapshots = captureNoteSnapshots(endnotes.items);
+        await context.sync();
+
+        footnoteSnapshots.forEach(function (snapshot) {
+            snapshot.text = snapshot.range.text;
+        });
+        endnoteSnapshots.forEach(function (snapshot) {
+            snapshot.text = snapshot.range.text;
+        });
+
+        const footnoteResult = await processNotesPart(
+            context,
+            footnoteSnapshots,
             "footnote"
         );
-
-    const endnoteResult =
-        await processNotesPart(
-            zip,
-            "word/endnotes.xml",
-            "endnote",
+        const endnoteResult = await processNotesPart(
+            context,
+            endnoteSnapshots,
             "endnote"
         );
 
-    const totalApplied =
-        Number(
-            footnoteResult?.applied ||
-            0
-        ) +
-        Number(
-            endnoteResult?.applied ||
-            0
-        );
+        const allReplacements = [
+            ...footnoteResult.replacements,
+            ...endnoteResult.replacements
+        ].sort(function (a, b) {
+            return a.source.localeCompare(b.source) ||
+                a.noteIndex - b.noteIndex ||
+                b.start - a.start;
+        });
 
-    const totalSkipped =
-        Number(
-            footnoteResult?.skipped ||
-            0
-        ) +
-        Number(
-            endnoteResult?.skipped ||
-            0
-        );
+        if (!allReplacements.length) {
+            return {
+                applied: 0,
+                skipped: footnoteResult.skipped + endnoteResult.skipped
+            };
+        }
 
-    if (
-        totalApplied === 0
-    ) {
+        // فحص أخير للنطاقات الحية بعد اكتمال التخطيط وقبل أول تعديل.
+        allReplacements.forEach(function (replacement) {
+            replacement.range.load("text");
+        });
+        await context.sync();
+
+        for (const replacement of allReplacements) {
+            if (
+                normalizeLocal(replacement.range.text) !==
+                normalizeLocal(replacement.expectedText)
+            ) {
+                throw new Error(
+                    "تغير أحد مواضع التوثيق أثناء تجهيز الاستبدال؛ أُلغي التنفيذ دون تعديل الحواشي."
+                );
+            }
+        }
+
+        // لا نبدأ الكتابة إلا بعد نجاح التحقق الأخير لجميع النطاقات.
+        allReplacements.forEach(function (replacement) {
+            replacement.range.insertText(
+                replacement.replacementText,
+                Word.InsertLocation.replace
+            );
+        });
+
+        await context.sync();
 
         return {
-
-            applied:
-                0,
-
-            skipped:
-                totalSkipped
-
+            applied: allReplacements.length,
+            skipped: footnoteResult.skipped + endnoteResult.skipped
         };
-
-    }
-
-    /*
-     * =========================================================
-     * 17. توليد DOCX المعدل مرة واحدة
-     * =========================================================
-     */
-
-    const modifiedBase64 =
-        await zip.generateAsync(
-            {
-                type:
-                    "base64",
-
-                compression:
-                    "DEFLATE",
-
-                compressionOptions:
-                    {
-                        level:
-                            6
-                    }
-
-            }
-        );
-
-    /*
-     * =========================================================
-     * 18. إعادة المستند مرة واحدة
-     * =========================================================
-     */
-
-    await Word.run(
-        async function (
-            context
-        ) {
-
-            context.document.insertFileFromBase64(
-                modifiedBase64,
-                Word.InsertLocation.replace,
-                {
-                    importTheme:
-                        true,
-
-                    importStyles:
-                        true,
-
-                    importParagraphSpacing:
-                        true,
-
-                    importPageColor:
-                        true,
-
-                    importChangeTrackingMode:
-                        true,
-
-                    importCustomProperties:
-                        true,
-
-                    importCustomXmlParts:
-                        true,
-
-                    importDifferentOddEvenPages:
-                        true
-                }
-            );
-
-            await context.sync();
-
-        }
-    );
-
-    return {
-
-        applied:
-            totalApplied,
-
-        skipped:
-            totalSkipped
-
-    };
+    });
 
 }
 
