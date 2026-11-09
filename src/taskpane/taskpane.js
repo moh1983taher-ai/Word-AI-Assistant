@@ -47670,7 +47670,7 @@ async function applyFootnoteSuggestions(footnoteSuggestions) {
                     continue;
                 }
 
-                const identitySource = getSuggestedIdentity(sourceText);
+                const identitySource = stripReferenceApplicationLocation(sourceText);
                 const candidates = getReferenceApplicationIdentityCandidates(reference, identitySource);
                 if (!candidates.length) {
                     skipped++;
