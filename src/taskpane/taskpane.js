@@ -48458,7 +48458,8 @@ async function applyFootnoteSuggestions(
         noteElement,
         rawStart,
         rawEnd,
-        replacement
+        replacement,
+        expectedText
     ) {
 
         const ns =
@@ -48502,6 +48503,20 @@ async function applyFootnoteSuggestions(
 
             }
         );
+
+        // Revalidate the exact reviewed anchor against the current XML text
+        // before mutating any run. A stale or shifted range is never guessed.
+        if (
+            !Number.isInteger(rawStart) ||
+            !Number.isInteger(rawEnd) ||
+            rawStart < 0 ||
+            rawEnd <= rawStart ||
+            rawEnd > fullText.length ||
+            !expectedText ||
+            normalizeLocal(fullText.slice(rawStart, rawEnd)) !== normalizeLocal(expectedText)
+        ) {
+            return false;
+        }
 
         let firstNode =
             -1;
@@ -48855,8 +48870,24 @@ async function applyFootnoteSuggestions(
                 const hasUnparsedLocationSuffix =
                     identityText === sourceText &&
                     /(?:^|[،,؛;\s])(?:ج|جزء|المجلد|المجلدات|ص|صفحة|صفحات)\s*\d|\d+\s*\/\s*\d+\s*$|\b\d+\s*[-–—]\s*\d+\s*$/.test(sourceText);
+
+                // If location data could not be separated confidently, leave
+                // the citation untouched rather than risk deleting volume/page.
+                if (hasUnparsedLocationSuffix) {
+                    skipped++;
+                    continue;
+                }
+
+                const normalizedSourceText = normalizeLocal(sourceText);
+                const sourceOccurrence = suggestion.sourceTexts
+                    .slice(0, i)
+                    .filter(function (priorText) {
+                        return normalizeLocal(priorText) === normalizedSourceText;
+                    }).length;
+
                 pairs.push({
                     index: i,
+                    sourceOccurrence: sourceOccurrence,
                     sourceText: sourceText,
                     identityText: identityText,
                     hasUnparsedLocationSuffix: hasUnparsedLocationSuffix,
@@ -48883,32 +48914,48 @@ async function applyFootnoteSuggestions(
                 // Locate the complete original citation first. Within that exact
                 // span, select only the author/book identity and leave page/volume
                 // notation and surrounding punctuation untouched.
-                const fullMatches = findAllIdentityMatches(originalText, pair.sourceText)
-                    .filter(function (candidate) {
-                        return !overlapsClaimed(candidate);
-                    });
+                // The reviewed source list preserves occurrence order. Resolve the
+                // exact occurrence of this citation from the immutable note snapshot,
+                // just as the Quran converter resolves an approved text anchor.
+                const sourceOccurrence = pair.sourceOccurrence;
+                const allFullMatches = findAllIdentityMatches(originalText, pair.sourceText);
+                const fullMatch = allFullMatches[sourceOccurrence] || null;
 
                 let match = null;
-                if (fullMatches.length > 0 && pair.identityText) {
+                if (fullMatch && !overlapsClaimed(fullMatch) && pair.identityText) {
                     const identityMatches = findAllIdentityMatches(originalText, pair.identityText);
                     const contained = identityMatches.filter(function (identityMatch) {
                         return !overlapsClaimed(identityMatch) &&
-                            fullMatches.some(function (fullMatch) {
-                                return identityMatch.start >= fullMatch.start &&
-                                    identityMatch.end <= fullMatch.end;
-                            });
+                            identityMatch.start >= fullMatch.start &&
+                            identityMatch.end <= fullMatch.end;
                     });
 
                     if (contained.length === 1) {
                         match = contained[0];
-                    } else if (
-                        contained.length > 1 &&
-                        pair.identityText !== pair.sourceText
-                    ) {
-                        // If the same identity occurs more than once inside the
-                        // source span, do not guess which occurrence to rewrite.
+                    } else if (contained.length > 1) {
+                        // More than one identity inside the selected citation is ambiguous.
                         skipped++;
                         return;
+                    }
+                }
+
+                // Formatting differences may prevent a complete citation match.
+                // Fall back only when the full citation was not found at all, and
+                // only when the identity is unique in this note.
+                if (
+                    !match &&
+                    allFullMatches.length === 0 &&
+                    pair.identityText &&
+                    !pair.hasUnparsedLocationSuffix &&
+                    normalizeLocal(pair.identityText).length >= 8
+                ) {
+                    const identityMatches = findAllIdentityMatches(originalText, pair.identityText)
+                        .filter(function (candidate) {
+                            return !overlapsClaimed(candidate);
+                        });
+
+                    if (identityMatches.length === 1) {
+                        match = identityMatches[0];
                     }
                 }
 
@@ -48941,6 +48988,7 @@ async function applyFootnoteSuggestions(
                 replacements.push({
                     start: match.start,
                     end: match.end,
+                    expectedText: pair.identityText,
                     text: pair.replacementText,
                     sourceIndex: pair.index
                 });
@@ -49045,7 +49093,8 @@ async function applyFootnoteSuggestions(
                             noteElement,
                             replacement.start,
                             replacement.end,
-                            replacement.text
+                            replacement.text,
+                            replacement.expectedText
                         )
                     ) {
 
