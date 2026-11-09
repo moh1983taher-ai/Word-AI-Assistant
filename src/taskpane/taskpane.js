@@ -45747,6 +45747,20 @@ if (referencesContent) {
                                                 footnoteSuggestions
                                             );
 
+                                            const mainTextSuggestions =
+                                                await buildMainTextSuggestions(
+                                                    finalReferenceResults,
+                                                    (referenceAddMissingAuthors ? referenceAddMissingAuthors.checked : false)
+                                                );
+
+                                            const mainTextSuggestionHTML =
+                                                mainTextSuggestions.map(function (item) {
+                                                    return "<div class='footnote-suggestion-item'><div class='footnote-suggestion-content'><div class='footnote-suggestion-original'>" +
+                                                        escapeReferenceHTML(item.anchorText) +
+                                                        "</div><div class='footnote-suggestion-references'><div class='footnote-suggestion-reference'><div class='footnote-suggestion-arrow'>←</div><div class='footnote-suggestion-new'>" +
+                                                        escapeReferenceHTML(item.suggestedText) +
+                                                        "</div></div></div></div></div>";
+                                                }).join("");
                                             const footnoteSuggestionHTML =
                                                 footnoteSuggestions
                                                     .map(function (item) {
@@ -45870,6 +45884,14 @@ if (referencesContent) {
 
                                                         </div>
 
+                                                        <div class="footnote-suggestions-title reference-collapsible-header">
+                                                            <span>توثيق المتن المقترح <strong>${mainTextSuggestions.length}</strong></span>
+                                                        </div>
+                                                        <div class="footnote-suggestions-list">
+                                                            ${mainTextSuggestionHTML}
+                                                        </div>
+                                                        ${mainTextSuggestions.length > 0 ? "<button type='button' id='apply-main-text-suggestions-btn' class='apply-footnote-suggestions-btn'>تطبيق التوثيق على المتن</button>" : ""}
+
                                                         ${
                                                             footnoteSuggestions.some(
                                                                 function (item) {
@@ -45894,6 +45916,25 @@ if (referencesContent) {
                                             }
 
 
+                                            const applyMainTextSuggestionsBtn =
+                                                document.getElementById("apply-main-text-suggestions-btn");
+
+                                            if (applyMainTextSuggestionsBtn) {
+                                                applyMainTextSuggestionsBtn.onclick = async function () {
+                                                    applyMainTextSuggestionsBtn.disabled = true;
+                                                    applyMainTextSuggestionsBtn.textContent = "جارٍ تطبيق التوثيق على المتن...";
+                                                    try {
+                                                        const result = await applyMainTextSuggestions(mainTextSuggestions);
+                                                        applyMainTextSuggestionsBtn.textContent = result.skipped > 0
+                                                            ? "✓ طُبّق التوثيق على " + result.applied + "، وتعذّر تطبيق " + result.skipped
+                                                            : "✓ تم تطبيق التوثيق على المتن (" + result.applied + ")";
+                                                    } catch (error) {
+                                                        console.error("فشل تطبيق التوثيق على المتن:", error);
+                                                        applyMainTextSuggestionsBtn.disabled = false;
+                                                        applyMainTextSuggestionsBtn.textContent = "تطبيق التوثيق على المتن";
+                                                    }
+                                                };
+                                            }
                                             const applyFootnoteSuggestionsBtn =
                                                 document.getElementById(
                                                     "apply-footnote-suggestions-btn"
@@ -47359,7 +47400,353 @@ async function buildFootnoteSuggestions(
 }
 
 
-async function applyFootnoteSuggestions(
+function stripReferenceApplicationLocation(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+
+    // Only remove an explicitly marked volume/page suffix. An unmarked
+    // trailing number is ambiguous and must not be silently treated as a page.
+    const locationPatterns = [
+        /\s*(?:[،,؛;]\s*)?(?:جـ?|جزء|المجلد|المجلّد|مجلد|vol(?:ume)?\.?)\s*[:：]?\s*[0-9٠-٩۰-۹]+(?:\s*(?:[،,؛;]\s*)?(?:صـ?|صفحة|صفحات|p{1,2}\.?)\s*[:：]?\s*[0-9٠-٩۰-۹]+(?:\s*[-–—]\s*[0-9٠-٩۰-۹]+)?)?\s*$/iu,
+        /\s*(?:[،,؛;]\s*)?(?:صـ?|صفحة|صفحات|p{1,2}\.?)\s*[:：]?\s*[0-9٠-٩۰-۹]+(?:\s*[-–—]\s*[0-9٠-٩۰-۹]+)?\s*$/iu,
+        /\s*[0-9٠-٩۰-۹]+\s*\/\s*[0-9٠-٩۰-۹]+(?:\s*[-–—]\s*[0-9٠-٩۰-۹]+)?\s*$/u
+    ];
+
+    for (const pattern of locationPatterns) {
+        const match = text.match(pattern);
+        if (match && match.index > 0) {
+            return text.substring(0, match.index).trim().replace(/[،,؛;]+$/g, "").trim();
+        }
+    }
+
+    // Do not guess whether a bare final number belongs to the title or the
+    // page notation. Returning an empty identity makes the caller skip it.
+    if (/\s+[0-9٠-٩۰-۹]+(?:\s*[-–—]\s*[0-9٠-٩۰-۹]+)?\s*$/u.test(text)) {
+        return "";
+    }
+
+    return text;
+}
+
+function normalizeReferenceApplicationText(value) {
+    return String(value ?? "")
+        .normalize("NFC")
+        .replace(/[٠-٩]/g, function (digit) { return String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)); })
+        .replace(/[۰-۹]/g, function (digit) { return String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)); })
+        .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+        .replace(/[\u200C-\u200F\u202A-\u202E\uFEFF]/g, "")
+        .replace(/[أإآٱ]/g, "ا")
+        .replace(/ى/g, "ي")
+        .replace(/[\s\u00A0،,؛:()[\]{}"']/g, "")
+        .toLowerCase();
+}
+
+function getReferenceApplicationIdentityCandidates(reference, sourceText) {
+    const author = String(reference?.author || "").trim();
+    const title = String(reference?.title || "").trim();
+    const candidates = [];
+    const add = function (value) {
+        const text = String(value || "").trim();
+        const normalized = normalizeReferenceApplicationText(text);
+        // Short title fragments are not reliable identifiers.
+        if (normalized.length >= 8 && !candidates.some(function (item) {
+            return normalizeReferenceApplicationText(item) === normalized;
+        })) candidates.push(text);
+    };
+
+    const identitySource = stripReferenceApplicationLocation(sourceText);
+    add(identitySource);
+
+    if (author && title) {
+        add(author + "، " + title);
+        add(title + "، " + author);
+        add(author + " " + title);
+        add(title + " " + author);
+    }
+
+    // Keep the complete title only when it occurs in the original citation.
+    // Do not manufacture shorter title prefixes that may identify another book.
+    add(title);
+
+    const sourceNormalized = normalizeReferenceApplicationText(sourceText);
+    return candidates.filter(function (candidate) {
+        const normalized = normalizeReferenceApplicationText(candidate);
+        return normalized && sourceNormalized.includes(normalized);
+    }).sort(function (a, b) {
+        return normalizeReferenceApplicationText(b).length - normalizeReferenceApplicationText(a).length;
+    });
+}
+
+async function getUniqueWordSearchRange(context, container, query, occurrenceIndex) {
+    const value = String(query || "").trim();
+    if (!value) return null;
+
+    const results = container.search(value, { matchCase: false, matchWholeWord: false });
+    results.load("items/text");
+    await context.sync();
+
+    const matches = results.items.filter(function (range) {
+        return normalizeReferenceApplicationText(range.text) === normalizeReferenceApplicationText(value);
+    });
+
+    // Explicit ordinals are reserved for exact source occurrences. Identity
+    // matches without an ordinal must be unique; never choose the first guess.
+    if (Number.isInteger(occurrenceIndex) && occurrenceIndex >= 0) {
+        return occurrenceIndex < matches.length ? matches[occurrenceIndex] : null;
+    }
+
+    return matches.length === 1 ? matches[0] : null;
+}
+
+async function buildMainTextSuggestions(unifiedReferences, addMissingAuthors = false) {
+    if (!Array.isArray(unifiedReferences) || unifiedReferences.length === 0) return [];
+    const sources = await readReferenceSources();
+    const materials = processReferenceSources(sources).filter(function (item) {
+        return item?.source === "main-text";
+    });
+    const materialById = new Map(materials.map(function (item) {
+        return [String(item.id), item];
+    }));
+    const pending = [];
+
+    unifiedReferences.forEach(function (reference) {
+        const occurrences = Array.isArray(reference?.occurrences) ? reference.occurrences : [];
+        occurrences.forEach(function (occurrence) {
+            if (occurrence?.source !== "main-text" || !occurrence.materialId) return;
+            const material = materialById.get(String(occurrence.materialId));
+            if (!material || !String(material.originalText || "").trim()) return;
+
+            const variants = Array.isArray(reference.variants) ? reference.variants : [];
+            const variantTexts = variants.map(function (variant) {
+                if (typeof variant === "string") return variant.trim();
+                if (!variant || typeof variant !== "object") return "";
+                if (variant.materialId && String(variant.materialId) !== String(occurrence.materialId)) return "";
+                return String(variant.text || variant.originalText || variant.cleanedText || variant.citation || variant.value || "").trim();
+            }).filter(Boolean);
+
+            const identitySource = variantTexts.find(function (candidate) {
+                const normalizedCandidate = normalizeReferenceApplicationText(candidate);
+                return normalizedCandidate.length >= 4 &&
+                    normalizeReferenceApplicationText(material.originalText).includes(normalizedCandidate);
+            }) || String(reference?.title || reference?.author || "");
+
+            const author = String(reference?.author || "").trim();
+            const authorExists = author && normalizeReferenceApplicationText(material.originalText).includes(
+                normalizeReferenceApplicationText(author)
+            );
+            const includeAuthor = Boolean(author) && (Boolean(authorExists) || addMissingAuthors);
+            const suggestedText = String(formatFootnoteReference(reference, occurrence, includeAuthor) || "").trim();
+            const replacementText = stripReferenceApplicationLocation(suggestedText);
+            const identityCandidates = getReferenceApplicationIdentityCandidates(reference, identitySource);
+            if (!suggestedText || !replacementText || identityCandidates.length === 0) return;
+
+            pending.push({
+                materialId: String(occurrence.materialId),
+                position: Number(occurrence.position ?? material.position ?? 0),
+                anchorText: String(material.originalText || "").trim(),
+                identitySource: identitySource,
+                identityCandidates: identityCandidates,
+                reference: reference,
+                suggestedText: suggestedText,
+                replacementText: replacementText
+            });
+        });
+    });
+
+    pending.sort(function (a, b) { return a.position - b.position; });
+    const seenReferences = new Set();
+    pending.forEach(function (item) {
+        if (referenceStyle.format !== "title-author-first") return;
+        const key = "ref:" + String(item.reference?.author || "").trim().toLowerCase() +
+            "|" + String(item.reference?.title || "").trim().toLowerCase();
+        const first = !seenReferences.has(key);
+        seenReferences.add(key);
+        if (!first && item.reference?.author) {
+            item.suggestedText = formatFootnoteReference(
+                item.reference,
+                { volume: "", page: "", pageRange: "" },
+                false
+            );
+            item.replacementText = stripReferenceApplicationLocation(item.suggestedText);
+        }
+    });
+
+    const anchorGroups = new Map();
+    materials.forEach(function (material) {
+        const anchor = String(material.originalText || "").trim();
+        const key = normalizeReferenceApplicationText(anchor);
+        if (!key) return;
+        if (!anchorGroups.has(key)) anchorGroups.set(key, []);
+        anchorGroups.get(key).push({ materialId: String(material.id), position: Number(material.position || 0) });
+    });
+    anchorGroups.forEach(function (items) { items.sort(function (a, b) { return a.position - b.position; }); });
+    pending.forEach(function (item) {
+        const group = anchorGroups.get(normalizeReferenceApplicationText(item.anchorText)) || [];
+        item.anchorCount = group.length;
+        item.anchorOrdinal = group.findIndex(function (entry) { return entry.materialId === item.materialId; });
+    });
+    return pending.filter(function (item) { return item.anchorOrdinal >= 0 && item.replacementText; });
+}
+
+async function applyMainTextSuggestions(suggestions) {
+    if (!Array.isArray(suggestions) || suggestions.length === 0) return { applied: 0, skipped: 0 };
+    return await Word.run(async function (context) {
+        const body = context.document.body;
+        const groups = new Map();
+        suggestions.forEach(function (item) {
+            const key = normalizeReferenceApplicationText(item.anchorText);
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(item);
+        });
+        let applied = 0;
+        let skipped = 0;
+
+        for (const groupItems of groups.values()) {
+            const anchorText = groupItems[0].anchorText;
+            const anchorResults = body.search(anchorText, { matchCase: false, matchWholeWord: false });
+            anchorResults.load("items/text");
+            await context.sync();
+            const anchors = anchorResults.items.filter(function (range) {
+                return normalizeReferenceApplicationText(range.text) === normalizeReferenceApplicationText(anchorText);
+            });
+            const expectedCount = Number(groupItems[0].anchorCount || 0);
+            if (!expectedCount || anchors.length !== expectedCount) {
+                skipped += groupItems.length;
+                continue;
+            }
+
+            for (const item of groupItems) {
+                const anchor = anchors[item.anchorOrdinal];
+                if (!anchor || normalizeReferenceApplicationText(anchor.text) !== normalizeReferenceApplicationText(item.anchorText)) {
+                    skipped++;
+                    continue;
+                }
+                let identityRange = null;
+                for (const candidate of item.identityCandidates) {
+                    const found = anchor.search(candidate, { matchCase: false, matchWholeWord: false });
+                    found.load("items/text");
+                    await context.sync();
+                    const matches = found.items.filter(function (range) {
+                        return normalizeReferenceApplicationText(range.text) === normalizeReferenceApplicationText(candidate);
+                    });
+                    if (matches.length === 1) {
+                        identityRange = matches[0];
+                        break;
+                    }
+                }
+                if (!identityRange || !item.replacementText) {
+                    skipped++;
+                    continue;
+                }
+                identityRange.insertText(item.replacementText, Word.InsertLocation.replace);
+                await context.sync();
+                applied++;
+            }
+        }
+        return { applied: applied, skipped: skipped };
+    });
+}
+
+async function applyFootnoteSuggestions(footnoteSuggestions) {
+    if (!Array.isArray(footnoteSuggestions) || footnoteSuggestions.length === 0) return { applied: 0, skipped: 0 };
+    if (!Office.context.requirements.isSetSupported("WordApi", "1.5")) {
+        throw new Error("تطبيق التوثيق على الحواشي يحتاج إلى Word API 1.5 أو أحدث.");
+    }
+    return await Word.run(async function (context) {
+        const body = context.document.body;
+        const footnotes = body.footnotes;
+        const endnotes = body.endnotes;
+        footnotes.load("items");
+        endnotes.load("items");
+        await context.sync();
+        footnotes.items.forEach(function (note) { note.body.load("text"); });
+        endnotes.items.forEach(function (note) { note.body.load("text"); });
+        await context.sync();
+
+        let applied = 0;
+        let skipped = 0;
+        const sourceCollections = { footnote: footnotes.items, endnote: endnotes.items };
+
+        const sourceOccurrenceCounters = new Map();
+
+        for (const item of footnoteSuggestions) {
+            const notes = sourceCollections[item?.source];
+            const noteIndex = Number(item?.noteNumber) - 1;
+            if (!notes || !Number.isInteger(noteIndex) || noteIndex < 0 || noteIndex >= notes.length ||
+                !Array.isArray(item.references) || !Array.isArray(item.suggestedTexts)) {
+                skipped++;
+                continue;
+            }
+
+            const note = notes[noteIndex];
+            const actualNoteText = String(note.body?.text || "");
+            if (normalizeReferenceApplicationText(actualNoteText) !== normalizeReferenceApplicationText(item.originalText || "")) {
+                skipped += Math.max(1, item.references.length);
+                continue;
+            }
+
+            const sourceTexts = Array.isArray(item.sourceTexts) ? item.sourceTexts : [];
+            const pairCount = Math.min(item.references.length, item.suggestedTexts.length, sourceTexts.length);
+            if (!pairCount) {
+                skipped++;
+                continue;
+            }
+
+            for (let index = 0; index < pairCount; index++) {
+                const reference = item.references[index];
+                const sourceText = String(sourceTexts[index] || "").trim();
+                const suggestedText = String(item.suggestedTexts[index] || "").trim();
+                const replacementText = stripReferenceApplicationLocation(suggestedText);
+                if (!sourceText || !replacementText) {
+                    skipped++;
+                    continue;
+                }
+
+                const identitySource = stripReferenceApplicationLocation(sourceText);
+                const candidates = getReferenceApplicationIdentityCandidates(reference, identitySource);
+                if (!candidates.length) {
+                    skipped++;
+                    continue;
+                }
+
+                const sourceKey = String(item.source) + "|" + String(item.noteNumber) + "|" + normalizeReferenceApplicationText(sourceText);
+                const sourceOccurrenceIndex = sourceOccurrenceCounters.get(sourceKey) || 0;
+                sourceOccurrenceCounters.set(sourceKey, sourceOccurrenceIndex + 1);
+                const anchorRange = await getUniqueWordSearchRange(context, note.body, sourceText, sourceOccurrenceIndex);
+                let identityRange = null;
+                if (anchorRange) {
+                    for (const candidate of candidates) {
+                        identityRange = await getUniqueWordSearchRange(context, anchorRange, candidate);
+                        if (identityRange) break;
+                    }
+                } else {
+                    const fallback = candidates.find(function (candidate) {
+                        return normalizeReferenceApplicationText(candidate).length >= 8;
+                    });
+                    if (fallback) identityRange = await getUniqueWordSearchRange(context, note.body, fallback);
+                }
+
+                if (!identityRange) {
+                    skipped++;
+                    continue;
+                }
+                identityRange.insertText(replacementText, Word.InsertLocation.replace);
+                await context.sync();
+                applied++;
+
+                if (
+                    normalizeReferenceApplicationText(sourceText) !==
+                    normalizeReferenceApplicationText(replacementText)
+                ) {
+                    sourceOccurrenceCounters.set(sourceKey, sourceOccurrenceIndex);
+                }
+            }
+        }
+        return { applied: applied, skipped: skipped };
+    });
+}
+
+async function applyFootnoteSuggestionsLegacy(
     footnoteSuggestions
 ) {
 
