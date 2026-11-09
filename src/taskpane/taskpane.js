@@ -45750,7 +45750,7 @@ if (referencesContent) {
                                             const mainTextSuggestions =
                                                 await buildMainTextSuggestions(
                                                     finalReferenceResults,
-                                                    document.getElementById("add-missing-authors")?.checked === true
+                                                    (referenceAddMissingAuthors ? referenceAddMissingAuthors.checked : false)
                                                 );
 
                                             const mainTextSuggestionHTML =
@@ -47433,7 +47433,7 @@ function getReferenceApplicationIdentityCandidates(reference, sourceText) {
             return normalizeReferenceApplicationText(item) === normalized;
         })) candidates.push(text);
     };
-    add(sourceText);
+    add(stripReferenceApplicationLocation(sourceText));
     if (author && title) {
         add(author + "، " + title);
         add(title + "، " + author);
@@ -47496,7 +47496,7 @@ async function buildMainTextSuggestions(unifiedReferences, addMissingAuthors = f
                 const normalizedCandidate = normalizeReferenceApplicationText(candidate);
                 return normalizedCandidate.length >= 4 &&
                     normalizeReferenceApplicationText(material.originalText).includes(normalizedCandidate);
-            }) || String(material.originalText || "");
+            }) || String(reference?.title || reference?.author || "");
 
             const author = String(reference?.author || "").trim();
             const authorExists = author && normalizeReferenceApplicationText(material.originalText).includes(
