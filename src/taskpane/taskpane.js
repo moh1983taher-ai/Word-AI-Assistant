@@ -48678,23 +48678,44 @@ async function applyFootnoteSuggestions(
                 query,
                 {
                     matchCase: false,
-                    matchWholeWord: false
+                    matchWholeWord: true
                 }
             ).load("items");
 
             await context.sync();
-
             matches.items.forEach(function (candidate) {
                 candidate.load("text");
             });
-
             await context.sync();
 
             const exactMatches = matches.items.filter(function (candidate) {
                 return normalizeLocal(candidate.text) === normalizeLocal(query);
             });
 
-            return exactMatches[occurrence] || null;
+            if (exactMatches[occurrence]) return exactMatches[occurrence];
+
+            const snapshotMatches = findAllIdentityMatches(originalText, query);
+            if (snapshotMatches.length !== 1 || occurrence !== 0) return null;
+
+            const relaxed = noteRange.search(
+                query,
+                {
+                    matchCase: false,
+                    matchWholeWord: false
+                }
+            ).load("items");
+
+            await context.sync();
+            relaxed.items.forEach(function (candidate) {
+                candidate.load("text");
+            });
+            await context.sync();
+
+            const relaxedExact = relaxed.items.filter(function (candidate) {
+                return normalizeLocal(candidate.text) === normalizeLocal(query);
+            });
+
+            return relaxedExact.length === 1 ? relaxedExact[0] : null;
         }
 
         let resolvedRange = null;
@@ -48707,30 +48728,7 @@ async function applyFootnoteSuggestions(
 
             resolvedRange = await resolveOccurrence(expectedText, occurrence);
         } else {
-            // Word Search لا يقبل عبارة طويلة؛ نثبت طرفيها ثم نوسّع النطاق بينهما.
-            const chunkLength = 180;
-            const prefix = expectedText.slice(0, chunkLength);
-            const suffix = expectedText.slice(-chunkLength);
-            const prefixOccurrence = findAllIdentityMatches(
-                originalText.slice(0, rawStart),
-                prefix
-            ).length;
-            const suffixOccurrence = findAllIdentityMatches(
-                originalText.slice(0, rawEnd - chunkLength),
-                suffix
-            ).length;
-
-            const prefixRange = await resolveOccurrence(prefix, prefixOccurrence);
-            const suffixRange = await resolveOccurrence(suffix, suffixOccurrence);
-
-            if (prefixRange && suffixRange) {
-                resolvedRange = prefixRange.expandTo(suffixRange).load("text");
-                await context.sync();
-
-                if (normalizeLocal(resolvedRange.text) !== normalizeLocal(expectedText)) {
-                    return null;
-                }
-            }
+            return null;
         }
 
         if (!resolvedRange) return null;
