@@ -45747,6 +45747,20 @@ if (referencesContent) {
                                                 footnoteSuggestions
                                             );
 
+                                            const mainTextSuggestions =
+                                                await buildMainTextSuggestions(
+                                                    finalReferenceResults,
+                                                    document.getElementById("add-missing-authors")?.checked === true
+                                                );
+
+                                            const mainTextSuggestionHTML =
+                                                mainTextSuggestions.map(function (item) {
+                                                    return "<div class='footnote-suggestion-item'><div class='footnote-suggestion-content'><div class='footnote-suggestion-original'>" +
+                                                        escapeReferenceHTML(item.anchorText) +
+                                                        "</div><div class='footnote-suggestion-references'><div class='footnote-suggestion-reference'><div class='footnote-suggestion-arrow'>←</div><div class='footnote-suggestion-new'>" +
+                                                        escapeReferenceHTML(item.suggestedText) +
+                                                        "</div></div></div></div></div>";
+                                                }).join("");
                                             const footnoteSuggestionHTML =
                                                 footnoteSuggestions
                                                     .map(function (item) {
@@ -45870,6 +45884,14 @@ if (referencesContent) {
 
                                                         </div>
 
+                                                        <div class="footnote-suggestions-title reference-collapsible-header">
+                                                            <span>توثيق المتن المقترح <strong>${mainTextSuggestions.length}</strong></span>
+                                                        </div>
+                                                        <div class="footnote-suggestions-list">
+                                                            ${mainTextSuggestionHTML}
+                                                        </div>
+                                                        ${mainTextSuggestions.length > 0 ? "<button type='button' id='apply-main-text-suggestions-btn' class='apply-footnote-suggestions-btn'>تطبيق التوثيق على المتن</button>" : ""}
+
                                                         ${
                                                             footnoteSuggestions.some(
                                                                 function (item) {
@@ -45894,6 +45916,25 @@ if (referencesContent) {
                                             }
 
 
+                                            const applyMainTextSuggestionsBtn =
+                                                document.getElementById("apply-main-text-suggestions-btn");
+
+                                            if (applyMainTextSuggestionsBtn) {
+                                                applyMainTextSuggestionsBtn.onclick = async function () {
+                                                    applyMainTextSuggestionsBtn.disabled = true;
+                                                    applyMainTextSuggestionsBtn.textContent = "جارٍ تطبيق التوثيق على المتن...";
+                                                    try {
+                                                        const result = await applyMainTextSuggestions(mainTextSuggestions);
+                                                        applyMainTextSuggestionsBtn.textContent = result.skipped > 0
+                                                            ? "✓ طُبّق التوثيق على " + result.applied + "، وتعذّر تطبيق " + result.skipped
+                                                            : "✓ تم تطبيق التوثيق على المتن (" + result.applied + ")";
+                                                    } catch (error) {
+                                                        console.error("فشل تطبيق التوثيق على المتن:", error);
+                                                        applyMainTextSuggestionsBtn.disabled = false;
+                                                        applyMainTextSuggestionsBtn.textContent = "تطبيق التوثيق على المتن";
+                                                    }
+                                                };
+                                            }
                                             const applyFootnoteSuggestionsBtn =
                                                 document.getElementById(
                                                     "apply-footnote-suggestions-btn"
