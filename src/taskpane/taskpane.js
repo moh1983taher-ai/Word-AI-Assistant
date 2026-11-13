@@ -46558,11 +46558,7 @@ function formatFootnoteReference(
         return "";
     }
 
-    const title =
-        window.FootnoteCitationEngine.normalizeBibliographicTitle(
-            reference?.title || "",
-            reference?.author || ""
-        );
+    let title = String(reference?.title || "").trim();
 
     const author =
         String(
@@ -46648,6 +46644,14 @@ function formatFootnoteReference(
         locationText =
             `ص ${page}`;
     }
+
+    // Remove a location suffix from title only when its value is
+    // already available separately and will be appended to the formatted citation.
+    title = window.FootnoteCitationEngine.normalizeBibliographicTitle(
+        title,
+        author,
+        Boolean(locationText)
+    );
 
     /*
      * منع تكرار موضع الاستشهاد إذا كان الذكاء الاصطناعي
