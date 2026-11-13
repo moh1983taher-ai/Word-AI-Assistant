@@ -87,20 +87,25 @@ assert.equal(oneCitationPairs.length, 1,
     "multiple page locations attached to one citation must not become duplicate identity replacements");
 
 assert.equal(
-    engine.normalizeBibliographicTitle("السيوطي، الأشباه والنظائر والنظائر، ط1، ص98", "السيوطي"),
+    engine.normalizeBibliographicTitle("السيوطي، الأشباه والنظائر والنظائر، ط1، ص98", "السيوطي", "ص98"),
     "الأشباه والنظائر، ط1",
     "the formatter must remove a duplicated author prefix and adjacent repeated title word while preserving edition data"
 );
 
 assert.equal(
-    engine.normalizeBibliographicTitle("الأشباه والنظائر، السيوطي، ط1، ص98", "السيوطي"),
+    engine.normalizeBibliographicTitle("الأشباه والنظائر، السيوطي، ط1، ص98", "السيوطي", "ص98"),
     "الأشباه والنظائر، ط1",
     "the author must be removed from a separate bibliographic segment even when it appears between title and edition"
 );
 assert.equal(
-    engine.normalizeBibliographicTitle("السيوطي، الأشباه والنظائر، ص98", "السيوطي", false),
+    engine.normalizeBibliographicTitle("السيوطي، الأشباه والنظائر، ص98", "السيوطي"),
     "الأشباه والنظائر، ص98",
     "a page suffix must remain when no separate location value is available to re-append"
+);
+assert.equal(
+    engine.normalizeBibliographicTitle("السيوطي، الأشباه والنظائر، ص98", "السيوطي", "ص97"),
+    "الأشباه والنظائر، ص98",
+    "a page suffix must not be removed when it disagrees with the separately recovered page"
 );
 
 assert.equal(
