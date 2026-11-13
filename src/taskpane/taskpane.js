@@ -46558,10 +46558,11 @@ function formatFootnoteReference(
         return "";
     }
 
-    let title =
-        String(
-            reference?.title || ""
-        ).trim();
+    const title =
+        window.FootnoteCitationEngine.normalizeBibliographicTitle(
+            reference?.title || "",
+            reference?.author || ""
+        );
 
     const author =
         String(
@@ -46806,13 +46807,8 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
             }
 
             const bucket = map.get(materialId);
-            const identityKey = window.FootnoteCitationEngine.referenceKey(reference);
-            if (identityKey && bucket.some(function (item) {
-                return window.FootnoteCitationEngine.referenceKey(item.reference) === identityKey;
-            })) {
-                return;
-            }
-
+            // Do not collapse by author/title: one note may cite the same work
+            // more than once. The application engine resolves each source occurrence.
             bucket.push({
 
                 reference:
@@ -47703,69 +47699,10 @@ function mergeEquivalentReferences(references) {
                     occurrence
                 ) {
 
-                    const exists =
-                        existing.occurrences.some(
-                            function (
-                                old
-                            ) {
-
-                                return (
-                                    String(
-                                        old.materialId ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.materialId ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.source ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.source ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.noteNumber ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.noteNumber ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.volume ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.volume ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.page ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.page ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.pageRange ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.pageRange ?? ""
-                                    )
-                                );
-
-                            }
-                        );
-
-
-                    if (
-                        !exists
-                    ) {
-
-                        existing.occurrences.push(
-                            occurrence
-                        );
-
-                    }
+                    // Preserve occurrence multiplicity. Equal bibliographic
+                    // identity and equal page metadata do not prove that two
+                    // citations in the same note are the same textual appearance.
+                    existing.occurrences.push(occurrence);
 
                 }
             );
