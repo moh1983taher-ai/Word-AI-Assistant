@@ -91,8 +91,29 @@
         return Number.isInteger(noteNumber) && noteNumber > 0 ? noteNumber - 1 : -1;
     }
 
-    function normalizeBibliographicTitle(value, author, stripLocationSuffix = true) {
-        let title = stripLocationSuffix ? getIdentityText(value) : String(value ?? "").trim();
+    function normalizeBibliographicTitle(value, author, locationText = "") {
+        let title = String(value ?? "").trim();
+        const location = String(locationText ?? "").trim();
+        if (title && location) {
+            const suffixCandidates = [location];
+            if (/^ص/u.test(location)) {
+                const pageValue = location.replace(/^ص\s*/u, "").trim();
+                if (pageValue) {
+                    suffixCandidates.push("ص" + pageValue);
+                    suffixCandidates.push("صفحة " + pageValue);
+                }
+            }
+            for (const suffix of new Set(suffixCandidates)) {
+                const position = title.lastIndexOf(suffix);
+                if (position < 0) continue;
+                const tail = title.slice(position + suffix.length);
+                const hasBoundary = position === 0 || /[\s،,؛:]/u.test(title[position - 1]);
+                if (tail.trim() === "" && hasBoundary) {
+                    title = title.slice(0, position).replace(/[،,؛:\s]+$/u, "").trim();
+                    break;
+                }
+            }
+        }
         const authorKey = normalizeIdentityText(author);
         if (!title) return "";
 
@@ -215,7 +236,7 @@
         if (!text.trim() || !reference || typeof reference !== "object") return "";
 
         const author = String(reference.author ?? "").trim();
-        const title = normalizeBibliographicTitle(reference.title ?? "", author);
+        const title = normalizeBibliographicTitle(getIdentityText(reference.title ?? ""), author);
         if (!title) return "";
 
         const candidates = [];
