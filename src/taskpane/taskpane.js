@@ -47448,8 +47448,8 @@ function mergeEquivalentReferences(references) {
                 );
 
             const title =
-                clean(
-                    reference.title
+                window.FootnoteCitationEngine.getIdentityText(
+                    clean(reference.title)
                 );
 
             const currentTitleKey =
@@ -47525,6 +47525,9 @@ function mergeEquivalentReferences(references) {
                 merged.push({
 
                     ...reference,
+
+                    // Page/volume suffixes belong to occurrence metadata, never to the work title.
+                    title: title,
 
                     locations:
                         Array.isArray(
