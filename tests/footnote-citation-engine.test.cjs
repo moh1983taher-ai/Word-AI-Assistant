@@ -17,6 +17,13 @@ assert.equal(engine.uniqueReferenceEntries(distinctWork).length, 2,
     "a distinct title by the same author must remain a separate reference");
 
 assert.equal(
+    engine.referenceKey({ author: "سيبويه", title: "الكتاب، 1/3" }),
+    engine.referenceKey({ author: "سيبويه", title: "الكتاب، 2/4" }),
+    "page suffixes embedded in model title fields must not create separate book identities"
+);
+
+
+assert.equal(
     engine.getIdentityText("الكتاب، سيبويه، 1/3، 2/4"),
     "الكتاب، سيبويه",
     "multiple volume/page pairs must be excluded from the replaceable identity"
