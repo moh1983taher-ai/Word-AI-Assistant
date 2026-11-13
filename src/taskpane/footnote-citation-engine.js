@@ -174,8 +174,8 @@
             const body = context.document.body;
             const footnotes = body.footnotes;
             const endnotes = body.endnotes;
-            footnotes.load("items");
-            endnotes.load("items");
+            footnotes.load("items/body");
+            endnotes.load("items/body");
             await context.sync();
 
             const noteEntries = [];
@@ -240,80 +240,98 @@
                 summaries.unchanged += pairs.unchangedCount || 0;
 
                 for (const pair of pairs) {
-                    const fullSearch = entry.range.search(pair.sourceText, options).load("items");
-                    operations.push({ entry: entry, pair: pair, fullSearch: fullSearch });
+                    operations.push({ entry: entry, pair: pair });
                 }
             }
 
             if (!operations.length) return;
-            await context.sync();
 
-            const fullCandidates = [];
-            for (const operation of operations) {
-                for (const match of operation.fullSearch.items) {
-                    match.load("text");
-                    fullCandidates.push(match);
-                }
-            }
-            if (fullCandidates.length) await context.sync();
-
-            const identitySearches = [];
-            for (const operation of operations) {
-                const expectedFull = normalizeIdentityText(operation.pair.sourceText);
-                const matches = operation.fullSearch.items.filter(match =>
-                    normalizeIdentityText(match.text) === expectedFull
-                );
-                if (matches.length !== 1) {
-                    summaries.skipped++;
-                    continue;
-                }
-
-                const identitySearch = matches[0].search(
-                    operation.pair.identityText,
-                    options
-                ).load("items");
-
-                identitySearches.push({
-                    entry: operation.entry,
-                    pair: operation.pair,
-                    identitySearch: identitySearch
-                });
-            }
-
-            if (identitySearches.length) await context.sync();
-
-            const identityCandidates = [];
-            for (const operation of identitySearches) {
-                for (const match of operation.identitySearch.items) {
-                    match.load("text");
-                    identityCandidates.push(match);
-                }
-            }
-            if (identityCandidates.length) await context.sync();
-
+            // Bound the number of queued Word searches. Each batch is fully
+            // resolved before the next one, while all mutations remain deferred.
+            const SEARCH_BATCH_SIZE = 60;
             const resolved = [];
-            for (const operation of identitySearches) {
-                const expectedIdentity = normalizeIdentityText(operation.pair.identityText);
-                const matches = operation.identitySearch.items.filter(match =>
-                    normalizeIdentityText(match.text) === expectedIdentity
-                );
-                if (matches.length !== 1) {
-                    summaries.skipped++;
-                    continue;
-                }
 
-                const range = matches[0];
-                if (String(range.text ?? "") !== operation.pair.expectedText) {
-                    summaries.skipped++;
-                    continue;
-                }
-
-                resolved.push({
-                    entry: operation.entry,
-                    pair: operation.pair,
-                    range: range,
-                    insertedRange: null
+            for (let offset = 0; offset < operations.length; offset += SEARCH_BATCH_SIZE) {
+                const batch = operations.slice(offset, offset + SEARCH_BATCH_SIZE);
+                const fullSearches = batch.map(function (operation) {
+                    return {
+                        entry: operation.entry,
+                        pair: operation.pair,
+                        fullSearch: operation.entry.range.search(
+                            operation.pair.sourceText,
+                            options
+                        ).load("items")
+                    };
                 });
+
+                await context.sync();
+
+                const fullCandidates = [];
+                for (const operation of fullSearches) {
+                    for (const match of operation.fullSearch.items) {
+                        match.load("text");
+                        fullCandidates.push(match);
+                    }
+                }
+                if (fullCandidates.length) await context.sync();
+
+                const identitySearches = [];
+                for (const operation of fullSearches) {
+                    const expectedFull = normalizeIdentityText(operation.pair.sourceText);
+                    const matches = operation.fullSearch.items.filter(match =>
+                        normalizeIdentityText(match.text) === expectedFull
+                    );
+                    if (matches.length !== 1) {
+                        summaries.skipped++;
+                        continue;
+                    }
+
+                    const identitySearch = matches[0].search(
+                        operation.pair.identityText,
+                        options
+                    ).load("items");
+
+                    identitySearches.push({
+                        entry: operation.entry,
+                        pair: operation.pair,
+                        identitySearch: identitySearch
+                    });
+                }
+
+                if (identitySearches.length) await context.sync();
+
+                const identityCandidates = [];
+                for (const operation of identitySearches) {
+                    for (const match of operation.identitySearch.items) {
+                        match.load("text");
+                        identityCandidates.push(match);
+                    }
+                }
+                if (identityCandidates.length) await context.sync();
+
+                for (const operation of identitySearches) {
+                    const expectedIdentity = normalizeIdentityText(operation.pair.identityText);
+                    const matches = operation.identitySearch.items.filter(match =>
+                        normalizeIdentityText(match.text) === expectedIdentity
+                    );
+                    if (matches.length !== 1) {
+                        summaries.skipped++;
+                        continue;
+                    }
+
+                    const range = matches[0];
+                    if (String(range.text ?? "") !== operation.pair.expectedText) {
+                        summaries.skipped++;
+                        continue;
+                    }
+
+                    resolved.push({
+                        entry: operation.entry,
+                        pair: operation.pair,
+                        range: range,
+                        insertedRange: null
+                    });
+                }
             }
 
             // Re-read every affected note immediately before queuing mutations.
