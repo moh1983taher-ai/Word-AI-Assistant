@@ -46653,57 +46653,8 @@ function formatFootnoteReference(
         locationText
     );
 
-    /*
-     * منع تكرار موضع الاستشهاد إذا كان الذكاء الاصطناعي
-     * قد أدخله خطأً داخل title.
-     *
-     * مثال:
-     * title = "دور الكلمة في اللغة 45"
-     * location = "45"
-     *
-     * تصبح:
-     * title = "دور الكلمة في اللغة"
-     */
-    if (
-        locationText &&
-        title
-    ) {
-
-        const rawLocation =
-            locationText
-                .replace(
-                    /^ص\s*/,
-                    ""
-                )
-                .trim();
-
-        if (rawLocation) {
-
-            const escapedLocation =
-                rawLocation.replace(
-                    /[.*+?^${}()|[\]\\]/g,
-                    "\\$&"
-                );
-
-            const duplicateLocationPattern =
-                new RegExp(
-                    `(?:\\s|،|\\(|\\[)*${escapedLocation}\\s*$`
-                );
-
-            title =
-                title
-                    .replace(
-                        duplicateLocationPattern,
-                        ""
-                    )
-                    .trim()
-                    .replace(
-                        /[،,؛:\s]+$/,
-                        ""
-                    )
-                    .trim();
-        }
-    }
+    // Location cleanup is handled above using exact, separately recovered values.
+    // Unlabeled trailing numbers are intentionally preserved to avoid deleting title text.
 
     let base = "";
 
