@@ -46558,10 +46558,7 @@ function formatFootnoteReference(
         return "";
     }
 
-    let title =
-        String(
-            reference?.title || ""
-        ).trim();
+    let title = String(reference?.title || "").trim();
 
     const author =
         String(
@@ -46648,57 +46645,16 @@ function formatFootnoteReference(
             `ص ${page}`;
     }
 
-    /*
-     * منع تكرار موضع الاستشهاد إذا كان الذكاء الاصطناعي
-     * قد أدخله خطأً داخل title.
-     *
-     * مثال:
-     * title = "دور الكلمة في اللغة 45"
-     * location = "45"
-     *
-     * تصبح:
-     * title = "دور الكلمة في اللغة"
-     */
-    if (
-        locationText &&
-        title
-    ) {
+    // Remove a location suffix from title only when its value is
+    // already available separately and will be appended to the formatted citation.
+    title = window.FootnoteCitationEngine.normalizeBibliographicTitle(
+        title,
+        author,
+        locationText
+    );
 
-        const rawLocation =
-            locationText
-                .replace(
-                    /^ص\s*/,
-                    ""
-                )
-                .trim();
-
-        if (rawLocation) {
-
-            const escapedLocation =
-                rawLocation.replace(
-                    /[.*+?^${}()|[\]\\]/g,
-                    "\\$&"
-                );
-
-            const duplicateLocationPattern =
-                new RegExp(
-                    `(?:\\s|،|\\(|\\[)*${escapedLocation}\\s*$`
-                );
-
-            title =
-                title
-                    .replace(
-                        duplicateLocationPattern,
-                        ""
-                    )
-                    .trim()
-                    .replace(
-                        /[،,؛:\s]+$/,
-                        ""
-                    )
-                    .trim();
-        }
-    }
+    // Location cleanup is handled above using exact, separately recovered values.
+    // Unlabeled trailing numbers are intentionally preserved to avoid deleting title text.
 
     let base = "";
 
@@ -46806,13 +46762,8 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
             }
 
             const bucket = map.get(materialId);
-            const identityKey = window.FootnoteCitationEngine.referenceKey(reference);
-            if (identityKey && bucket.some(function (item) {
-                return window.FootnoteCitationEngine.referenceKey(item.reference) === identityKey;
-            })) {
-                return;
-            }
-
+            // Do not collapse by author/title: one note may cite the same work
+            // more than once. The application engine resolves each source occurrence.
             bucket.push({
 
                 reference:
@@ -47209,11 +47160,17 @@ async function buildFootnoteSuggestions(
                                     item
                                 ) {
 
-                                    return findSourceText(
+                                    const knownVariant = findSourceText(
                                         originalText,
                                         item.reference,
                                         item.occurrence
                                     );
+
+                                    return knownVariant ||
+                                        window.FootnoteCitationEngine.findUniqueBibliographicAnchor(
+                                            originalText,
+                                            item.reference
+                                        );
 
                                 }
                             );
@@ -47221,7 +47178,8 @@ async function buildFootnoteSuggestions(
                         const suggestedTexts =
                             matches.map(
                                 function (
-                                    item
+                                    item,
+                                    index
                                 ) {
 
                                     const reference =
@@ -47237,7 +47195,7 @@ async function buildFootnoteSuggestions(
                                      */
                                     const authorExists =
                                         authorExistsInSource(
-                                            originalText,
+                                            sourceTexts[index],
                                             reference
                                         );
 
@@ -47703,69 +47661,10 @@ function mergeEquivalentReferences(references) {
                     occurrence
                 ) {
 
-                    const exists =
-                        existing.occurrences.some(
-                            function (
-                                old
-                            ) {
-
-                                return (
-                                    String(
-                                        old.materialId ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.materialId ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.source ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.source ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.noteNumber ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.noteNumber ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.volume ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.volume ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.page ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.page ?? ""
-                                    ) &&
-
-                                    String(
-                                        old.pageRange ?? ""
-                                    ) ===
-                                    String(
-                                        occurrence.pageRange ?? ""
-                                    )
-                                );
-
-                            }
-                        );
-
-
-                    if (
-                        !exists
-                    ) {
-
-                        existing.occurrences.push(
-                            occurrence
-                        );
-
-                    }
+                    // Preserve occurrence multiplicity. Equal bibliographic
+                    // identity and equal page metadata do not prove that two
+                    // citations in the same note are the same textual appearance.
+                    existing.occurrences.push(occurrence);
 
                 }
             );

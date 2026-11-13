@@ -91,6 +91,73 @@
         return Number.isInteger(noteNumber) && noteNumber > 0 ? noteNumber - 1 : -1;
     }
 
+    function normalizeBibliographicTitle(value, author, locationText = "") {
+        let title = String(value ?? "").trim();
+        const location = String(locationText ?? "").trim();
+        if (title && location) {
+            const suffixCandidates = [location];
+            if (/^ص/u.test(location)) {
+                const pageValue = location.replace(/^ص\s*/u, "").trim();
+                if (pageValue) {
+                    suffixCandidates.push("ص" + pageValue);
+                    suffixCandidates.push("صفحة " + pageValue);
+                }
+            }
+            for (const suffix of new Set(suffixCandidates)) {
+                const position = title.lastIndexOf(suffix);
+                if (position < 0) continue;
+                const tail = title.slice(position + suffix.length);
+                const hasBoundary = position === 0 || /[\s،,؛:]/u.test(title[position - 1]);
+                if (tail.trim() === "" && hasBoundary) {
+                    title = title.slice(0, position).replace(/[،,؛:\s]+$/u, "").trim();
+                    break;
+                }
+            }
+        }
+        const authorKey = normalizeIdentityText(author);
+        if (!title) return "";
+
+        if (authorKey) {
+            const parts = title.split(/[،,؛;]+/u).map(part => part.trim()).filter(Boolean);
+            const authorFiltered = parts.filter(part => normalizeIdentityText(part) !== authorKey);
+            if (authorFiltered.length && authorFiltered.length !== parts.length) {
+                title = authorFiltered.join("، ");
+            }
+        }
+
+        const tokens = title.split(/\s+/u).filter(Boolean);
+        const cleaned = [];
+
+        function tokenInfo(token) {
+            const raw = String(token || "");
+            const core = raw.replace(/^[،,؛:()[\]{}"'\u0060]+/u, "").replace(/[،,؛:()[\]{}"'\u0060]+$/u, "");
+            const hasWaw = /^و(?=.{2,})/u.test(core);
+            return {
+                key: normalizeIdentityText(hasWaw ? core.slice(1) : core),
+                hasWaw: hasWaw,
+                suffix: (raw.match(/[،,؛:.)\]}]+$/u) || [""])[0]
+            };
+        }
+
+        for (const token of tokens) {
+            const current = tokenInfo(token);
+            const previous = cleaned.length ? tokenInfo(cleaned[cleaned.length - 1]) : null;
+            const duplicate = previous && current.key &&
+                current.key === previous.key &&
+                (current.hasWaw || previous.hasWaw);
+
+            if (duplicate) {
+                if (current.suffix && !/[،,؛:.)\]}]+$/u.test(cleaned[cleaned.length - 1])) {
+                    cleaned[cleaned.length - 1] += current.suffix;
+                }
+                continue;
+            }
+            cleaned.push(token);
+        }
+
+        return cleaned.join(" ").replace(/\s+([،,؛:.)])/gu, "$1").trim();
+    }
+
     function buildPairs(noteText, suggestion) {
         const references = Array.isArray(suggestion && suggestion.references) ? suggestion.references : [];
         const suggestedTexts = Array.isArray(suggestion && suggestion.suggestedTexts) ? suggestion.suggestedTexts : [];
@@ -99,7 +166,10 @@
         const pairs = [];
         pairs.collapsedCount = 0;
         pairs.unchangedCount = 0;
-        const seen = new Set();
+
+        // The same work can legitimately occur more than once in a single note.
+        // Preserve each occurrence using the ordinal of its complete source anchor.
+        const sourceOccurrenceCounts = new Map();
 
         for (let index = 0; index < count; index++) {
             const reference = references[index];
@@ -108,31 +178,28 @@
             const identityText = getIdentityText(sourceText);
             if (!sourceText || !identityText || !replacementText) continue;
 
-            const key = referenceKey(reference) || normalizeIdentityText(identityText);
-            if (!key) continue;
-            if (seen.has(key)) {
-                pairs.collapsedCount++;
-                continue;
-            }
+            const sourceKey = normalizeIdentityText(sourceText);
+            if (!sourceKey) continue;
 
-            if (identityText === sourceText && hasUnparsedLocationSuffix(sourceText)) continue;
+            const sourceOccurrenceIndex = sourceOccurrenceCounts.get(sourceKey) || 0;
             const sourceMatches = findExactOccurrences(noteText, sourceText);
-            if (sourceMatches.length !== 1) continue;
+            if (sourceMatches.length <= sourceOccurrenceIndex) continue;
+
+            const sourceStart = sourceMatches[sourceOccurrenceIndex];
+            sourceOccurrenceCounts.set(sourceKey, sourceOccurrenceIndex + 1);
 
             const identityOffset = sourceText.indexOf(identityText);
             if (identityOffset < 0) continue;
 
-            const start = sourceMatches[0] + identityOffset;
+            const start = sourceStart + identityOffset;
             const end = start + identityText.length;
             if (noteText.slice(start, end) !== identityText) continue;
 
             if (normalizeIdentityText(identityText) === normalizeIdentityText(replacementText)) {
-                seen.add(key);
                 pairs.unchangedCount++;
                 continue;
             }
 
-            seen.add(key);
             pairs.push({
                 sourceText: sourceText,
                 identityText: identityText,
@@ -140,7 +207,8 @@
                 start: start,
                 end: end,
                 expectedText: identityText,
-                referenceKey: key
+                sourceOccurrenceIndex: sourceOccurrenceIndex,
+                referenceKey: referenceKey(reference) || sourceKey
             });
         }
 
@@ -151,7 +219,76 @@
             if (previous && pair.start < previous.end) continue;
             nonOverlapping.push(pair);
         }
+        nonOverlapping.collapsedCount = pairs.collapsedCount;
+        nonOverlapping.unchangedCount = pairs.unchangedCount;
         return nonOverlapping;
+    }
+
+    function selectOccurrence(matches, occurrenceIndex) {
+        if (!Array.isArray(matches) || !Number.isInteger(occurrenceIndex) || occurrenceIndex < 0) {
+            return null;
+        }
+        return matches[occurrenceIndex] || null;
+    }
+
+    function findUniqueBibliographicAnchor(noteText, reference) {
+        const text = String(noteText ?? "");
+        if (!text.trim() || !reference || typeof reference !== "object") return "";
+
+        const author = String(reference.author ?? "").trim();
+        const title = normalizeBibliographicTitle(getIdentityText(reference.title ?? ""), author);
+        if (!title) return "";
+
+        const candidates = [];
+        const addCandidate = value => {
+            const candidate = String(value ?? "").trim();
+            const key = normalizeIdentityText(candidate);
+            if (key.length < 8 || candidates.some(item => normalizeIdentityText(item) === key)) return;
+            candidates.push(candidate);
+        };
+
+        if (author) {
+            addCandidate(author + "، " + title);
+            addCandidate(title + "، " + author);
+            addCandidate(author + " " + title);
+            addCandidate(title + " " + author);
+        }
+        addCandidate(title);
+
+        let normalized = "";
+        const rawMap = [];
+        for (let index = 0; index < text.length; index++) {
+            const part = normalizeIdentityText(text[index]);
+            normalized += part;
+            for (let offset = 0; offset < part.length; offset++) rawMap.push(index);
+        }
+
+        candidates.sort((a, b) => normalizeIdentityText(b).length - normalizeIdentityText(a).length);
+
+        for (const candidate of candidates) {
+            const target = normalizeIdentityText(candidate);
+            const positions = [];
+            let from = 0;
+            while (from <= normalized.length - target.length) {
+                const position = normalized.indexOf(target, from);
+                if (position < 0) break;
+                positions.push(position);
+                from = position + Math.max(1, target.length);
+            }
+
+            // A fallback is safe only when the bibliographic identity occurs once.
+            // Repeated occurrences must be anchored by an explicit source variant.
+            if (positions.length !== 1) continue;
+
+            const position = positions[0];
+            const rawStart = rawMap[position];
+            const rawEnd = rawMap[position + target.length - 1] + 1;
+            if (Number.isInteger(rawStart) && Number.isInteger(rawEnd) && rawEnd > rawStart) {
+                return text.slice(rawStart, rawEnd);
+            }
+        }
+
+        return "";
     }
 
     function searchOptions() {
@@ -281,12 +418,13 @@
                     const matches = operation.fullSearch.items.filter(match =>
                         normalizeIdentityText(match.text) === expectedFull
                     );
-                    if (matches.length !== 1) {
+                    const fullMatch = selectOccurrence(matches, operation.pair.sourceOccurrenceIndex);
+                    if (!fullMatch) {
                         summaries.skipped++;
                         continue;
                     }
 
-                    const identitySearch = matches[0].search(
+                    const identitySearch = fullMatch.search(
                         operation.pair.identityText,
                         options
                     ).load("items");
@@ -387,7 +525,10 @@
         hasUnparsedLocationSuffix: hasUnparsedLocationSuffix,
         normalizeIdentityText: normalizeIdentityText,
         referenceKey: referenceKey,
-        uniqueReferenceEntries: uniqueReferenceEntries
+        uniqueReferenceEntries: uniqueReferenceEntries,
+        normalizeBibliographicTitle: normalizeBibliographicTitle,
+        findUniqueBibliographicAnchor: findUniqueBibliographicAnchor,
+        selectOccurrence: selectOccurrence
     };
 
     if (typeof module !== "undefined" && module.exports) {
