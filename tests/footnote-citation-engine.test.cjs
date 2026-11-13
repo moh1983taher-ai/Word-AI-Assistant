@@ -92,6 +92,12 @@ assert.equal(
     "the formatter must remove a duplicated author prefix and adjacent repeated title word while preserving edition data"
 );
 
+assert.equal(
+    engine.normalizeBibliographicTitle("الأشباه والنظائر، السيوطي، ط1، ص98", "السيوطي"),
+    "الأشباه والنظائر، ط1",
+    "the author must be removed from a separate bibliographic segment even when it appears between title and edition"
+);
+
 const occurrenceMatches = [{ id: 1 }, { id: 2 }];
 assert.equal(engine.selectOccurrence(occurrenceMatches, 1).id, 2,
     "Word search results must be selected by the validated occurrence ordinal");
