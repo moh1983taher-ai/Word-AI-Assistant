@@ -210,6 +210,66 @@
         return matches[occurrenceIndex] || null;
     }
 
+    function findUniqueBibliographicAnchor(noteText, reference) {
+        const text = String(noteText ?? "");
+        if (!text.trim() || !reference || typeof reference !== "object") return "";
+
+        const author = String(reference.author ?? "").trim();
+        const title = normalizeBibliographicTitle(reference.title ?? "", author);
+        if (!title) return "";
+
+        const candidates = [];
+        const addCandidate = value => {
+            const candidate = String(value ?? "").trim();
+            const key = normalizeIdentityText(candidate);
+            if (key.length < 8 || candidates.some(item => normalizeIdentityText(item) === key)) return;
+            candidates.push(candidate);
+        };
+
+        if (author) {
+            addCandidate(author + "، " + title);
+            addCandidate(title + "، " + author);
+            addCandidate(author + " " + title);
+            addCandidate(title + " " + author);
+        }
+        addCandidate(title);
+
+        let normalized = "";
+        const rawMap = [];
+        for (let index = 0; index < text.length; index++) {
+            const part = normalizeIdentityText(text[index]);
+            normalized += part;
+            for (let offset = 0; offset < part.length; offset++) rawMap.push(index);
+        }
+
+        candidates.sort((a, b) => normalizeIdentityText(b).length - normalizeIdentityText(a).length);
+
+        for (const candidate of candidates) {
+            const target = normalizeIdentityText(candidate);
+            const positions = [];
+            let from = 0;
+            while (from <= normalized.length - target.length) {
+                const position = normalized.indexOf(target, from);
+                if (position < 0) break;
+                positions.push(position);
+                from = position + Math.max(1, target.length);
+            }
+
+            // A fallback is safe only when the bibliographic identity occurs once.
+            // Repeated occurrences must be anchored by an explicit source variant.
+            if (positions.length !== 1) continue;
+
+            const position = positions[0];
+            const rawStart = rawMap[position];
+            const rawEnd = rawMap[position + target.length - 1] + 1;
+            if (Number.isInteger(rawStart) && Number.isInteger(rawEnd) && rawEnd > rawStart) {
+                return text.slice(rawStart, rawEnd);
+            }
+        }
+
+        return "";
+    }
+
     function searchOptions() {
         return {
             matchCase: false,
@@ -446,6 +506,7 @@
         referenceKey: referenceKey,
         uniqueReferenceEntries: uniqueReferenceEntries,
         normalizeBibliographicTitle: normalizeBibliographicTitle,
+        findUniqueBibliographicAnchor: findUniqueBibliographicAnchor,
         selectOccurrence: selectOccurrence
     };
 
