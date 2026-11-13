@@ -46650,7 +46650,7 @@ function formatFootnoteReference(
     title = window.FootnoteCitationEngine.normalizeBibliographicTitle(
         title,
         author,
-        Boolean(locationText)
+        locationText
     );
 
     /*
