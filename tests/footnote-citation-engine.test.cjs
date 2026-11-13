@@ -97,6 +97,11 @@ assert.equal(
     "الأشباه والنظائر، ط1",
     "the author must be removed from a separate bibliographic segment even when it appears between title and edition"
 );
+assert.equal(
+    engine.normalizeBibliographicTitle("السيوطي، الأشباه والنظائر، ص98", "السيوطي", false),
+    "الأشباه والنظائر، ص98",
+    "a page suffix must remain when no separate location value is available to re-append"
+);
 
 assert.equal(
     engine.findUniqueBibliographicAnchor(
