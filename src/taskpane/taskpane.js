@@ -47205,11 +47205,17 @@ async function buildFootnoteSuggestions(
                                     item
                                 ) {
 
-                                    return findSourceText(
+                                    const knownVariant = findSourceText(
                                         originalText,
                                         item.reference,
                                         item.occurrence
                                     );
+
+                                    return knownVariant ||
+                                        window.FootnoteCitationEngine.findUniqueBibliographicAnchor(
+                                            originalText,
+                                            item.reference
+                                        );
 
                                 }
                             );
@@ -47217,7 +47223,8 @@ async function buildFootnoteSuggestions(
                         const suggestedTexts =
                             matches.map(
                                 function (
-                                    item
+                                    item,
+                                    index
                                 ) {
 
                                     const reference =
@@ -47233,7 +47240,7 @@ async function buildFootnoteSuggestions(
                                      */
                                     const authorExists =
                                         authorExistsInSource(
-                                            originalText,
+                                            sourceTexts[index],
                                             reference
                                         );
 
