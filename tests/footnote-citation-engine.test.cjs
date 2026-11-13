@@ -98,6 +98,23 @@ assert.equal(
     "the author must be removed from a separate bibliographic segment even when it appears between title and edition"
 );
 
+assert.equal(
+    engine.findUniqueBibliographicAnchor(
+        "المرجع: السيوطي، الأشباه والنظائر، ص98.",
+        { author: "السيوطي", title: "الأشباه والنظائر" }
+    ),
+    "السيوطي، الأشباه والنظائر",
+    "a unique author/title anchor must be recovered when the model omitted citation variants"
+);
+assert.equal(
+    engine.findUniqueBibliographicAnchor(
+        "السيوطي، الأشباه والنظائر، ثم السيوطي، الأشباه والنظائر",
+        { author: "السيوطي", title: "الأشباه والنظائر" }
+    ),
+    "",
+    "the fallback must refuse ambiguous repeated identities rather than guess an occurrence"
+);
+
 const occurrenceMatches = [{ id: 1 }, { id: 2 }];
 assert.equal(engine.selectOccurrence(occurrenceMatches, 1).id, 2,
     "Word search results must be selected by the validated occurrence ordinal");
