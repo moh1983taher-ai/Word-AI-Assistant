@@ -47399,8 +47399,8 @@ function mergeEquivalentReferences(references) {
 
     function titleKey(title) {
 
-        return clean(
-            title
+        return window.FootnoteCitationEngine.getIdentityText(
+            clean(title)
         )
             .replace(
                 /^الـ/,
