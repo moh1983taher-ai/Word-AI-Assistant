@@ -28,7 +28,7 @@
     function referenceKey(reference) {
         if (!reference || typeof reference !== "object") return "";
         const author = normalizeIdentityText(reference.author);
-        const title = normalizeIdentityText(reference.title);
+        const title = normalizeIdentityText(getIdentityText(reference.title));
         if (!title) return "";
         return author + "::" + title;
     }
