@@ -63,4 +63,39 @@ assert.equal(
     "an unanchored source citation must be skipped rather than guessed"
 );
 
+
+const repeatedNote = "الكتاب، سيبويه، 1/3؛ ثم الكتاب، سيبويه، 1/3.";
+const repeatedPairs = engine.buildPairs(repeatedNote, {
+    references: [reference, reference],
+    sourceTexts: ["الكتاب، سيبويه، 1/3", "الكتاب، سيبويه، 1/3"],
+    suggestedTexts: ["سيبويه، الكتاب، 1/3", "سيبويه، الكتاب، 1/3"]
+});
+assert.equal(repeatedPairs.length, 2,
+    "the same work cited twice in one note must yield two independent anchored replacements");
+assert.deepEqual(repeatedPairs.map(pair => pair.sourceOccurrenceIndex), [0, 1],
+    "repeated source anchors must keep their stable occurrence ordinals");
+assert.equal(repeatedNote.slice(repeatedPairs[0].start, repeatedPairs[0].end), "الكتاب، سيبويه");
+assert.equal(repeatedNote.slice(repeatedPairs[1].start, repeatedPairs[1].end), "الكتاب، سيبويه");
+
+const oneCitationSeveralPages = "الكتاب، سيبويه، 1/3، 2/4";
+const oneCitationPairs = engine.buildPairs(oneCitationSeveralPages, {
+    references: [reference, reference],
+    sourceTexts: ["الكتاب، سيبويه، 1/3", "الكتاب، سيبويه، 2/4"],
+    suggestedTexts: ["سيبويه، الكتاب، 1/3", "سيبويه، الكتاب، 2/4"]
+});
+assert.equal(oneCitationPairs.length, 1,
+    "multiple page locations attached to one citation must not become duplicate identity replacements");
+
+assert.equal(
+    engine.normalizeBibliographicTitle("السيوطي، الأشباه والنظائر والنظائر، ط1، ص98", "السيوطي"),
+    "الأشباه والنظائر، ط1",
+    "the formatter must remove a duplicated author prefix and adjacent repeated title word while preserving edition data"
+);
+
+const occurrenceMatches = [{ id: 1 }, { id: 2 }];
+assert.equal(engine.selectOccurrence(occurrenceMatches, 1).id, 2,
+    "Word search results must be selected by the validated occurrence ordinal");
+assert.equal(engine.selectOccurrence(occurrenceMatches, 2), null,
+    "a missing occurrence ordinal must never fall back to the first match");
+
 console.log("Footnote citation engine tests passed.");
