@@ -3,11 +3,11 @@
 
     const DIGIT = "[0-9٠-٩۰-۹]";
     const NUMBER = DIGIT + "{1,6}(?:\\s*\\/\\s*" + DIGIT + "{1,6})?(?:\\s*[-–—]\\s*" + DIGIT + "{1,6})?";
-    const LOCATION_LABEL = "(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\\\s*)?";
-    const LOCATION_SEPARATOR = "(?:\\\\s*[،,؛;]\\\\s*|\\\\s+)";
+    const LOCATION_LABEL = "(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?";
+    const LOCATION_SEPARATOR = "(?:\\s*[،,؛;]\\s*|\\s+)";
     const LOCATION_SUFFIX = new RegExp(
         LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER +
-        "(?:" + LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER + ")*\\\\s*$",
+        "(?:" + LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER + ")*\\s*$",
         "u"
     );
 
@@ -15,14 +15,14 @@
         return String(value ?? "")
             .normalize("NFC")
             .toLowerCase()
-            .replace(/[\\u064B-\\u065F\\u0670\\u0640]/gu, "")
-            .replace(/[\\u200B-\\u200F\\u202A-\\u202E\\uFEFF]/gu, "")
+            .replace(/[\u064B-\u065F\u0670\u0640]/gu, "")
+            .replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/gu, "")
             .replace(/[أإآٱ]/gu, "ا")
             .replace(/ى/gu, "ي")
             .replace(/[ؤ]/gu, "و")
             .replace(/[ئ]/gu, "ي")
             .replace(/ة/gu, "ه")
-            .replace(/[\\s\\u00A0\\p{P}\\p{S}]+/gu, "");
+            .replace(/[\s\u00A0\p{P}\p{S}]+/gu, "");
     }
 
     function referenceKey(reference) {
@@ -52,14 +52,14 @@
         if (!match || match.index <= 0) return text;
         return text.slice(0, match.index)
             .trim()
-            .replace(/[،,؛;:\\s]+$/gu, "")
+            .replace(/[،,؛;:\s]+$/gu, "")
             .trim();
     }
 
     function hasUnparsedLocationSuffix(value) {
         const text = String(value ?? "").trim();
         if (!text) return false;
-        return /(?:^|[،,؛;\\s])(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*[0-9٠-٩۰-۹]/u.test(text) ||
+        return /(?:^|[،,؛;\s])(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*[0-9٠-٩۰-۹]/u.test(text) ||
             /(?:^|[،,؛;\\s])[0-9٠-٩۰-۹]{1,6}\\s*\\/\\s*[0-9٠-٩۰-۹]{1,6}(?:\\s*[،,؛;]\\s*[0-9٠-٩۰-۹]{1,6}\\s*\\/\\s*[0-9٠-٩۰-۹]{1,6})?\\s*$/u.test(text) ||
             /(?:^|[،,؛;\\s])[0-9٠-٩۰-۹]{1,6}\\s*[-–—]\\s*[0-9٠-٩۰-۹]{1,6}\\s*$/u.test(text);
     }
@@ -81,7 +81,7 @@
 
     function getNoteIndex(suggestion, source) {
         const materialId = String(suggestion && suggestion.materialId || "");
-        const pattern = source === "footnote" ? /^footnote-(\\d+)$/ : /^endnote-(\\d+)$/;
+        const pattern = source === "footnote" ? /^footnote-(\d+)$/ : /^endnote-(\d+)$/;
         const match = materialId.match(pattern);
         if (match) {
             const value = Number(match[1]);
@@ -97,6 +97,7 @@
         const sourceTexts = Array.isArray(suggestion && suggestion.sourceTexts) ? suggestion.sourceTexts : [];
         const count = Math.min(references.length, suggestedTexts.length, sourceTexts.length);
         const pairs = [];
+        pairs.collapsedCount = 0;
         const seen = new Set();
 
         for (let index = 0; index < count; index++) {
@@ -107,7 +108,11 @@
             if (!sourceText || !identityText || !replacementText) continue;
 
             const key = referenceKey(reference) || normalizeIdentityText(identityText);
-            if (!key || seen.has(key)) continue;
+            if (!key) continue;
+            if (seen.has(key)) {
+                pairs.collapsedCount++;
+                continue;
+            }
             seen.add(key);
 
             if (identityText === sourceText && hasUnparsedLocationSuffix(sourceText)) continue;
@@ -225,7 +230,7 @@
                     Array.isArray(suggestion && suggestion.sourceTexts) ? suggestion.sourceTexts.length : 0,
                     Array.isArray(suggestion && suggestion.suggestedTexts) ? suggestion.suggestedTexts.length : 0
                 );
-                summaries.skipped += Math.max(0, requestedCount - pairs.length);
+                summaries.skipped += Math.max(0, requestedCount - pairs.length - (pairs.collapsedCount || 0));
 
                 for (const pair of pairs) {
                     const fullSearch = entry.range.search(pair.sourceText, options).load("items");
