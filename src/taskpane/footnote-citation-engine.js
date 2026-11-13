@@ -98,6 +98,7 @@
         const count = Math.min(references.length, suggestedTexts.length, sourceTexts.length);
         const pairs = [];
         pairs.collapsedCount = 0;
+        pairs.unchangedCount = 0;
         const seen = new Set();
 
         for (let index = 0; index < count; index++) {
@@ -113,7 +114,6 @@
                 pairs.collapsedCount++;
                 continue;
             }
-            seen.add(key);
 
             if (identityText === sourceText && hasUnparsedLocationSuffix(sourceText)) continue;
             const sourceMatches = findExactOccurrences(noteText, sourceText);
@@ -126,8 +126,13 @@
             const end = start + identityText.length;
             if (noteText.slice(start, end) !== identityText) continue;
 
-            if (normalizeIdentityText(identityText) === normalizeIdentityText(replacementText)) continue;
+            if (normalizeIdentityText(identityText) === normalizeIdentityText(replacementText)) {
+                seen.add(key);
+                pairs.unchangedCount++;
+                continue;
+            }
 
+            seen.add(key);
             pairs.push({
                 sourceText: sourceText,
                 identityText: identityText,
@@ -230,7 +235,9 @@
                     Array.isArray(suggestion && suggestion.sourceTexts) ? suggestion.sourceTexts.length : 0,
                     Array.isArray(suggestion && suggestion.suggestedTexts) ? suggestion.suggestedTexts.length : 0
                 );
-                summaries.skipped += Math.max(0, requestedCount - pairs.length - (pairs.collapsedCount || 0));
+                summaries.skipped += Math.max(0, requestedCount - pairs.length -
+                    (pairs.collapsedCount || 0) - (pairs.unchangedCount || 0));
+                summaries.unchanged += pairs.unchangedCount || 0;
 
                 for (const pair of pairs) {
                     const fullSearch = entry.range.search(pair.sourceText, options).load("items");
