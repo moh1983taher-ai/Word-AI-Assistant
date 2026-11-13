@@ -98,9 +98,10 @@
 
         if (authorKey) {
             const parts = title.split(/[،,؛;]+/u).map(part => part.trim()).filter(Boolean);
-            while (parts.length > 1 && normalizeIdentityText(parts[0]) === authorKey) parts.shift();
-            while (parts.length > 1 && normalizeIdentityText(parts[parts.length - 1]) === authorKey) parts.pop();
-            title = parts.join("، ");
+            const authorFiltered = parts.filter(part => normalizeIdentityText(part) !== authorKey);
+            if (authorFiltered.length && authorFiltered.length !== parts.length) {
+                title = authorFiltered.join("، ");
+            }
         }
 
         const tokens = title.split(/\s+/u).filter(Boolean);
