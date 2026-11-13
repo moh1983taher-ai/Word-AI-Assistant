@@ -91,8 +91,8 @@
         return Number.isInteger(noteNumber) && noteNumber > 0 ? noteNumber - 1 : -1;
     }
 
-    function normalizeBibliographicTitle(value, author) {
-        let title = getIdentityText(value);
+    function normalizeBibliographicTitle(value, author, stripLocationSuffix = true) {
+        let title = stripLocationSuffix ? getIdentityText(value) : String(value ?? "").trim();
         const authorKey = normalizeIdentityText(author);
         if (!title) return "";
 
