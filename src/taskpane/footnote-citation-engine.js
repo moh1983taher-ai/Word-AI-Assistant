@@ -435,10 +435,10 @@ function getNoteIndex(suggestion, source) {
             const allowedPrefix = !selectedPrefix;
             const suffixCore = selectedSuffix.replace(/[.؟!)]*$/u, "").trim();
             const suffixWithoutRangePhrase = suffixCore.replace(
-                /(?:[،,؛;]?\\s*)(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك)$/u,
+                /(?:[،,؛;]?\s*)(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك)$/u,
                 ""
             ).trim();
-            const locationSuffixPattern = /^[،,؛;]?\\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[٠-٩۰-۹0-9]+(?:\\s*\\/\\s*[٠-٩۰-۹0-9]+)?(?:\\s*[-–—]\\s*[٠-٩۰-۹0-9]+)?(?:\\s*[،,؛;]\\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[٠-٩۰-۹0-9]+(?:\\s*\\/\\s*[٠-٩۰-۹0-9]+)?(?:\\s*[-–—]\\s*[٠-٩۰-۹0-9]+)?)*$/u;
+            const locationSuffixPattern = /^[،,؛;]?\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[٠-٩۰-۹0-9]+(?:\s*\/\s*[٠-٩۰-۹0-9]+)?(?:\s*[-–—]\s*[٠-٩۰-۹0-9]+)?(?:\s*[،,؛;]\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[٠-٩۰-۹0-9]+(?:\s*\/\s*[٠-٩۰-۹0-9]+)?(?:\s*[-–—]\s*[٠-٩۰-۹0-9]+)?)*$/u;
             const allowedSuffix = !suffixCore ||
                 locationSuffixPattern.test(suffixWithoutRangePhrase) &&
                 (suffixWithoutRangePhrase === suffixCore || suffixWithoutRangePhrase.length < suffixCore.length);
