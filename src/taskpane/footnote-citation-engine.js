@@ -7,7 +7,8 @@
     const LOCATION_SEPARATOR = "(?:\\s*[،,؛;]\\s*|\\s+)";
     const LOCATION_SUFFIX = new RegExp(
         LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER +
-        "(?:" + LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER + ")*\\s*$",
+        "(?:" + LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER + ")*" +
+        "(?:\\s*(?:[،,؛;]\\s*)?(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?\\s*$",
         "u"
     );
 
@@ -46,8 +47,10 @@
     }
 
     function getIdentityText(value) {
-        const text = String(value ?? "").trim();
+        let text = String(value ?? "").trim();
         if (!text) return "";
+        // Editorial cues are outside the bibliographic identity and must survive replacement.
+        text = text.replace(/^(?:(?:انظر|ينظر|راجع|يراجع|قارن|نقلاً عن|نقلًا عن)\s*[:：]?\s*)+/u, "").trim();
         const match = LOCATION_SUFFIX.exec(text);
         if (!match || match.index <= 0) return text;
         return text.slice(0, match.index)
@@ -56,12 +59,34 @@
             .trim();
     }
 
+    function isHadithTakhrijReference(reference, occurrence = null) {
+        if (!reference || typeof reference !== "object") return false;
+        const type = String(reference.type || reference.referenceType || reference.kind || "").trim().toLowerCase();
+        if (["hadith", "حديث", "hadith-takhrij", "takhrij"].includes(type)) return true;
+
+        const variantTexts = (Array.isArray(reference.variants) ? reference.variants : []).map(item => {
+            if (typeof item === "string") return item;
+            if (!item || typeof item !== "object") return "";
+            return String(item.text || item.originalText || item.cleanedText || item.citation || item.value || "");
+        });
+
+        const evidence = [
+            reference.author, reference.title, reference.originalText,
+            reference.cleanedText, reference.notes,
+            occurrence && occurrence.sourceText,
+            occurrence && occurrence.originalText,
+            ...variantTexts
+        ].filter(Boolean).join(" ");
+
+        return /(?:^|[\s،,؛:])(?:أخرجه|أخرج|رواه|روى|خرَّجه|خرّجه|خرجه|تخريج(?:\s+الحديث)?|عزاه)(?=$|[\s،,؛:])|حديث\s*(?:رقم|برقم)|رقم\s+الحديث|متفق\s+عليه/u.test(evidence);
+    }
+
     function hasUnparsedLocationSuffix(value) {
         const text = String(value ?? "").trim();
         if (!text) return false;
         return /(?:^|[،,؛;\s])(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*[0-9٠-٩۰-۹]/u.test(text) ||
             /(?:^|[،,؛;\s])[0-9٠-٩۰-۹]{1,6}\s*\/\s*[0-9٠-٩۰-۹]{1,6}(?:\s*[،,؛;]\s*[0-9٠-٩۰-۹]{1,6}\s*\/\s*[0-9٠-٩۰-۹]{1,6})?\s*$/u.test(text) ||
-            /(?:^|[،,؛;\s])[0-9٠-٩۰-۹]{1,6}\s*[-–—]\s*[0-9٠-٩۰-۹]{1,6}\s*$/u.test(text);
+            /(?:^|[،,؛;\s])[0-9٠-٩۰-۹]{1,6}\s*[-–—]\s*[0-9٠-٩۰-۹]{1,6}(?:\s*[،,؛;]?\s*وما بعدها)?\s*$/u.test(text);
     }
 
     function findExactOccurrences(text, needle) {
@@ -108,7 +133,13 @@
             const previous = rawStart > 0 ? source[rawStart - 1] : "";
             const next = source.slice(rawEnd).match(/^\s*/u)?.[0].length || 0;
             const following = source[rawEnd + next] || "";
-            if (previous && /[\p{L}\p{N}]/u.test(previous)) continue;
+            if (previous && /[\p{L}\p{N}]/u.test(previous)) {
+                const beforePrevious = rawStart > 1 ? source[rawStart - 2] : "";
+                const isAttachedKaf = previous === "ك" &&
+                    /^ال/u.test(source.slice(rawStart, rawStart + 2)) &&
+                    (!beforePrevious || !/[\p{L}\p{N}]/u.test(beforePrevious));
+                if (!isAttachedKaf) continue;
+            }
             if (following && /[\p{L}\p{N}]/u.test(following)) continue;
             return source.slice(rawStart, rawEnd);
         }
@@ -227,9 +258,27 @@ function getNoteIndex(suggestion, source) {
             const identityOffset = sourceText.indexOf(identityText);
             if (identityOffset < 0) continue;
 
-            const start = sourceStart + identityOffset;
-            const end = start + identityText.length;
-            if (noteText.slice(start, end) !== identityText) continue;
+            let replaceableText = identityText;
+            let replacementStart = sourceStart + identityOffset;
+            let fullSearchText = sourceText;
+
+            // Include a standalone attached kaf before a definite-article author in the exact anchor.
+            if (
+                identityOffset === 0 &&
+                /^ال/u.test(identityText) &&
+                sourceStart > 0 &&
+                noteText[sourceStart - 1] === "ك" &&
+                (sourceStart < 2 || !/[\p{L}\p{N}]/u.test(noteText[sourceStart - 2])) &&
+                !sourceText.startsWith("ك")
+            ) {
+                replacementStart = sourceStart - 1;
+                replaceableText = "ك" + identityText;
+                fullSearchText = "ك" + sourceText;
+            }
+
+            const start = replacementStart;
+            const end = start + replaceableText.length;
+            if (noteText.slice(start, end) !== replaceableText) continue;
 
             if (normalizeIdentityText(identityText) === normalizeIdentityText(replacementText)) {
                 pairs.unchangedCount++;
@@ -237,12 +286,12 @@ function getNoteIndex(suggestion, source) {
             }
 
             pairs.push({
-                sourceText: sourceText,
-                identityText: identityText,
+                sourceText: fullSearchText,
+                identityText: replaceableText,
                 replacementText: replacementText,
                 start: start,
                 end: end,
-                expectedText: identityText,
+                expectedText: replaceableText,
                 sourceOccurrenceIndex: sourceOccurrenceIndex,
                 referenceKey: referenceKey(reference) || sourceKey
             });
@@ -566,6 +615,7 @@ function getNoteIndex(suggestion, source) {
         uniqueReferenceEntries: uniqueReferenceEntries,
         normalizeBibliographicTitle: normalizeBibliographicTitle,
         findUniqueBibliographicAnchor: findUniqueBibliographicAnchor,
+        isHadithTakhrijReference: isHadithTakhrijReference,
         selectOccurrence: selectOccurrence
     };
 
