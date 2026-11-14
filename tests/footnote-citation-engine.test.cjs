@@ -195,7 +195,9 @@ const kafPairs = engine.buildPairs(kafNote, {
     suggestedTexts: ["الزركشي، البحر المحيط"]
 });
 assert.equal(kafPairs.length, 1);
-assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "كالزركشي، البحر المحيط");
+assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "الزركشي، البحر المحيط");
+assert.equal(kafNote[kafPairs[0].start - 1], "ك",
+    "the attached preposition must remain outside the replacement span");
 
 // Hadith takhrij is excluded, while a normal bibliographic reference to al-Bukhari is not.
 assert.equal(engine.isHadithTakhrijReference({ type: "hadith", author: "البخاري", title: "صحيح البخاري" }), true);
