@@ -29608,27 +29608,43 @@ variants تستخدم للصيغ المختلفة للمرجع نفسه فقط.
 ولا يجوز وضع كتاب مختلف داخل variants.
 
 =====================================================
-10.1 النص الأصلي الكامل لكل ظهور في الحواشي
+10.1 النطاق الأصلي الدقيق لكل ظهور في الحواشي
 =====================================================
 
 لكل occurrence تابع لحاشية أو حاشية ختامية،
-أعد الحقل sourceText بوصفه اقتباسًا حرفيًا متصلًا
-من نص المادة الأصلية نفسها.
+أعد sourceText بوصفه أضيق مقطع متصل يطابق الإحالة
+الببليوغرافية الظاهرة في الحاشية حرفيًا.
 
-يجب أن يضم sourceText الإحالة كاملة كما كتبها الباحث:
-اسم المؤلف إن وجد، والعنوان كاملًا، وبيانات الطبعة
-والجزء والصفحة إذا كانت ضمن الإحالة نفسها.
+يجب أن يضم sourceText عناصر الإحالة الموجودة فعلًا:
+اسم المؤلف إن ظهر، وعنوان الكتاب، وأي بيانات طبعة
+أو جزء أو صفحة متصلة بالإحالة نفسها.
 
-لا تكتفِ ببداية العنوان أو جزء منه.
-إذا كان النص "السيوطي، الأشباه والنظائر، ط1، ص98"
-فلا تُعد "السيوطي، الأشباه" بوصفه sourceText.
+لا تجعل sourceText نص الحاشية كاملًا لمجرد أن المرجع
+ورد في داخلها. ولا تُدخل فيه الاقتباس المنقول أو الشرح
+أو التعليق أو نسبة القول أو الكلام السابق واللاحق للمرجع.
 
-لا تعِد صياغة النص ولا توحّد علامات ترقيمه.
-انسخ المقطع كما ورد حرفيًا، مع استبعاد الكلام التفسيري
-المجاور والإحالة المستقلة التالية.
+مثال:
+إذا كانت الحاشية:
+يقول: "نص منقول طويل" المنخول 454.
+فإن sourceText هو: "المنخول 454"
+وليس الحاشية كاملة، ولا الاقتباس مع المرجع.
 
-إذا لم تستطع تحديد حدود الإحالة كاملة بثقة،
-اجعل sourceText فارغًا، وارفع needsReview بدل اختراع نطاق.
+ومثال آخر:
+إذا كانت الحاشية:
+السيوطي، الأشباه والنظائر، ط1، ص98.
+فإن sourceText هو هذه الإحالة كاملة؛
+ولا تختصره إلى "السيوطي، الأشباه".
+
+انسخ النطاق المختار حرفيًا دون إعادة صياغة أو توحيد
+علامات الترقيم. لا تدمج إحالتين مستقلتين في نطاق واحد.
+
+إذا تكرر المرجع في الحاشية نفسها، أعد لكل ظهور
+نطاقه الخاص، مع المحافظة على ترتيب الظهور.
+
+إذا لم تستطع تحديد بداية الإحالة ونهايتها بثقة،
+اجعل sourceText فارغًا وneedsReview = true.
+لا تستنتج النطاق من اسم المؤلف أو عنوان الكتاب وحدهما،
+ولا تستبدل المقطع بتخمين برمجي.
 
 أضف sourceTextConfidence من 0 إلى 1.
 
@@ -29768,7 +29784,7 @@ other
             "افصل جميع المراجع المستقلة الموجودة داخل كل مادة.",
 
             "إذا كان المرجع نفسه له أكثر من موضع، احتفظ بجميع مواضعه.",
-            "لكل occurrence في الحواشي، انسخ sourceText كاملًا حرفيًا من الحاشية نفسها، ولا تكتفِ بجزء من العنوان. اربط كل variant بـ materialId الصحيح، ولا تنقل صيغة من حاشية إلى أخرى.",
+            "لكل occurrence في الحواشي، اجعل sourceText أضيق نطاق حرفي للإحالة الببليوغرافية وحدها، لا نص الحاشية ولا الاقتباس أو الشرح المحيط. احتفظ ببيانات الجزء والصفحة المتصلة بالإحالة، وافصل الظهورات المتكررة، واربط كل variant بـ materialId الصحيح.",
 
             "",
 
@@ -47023,42 +47039,15 @@ async function buildFootnoteSuggestions(
 
             function findSourceText(originalText, reference, occurrence) {
                 const text = String(originalText || "");
-                if (!text.trim()) return "";
+                const candidate = String(occurrence?.sourceText || "").trim();
+                if (!text.trim() || !candidate) return "";
                 const engine = window.FootnoteCitationEngine;
                 if (!engine || typeof engine.findValidatedSourceSpan !== "function") return "";
-                const validate = candidate => engine.findValidatedSourceSpan(text, candidate);
 
-                // Prefer the exact source span returned for this AI occurrence.
-                const occurrenceAnchor = validate(occurrence?.sourceText);
-                if (occurrenceAnchor) return occurrenceAnchor;
-
-                const variants = Array.isArray(reference?.variants) ? reference.variants : [];
-                function getVariantText(item) {
-                    if (typeof item === "string") return item.trim();
-                    if (!item || typeof item !== "object") return "";
-                    return String(item.text || item.originalText || item.cleanedText || item.citation || item.value || "").trim();
-                }
-
-                const materialId = String(occurrence?.materialId || "");
-                const ranked = variants.map(function (item, index) {
-                    const scopedMaterial = String(item?.materialId || "");
-                    // A spelling from another note must never anchor this occurrence.
-                    if (materialId && scopedMaterial !== materialId) return null;
-                    let score = 0;
-                    if (materialId && scopedMaterial === materialId) score += 1000;
-                    if (occurrence?.source && String(item?.source || "") === String(occurrence.source)) score += 100;
-                    if (occurrence?.noteNumber != null && String(item?.noteNumber ?? "") === String(occurrence.noteNumber)) score += 50;
-                    const candidate = getVariantText(item);
-                    return { text: candidate, score, length: engine.normalizeIdentityText(candidate).length, index };
-                }).filter(item => item && item.text && item.text !== "[object Object]" && item.length >= 4)
-                  .sort((a, b) => b.score - a.score || b.length - a.length || a.index - b.index);
-
-                for (const item of ranked) {
-                    const validated = validate(item.text);
-                    if (validated) return validated;
-                }
-
-                return engine.findUniqueBibliographicAnchor(originalText, reference) || "";
+                // The model-selected occurrence span is authoritative.
+                // Do not replace it with a variant, inferred author/title anchor,
+                // or any other heuristic when it is missing or cannot be verified.
+                return engine.findValidatedSourceSpan(text, candidate) || "";
             }
 
             /*
@@ -47170,22 +47159,12 @@ async function buildFootnoteSuggestions(
 
                         const sourceTexts =
                             matches.map(
-                                function (
-                                    item
-                                ) {
-
-                                    const knownVariant = findSourceText(
+                                function (item) {
+                                    return findSourceText(
                                         originalText,
                                         item.reference,
                                         item.occurrence
                                     );
-
-                                    return knownVariant ||
-                                        window.FootnoteCitationEngine.findUniqueBibliographicAnchor(
-                                            originalText,
-                                            item.reference
-                                        );
-
                                 }
                             );
 

@@ -8,7 +8,7 @@
     const LOCATION_SUFFIX = new RegExp(
         LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER +
         "(?:" + LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER + ")*" +
-        "(?:\\s*(?:[،,؛;]\\s*)?(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?\\s*$",
+        "(?:\\s*(?:[،,؛;]\\s*)?(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?[.؟!)]*\\s*$",
         "u"
     );
 
@@ -382,35 +382,28 @@ function getNoteIndex(suggestion, source) {
     }
 
     function normalizeBibliographicTitleKey(value) {
-        const key = normalizeIdentityText(getIdentityText(value));
-
-        // Verified alias for al-Farahidi's work. Do not remove "كتاب" generically:
-        // in other titles it may be a meaningful part of the bibliographic identity.
-        const aliases = new Map([
-            [normalizeIdentityText("كتاب العين"), normalizeIdentityText("العين")],
-            [normalizeIdentityText("العين"), normalizeIdentityText("العين")]
-        ]);
-
-        return aliases.get(key) || key;
+        // Preserve the literal work title. "كتاب العين" and "العين" are
+        // distinct bibliographic strings unless the user explicitly normalizes them.
+        return normalizeIdentityText(getIdentityText(value));
     }
 
     function buildPairs(noteText, suggestion) {
+        const note = String(noteText ?? "");
         const references = Array.isArray(suggestion && suggestion.references)
-            ? suggestion.references
-            : [];
+            ? suggestion.references : [];
         const suggestedTexts = Array.isArray(suggestion && suggestion.suggestedTexts)
-            ? suggestion.suggestedTexts
-            : [];
+            ? suggestion.suggestedTexts : [];
         const sourceTexts = Array.isArray(suggestion && suggestion.sourceTexts)
-            ? suggestion.sourceTexts
-            : [];
-
+            ? suggestion.sourceTexts : [];
         const count = Math.min(references.length, suggestedTexts.length, sourceTexts.length);
         const pairs = [];
         pairs.collapsedCount = 0;
         pairs.unchangedCount = 0;
 
-        const sourceOccurrenceCounts = new Map();
+        // AI sourceText is the sole authority for locating the citation.
+        // The engine validates that selection, but never substitutes a title/author
+        // heuristic when the model's selected span is absent or ambiguous.
+        const occurrenceCounts = new Map();
 
         for (let index = 0; index < count; index++) {
             const reference = references[index];
@@ -418,58 +411,81 @@ function getNoteIndex(suggestion, source) {
             const replacementText = getIdentityText(suggestedTexts[index]);
             if (!sourceText || !replacementText) continue;
 
-            const spans = findBibliographicCitationSpans(noteText, reference);
-            if (!spans.length) continue;
+            // Quoted material cannot be part of a bibliographic source selection.
+            // If the model accidentally returns a whole note containing a quotation,
+            // fail closed instead of replacing the quotation and its explanation.
+            if (/[\\"“”«»„]/u.test(sourceText)) continue;
 
-            // If the AI supplied the whole note and the title occurs more than once,
-            // the occurrence cannot be selected safely. Skip rather than guess.
-            if (
-                normalizeIdentityText(sourceText) === normalizeIdentityText(noteText) &&
-                spans.length > 1
-            ) {
-                continue;
-            }
+            let identityText = getIdentityText(sourceText);
+            if (!identityText) continue;
 
-            const sourceKey =
-                referenceKey(reference) + "::" +
-                normalizeIdentityText(getIdentityText(sourceText));
+            // A selected span may contain only an editorial lead-in, the citation,
+            // and trailing volume/page data. Reject prose or quotations rather than
+            // extracting a plausible-looking title from a larger passage.
+            const sourceWithoutLeadIn = sourceText.replace(
+                /^(?:(?:انظر|ينظر|راجع|يراجع|قارن)\s*[:：]?\s*)+/u, ""
+            ).trim();
+            const attachedKaf = /^ك(?=ال)/u.test(sourceWithoutLeadIn) &&
+                /^ال/u.test(String(reference && reference.author || ""));
+            const selectedIdentity = attachedKaf ? identityText.replace(/^ك/u, "") : identityText;
+            const identityWithinSelection = findNormalizedSpans(sourceWithoutLeadIn, selectedIdentity);
+            if (identityWithinSelection.length !== 1) continue;
+            const selectedPrefix = sourceWithoutLeadIn.slice(0, identityWithinSelection[0].start);
+            const selectedSuffix = sourceWithoutLeadIn.slice(identityWithinSelection[0].end);
+            const allowedPrefix = !selectedPrefix || (attachedKaf && selectedPrefix === "ك");
+            const suffixCore = selectedSuffix.replace(/[.؟!)]*$/u, "").trim();
+            const suffixWithoutRangePhrase = suffixCore.replace(
+                /(?:[،,؛;]?\s*)(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك)$/u,
+                ""
+            ).trim();
+            const locationSuffixPattern = /^[،,؛;]?\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[٠-٩۰-۹0-9]+(?:\s*\/\s*[٠-٩۰-۹0-9]+)?(?:\s*[-–—]\s*[٠-٩۰-۹0-9]+)?(?:\s*[،,؛;]\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[٠-٩۰-۹0-9]+(?:\s*\/\s*[٠-٩۰-۹0-9]+)?(?:\s*[-–—]\s*[٠-٩۰-۹0-9]+)?)*$/u;
+            const allowedSuffix = !suffixCore ||
+                locationSuffixPattern.test(suffixWithoutRangePhrase) &&
+                (suffixWithoutRangePhrase === suffixCore || suffixWithoutRangePhrase.length < suffixCore.length);
+            if (!allowedPrefix || !allowedSuffix) continue;
 
-            if (!sourceKey) continue;
+            const normalizedSourceKey = normalizeIdentityText(sourceText);
+            const occurrenceIndex = occurrenceCounts.get(normalizedSourceKey) || 0;
+            const sourceSpans = findNormalizedSpans(note, sourceText);
+            if (sourceSpans.length <= occurrenceIndex) continue;
 
-            const occurrenceIndex = sourceOccurrenceCounts.get(sourceKey) || 0;
-            if (spans.length <= occurrenceIndex) continue;
+            const sourceSpan = sourceSpans[occurrenceIndex];
+            occurrenceCounts.set(normalizedSourceKey, occurrenceIndex + 1);
 
-            const span = spans[occurrenceIndex];
-            sourceOccurrenceCounts.set(sourceKey, occurrenceIndex + 1);
+            const identitySpanInSource = identityWithinSelection[0];
+            const rawIdentity = sourceWithoutLeadIn.slice(
+                identitySpanInSource.start,
+                identitySpanInSource.end
+            );
+            const leadInLength = sourceText.length - sourceWithoutLeadIn.length;
+            const start = sourceSpan.start + leadInLength + identitySpanInSource.start;
+            const end = start + rawIdentity.length;
+            if (note.slice(start, end) !== rawIdentity) continue;
 
-            if (normalizeIdentityText(span.text) === normalizeIdentityText(replacementText)) {
+            if (normalizeIdentityText(rawIdentity) === normalizeIdentityText(replacementText)) {
                 pairs.unchangedCount++;
                 continue;
             }
 
             pairs.push({
                 sourceText,
-                identityText: span.text,
+                identityText: rawIdentity,
                 replacementText,
-                start: span.start,
-                end: span.end,
-                expectedText: span.text,
+                start,
+                end,
+                expectedText: rawIdentity,
                 sourceOccurrenceIndex: occurrenceIndex,
-                referenceKey: referenceKey(reference) || sourceKey
+                referenceKey: referenceKey(reference) || normalizedSourceKey
             });
         }
 
-        pairs.sort((left, right) =>
-            left.start - right.start || right.end - left.end
-        );
-
+        pairs.sort((left, right) => left.start - right.start || right.end - left.end);
         const nonOverlapping = [];
         for (const pair of pairs) {
             const previous = nonOverlapping[nonOverlapping.length - 1];
             if (previous && pair.start < previous.end) continue;
             nonOverlapping.push(pair);
         }
-
         nonOverlapping.collapsedCount = pairs.collapsedCount;
         nonOverlapping.unchangedCount = pairs.unchangedCount;
         return nonOverlapping;

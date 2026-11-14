@@ -232,23 +232,24 @@ console.log("Footnote citation engine tests passed.");
 
 
 const quoteNote='يقول: "وللشافعي رضي الله عنه مسلكان يحصر في أحدهما التمسك في الشبه أو المخيل الذي يشهد له أصل معين ويرد كل استدلال مرسل " المنخول 454.';
-const quotePairs=engine.buildPairs(quoteNote,{references:[{author:"الغزالي",title:"المنخول من تعليقات الأصول"}],sourceTexts:[quoteNote],suggestedTexts:["الغزالي، المنخول من تعليقات الأصول"]});
+const quotePairs=engine.buildPairs(quoteNote,{references:[{author:"الغزالي",title:"المنخول من تعليقات الأصول"}],sourceTexts:["المنخول 454"],suggestedTexts:["الغزالي، المنخول من تعليقات الأصول"]});
 assert.equal(quotePairs.length,1);assert.equal(quoteNote.slice(quotePairs[0].start,quotePairs[0].end),"المنخول");assert.ok(quoteNote.slice(0,quotePairs[0].start).startsWith('يقول: "وللشافعي'));assert.ok(quoteNote.slice(quotePairs[0].end).includes("454"));
 const نقلNote="كما نقل عنه الإسنوي، نهاية السول في شرح منهاج الوصول،";
-const نقلPairs=engine.buildPairs(نقلNote,{references:[{author:"الإسنوي",title:"نهاية السول في شرح منهاج الوصول"}],sourceTexts:[نقلNote],suggestedTexts:["الإسنوي، نهاية السول في شرح منهاج الوصول"]});
+const نقلPairs=engine.buildPairs(نقلNote,{references:[{author:"الإسنوي",title:"نهاية السول في شرح منهاج الوصول"}],sourceTexts:["الإسنوي، نهاية السول في شرح منهاج الوصول"],suggestedTexts:["الإسنوي، نهاية السول في شرح منهاج الوصول"]});
 assert.equal(نقلPairs.length,0,"an already canonical citation must remain unchanged");
 assert.equal(نقلPairs.unchangedCount,1);
 assert.ok(نقلNote.startsWith("كما نقل عنه الإسنوي"));
 
 const نقلReversedNote="كما نقل عنه نهاية السول في شرح منهاج الوصول، الإسنوي،";
-const نقلReversedPairs=engine.buildPairs(نقلReversedNote,{references:[{author:"الإسنوي",title:"نهاية السول في شرح منهاج الوصول"}],sourceTexts:[نقلReversedNote],suggestedTexts:["الإسنوي، نهاية السول في شرح منهاج الوصول"]});
+const نقلReversedPairs=engine.buildPairs(نقلReversedNote,{references:[{author:"الإسنوي",title:"نهاية السول في شرح منهاج الوصول"}],sourceTexts:["نهاية السول في شرح منهاج الوصول، الإسنوي"],suggestedTexts:["الإسنوي، نهاية السول في شرح منهاج الوصول"]});
 assert.equal(نقلReversedPairs.length,1);
 assert.equal(نقلReversedNote.slice(نقلReversedPairs[0].start,نقلReversedPairs[0].end),"نهاية السول في شرح منهاج الوصول، الإسنوي");
 assert.ok(نقلReversedNote.slice(0,نقلReversedPairs[0].start).startsWith("كما نقل عنه"));
 const الزركشيNote='ومثلها قاعدة الزركشي في العقود: "العادة إذا اطردت ينزل اللفظ في العقود عليها، وإذا اضطربت لم تعتبر ووجب البيان، (وإذا) تعارضت الظنون في اعتبارها فخلاف " المنثور، 2/362.';
-const الزركشيPairs=engine.buildPairs(الزركشيNote,{references:[{author:"الزركشي",title:"المنثور"}],sourceTexts:[الزركشيNote],suggestedTexts:["الزركشي، المنثور"]});
+const الزركشيPairs=engine.buildPairs(الزركشيNote,{references:[{author:"الزركشي",title:"المنثور"}],sourceTexts:["المنثور، 2/362"],suggestedTexts:["الزركشي، المنثور"]});
 assert.equal(الزركشيPairs.length,1);assert.equal(الزركشيNote.slice(الزركشيPairs[0].start,الزركشيPairs[0].end),"المنثور");assert.ok(الزركشيNote.slice(0,الزركشيPairs[0].start).startsWith("ومثلها قاعدة الزركشي"));assert.ok(الزركشيNote.slice(الزركشيPairs[0].end).includes("2/362"));
-assert.equal(engine.normalizeBibliographicTitleKey("كتاب العين"),engine.normalizeBibliographicTitleKey("العين"));
+assert.notEqual(engine.normalizeBibliographicTitleKey("كتاب العين"),engine.normalizeBibliographicTitleKey("العين"),
+    "distinct literal work titles must remain distinct bibliographic identities");
 assert.notEqual(engine.normalizeBibliographicTitleKey("كتاب الأم"),engine.normalizeBibliographicTitleKey("الأم"),
     "the word كتاب must not be removed from unrelated titles without a verified alias");
 
@@ -261,3 +262,57 @@ const ambiguousWholeNotePairs=engine.buildPairs(ambiguousWholeNote,{
 });
 assert.equal(ambiguousWholeNotePairs.length,0,
     "a whole-note anchor with repeated identical works must be skipped as ambiguous");
+
+
+ // AI-selected spans are authoritative: a whole explanatory note is never mined
+ // for a title by fallback heuristics.
+ const wholeQuotedNote = 'يقول: "نقل المؤلف عن الشافعي" المنخول 454.';
+ const wholeNotePairs = engine.buildPairs(wholeQuotedNote, {
+     references: [{ author: "الغزالي", title: "المنخول من تعليقات الأصول" }],
+     sourceTexts: [wholeQuotedNote],
+     suggestedTexts: ["الغزالي، المنخول من تعليقات الأصول"]
+ });
+ assert.equal(wholeNotePairs.length, 0,
+     "a whole note containing prose and a citation must be rejected when AI did not isolate the source span");
+
+ // A narrow AI selection that includes the citation and its page locator
+ // replaces only the citation identity, preserving the locator.
+ const narrowPageNote = 'يقول: "نص منقول" المنخول 454.';
+ const narrowPagePairs = engine.buildPairs(narrowPageNote, {
+     references: [{ author: "الغزالي", title: "المنخول من تعليقات الأصول" }],
+     sourceTexts: ["المنخول 454."],
+     suggestedTexts: ["الغزالي، المنخول من تعليقات الأصول"]
+ });
+ assert.equal(narrowPagePairs.length, 1);
+ assert.equal(narrowPageNote.slice(narrowPagePairs[0].start, narrowPagePairs[0].end), "المنخول");
+ assert.ok(narrowPageNote.slice(0, narrowPagePairs[0].start).includes('"نص منقول"'));
+ assert.ok(narrowPageNote.slice(narrowPagePairs[0].end).includes("454"));
+
+ // AI selection that extends into explanatory prose is rejected safely.
+ const proseTailNote = "المنخول 454، وهو من أهم كتب الأصول";
+ const proseTailPairs = engine.buildPairs(proseTailNote, {
+     references: [{ author: "الغزالي", title: "المنخول من تعليقات الأصول" }],
+     sourceTexts: [proseTailNote],
+     suggestedTexts: ["الغزالي، المنخول من تعليقات الأصول"]
+ });
+ assert.equal(proseTailPairs.length, 0,
+     "the engine must not trim explanatory prose from an oversized AI selection");
+
+ // The AI-selected source must occur exactly in the note; no title-only fallback.
+ const missingAiSpan = engine.buildPairs("المنخول 454", {
+     references: [{ author: "الغزالي", title: "المنخول من تعليقات الأصول" }],
+     sourceTexts: ["عنوان آخر 454"],
+     suggestedTexts: ["الغزالي، المنخول من تعليقات الأصول"]
+ });
+ assert.equal(missingAiSpan.length, 0);
+
+ // Preserve the distinction between a connected kaf and the author name.
+ const kafSource = "كالزركشي، البحر المحيط";
+ const kafSourcePairs = engine.buildPairs(kafNote, {
+     references: [{ author: "الزركشي", title: "البحر المحيط" }],
+     sourceTexts: [kafSource],
+     suggestedTexts: ["الزركشي، البحر المحيط"]
+ });
+ assert.equal(kafSourcePairs.length, 1);
+ assert.equal(kafNote.slice(kafSourcePairs[0].start, kafSourcePairs[0].end), "الزركشي، البحر المحيط");
+ assert.equal(kafNote[kafSourcePairs[0].start - 1], "ك");
