@@ -46799,6 +46799,16 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
 
     unifiedReferences.forEach(function (reference) {
 
+        const citationEngine = window.FootnoteCitationEngine;
+        if (
+            citationEngine &&
+            typeof citationEngine.isHadithTakhrijReference === "function" &&
+            citationEngine.isHadithTakhrijReference(reference)
+        ) {
+            // Hadith takhrij is not a bibliographic book citation; leave it untouched.
+            return;
+        }
+
         const occurrences =
             Array.isArray(reference?.occurrences)
                 ? reference.occurrences
