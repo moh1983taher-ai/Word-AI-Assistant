@@ -343,13 +343,14 @@ function getNoteIndex(suggestion, source) {
             candidates.push(candidate);
         };
 
-        if (author) {
-            addCandidate(author + "، " + title);
-            addCandidate(title + "، " + author);
-            addCandidate(author + " " + title);
-            addCandidate(title + " " + author);
-        }
-        addCandidate(title);
+        // A fallback must prove the complete author/title identity.
+        // Matching the title alone is unsafe: common titles can appear in prose
+        // or in a different citation and must never authorize replacement.
+        if (!author || !title) return "";
+        addCandidate(author + "، " + title);
+        addCandidate(title + "، " + author);
+        addCandidate(author + " " + title);
+        addCandidate(title + " " + author);
 
         let normalized = "";
         const rawMap = [];
