@@ -383,7 +383,6 @@ function getNoteIndex(suggestion, source) {
         function expandAttachedAuthorPrefix(start) {
             const previous = start > 0 ? source[start - 1] : "";
             const beforePrevious = start > 1 ? source[start - 2] : "";
-            const beforeBeforePrevious = start > 2 ? source[start - 3] : "";
             // The doubled lam is a spelling form of the definite-article
             // construction in "للأزهري". Do not absorb other attached
             // particles (notably ك in "كالزركشي") into the author's name.

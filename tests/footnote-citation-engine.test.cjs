@@ -382,6 +382,20 @@ assert.equal(
     "نزهة الألباء في طبقات الأدباء"
 );
 
+
+assert.equal(
+    engine.formatBibliographicIdentity(detailedReference, "reference-only"),
+    "نزهة الألباء في طبقات الأدباء"
+);
+assert.equal(
+    engine.formatBibliographicIdentity(detailedReference, "author-title"),
+    "الأنباري، نزهة الألباء في طبقات الأدباء"
+);
+assert.equal(
+    engine.formatBibliographicIdentity(detailedReference, "title-author"),
+    "نزهة الألباء في طبقات الأدباء، الأنباري"
+);
+
 const detailedPreview = engine.buildCitationPreview(
     detailedCitation,
     detailedReference,
@@ -571,6 +585,10 @@ async function testDetailedCitationApplyPreservesAllMetadata() {
     }
 }
 
-globalThis.__FOOTNOTE_TEST_PROMISE__ = testExactWordReplacementPreservesContext()
+testExactWordReplacementPreservesContext()
     .then(() => testDetailedCitationApplyPreservesAllMetadata())
-    
+    .then(() => console.log("Footnote citation engine tests passed."))
+    .catch(error => {
+        console.error(error);
+        process.exitCode = 1;
+    });
