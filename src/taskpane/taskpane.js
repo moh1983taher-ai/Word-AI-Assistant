@@ -47533,7 +47533,7 @@ function mergeEquivalentReferences(references) {
                 existing.title = title;
             } else {
                 const oldTitle = clean(existing.title);
-                if (/^كتاب\\s+/u.test(title) && !/^كتاب\\s+/u.test(oldTitle)) existing.title = title;
+                if (/^كتاب\s+/u.test(title) && !/^كتاب\s+/u.test(oldTitle)) existing.title = title;
             }
 
             /*
