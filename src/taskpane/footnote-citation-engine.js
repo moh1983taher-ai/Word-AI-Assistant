@@ -106,10 +106,10 @@
             if (!Number.isInteger(rawStart) || !Number.isInteger(rawEnd) || rawEnd <= rawStart) continue;
 
             const previous = rawStart > 0 ? source[rawStart - 1] : "";
-            const next = source.slice(rawEnd).match(/^\\s*/u)?.[0].length || 0;
+            const next = source.slice(rawEnd).match(/^\s*/u)?.[0].length || 0;
             const following = source[rawEnd + next] || "";
-            if (previous && /[\\p{L}\\p{N}]/u.test(previous)) continue;
-            if (following && /[\\p{L}\\p{N}]/u.test(following)) continue;
+            if (previous && /[\p{L}\p{N}]/u.test(previous)) continue;
+            if (following && /[\p{L}\p{N}]/u.test(following)) continue;
             return source.slice(rawStart, rawEnd);
         }
         return "";
