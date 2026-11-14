@@ -63,6 +63,16 @@ assert.equal(
     "an unanchored source citation must be skipped rather than guessed"
 );
 
+assert.equal(
+    engine.buildPairs("الكتاب، سيبويه، 1/3", {
+        references: [{ author: "شخص آخر", title: "الكتاب" }],
+        sourceTexts: ["عنوان غير مطابق"],
+        suggestedTexts: ["شخص آخر، الكتاب"]
+    }).length,
+    0,
+    "a matching title alone must not authorize a fallback replacement"
+);
+
 
 const repeatedNote = "الكتاب، سيبويه، 1/3؛ ثم الكتاب، سيبويه، 1/3.";
 const repeatedPairs = engine.buildPairs(repeatedNote, {
