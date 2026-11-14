@@ -243,3 +243,13 @@ assert.equal(الزركشيPairs.length,1);assert.equal(الزركشيNote.slice
 assert.equal(engine.normalizeBibliographicTitleKey("كتاب العين"),engine.normalizeBibliographicTitleKey("العين"));
 assert.notEqual(engine.normalizeBibliographicTitleKey("كتاب الأم"),engine.normalizeBibliographicTitleKey("الأم"),
     "the word كتاب must not be removed from unrelated titles without a verified alias");
+
+
+const ambiguousWholeNote="الكتاب، سيبويه، 1/3 ثم الكتاب، سيبويه، 2/4";
+const ambiguousWholeNotePairs=engine.buildPairs(ambiguousWholeNote,{
+    references:[{author:"سيبويه",title:"الكتاب"}],
+    sourceTexts:[ambiguousWholeNote],
+    suggestedTexts:["سيبويه، الكتاب"]
+});
+assert.equal(ambiguousWholeNotePairs.length,0,
+    "a whole-note anchor with repeated identical works must be skipped as ambiguous");
