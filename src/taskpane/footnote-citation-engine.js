@@ -258,25 +258,10 @@ function getNoteIndex(suggestion, source) {
             const identityOffset = sourceText.indexOf(identityText);
             if (identityOffset < 0) continue;
 
-            let replaceableText = identityText;
-            let replacementStart = sourceStart + identityOffset;
-            let fullSearchText = sourceText;
-
-            // Include a standalone attached kaf before a definite-article author in the exact anchor.
-            if (
-                identityOffset === 0 &&
-                /^ال/u.test(identityText) &&
-                sourceStart > 0 &&
-                noteText[sourceStart - 1] === "ك" &&
-                (sourceStart < 2 || !/[\p{L}\p{N}]/u.test(noteText[sourceStart - 2])) &&
-                !sourceText.startsWith("ك")
-            ) {
-                replacementStart = sourceStart - 1;
-                replaceableText = "ك" + identityText;
-                fullSearchText = "ك" + sourceText;
-            }
-
-            const start = replacementStart;
+            // Keep attached prepositions (for example the kaf in "كالزركشي")
+            // outside the bibliographic replacement span.
+            const replaceableText = identityText;
+            const start = sourceStart + identityOffset;
             const end = start + replaceableText.length;
             if (noteText.slice(start, end) !== replaceableText) continue;
 
@@ -286,12 +271,12 @@ function getNoteIndex(suggestion, source) {
             }
 
             pairs.push({
-                sourceText: fullSearchText,
+                sourceText: sourceText,
                 identityText: replaceableText,
                 replacementText: replacementText,
                 start: start,
                 end: end,
-                expectedText: replaceableText,
+                expectedText: identityText,
                 sourceOccurrenceIndex: sourceOccurrenceIndex,
                 referenceKey: referenceKey(reference) || sourceKey
             });
