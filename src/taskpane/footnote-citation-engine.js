@@ -423,7 +423,7 @@ function getNoteIndex(suggestion, source) {
             // and trailing volume/page data. Reject prose or quotations rather than
             // extracting a plausible-looking title from a larger passage.
             const sourceWithoutLeadIn = sourceText.replace(
-                /^(?:(?:انظر|ينظر|راجع|يراجع|قارن)\\s*[:：]?\\s*)+/u, ""
+                /^(?:(?:انظر|ينظر|راجع|يراجع|قارن)\s*[:：]?\s*)+/u, ""
             ).trim();
             const attachedKaf = /^ك(?=ال)/u.test(sourceWithoutLeadIn) &&
                 /^ال/u.test(String(reference && reference.author || ""));
@@ -433,7 +433,7 @@ function getNoteIndex(suggestion, source) {
             const selectedPrefix = sourceWithoutLeadIn.slice(0, identityWithinSelection[0].start);
             const selectedSuffix = sourceWithoutLeadIn.slice(identityWithinSelection[0].end);
             const allowedPrefix = !selectedPrefix;
-            const allowedSuffix = !selectedSuffix || /^(?:[،,؛;]?\\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]{1,6}(?:\\s*\\/\\s*[0-9٠-٩۰-۹]{1,6})?(?:\\s*[-–—]\\s*[0-9٠-٩۰-۹]{1,6})?(?:[،,؛;]?\\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]{1,6}(?:\\s*\\/\\s*[0-9٠-٩۰-۹]{1,6})?(?:\\s*[-–—]\\s*[0-9٠-٩۰-۹]{1,6})?)*(?:[،,؛;]?\\s*(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?[.؟!)]*\\s*$/u.test(selectedSuffix);
+            const allowedSuffix = !selectedSuffix || /^(?:[،,؛;]?\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]{1,6}(?:\s*\/\s*[0-9٠-٩۰-۹]{1,6})?(?:\s*[-–—]\s*[0-9٠-٩۰-۹]{1,6})?(?:[،,؛;]?\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]{1,6}(?:\s*\/\s*[0-9٠-٩۰-۹]{1,6})?(?:\s*[-–—]\s*[0-9٠-٩۰-۹]{1,6})?)*(?:[،,؛;]?\s*(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?[.؟!)]*\s*$/u.test(selectedSuffix);
             if (!allowedPrefix || !allowedSuffix) continue;
 
             const normalizedSourceKey = normalizeIdentityText(sourceText);
