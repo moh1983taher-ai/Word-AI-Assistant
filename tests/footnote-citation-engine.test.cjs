@@ -347,10 +347,230 @@ async function testExactWordReplacementPreservesContext() {
     }
 }
 
-testExactWordReplacementPreservesContext()
-    .then(() => console.log("Footnote citation engine tests passed."))
-    .catch(error => {
-        console.error(error);
-        process.exitCode = 1;
-    });
 
+// Full first-mention citations must preserve their original bibliographic metadata.
+// Only the contiguous title/author identity is eligible for replacement.
+const detailedCitation =
+    "نزهة الألباء في طبقات الأدباء، الأنباري، (المتوفى سنة: ٥٧٧ه‍) المحقق: إبراهيم السامرائي، مكتبة المنار، الأردن، الطبعة الثالثة: (١٤٠٥ه‍ / ١٩٨٥م): (١/٨١)";
+const detailedReference = {
+    title: "نزهة الألباء في طبقات الأدباء",
+    author: "الأنباري",
+    authorFull: "عبد الرحمن بن محمد بن عبيد الله الأنصاري أبو البركات كمال الدين الأنباري"
+};
+const detailedIdentity = engine.resolveBibliographicIdentitySpan(detailedCitation, detailedReference);
+assert.ok(detailedIdentity, "a full author/title pair should be found inside a detailed citation");
+assert.equal(
+    detailedCitation.slice(detailedIdentity.start, detailedIdentity.end),
+    "نزهة الألباء في طبقات الأدباء، الأنباري"
+);
+assert.ok(detailedCitation.slice(detailedIdentity.end).startsWith("، (المتوفى سنة: ٥٧٧ه‍) المحقق: إبراهيم السامرائي"));
+assert.ok(detailedCitation.slice(detailedIdentity.end).includes("مكتبة المنار، الأردن، الطبعة الثالثة:"));
+assert.ok(detailedCitation.slice(detailedIdentity.end).includes("(١٤٠٥ه‍ / ١٩٨٥م): (١/٨١)"));
+
+const firstMentionIdentity = engine.formatBibliographicIdentity(
+    detailedReference,
+    "title-author-first",
+    true,
+    detailedReference.authorFull
+);
+assert.equal(
+    firstMentionIdentity,
+    "نزهة الألباء في طبقات الأدباء، عبد الرحمن بن محمد بن عبيد الله الأنصاري أبو البركات كمال الدين الأنباري"
+);
+assert.equal(
+    engine.formatBibliographicIdentity(detailedReference, "title-author-first", false),
+    "نزهة الألباء في طبقات الأدباء"
+);
+
+const detailedPreview = engine.buildCitationPreview(
+    detailedCitation,
+    detailedReference,
+    firstMentionIdentity
+);
+assert.ok(detailedPreview.includes("(المتوفى سنة: ٥٧٧ه‍)"));
+assert.ok(detailedPreview.includes("المحقق: إبراهيم السامرائي"));
+assert.ok(detailedPreview.includes("مكتبة المنار، الأردن"));
+assert.ok(detailedPreview.includes("الطبعة الثالثة: (١٤٠٥ه‍ / ١٩٨٥م)"));
+assert.ok(detailedPreview.endsWith("(١/٨١)"));
+
+const alreadyFullCitation =
+    "نزهة الألباء في طبقات الأدباء، عبد الرحمن بن محمد بن عبيد الله الأنصاري أبو البركات كمال الدين الأنباري، (المتوفى سنة: ٥٧٧ه‍) المحقق: إبراهيم السامرائي، مكتبة المنار، الأردن، الطبعة الثالثة: (١٤٠٥ه‍ / ١٩٨٥م): (١/٨١)";
+const alreadyFullSpan = engine.resolveBibliographicIdentitySpan(alreadyFullCitation, detailedReference);
+assert.equal(
+    alreadyFullCitation.slice(alreadyFullSpan.start, alreadyFullSpan.end),
+    "نزهة الألباء في طبقات الأدباء، عبد الرحمن بن محمد بن عبيد الله الأنصاري أبو البركات كمال الدين الأنباري"
+);
+const alreadyFullPairs = engine.buildPairs(alreadyFullCitation, {
+    references: [detailedReference],
+    sourceTexts: [alreadyFullCitation],
+    replacementTexts: [firstMentionIdentity]
+});
+assert.equal(alreadyFullPairs.length, 0, "an already canonical full first mention should remain unchanged");
+assert.equal(alreadyFullPairs.unchangedCount, 1);
+
+
+const detailedNote = "([1]) ترجمة مطولة للفراء، ينظر: " + detailedCitation + "؛ ثم يراجع الباحث ذلك لاحقًا.";
+const detailedPairs = engine.buildPairs(detailedNote, {
+    references: [detailedReference],
+    sourceTexts: [detailedCitation],
+    suggestedTexts: [detailedPreview],
+    replacementTexts: [firstMentionIdentity]
+});
+assert.equal(detailedPairs.length, 1);
+assert.equal(
+    detailedNote.slice(detailedPairs[0].start, detailedPairs[0].end),
+    detailedCitation.slice(detailedIdentity.start, detailedIdentity.end)
+);
+assert.ok(detailedNote.slice(0, detailedPairs[0].start).startsWith("([1]) ترجمة مطولة للفراء، ينظر: "));
+assert.ok(detailedNote.slice(detailedPairs[0].end).startsWith("، (المتوفى سنة: ٥٧٧ه‍) المحقق: إبراهيم السامرائي"));
+assert.ok(detailedNote.slice(detailedPairs[0].end).includes("مكتبة المنار، الأردن، الطبعة الثالثة:"));
+assert.ok(detailedNote.slice(detailedPairs[0].end).includes("؛ ثم يراجع الباحث ذلك لاحقًا."));
+
+const dictionaryCitation =
+    "تهذيب اللغة، أبي منصور محمد بن أحمد الأزهري، (المتوفى سنة:٣٧٠ه‍) (مادة: قيم)، دار إحياء التراث العربي، بيروت، الطبعة الأولى: (١٤٢١ه‍ /٢٠٠١م): (٩/٣٦٩).";
+const dictionaryReference = {
+    title: "تهذيب اللغة",
+    author: "الأزهري",
+    authorFull: "أبي منصور محمد بن أحمد الأزهري"
+};
+const dictionaryIdentity = engine.resolveBibliographicIdentitySpan(dictionaryCitation, dictionaryReference);
+assert.ok(dictionaryIdentity?.includesAuthor);
+assert.equal(
+    dictionaryCitation.slice(dictionaryIdentity.start, dictionaryIdentity.end),
+    "تهذيب اللغة، أبي منصور محمد بن أحمد الأزهري"
+);
+assert.ok(dictionaryCitation.slice(dictionaryIdentity.end).includes("(مادة: قيم)"));
+assert.ok(dictionaryCitation.slice(dictionaryIdentity.end).includes("دار إحياء التراث العربي، بيروت"));
+assert.ok(dictionaryCitation.slice(dictionaryIdentity.end).includes("الطبعة الأولى: (١٤٢١ه‍ /٢٠٠١م)"));
+assert.ok(dictionaryCitation.slice(dictionaryIdentity.end).includes("(٩/٣٦٩)"));
+
+const prefixedShortCitation = "تهذيب اللغة، للأزهري: (مادة: خلق)، (٧/١٧)";
+const prefixedShortReference = {
+    title: "تهذيب اللغة",
+    author: "الأزهري",
+    authorFull: "أبي منصور محمد بن أحمد الأزهري"
+};
+const prefixedShortIdentity = engine.resolveBibliographicIdentitySpan(
+    prefixedShortCitation,
+    prefixedShortReference
+);
+assert.ok(prefixedShortIdentity?.includesAuthor);
+assert.equal(
+    prefixedShortCitation.slice(prefixedShortIdentity.start, prefixedShortIdentity.end),
+    "تهذيب اللغة، للأزهري",
+    "attached lam should be included in the matched short author"
+);
+
+const ambiguousAuthorCitation =
+    "تهذيب اللغة، أبي منصور محمد بن أحمد الأزهري، (المتوفى سنة:٣٧٠ه‍) (مادة: قيم)، دار إحياء التراث العربي";
+const ambiguousAuthorReference = { title: "تهذيب اللغة", author: "الأزهري" };
+const ambiguousAuthorIdentity = engine.resolveBibliographicIdentitySpan(
+    ambiguousAuthorCitation,
+    ambiguousAuthorReference
+);
+assert.ok(ambiguousAuthorIdentity?.authorFound);
+assert.equal(ambiguousAuthorIdentity.includesAuthor, false);
+assert.equal(
+    engine.buildPairs(ambiguousAuthorCitation, {
+        references: [ambiguousAuthorReference],
+        sourceTexts: [ambiguousAuthorCitation],
+        replacementTexts: ["تهذيب اللغة، الأزهري"]
+    }).length,
+    0,
+    "ambiguous author boundaries must be skipped instead of consuming the full author data"
+);
+
+// Independent detailed references in one note must receive independent spans.
+const secondDetailedCitation =
+    "معجم الأدباء، الحموي، (المتوفى سنة:٦٢٦ه‍) تحقيق: إحسان عباس، دار الغرب الإسلامي، بيروت، الطبعة الأولى: (١٤١٤ه‍ / ١٩٩٣): (٦/٢٨١٢ -٢٨١٤)";
+const secondDetailedReference = {
+    title: "معجم الأدباء",
+    author: "الحموي",
+    authorFull: "شهاب الدين أبو عبدالله ياقوت بن عبد الله الرومي الحموي"
+};
+const twoCitationNote = detailedCitation + "، و" + secondDetailedCitation + "؛";
+const twoCitationPairs = engine.buildPairs(twoCitationNote, {
+    references: [detailedReference, secondDetailedReference],
+    sourceTexts: [detailedCitation, secondDetailedCitation],
+    replacementTexts: [
+        firstMentionIdentity,
+        "معجم الأدباء، شهاب الدين أبو عبدالله ياقوت بن عبد الله الرومي الحموي"
+    ]
+});
+assert.equal(twoCitationPairs.length, 2);
+assert.ok(twoCitationNote.slice(twoCitationPairs[0].end).includes("(المتوفى سنة: ٥٧٧ه‍)"));
+assert.ok(twoCitationNote.slice(twoCitationPairs[1].end).includes("تحقيق: إحسان عباس، دار الغرب الإسلامي"));
+
+async function testDetailedCitationApplyPreservesAllMetadata() {
+    const originalNote = "([1]) ترجمة مطولة للفراء، ينظر: " + detailedCitation + "؛ ثم يراجع الباحث ذلك لاحقًا.";
+    const note = { text: originalNote };
+    const searchCalls = [];
+    function makeRange(start, end) {
+        return {
+            get text() { return note.text.slice(start, end); },
+            load() { return this; },
+            search(needle, options) {
+                searchCalls.push({ needle, options: { ...options } });
+                const scopeText = this.text;
+                const items = [];
+                let from = 0;
+                while (from <= scopeText.length - needle.length) {
+                    const found = scopeText.indexOf(needle, from);
+                    if (found < 0) break;
+                    items.push(makeRange(start + found, start + found + needle.length));
+                    from = found + Math.max(1, needle.length);
+                }
+                return { items, load() { return this; } };
+            },
+            insertText(replacement, location) {
+                assert.equal(location, "Replace");
+                note.text = note.text.slice(0, start) + replacement + note.text.slice(end);
+                return { get text() { return replacement; }, load() { return this; } };
+            }
+        };
+    }
+    const footnotes = {
+        items: [{ body: { getRange: () => makeRange(0, note.text.length) } }],
+        load() { return this; }
+    };
+    const endnotes = { items: [], load() { return this; } };
+    const previousWord = global.Word;
+    global.Word = {
+        async run(callback) {
+            return callback({
+                document: { body: { footnotes, endnotes } },
+                async sync() {}
+            });
+        }
+    };
+    try {
+        const result = await engine.apply([{
+            source: "footnote",
+            materialId: "footnote-1",
+            noteNumber: 1,
+            originalText: originalNote,
+            references: [detailedReference],
+            sourceTexts: [detailedCitation],
+            suggestedTexts: [detailedPreview],
+            replacementTexts: [firstMentionIdentity]
+        }]);
+        assert.deepEqual(result, { applied: 1, skipped: 0, unchanged: 0 });
+        const expectedNote = "([1]) ترجمة مطولة للفراء، ينظر: " + firstMentionIdentity +
+            "، (المتوفى سنة: ٥٧٧ه‍) المحقق: إبراهيم السامرائي، مكتبة المنار، الأردن، الطبعة الثالثة: (١٤٠٥ه‍ / ١٩٨٥م): (١/٨١)؛ ثم يراجع الباحث ذلك لاحقًا.";
+        assert.equal(note.text, expectedNote,
+            "Word apply must replace only the identity and preserve all metadata and surrounding prose");
+        assert.ok(searchCalls.length >= 2);
+        for (const call of searchCalls) {
+            assert.equal(call.options.matchCase, true);
+            assert.equal(call.options.ignorePunct, false);
+            assert.equal(call.options.ignoreSpace, false);
+        }
+    } finally {
+        if (previousWord === undefined) delete global.Word;
+        else global.Word = previousWord;
+    }
+}
+
+globalThis.__FOOTNOTE_TEST_PROMISE__ = testExactWordReplacementPreservesContext()
+    .then(() => testDetailedCitationApplyPreservesAllMetadata())
+    
