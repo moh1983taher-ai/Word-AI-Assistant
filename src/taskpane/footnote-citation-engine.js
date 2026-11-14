@@ -8,7 +8,7 @@
     const LOCATION_SUFFIX = new RegExp(
         LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER +
         "(?:" + LOCATION_SEPARATOR + LOCATION_LABEL + NUMBER + ")*" +
-        "(?:\\s*(?:[،,؛;]\\s*)?(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?\\s*$",
+        "(?:\\s*(?:[،,؛;]\\s*)?(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?[.؟!)]*\\s*$",
         "u"
     );
 
@@ -411,6 +411,11 @@ function getNoteIndex(suggestion, source) {
             const replacementText = getIdentityText(suggestedTexts[index]);
             if (!sourceText || !replacementText) continue;
 
+            // Quoted material cannot be part of a bibliographic source selection.
+            // If the model accidentally returns a whole note containing a quotation,
+            // fail closed instead of replacing the quotation and its explanation.
+            if (/[\\"“”«»„]/u.test(sourceText)) continue;
+
             let identityText = getIdentityText(sourceText);
             if (!identityText) continue;
 
@@ -428,7 +433,7 @@ function getNoteIndex(suggestion, source) {
             const selectedPrefix = sourceWithoutLeadIn.slice(0, identityWithinSelection[0].start);
             const selectedSuffix = sourceWithoutLeadIn.slice(identityWithinSelection[0].end);
             const allowedPrefix = !selectedPrefix;
-            const allowedSuffix = !selectedSuffix || /^(?:[،,؛;]?\\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]{1,6}(?:\\s*\\/\\s*[0-9٠-٩۰-۹]{1,6})?(?:\\s*[-–—]\\s*[0-9٠-٩۰-۹]{1,6})?(?:[،,؛;]?\\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]{1,6}(?:\\s*\\/\\s*[0-9٠-٩۰-۹]{1,6})?(?:\\s*[-–—]\\s*[0-9٠-٩۰-۹]{1,6})?)*(?:[،,؛;]?\\s*(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?\\s*$/u.test(selectedSuffix);
+            const allowedSuffix = !selectedSuffix || /^(?:[،,؛;]?\\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]{1,6}(?:\\s*\\/\\s*[0-9٠-٩۰-۹]{1,6})?(?:\\s*[-–—]\\s*[0-9٠-٩۰-۹]{1,6})?(?:[،,؛;]?\\s*(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]{1,6}(?:\\s*\\/\\s*[0-9٠-٩۰-۹]{1,6})?(?:\\s*[-–—]\\s*[0-9٠-٩۰-۹]{1,6})?)*(?:[،,؛;]?\\s*(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك))?[.؟!)]*\\s*$/u.test(selectedSuffix);
             if (!allowedPrefix || !allowedSuffix) continue;
 
             const normalizedSourceKey = normalizeIdentityText(sourceText);
