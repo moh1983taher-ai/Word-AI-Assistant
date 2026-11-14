@@ -277,21 +277,21 @@ function getNoteIndex(suggestion, source) {
             const hasAttachedKaf = matchedSourceText === sourceText &&
                 /^ال/u.test(authorText) &&
                 sourceText.startsWith("ك" + authorText) &&
-                (sourceStart === 0 || !/[\\p{L}\\p{N}]/u.test(noteText[sourceStart - 1]));
+                (sourceStart === 0 || !/[\p{L}\p{N}]/u.test(noteText[sourceStart - 1]));
 
             const identitySourceText = hasAttachedKaf ? sourceText.slice(1) : matchedSourceText;
-            const identityText = getIdentityText(identitySourceText);
-            if (!identityText) continue;
+            const resolvedIdentityText = getIdentityText(identitySourceText);
+            if (!resolvedIdentityText) continue;
 
-            const localIdentityOffset = identitySourceText.indexOf(identityText);
+            const localIdentityOffset = identitySourceText.indexOf(resolvedIdentityText);
             if (localIdentityOffset < 0) continue;
 
-            const replaceableText = identityText;
+            const replaceableText = resolvedIdentityText;
             const start = sourceStart + (hasAttachedKaf ? 1 : 0) + localIdentityOffset;
             const end = start + replaceableText.length;
             if (noteText.slice(start, end) !== replaceableText) continue;
 
-            if (normalizeIdentityText(identityText) === normalizeIdentityText(replacementText)) {
+            if (normalizeIdentityText(resolvedIdentityText) === normalizeIdentityText(replacementText)) {
                 pairs.unchangedCount++;
                 continue;
             }
@@ -302,7 +302,7 @@ function getNoteIndex(suggestion, source) {
                 replacementText: replacementText,
                 start: start,
                 end: end,
-                expectedText: identityText,
+                expectedText: resolvedIdentityText,
                 sourceOccurrenceIndex: sourceOccurrenceIndex,
                 referenceKey: referenceKey(reference) || sourceKey
             });
