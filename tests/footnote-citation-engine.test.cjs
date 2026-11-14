@@ -229,3 +229,16 @@ assert.equal(engine.isHadithTakhrijReference({
 }), false);
 
 console.log("Footnote citation engine tests passed.");
+
+
+const quoteNote='يقول: "وللشافعي رضي الله عنه مسلكان يحصر في أحدهما التمسك في الشبه أو المخيل الذي يشهد له أصل معين ويرد كل استدلال مرسل " المنخول 454.';
+const quotePairs=engine.buildPairs(quoteNote,{references:[{author:"الغزالي",title:"المنخول من تعليقات الأصول"}],sourceTexts:[quoteNote],suggestedTexts:["الغزالي، المنخول من تعليقات الأصول"]});
+assert.equal(quotePairs.length,1);assert.equal(quoteNote.slice(quotePairs[0].start,quotePairs[0].end),"المنخول");assert.ok(quoteNote.slice(0,quotePairs[0].start).startsWith('يقول: "وللشافعي'));assert.ok(quoteNote.slice(quotePairs[0].end).includes("454"));
+const نقلNote="كما نقل عنه الإسنوي، نهاية السول في شرح منهاج الوصول،";
+const نقلPairs=engine.buildPairs(نقلNote,{references:[{author:"الإسنوي",title:"نهاية السول في شرح منهاج الوصول"}],sourceTexts:[نقلNote],suggestedTexts:["الإسنوي، نهاية السول في شرح منهاج الوصول"]});
+assert.equal(نقلPairs.length,1);assert.equal(نقلNote.slice(نقلPairs[0].start,نقلPairs[0].end),"الإسنوي، نهاية السول في شرح منهاج الوصول");assert.ok(نقلNote.slice(0,نقلPairs[0].start).startsWith("كما نقل عنه"));
+const الزركشيNote='ومثلها قاعدة الزركشي في العقود: "العادة إذا اطردت ينزل اللفظ في العقود عليها، وإذا اضطربت لم تعتبر ووجب البيان، (وإذا) تعارضت الظنون في اعتبارها فخلاف " المنثور، 2/362.';
+const الزركشيPairs=engine.buildPairs(الزركشيNote,{references:[{author:"الزركشي",title:"المنثور"}],sourceTexts:[الزركشيNote],suggestedTexts:["الزركشي، المنثور"]});
+assert.equal(الزركشيPairs.length,1);assert.equal(الزركشيNote.slice(الزركشيPairs[0].start,الزركشيPairs[0].end),"المنثور");assert.ok(الزركشيNote.slice(0,الزركشيPairs[0].start).startsWith("ومثلها قاعدة الزركشي"));assert.ok(الزركشيNote.slice(الزركشيPairs[0].end).includes("2/362"));
+assert.equal(engine.normalizeBibliographicTitleKey("كتاب العين"),engine.normalizeBibliographicTitleKey("العين"));
+assert.equal(engine.normalizeBibliographicTitleKey("كتاب الأم"),engine.normalizeBibliographicTitleKey("الأم"));
