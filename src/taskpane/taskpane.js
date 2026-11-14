@@ -30598,8 +30598,8 @@ function parseReferenceAIJSON(
          let parsed;
          try {
              const raw = String(answer || "").trim()
-                 .replace(/^\\x60{3}(?:json)?\\s*/i, "")
-                 .replace(/\\s*\\x60{3}$/i, "");
+                 .replace(/^\x60{3}(?:json)?\\s*/i, "")
+                 .replace(/\\s*\x60{3}$/i, "");
              parsed = JSON.parse(raw);
          } catch (error) {
              throw new Error("تعذر قراءة نتيجة توحيد أسماء الكتب والمؤلفين بصيغة JSON.");
