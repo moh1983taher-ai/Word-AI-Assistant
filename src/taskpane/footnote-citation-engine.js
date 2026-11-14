@@ -240,7 +240,7 @@ function getNoteIndex(suggestion, source) {
             const prev=source.slice(0,span.start).slice(-1);if(prev&&/[\p{L}\p{N}]/u.test(prev))continue;
             const tail=source.slice(span.end).replace(/^[\s،,؛:]+/u,"");
             const location=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u.test(tail);
-            const terminal=!tail||/^[.؛،,:؟!\)\]}]/u.test(tail);
+            const terminal=!tail||".؛،,:؟!)]}".includes(tail[0]);
             let start=span.start,end=span.end;
             if(author){
                 const as=findNormalizedSpans(source,author);
@@ -250,13 +250,13 @@ function getNoteIndex(suggestion, source) {
                 else if(after.length===1){
                     const afterAuthor=source.slice(after[0].end).replace(/^[\s،,؛:]+/u,"");
                     const authorThenLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u.test(afterAuthor);
-                    const authorThenTerminal=!afterAuthor||/^[.؛،,:؟!\)\]}]/u.test(afterAuthor);
+                    const authorThenTerminal=!afterAuthor||".؛،,:؟!)]}".includes(afterAuthor[0]);
                     if(authorThenLocation||authorThenTerminal)end=after[0].end;
                 }
             }
             const finalTail=source.slice(end).replace(/^[\s،,؛:]+/u,"");
             const hasFinalLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u.test(finalTail);
-            const hasFinalTerminal=!finalTail||/^[.؛،,:؟!\)\]}]/u.test(finalTail);
+            const hasFinalTerminal=!finalTail||".؛،,:؟!)]}".includes(finalTail[0]);
             if(!hasFinalLocation&&!hasFinalTerminal&&!location&&!terminal)continue;
             if(!out.some(q=>q.start===start&&q.end===end))out.push({start,end,text:source.slice(start,end).trim()});
         }if(out.length)break;}return out.sort((a,b)=>a.start-b.start);
