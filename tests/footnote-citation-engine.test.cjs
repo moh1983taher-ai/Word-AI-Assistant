@@ -228,4 +228,129 @@ assert.equal(engine.isHadithTakhrijReference({
     variants: ["البخاري، صحيح البخاري، ج 1، ص 20"]
 }), false);
 
-console.log("Footnote citation engine tests passed.");
+
+assert.equal(
+    engine.getIdentityText("(1) انظر: الزركشي، المنثور، ج 2، ص 145"),
+    "الزركشي، المنثور",
+    "a note counter and editorial lead-in must stay outside the bibliographic replacement"
+);
+assert.equal(
+    engine.getIdentityText("1 انظر: الزركشي، المنثور، ج 2، ص 145"),
+    "الزركشي، المنثور",
+    "an unbracketed note counter before an editorial lead-in must remain outside the replacement"
+);
+assert.equal(
+    engine.getIdentityText("(انظر: الزركشي، المنثور، ج 2، ص 145)"),
+    "الزركشي، المنثور",
+    "outer citation parentheses and editorial lead-ins must remain outside the replacement"
+);
+
+const protectedContextNote =
+    "(1) انظر: الزركشي، المنثور، ج 2، ص 145؛ ويراجع الباحث ذلك في موضع لاحق.";
+const protectedContextPairs = engine.buildPairs(protectedContextNote, {
+    references: [{ author: "الزركشي", title: "المنثور" }],
+    sourceTexts: ["(1) انظر: الزركشي، المنثور، ج 2، ص 145"],
+    suggestedTexts: ["الزركشي، المنثور المحقق"]
+});
+assert.equal(protectedContextPairs.length, 1);
+assert.equal(
+    protectedContextNote.slice(protectedContextPairs[0].start, protectedContextPairs[0].end),
+    "الزركشي، المنثور",
+    "only the bibliographic identity may be included in the replacement range"
+);
+assert.equal(
+    protectedContextNote.slice(0, protectedContextPairs[0].start),
+    "(1) انظر: ",
+    "the note counter and editorial phrase must remain byte-for-byte unchanged"
+);
+assert.equal(
+    protectedContextNote.slice(protectedContextPairs[0].end),
+    "، ج 2، ص 145؛ ويراجع الباحث ذلك في موضع لاحق.",
+    "volume, pages, separators, and all following prose must remain unchanged"
+);
+
+// End-to-end Office.js adapter simulation: the exact source span is located,
+// only the bibliographic identity is replaced, and surrounding text survives.
+async function testExactWordReplacementPreservesContext() {
+    const note = { text: protectedContextNote };
+    const searchCalls = [];
+
+    function makeRange(start, end) {
+        return {
+            get text() { return note.text.slice(start, end); },
+            load() { return this; },
+            search(needle, options) {
+                searchCalls.push({ needle, options: { ...options } });
+                const scopeText = this.text;
+                const items = [];
+                let from = 0;
+                while (from <= scopeText.length - needle.length) {
+                    const found = scopeText.indexOf(needle, from);
+                    if (found < 0) break;
+                    items.push(makeRange(start + found, start + found + needle.length));
+                    from = found + Math.max(1, needle.length);
+                }
+                return { items, load() { return this; } };
+            },
+            insertText(replacement, location) {
+                assert.equal(location, "Replace");
+                note.text =
+                    note.text.slice(0, start) +
+                    replacement +
+                    note.text.slice(end);
+                return { get text() { return replacement; }, load() { return this; } };
+            }
+        };
+    }
+
+    const footnotes = {
+        items: [{ body: { getRange: () => makeRange(0, note.text.length) } }],
+        load() { return this; }
+    };
+    const endnotes = { items: [], load() { return this; } };
+    const previousWord = global.Word;
+    global.Word = {
+        async run(callback) {
+            return callback({
+                document: { body: { footnotes, endnotes } },
+                async sync() {}
+            });
+        }
+    };
+
+    try {
+        const result = await engine.apply([{
+            source: "footnote",
+            materialId: "footnote-1",
+            noteNumber: 1,
+            originalText: protectedContextNote,
+            references: [{ author: "الزركشي", title: "المنثور" }],
+            sourceTexts: ["(1) انظر: الزركشي، المنثور، ج 2، ص 145"],
+            suggestedTexts: ["الزركشي، المنثور المحقق"]
+        }]);
+
+        assert.deepEqual(result, { applied: 1, skipped: 0, unchanged: 0 });
+        assert.equal(
+            note.text,
+            "(1) انظر: الزركشي، المنثور المحقق، ج 2، ص 145؛ ويراجع الباحث ذلك في موضع لاحق.",
+            "the live note must change only inside the exact bibliographic identity"
+        );
+        assert.ok(searchCalls.length >= 2);
+        for (const call of searchCalls) {
+            assert.equal(call.options.matchCase, true);
+            assert.equal(call.options.ignorePunct, false);
+            assert.equal(call.options.ignoreSpace, false);
+        }
+    } finally {
+        if (previousWord === undefined) delete global.Word;
+        else global.Word = previousWord;
+    }
+}
+
+testExactWordReplacementPreservesContext()
+    .then(() => console.log("Footnote citation engine tests passed."))
+    .catch(error => {
+        console.error(error);
+        process.exitCode = 1;
+    });
+
