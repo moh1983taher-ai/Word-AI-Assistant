@@ -320,7 +320,8 @@ function getNoteIndex(suggestion, source) {
             const rawStart = rawMap[position];
             const rawEnd = rawMap[position + target.length - 1] + 1;
             if (Number.isInteger(rawStart) && Number.isInteger(rawEnd) && rawEnd > rawStart) {
-                return text.slice(rawStart, rawEnd);
+                const validated = findValidatedSourceSpan(text, text.slice(rawStart, rawEnd));
+                if (validated) return validated;
             }
         }
 
