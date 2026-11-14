@@ -673,6 +673,49 @@ assert.equal(
     "the volume and page suffix must remain outside the replacement span"
 );
 
+const titleWithLocationAuthorTitle = engine.formatBibliographicIdentity(
+    titleWithLocationReference,
+    "author-title"
+);
+assert.equal(
+    titleWithLocationAuthorTitle,
+    "النووي، المجموع",
+    "formatted author-title output must not carry page data from the model title field"
+);
+assert.equal(
+    engine.formatBibliographicIdentity(titleWithLocationReference, "title-author"),
+    "المجموع، النووي",
+    "formatted title-author output must also exclude location metadata"
+);
+
+const fullAuthorWithLocationReference = {
+    ...titleWithLocationReference,
+    authorFull: "أبو زكريا محيي الدين يحيى بن شرف النووي"
+};
+const firstMentionWithLocation = engine.formatBibliographicIdentity(
+    fullAuthorWithLocationReference,
+    "title-author-first",
+    true,
+    fullAuthorWithLocationReference.authorFull
+);
+assert.equal(
+    firstMentionWithLocation,
+    "المجموع، أبو زكريا محيي الدين يحيى بن شرف النووي",
+    "the first-mention formatter must use the full author without appending page data"
+);
+const firstMentionWithLocationPairs = engine.buildPairs(titleWithLocationCitation, {
+    references: [fullAuthorWithLocationReference],
+    sourceTexts: [titleWithLocationCitation],
+    replacementTexts: [firstMentionWithLocation]
+});
+assert.equal(firstMentionWithLocationPairs.length, 1);
+assert.equal(
+    titleWithLocationCitation.slice(firstMentionWithLocationPairs[0].end),
+    "، ج 2، ص 145",
+    "first-mention replacement must preserve the original location suffix"
+);
+
+
 testExactWordReplacementPreservesContext()
     .then(() => testDetailedCitationApplyPreservesAllMetadata())
     .then(() => console.log("Footnote citation engine tests passed."))
