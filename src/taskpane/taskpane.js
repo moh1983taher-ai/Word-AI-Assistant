@@ -29140,6 +29140,28 @@ async function analyzeReferencesWithAI(
                 reference
             ) {
 
+                if (Array.isArray(reference.variants)) {
+                    reference.variants = reference.variants.filter(function (variant) {
+                        if (!variant || typeof variant !== "object") return true;
+                        const variantId = String(variant.materialId || "");
+                        let material = variantId ? materialIndex.get(variantId) : null;
+
+                        if (!material && variant.source && variant.noteNumber != null) {
+                            const candidates = payload.filter(function (item) {
+                                return String(item.source || "") === String(variant.source) &&
+                                    String(item.noteNumber ?? "") === String(variant.noteNumber);
+                            });
+                            if (candidates.length === 1) material = candidates[0];
+                        }
+
+                        if (!material || material.analysisRole !== "target") return false;
+                        variant.materialId = String(material.materialId);
+                        variant.source = String(material.source || "");
+                        variant.noteNumber = material.noteNumber ?? null;
+                        return true;
+                    });
+                }
+
                 if (
                     !Array.isArray(
                         reference.occurrences
@@ -29222,7 +29244,7 @@ async function analyzeReferencesWithAI(
                                 );
 
                             const rawMaterialText = String(material.text || "")
-                                .replace(/^【(?:FOOTNOTE|ENDNOTE)_ID:[^】]+】\\s*/u, "")
+                                .replace(/^【(?:FOOTNOTE|ENDNOTE)_ID:[^】]+】\s*/u, "")
                                 .trim();
                             const proposedSourceText = String(occurrence.sourceText || "").trim();
                             occurrence.sourceText = proposedSourceText
@@ -47612,12 +47634,22 @@ function mergeEquivalentReferences(references) {
                         .replace(/\s+/g, " ")
                         .toLowerCase();
 
+                    const scopeKey = function (item) {
+                        if (!item || typeof item !== "object") return "legacy";
+                        return [
+                            String(item.materialId || ""),
+                            String(item.source || ""),
+                            String(item.noteNumber ?? "")
+                        ].join("|");
+                    };
+
                     const exists = existing.variants.some(function (item) {
                         const oldValue = getVariantText(item);
                         return oldValue &&
                             oldValue.normalize("NFC")
                                 .replace(/\s+/g, " ")
-                                .toLowerCase() === key;
+                                .toLowerCase() === key &&
+                            scopeKey(item) === scopeKey(variant);
                     });
 
                     if (!exists) {
