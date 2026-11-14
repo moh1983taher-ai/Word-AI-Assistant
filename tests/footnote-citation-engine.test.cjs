@@ -229,3 +229,39 @@ assert.equal(engine.isHadithTakhrijReference({
 }), false);
 
 console.log("Footnote citation engine tests passed.");
+
+
+// AI-selected source spans: replace only the bibliographic citation and preserve
+// explanatory prose, quotations, and page locators around it.
+const quotedAlMankhul = 'يقول: "وللشافعي رضي الله عنه مسلكان يحصر في أحدهما التمسك في الشبه أو المخيل الذي يشهد له أصل معين ويرد كل استدلال مرسل " المنخول 454.';
+const alMankhulPairs = engine.buildPairs(quotedAlMankhul, {
+    references: [{ author: "الغزالي", title: "المنخول من تعليقات الأصول" }],
+    sourceTexts: ["المنخول 454"],
+    suggestedTexts: ["الغزالي، المنخول من تعليقات الأصول"]
+});
+assert.equal(alMankhulPairs.length, 1);
+assert.equal(quotedAlMankhul.slice(alMankhulPairs[0].start, alMankhulPairs[0].end), "المنخول");
+assert.equal(alMankhulPairs[0].replacementText, "الغزالي، المنخول من تعليقات الأصول");
+assert.ok(quotedAlMankhul.slice(0, alMankhulPairs[0].start).includes("وللشافعي"));
+assert.ok(quotedAlMankhul.slice(alMankhulPairs[0].end).includes("454"));
+
+const attributedIsnawi = "كما نقل عنه الإسنوي، نهاية السول في شرح منهاج الوصول،";
+const isnawiPairs = engine.buildPairs(attributedIsnawi, {
+    references: [{ author: "الإسنوي", title: "نهاية السول في شرح منهاج الوصول" }],
+    sourceTexts: ["الإسنوي، نهاية السول في شرح منهاج الوصول"],
+    suggestedTexts: ["الإسنوي، نهاية السول في شرح منهاج الوصول"]
+});
+assert.equal(isnawiPairs.length, 0);
+assert.equal(isnawiPairs.unchangedCount, 1);
+assert.ok(attributedIsnawi.startsWith("كما نقل عنه"));
+
+const quotedZarkashi = 'ومثلها قاعدة الزركشي في العقود: "العادة إذا اطردت ينزل اللفظ في العقود عليها، وإذا اضطربت لم تعتبر ووجب البيان، (وإذا) تعارضت الظنون في اعتبارها فخلاف " المنثور، 2/362.';
+const zarkashiPairs = engine.buildPairs(quotedZarkashi, {
+    references: [{ author: "الزركشي", title: "المنثور" }],
+    sourceTexts: ["المنثور، 2/362"],
+    suggestedTexts: ["الزركشي، المنثور"]
+});
+assert.equal(zarkashiPairs.length, 1);
+assert.equal(quotedZarkashi.slice(zarkashiPairs[0].start, zarkashiPairs[0].end), "المنثور");
+assert.ok(quotedZarkashi.slice(0, zarkashiPairs[0].start).startsWith("ومثلها قاعدة الزركشي"));
+assert.ok(quotedZarkashi.slice(zarkashiPairs[0].end).includes("2/362"));
