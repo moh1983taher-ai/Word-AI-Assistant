@@ -432,7 +432,7 @@ function getNoteIndex(suggestion, source) {
             if (identityWithinSelection.length !== 1) continue;
             const selectedPrefix = sourceWithoutLeadIn.slice(0, identityWithinSelection[0].start);
             const selectedSuffix = sourceWithoutLeadIn.slice(identityWithinSelection[0].end);
-            const allowedPrefix = !selectedPrefix;
+            const allowedPrefix = !selectedPrefix || (attachedKaf && selectedPrefix === "ك");
             const suffixCore = selectedSuffix.replace(/[.؟!)]*$/u, "").trim();
             const suffixWithoutRangePhrase = suffixCore.replace(
                 /(?:[،,؛;]?\s*)(?:وما بعدها|وما بعده|وما يليها|وما يليه|وما بعد ذلك)$/u,
