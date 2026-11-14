@@ -49,13 +49,64 @@
     function getIdentityText(value) {
         let text = String(value ?? "").trim();
         if (!text) return "";
-        // Editorial cues are outside the bibliographic identity and must survive replacement.
-        text = text.replace(/^(?:(?:انظر|ينظر|راجع|يراجع|قارن|نقلاً عن|نقلًا عن)\s*[:：]?\s*)+/u, "").trim();
+
+        // Outer punctuation enclosing the selected citation is not part of
+        // the bibliographic identity; it must remain in the surrounding note.
+        const wrappers = [
+            ["(", ")"], ["[", "]"], ["（", "）"], ["［", "］"],
+            ["{", "}"], ["【", "】"], ["«", "»"], ["“", "”"]
+        ];
+        for (const [opening, closing] of wrappers) {
+            if (!text.startsWith(opening) || !text.endsWith(closing)) continue;
+            let depth = 0;
+            let closesAtEnd = true;
+            for (let index = 0; index < text.length; index++) {
+                if (text[index] === opening) depth++;
+                if (text[index] === closing) depth--;
+                if (depth === 0 && index < text.length - 1) {
+                    closesAtEnd = false;
+                    break;
+                }
+            }
+            if (closesAtEnd && depth === 0) {
+                text = text.slice(opening.length, -closing.length).trim();
+                break;
+            }
+        }
+
+        // Keep note counters outside the replacement, whether or not an
+        // editorial lead-in such as "انظر:" follows the counter.
+        text = text.replace(
+            /^(?:(?:\(\s*[0-9٠-٩۰-۹]{1,4}\s*\)|\[\s*[0-9٠-٩۰-۹]{1,4}\s*\]|[0-9٠-٩۰-۹]{1,4}[.)])\s*)+/u,
+            ""
+        ).trimStart();
+        text = text.replace(
+            /^[0-9٠-٩۰-۹]{1,4}(?=\s+(?:انظر|ينظر|راجع|يراجع|قارن|نقلاً عن|نقلًا عن)(?:\s|[:：]|$))\s+/u,
+            ""
+        );
+        text = text.replace(
+            /^(?:(?:انظر|ينظر|راجع|يراجع|قارن|نقلاً عن|نقلًا عن)\s*[:：]?\s*)+/u,
+            ""
+        ).trim();
+
+        // Terminal punctuation and an unmatched closing bracket delimit the
+        // citation; they are not characters to be consumed by replacement.
+        text = text.replace(/[،,؛;:.!?؟۔]+$/u, "").trim();
+        const closingPairs = {
+            ")": "(", "]": "[", "}": "{", "）": "（", "］": "［", "】": "【"
+        };
+        for (const [closing, opening] of Object.entries(closingPairs)) {
+            if (!text.endsWith(closing)) continue;
+            const openingCount = [...text].filter(char => char === opening).length;
+            const closingCount = [...text].filter(char => char === closing).length;
+            if (closingCount > openingCount) text = text.slice(0, -closing.length).trimEnd();
+        }
+
         const match = LOCATION_SUFFIX.exec(text);
         if (!match || match.index <= 0) return text;
         return text.slice(0, match.index)
             .trim()
-            .replace(/[،,؛;:\s]+$/gu, "")
+            .replace(/[،,؛;:.\s]+$/gu, "")
             .trim();
     }
 
@@ -245,7 +296,9 @@ function getNoteIndex(suggestion, source) {
             const identityText = getIdentityText(sourceText);
             if (!sourceText || !identityText || !replacementText) continue;
 
-            const sourceKey = normalizeIdentityText(sourceText);
+            // Count repeated anchors by their exact source text. Similar strings
+            // that differ in punctuation must not share Word occurrence ordinals.
+            const sourceKey = sourceText;
             if (!sourceKey) continue;
 
             const sourceOccurrenceIndex = sourceOccurrenceCounts.get(sourceKey) || 0;
@@ -390,12 +443,15 @@ function getNoteIndex(suggestion, source) {
     }
 
     function searchOptions() {
+        // Search the exact source extracted from this same note snapshot. Ignoring
+        // punctuation or spaces can enlarge/shift Word's returned range.
+        // If Word cannot find the exact span, the operation is skipped safely.
         return {
-            matchCase: false,
+            matchCase: true,
             matchWholeWord: false,
             matchWildcards: false,
-            ignorePunct: true,
-            ignoreSpace: true
+            ignorePunct: false,
+            ignoreSpace: false
         };
     }
 
@@ -512,9 +568,9 @@ function getNoteIndex(suggestion, source) {
 
                 const identitySearches = [];
                 for (const operation of fullSearches) {
-                    const expectedFull = normalizeIdentityText(operation.pair.sourceText);
+                    const expectedFull = operation.pair.sourceText;
                     const matches = operation.fullSearch.items.filter(match =>
-                        normalizeIdentityText(match.text) === expectedFull
+                        String(match.text ?? "") === expectedFull
                     );
                     const fullMatch = selectOccurrence(matches, operation.pair.sourceOccurrenceIndex);
                     if (!fullMatch) {
@@ -546,9 +602,9 @@ function getNoteIndex(suggestion, source) {
                 if (identityCandidates.length) await context.sync();
 
                 for (const operation of identitySearches) {
-                    const expectedIdentity = normalizeIdentityText(operation.pair.identityText);
+                    const expectedIdentity = operation.pair.expectedText;
                     const matches = operation.identitySearch.items.filter(match =>
-                        normalizeIdentityText(match.text) === expectedIdentity
+                        String(match.text ?? "") === expectedIdentity
                     );
                     if (matches.length !== 1) {
                         summaries.skipped++;
