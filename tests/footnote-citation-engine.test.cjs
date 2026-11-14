@@ -585,6 +585,94 @@ async function testDetailedCitationApplyPreservesAllMetadata() {
     }
 }
 
+
+// A full author name found in metadata must not prevent the adjacent short
+// author form from being used to identify the replaceable book/author span.
+const authorRepeatedInMetadataCitation =
+    "الكتاب، السيوطي، المحقق: جلال الدين عبد الرحمن بن أبي بكر السيوطي، دار النشر، بيروت، ط2، ص45";
+const authorRepeatedInMetadataReference = {
+    title: "الكتاب",
+    author: "السيوطي",
+    authorFull: "جلال الدين عبد الرحمن بن أبي بكر السيوطي"
+};
+const authorRepeatedIdentity = engine.resolveBibliographicIdentitySpan(
+    authorRepeatedInMetadataCitation,
+    authorRepeatedInMetadataReference
+);
+assert.ok(authorRepeatedIdentity?.includesAuthor);
+assert.equal(
+    authorRepeatedInMetadataCitation.slice(authorRepeatedIdentity.start, authorRepeatedIdentity.end),
+    "الكتاب، السيوطي",
+    "the short adjacent author must be selected when the full name occurs only in later metadata"
+);
+
+const firstMentionFallbackText =
+    "الكتاب، جلال الدين عبد الرحمن بن أبي بكر السيوطي";
+const firstMentionFallbackPairs = engine.buildPairs(authorRepeatedInMetadataCitation, {
+    references: [authorRepeatedInMetadataReference],
+    sourceTexts: [authorRepeatedInMetadataCitation],
+    replacementTexts: [firstMentionFallbackText]
+});
+assert.equal(firstMentionFallbackPairs.length, 1);
+assert.equal(
+    authorRepeatedInMetadataCitation.slice(
+        firstMentionFallbackPairs[0].start,
+        firstMentionFallbackPairs[0].end
+    ),
+    "الكتاب، السيوطي"
+);
+assert.ok(
+    authorRepeatedInMetadataCitation.slice(firstMentionFallbackPairs[0].end)
+        .startsWith("، المحقق: جلال الدين عبد الرحمن بن أبي بكر السيوطي"),
+    "the full name in the editor/metadata segment must remain untouched"
+);
+
+const authorTitleFallbackPairs = engine.buildPairs(authorRepeatedInMetadataCitation, {
+    references: [authorRepeatedInMetadataReference],
+    sourceTexts: [authorRepeatedInMetadataCitation],
+    replacementTexts: ["السيوطي، الكتاب"]
+});
+assert.equal(authorTitleFallbackPairs.length, 1);
+assert.equal(
+    authorRepeatedInMetadataCitation.slice(
+        authorTitleFallbackPairs[0].start,
+        authorTitleFallbackPairs[0].end
+    ),
+    "الكتاب، السيوطي",
+    "the author-title format must use the same validated identity span"
+);
+
+// Location data accidentally included in the AI title field must be removed
+// from the match target so that volume/page information is preserved.
+const titleWithLocationCitation = "النووي، المجموع، ج 2، ص 145";
+const titleWithLocationReference = {
+    author: "النووي",
+    title: "المجموع، ج 2، ص 145"
+};
+const titleWithLocationIdentity = engine.resolveBibliographicIdentitySpan(
+    titleWithLocationCitation,
+    titleWithLocationReference
+);
+assert.ok(titleWithLocationIdentity?.includesAuthor);
+assert.equal(
+    titleWithLocationCitation.slice(
+        titleWithLocationIdentity.start,
+        titleWithLocationIdentity.end
+    ),
+    "النووي، المجموع"
+);
+const titleWithLocationPairs = engine.buildPairs(titleWithLocationCitation, {
+    references: [titleWithLocationReference],
+    sourceTexts: [titleWithLocationCitation],
+    replacementTexts: ["النووي، المجموع المحقق"]
+});
+assert.equal(titleWithLocationPairs.length, 1);
+assert.equal(
+    titleWithLocationCitation.slice(titleWithLocationPairs[0].end),
+    "، ج 2، ص 145",
+    "the volume and page suffix must remain outside the replacement span"
+);
+
 testExactWordReplacementPreservesContext()
     .then(() => testDetailedCitationApplyPreservesAllMetadata())
     .then(() => console.log("Footnote citation engine tests passed."))
