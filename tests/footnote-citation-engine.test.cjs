@@ -188,14 +188,14 @@ assert.equal(extendedPageNote.slice(extendedPagePairs[0].start, extendedPagePair
 assert.ok(extendedPageNote.slice(extendedPagePairs[0].end).includes("ص37 - 39، وما بعدها"));
 
 // A standalone attached kaf before a definite-article author is a valid anchor boundary.
-const kafNote = "كالبحر المحيط، الزركشي، ج 8، ص 85";
+const kafNote = "كالزركشي، البحر المحيط، ج 8، ص 85";
 const kafPairs = engine.buildPairs(kafNote, {
     references: [{ author: "الزركشي", title: "البحر المحيط" }],
-    sourceTexts: ["البحر المحيط، الزركشي"],
-    suggestedTexts: ["الزركشي، البحر المحيط"]
+    sourceTexts: ["كالزركشي، البحر المحيط"],
+    suggestedTexts: ["البحر المحيط، الزركشي"]
 });
 assert.equal(kafPairs.length, 1);
-assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "البحر المحيط، الزركشي");
+assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "الزركشي، البحر المحيط");
 assert.equal(kafNote[kafPairs[0].start - 1], "ك",
     "the attached preposition must remain outside the replacement span");
 
