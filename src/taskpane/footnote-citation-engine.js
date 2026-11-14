@@ -29,7 +29,7 @@
     function referenceKey(reference) {
         if (!reference || typeof reference !== "object") return "";
         const author = normalizeIdentityText(reference.author);
-        const title = normalizeBibliographicTitleKey(reference.title);
+        const title = normalizeIdentityText(getIdentityText(reference.title));
         if (!title) return "";
         return author + "::" + title;
     }
@@ -225,251 +225,96 @@ function getNoteIndex(suggestion, source) {
         return cleaned.join(" ").replace(/\s+([،,؛:.)])/gu, "$1").trim();
     }
 
-
-    function findNormalizedSpans(sourceText, candidateText) {
-        const source = String(sourceText ?? "");
-        const target = normalizeIdentityText(candidateText);
-        if (!source || !target) return [];
-
-        const normalized = [];
-        const rawMap = [];
-
-        for (let index = 0; index < source.length; index++) {
-            const normalizedCharacter = normalizeIdentityText(source[index]);
-            if (!normalizedCharacter) continue;
-
-            normalized.push(normalizedCharacter);
-            for (let offset = 0; offset < normalizedCharacter.length; offset++) {
-                rawMap.push(index);
-            }
-        }
-
-        const haystack = normalized.join("");
-        const spans = [];
-        let searchFrom = 0;
-
-        while (searchFrom <= haystack.length - target.length) {
-            const position = haystack.indexOf(target, searchFrom);
-            if (position < 0) break;
-
-            searchFrom = position + Math.max(1, target.length);
-
-            const start = rawMap[position];
-            const end = rawMap[position + target.length - 1] + 1;
-            if (!Number.isInteger(start) || !Number.isInteger(end) || end <= start) continue;
-
-            spans.push({
-                start,
-                end,
-                text: source.slice(start, end)
-            });
-        }
-
-        return spans;
-    }
-
-    function findBibliographicCitationSpans(noteText, reference) {
-        const source = String(noteText ?? "");
-        if (!source || !reference || typeof reference !== "object") return [];
-
-        const title = getIdentityText(reference.title || "");
-        const author = String(reference.author || "").trim();
-        if (!title) return [];
-
-        // Prefer the complete title. A first-word fallback is allowed only when
-        // it is independently bounded by a page locator or an adjacent author.
-        const titleCandidates = [];
-        function addTitleCandidate(value) {
-            const candidate = String(value || "").trim();
-            const key = normalizeIdentityText(candidate);
-
-            if (
-                key.length < 5 ||
-                titleCandidates.some(item => normalizeIdentityText(item) === key)
-            ) {
-                return;
-            }
-
-            titleCandidates.push(candidate);
-        }
-
-        addTitleCandidate(title);
-
-        const titleWithoutKitab = title.replace(/^كتاب\s+/u, "").trim();
-        if (titleWithoutKitab !== title) addTitleCandidate(titleWithoutKitab);
-
-        const firstTitleWord = titleWithoutKitab.split(/\s+/u).filter(Boolean)[0] || "";
-        if (normalizeIdentityText(firstTitleWord).length >= 5) {
-            addTitleCandidate(firstTitleWord);
-        }
-
-        const results = [];
-
-        for (const candidate of titleCandidates) {
-            const titleSpans = findNormalizedSpans(source, candidate);
-
-            for (const titleSpan of titleSpans) {
-                const previousCharacter = source.slice(0, titleSpan.start).slice(-1);
-                if (previousCharacter && /[\p{L}\p{N}]/u.test(previousCharacter)) continue;
-
-                let start = titleSpan.start;
-                let end = titleSpan.end;
-                let authorAdjacent = false;
-
-                if (author) {
-                    const authorSpans = findNormalizedSpans(source, author);
-
-                    const precedingAuthors = authorSpans.filter(span =>
-                        span.end <= titleSpan.start &&
-                        /^[\s،,؛:]+$/u.test(source.slice(span.end, titleSpan.start))
-                    );
-
-                    const followingAuthors = authorSpans.filter(span =>
-                        span.start >= titleSpan.end &&
-                        /^[\s،,؛:]+$/u.test(source.slice(titleSpan.end, span.start))
-                    );
-
-                    if (precedingAuthors.length === 1) {
-                        start = precedingAuthors[0].start;
-                        authorAdjacent = true;
-                    } else if (followingAuthors.length === 1) {
-                        const afterAuthor = source
-                            .slice(followingAuthors[0].end)
-                            .replace(/^[\s،,؛:]+/u, "");
-
-                        const authorThenLocation =
-                            /^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u
-                                .test(afterAuthor);
-
-                        const authorThenTerminal =
-                            !afterAuthor || ".؛،,:؟!)]}".includes(afterAuthor[0]);
-
-                        if (authorThenLocation || authorThenTerminal) {
-                            end = followingAuthors[0].end;
-                            authorAdjacent = true;
-                        }
-                    }
-                }
-
-                const finalTail = source
-                    .slice(end)
-                    .replace(/^[\s،,؛:]+/u, "");
-
-                const hasFinalLocation =
-                    /^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u
-                        .test(finalTail);
-
-                const hasFinalTerminal =
-                    !finalTail || ".؛،,:؟!)]}".includes(finalTail[0]);
-
-                // A title alone is not enough: require a page/volume locator,
-                // or an author immediately adjacent to the title.
-                if (!hasFinalLocation && !(authorAdjacent && hasFinalTerminal)) continue;
-
-                if (!results.some(item => item.start === start && item.end === end)) {
-                    results.push({
-                        start,
-                        end,
-                        text: source.slice(start, end).trim()
-                    });
-                }
-            }
-
-            if (results.length) break;
-        }
-
-        return results.sort((left, right) => left.start - right.start);
-    }
-
-    function normalizeBibliographicTitleKey(value) {
-        const key = normalizeIdentityText(getIdentityText(value));
-
-        // Verified alias for al-Farahidi's work. Do not remove "كتاب" generically:
-        // in other titles it may be a meaningful part of the bibliographic identity.
-        const aliases = new Map([
-            [normalizeIdentityText("كتاب العين"), normalizeIdentityText("العين")],
-            [normalizeIdentityText("العين"), normalizeIdentityText("العين")]
-        ]);
-
-        return aliases.get(key) || key;
-    }
-
     function buildPairs(noteText, suggestion) {
-        const references = Array.isArray(suggestion && suggestion.references)
-            ? suggestion.references
-            : [];
-        const suggestedTexts = Array.isArray(suggestion && suggestion.suggestedTexts)
-            ? suggestion.suggestedTexts
-            : [];
-        const sourceTexts = Array.isArray(suggestion && suggestion.sourceTexts)
-            ? suggestion.sourceTexts
-            : [];
-
+        const references = Array.isArray(suggestion && suggestion.references) ? suggestion.references : [];
+        const suggestedTexts = Array.isArray(suggestion && suggestion.suggestedTexts) ? suggestion.suggestedTexts : [];
+        const sourceTexts = Array.isArray(suggestion && suggestion.sourceTexts) ? suggestion.sourceTexts : [];
         const count = Math.min(references.length, suggestedTexts.length, sourceTexts.length);
         const pairs = [];
         pairs.collapsedCount = 0;
         pairs.unchangedCount = 0;
 
+        // The same work can legitimately occur more than once in a single note.
+        // Preserve each occurrence using the ordinal of its complete source anchor.
         const sourceOccurrenceCounts = new Map();
 
         for (let index = 0; index < count; index++) {
             const reference = references[index];
             const sourceText = String(sourceTexts[index] ?? "").trim();
             const replacementText = getIdentityText(suggestedTexts[index]);
-            if (!sourceText || !replacementText) continue;
+            const identityText = getIdentityText(sourceText);
+            if (!sourceText || !identityText || !replacementText) continue;
 
-            const spans = findBibliographicCitationSpans(noteText, reference);
-            if (!spans.length) continue;
-
-            // If the AI supplied the whole note and the title occurs more than once,
-            // the occurrence cannot be selected safely. Skip rather than guess.
-            if (
-                normalizeIdentityText(sourceText) === normalizeIdentityText(noteText) &&
-                spans.length > 1
-            ) {
-                continue;
-            }
-
-            const sourceKey =
-                referenceKey(reference) + "::" +
-                normalizeIdentityText(getIdentityText(sourceText));
-
+            const sourceKey = normalizeIdentityText(sourceText);
             if (!sourceKey) continue;
 
-            const occurrenceIndex = sourceOccurrenceCounts.get(sourceKey) || 0;
-            if (spans.length <= occurrenceIndex) continue;
+            const sourceOccurrenceIndex = sourceOccurrenceCounts.get(sourceKey) || 0;
+            let matchedSourceText = sourceText;
+            let sourceMatches = findExactOccurrences(noteText, matchedSourceText);
 
-            const span = spans[occurrenceIndex];
-            sourceOccurrenceCounts.set(sourceKey, occurrenceIndex + 1);
+            // If the AI supplied the bibliographic identity without an attached
+            // preposition, allow the unique validated anchor finder to locate it
+            // after a standalone kaf (e.g. "كالزركشي، البحر المحيط").
+            if (sourceMatches.length <= sourceOccurrenceIndex && sourceOccurrenceIndex === 0) {
+                const fallbackAnchor = findUniqueBibliographicAnchor(noteText, reference);
+                if (fallbackAnchor) {
+                    const fallbackMatches = findExactOccurrences(noteText, fallbackAnchor);
+                    if (fallbackMatches.length === 1) {
+                        matchedSourceText = fallbackAnchor;
+                        sourceMatches = fallbackMatches;
+                    }
+                }
+            }
+            if (sourceMatches.length <= sourceOccurrenceIndex) continue;
 
-            if (normalizeIdentityText(span.text) === normalizeIdentityText(replacementText)) {
+            const sourceStart = sourceMatches[sourceOccurrenceIndex];
+            sourceOccurrenceCounts.set(sourceKey, sourceOccurrenceIndex + 1);
+
+            // The kaf is a grammatical connector, not part of the author's name.
+            // Exclude it from the replaceable span only when the reference author
+            // confirms that the text immediately following it is the actual name.
+            const authorText = String(reference && reference.author || "").trim();
+            const hasAttachedKaf = matchedSourceText === sourceText &&
+                /^ال/u.test(authorText) &&
+                sourceText.startsWith("ك" + authorText) &&
+                (sourceStart === 0 || !/[\p{L}\p{N}]/u.test(noteText[sourceStart - 1]));
+
+            const identitySourceText = hasAttachedKaf ? sourceText.slice(1) : matchedSourceText;
+            const resolvedIdentityText = getIdentityText(identitySourceText);
+            if (!resolvedIdentityText) continue;
+
+            const localIdentityOffset = identitySourceText.indexOf(resolvedIdentityText);
+            if (localIdentityOffset < 0) continue;
+
+            const replaceableText = resolvedIdentityText;
+            const start = sourceStart + (hasAttachedKaf ? 1 : 0) + localIdentityOffset;
+            const end = start + replaceableText.length;
+            if (noteText.slice(start, end) !== replaceableText) continue;
+
+            if (normalizeIdentityText(resolvedIdentityText) === normalizeIdentityText(replacementText)) {
                 pairs.unchangedCount++;
                 continue;
             }
 
             pairs.push({
-                sourceText,
-                identityText: span.text,
-                replacementText,
-                start: span.start,
-                end: span.end,
-                expectedText: span.text,
-                sourceOccurrenceIndex: occurrenceIndex,
+                sourceText: sourceText,
+                identityText: replaceableText,
+                replacementText: replacementText,
+                start: start,
+                end: end,
+                expectedText: resolvedIdentityText,
+                sourceOccurrenceIndex: sourceOccurrenceIndex,
                 referenceKey: referenceKey(reference) || sourceKey
             });
         }
 
-        pairs.sort((left, right) =>
-            left.start - right.start || right.end - left.end
-        );
-
+        pairs.sort((a, b) => a.start - b.start || b.end - a.end);
         const nonOverlapping = [];
         for (const pair of pairs) {
             const previous = nonOverlapping[nonOverlapping.length - 1];
             if (previous && pair.start < previous.end) continue;
             nonOverlapping.push(pair);
         }
-
         nonOverlapping.collapsedCount = pairs.collapsedCount;
         nonOverlapping.unchangedCount = pairs.unchangedCount;
         return nonOverlapping;
@@ -779,8 +624,6 @@ function getNoteIndex(suggestion, source) {
         hasUnparsedLocationSuffix: hasUnparsedLocationSuffix,
         normalizeIdentityText: normalizeIdentityText,
         referenceKey: referenceKey,
-        normalizeBibliographicTitleKey: normalizeBibliographicTitleKey,
-        findBibliographicCitationSpans: findBibliographicCitationSpans,
         uniqueReferenceEntries: uniqueReferenceEntries,
         normalizeBibliographicTitle: normalizeBibliographicTitle,
         findUniqueBibliographicAnchor: findUniqueBibliographicAnchor,
