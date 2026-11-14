@@ -460,10 +460,13 @@ function getNoteIndex(suggestion, source) {
 
     function formatBibliographicIdentity(reference, format, includeAuthor = true, authorOverride) {
         if (!reference || typeof reference !== "object") return "";
-        const title = String(reference.title ?? "").trim();
         const author = String(
             authorOverride !== undefined ? authorOverride : reference.author ?? ""
         ).trim();
+        const title = normalizeBibliographicTitle(
+            getIdentityText(reference.title ?? ""),
+            String(reference.author || reference.sourceAuthor || reference.authorFull || author).trim()
+        );
 
         switch (String(format || "author-title")) {
             case "reference-only":
