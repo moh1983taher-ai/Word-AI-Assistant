@@ -228,7 +228,7 @@ assert.equal(engine.isHadithTakhrijReference({
     variants: ["البخاري، صحيح البخاري، ج 1، ص 20"]
 }), false);
 
-console.log("Footnote citation engine tests passed.");
+
 
 
 // AI-selected source spans: replace only the bibliographic citation and preserve
@@ -265,3 +265,5 @@ assert.equal(zarkashiPairs.length, 1);
 assert.equal(quotedZarkashi.slice(zarkashiPairs[0].start, zarkashiPairs[0].end), "المنثور");
 assert.ok(quotedZarkashi.slice(0, zarkashiPairs[0].start).startsWith("ومثلها قاعدة الزركشي"));
 assert.ok(quotedZarkashi.slice(zarkashiPairs[0].end).includes("2/362"));
+
+console.log("Footnote citation engine tests passed.");
