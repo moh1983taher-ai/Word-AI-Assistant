@@ -170,7 +170,10 @@ const lookAtPairs = engine.buildPairs(lookAtNote, {
     suggestedTexts: ["النووي، المجموع"]
 });
 assert.equal(lookAtPairs.length, 1);
-assert.equal(lookAtNote.slice(lookAtPairs[0].start, lookAtPairs[0].end), "النووي، المجموع");
+assert.equal(lookAtNote.slice(lookAtPairs[0].start, lookAtPairs[0].end), "المجموع، النووي",
+    "buildPairs must identify the original source span, not pretend it is already replaced");
+assert.equal(lookAtPairs[0].replacementText, "النووي، المجموع",
+    "the canonical order belongs in replacementText");
 assert.ok(lookAtNote.slice(0, lookAtPairs[0].start).startsWith("انظر:"));
 
 // Page ranges followed by "وما بعدها" remain outside the replacement span.
@@ -184,7 +187,9 @@ const extendedPagePairs = engine.buildPairs(extendedPageNote, {
 });
 assert.equal(extendedPagePairs.length, 1);
 assert.equal(extendedPageNote.slice(extendedPagePairs[0].start, extendedPagePairs[0].end),
-    "الغزالي، أساس القياس");
+    "أساس القياس، الغزالي",
+    "the source span retains the author's original order");
+assert.equal(extendedPagePairs[0].replacementText, "الغزالي، أساس القياس");
 assert.ok(extendedPageNote.slice(extendedPagePairs[0].end).includes("ص37 - 39، وما بعدها"));
 
 // A standalone attached kaf before a definite-article author is a valid anchor boundary.
@@ -195,9 +200,12 @@ const kafPairs = engine.buildPairs(kafNote, {
     suggestedTexts: ["البحر المحيط، الزركشي"]
 });
 assert.equal(kafPairs.length, 1);
-assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "الزركشي، البحر المحيط");
+assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "الزركشي، البحر المحيط",
+    "the author anchor is found after the attached kaf");
 assert.equal(kafNote[kafPairs[0].start - 1], "ك",
     "the attached preposition must remain outside the replacement span");
+assert.equal(kafPairs[0].replacementText, "البحر المحيط، الزركشي",
+    "the replacement may reorder the author and title without consuming the kaf");
 
 // Hadith takhrij is excluded, while a normal bibliographic reference to al-Bukhari is not.
 assert.equal(engine.isHadithTakhrijReference({ type: "hadith", author: "البخاري", title: "صحيح البخاري" }), true);
