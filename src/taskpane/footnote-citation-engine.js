@@ -226,65 +226,255 @@ function getNoteIndex(suggestion, source) {
     }
 
 
-    function findNormalizedSpans(sourceText,candidateText){
-        const source=String(sourceText??""),target=normalizeIdentityText(candidateText);if(!source||!target)return[];
-        const normalized=[],rawMap=[];for(let i=0;i<source.length;i++){const p=normalizeIdentityText(source[i]);if(!p)continue;normalized.push(p);for(let j=0;j<p.length;j++)rawMap.push(i);}
-        const hay=normalized.join(""),out=[];let from=0;while(from<=hay.length-target.length){const p=hay.indexOf(target,from);if(p<0)break;from=p+Math.max(1,target.length);const start=rawMap[p],end=rawMap[p+target.length-1]+1;if(Number.isInteger(start)&&Number.isInteger(end)&&end>start)out.push({start,end,text:source.slice(start,end)});}return out;
+    function findNormalizedSpans(sourceText, candidateText) {
+        const source = String(sourceText ?? "");
+        const target = normalizeIdentityText(candidateText);
+        if (!source || !target) return [];
+
+        const normalized = [];
+        const rawMap = [];
+
+        for (let index = 0; index < source.length; index++) {
+            const normalizedCharacter = normalizeIdentityText(source[index]);
+            if (!normalizedCharacter) continue;
+
+            normalized.push(normalizedCharacter);
+            for (let offset = 0; offset < normalizedCharacter.length; offset++) {
+                rawMap.push(index);
+            }
+        }
+
+        const haystack = normalized.join("");
+        const spans = [];
+        let searchFrom = 0;
+
+        while (searchFrom <= haystack.length - target.length) {
+            const position = haystack.indexOf(target, searchFrom);
+            if (position < 0) break;
+
+            searchFrom = position + Math.max(1, target.length);
+
+            const start = rawMap[position];
+            const end = rawMap[position + target.length - 1] + 1;
+            if (!Number.isInteger(start) || !Number.isInteger(end) || end <= start) continue;
+
+            spans.push({
+                start,
+                end,
+                text: source.slice(start, end)
+            });
+        }
+
+        return spans;
     }
-    function findBibliographicCitationSpans(noteText,sourceText,reference){
-        const source=String(noteText??"");if(!source||!reference||typeof reference!=="object")return[];
-        const title=getIdentityText(reference.title||""),author=String(reference.author||"").trim();if(!title)return[];
-        const candidates=[];const add=v=>{v=String(v||"").trim();const k=normalizeIdentityText(v);if(k.length>=5&&!candidates.some(q=>normalizeIdentityText(q)===k))candidates.push(v);};
-        add(title);const short=title.replace(/^كتاب\s+/u,"").trim();if(short!==title)add(short);const first=short.split(/\s+/u)[0]||"";if(normalizeIdentityText(first).length>=5)add(first);
-        const out=[];for(const candidate of candidates){for(const span of findNormalizedSpans(source,candidate)){
-            const prev=source.slice(0,span.start).slice(-1);if(prev&&/[\p{L}\p{N}]/u.test(prev))continue;
-            let start=span.start,end=span.end,authorAdjacent=false;
-            if(author){
-                const as=findNormalizedSpans(source,author);
-                const before=as.filter(a=>a.end<=span.start&&/^[\s،,؛:]+$/u.test(source.slice(a.end,span.start)));
-                const after=as.filter(a=>a.start>=span.end&&/^[\s،,؛:]+$/u.test(source.slice(span.end,a.start)));
-                if(before.length===1){start=before[0].start;authorAdjacent=true;}
-                else if(after.length===1){
-                    const afterAuthor=source.slice(after[0].end).replace(/^[\s،,؛:]+/u,"");
-                    const authorThenLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u.test(afterAuthor);
-                    const authorThenTerminal=!afterAuthor||".؛،,:؟!)]}".includes(afterAuthor[0]);
-                    if(authorThenLocation||authorThenTerminal){end=after[0].end;authorAdjacent=true;}
+
+    function findBibliographicCitationSpans(noteText, reference) {
+        const source = String(noteText ?? "");
+        if (!source || !reference || typeof reference !== "object") return [];
+
+        const title = getIdentityText(reference.title || "");
+        const author = String(reference.author || "").trim();
+        if (!title) return [];
+
+        // Prefer the complete title. A first-word fallback is allowed only when
+        // it is independently bounded by a page locator or an adjacent author.
+        const titleCandidates = [];
+        function addTitleCandidate(value) {
+            const candidate = String(value || "").trim();
+            const key = normalizeIdentityText(candidate);
+
+            if (
+                key.length < 5 ||
+                titleCandidates.some(item => normalizeIdentityText(item) === key)
+            ) {
+                return;
+            }
+
+            titleCandidates.push(candidate);
+        }
+
+        addTitleCandidate(title);
+
+        const titleWithoutKitab = title.replace(/^كتاب\s+/u, "").trim();
+        if (titleWithoutKitab !== title) addTitleCandidate(titleWithoutKitab);
+
+        const firstTitleWord = titleWithoutKitab.split(/\s+/u).filter(Boolean)[0] || "";
+        if (normalizeIdentityText(firstTitleWord).length >= 5) {
+            addTitleCandidate(firstTitleWord);
+        }
+
+        const results = [];
+
+        for (const candidate of titleCandidates) {
+            const titleSpans = findNormalizedSpans(source, candidate);
+
+            for (const titleSpan of titleSpans) {
+                const previousCharacter = source.slice(0, titleSpan.start).slice(-1);
+                if (previousCharacter && /[\p{L}\p{N}]/u.test(previousCharacter)) continue;
+
+                let start = titleSpan.start;
+                let end = titleSpan.end;
+                let authorAdjacent = false;
+
+                if (author) {
+                    const authorSpans = findNormalizedSpans(source, author);
+
+                    const precedingAuthors = authorSpans.filter(span =>
+                        span.end <= titleSpan.start &&
+                        /^[\s،,؛:]+$/u.test(source.slice(span.end, titleSpan.start))
+                    );
+
+                    const followingAuthors = authorSpans.filter(span =>
+                        span.start >= titleSpan.end &&
+                        /^[\s،,؛:]+$/u.test(source.slice(titleSpan.end, span.start))
+                    );
+
+                    if (precedingAuthors.length === 1) {
+                        start = precedingAuthors[0].start;
+                        authorAdjacent = true;
+                    } else if (followingAuthors.length === 1) {
+                        const afterAuthor = source
+                            .slice(followingAuthors[0].end)
+                            .replace(/^[\s،,؛:]+/u, "");
+
+                        const authorThenLocation =
+                            /^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u
+                                .test(afterAuthor);
+
+                        const authorThenTerminal =
+                            !afterAuthor || ".؛،,:؟!)]}".includes(afterAuthor[0]);
+
+                        if (authorThenLocation || authorThenTerminal) {
+                            end = followingAuthors[0].end;
+                            authorAdjacent = true;
+                        }
+                    }
+                }
+
+                const finalTail = source
+                    .slice(end)
+                    .replace(/^[\s،,؛:]+/u, "");
+
+                const hasFinalLocation =
+                    /^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u
+                        .test(finalTail);
+
+                const hasFinalTerminal =
+                    !finalTail || ".؛،,:؟!)]}".includes(finalTail[0]);
+
+                // A title alone is not enough: require a page/volume locator,
+                // or an author immediately adjacent to the title.
+                if (!hasFinalLocation && !(authorAdjacent && hasFinalTerminal)) continue;
+
+                if (!results.some(item => item.start === start && item.end === end)) {
+                    results.push({
+                        start,
+                        end,
+                        text: source.slice(start, end).trim()
+                    });
                 }
             }
-            const finalTail=source.slice(end).replace(/^[\s،,؛:]+/u,"");
-            const hasFinalLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u.test(finalTail);
-            const hasFinalTerminal=!finalTail||".؛،,:؟!)]}".includes(finalTail[0]);
-            if(!hasFinalLocation&&!(authorAdjacent&&hasFinalTerminal))continue;
-            if(!out.some(q=>q.start===start&&q.end===end))out.push({start,end,text:source.slice(start,end).trim()});
-        }if(out.length)break;}return out.sort((a,b)=>a.start-b.start);
+
+            if (results.length) break;
+        }
+
+        return results.sort((left, right) => left.start - right.start);
     }
-    function normalizeBibliographicTitleKey(value){
-        const key=normalizeIdentityText(getIdentityText(value));
-        // Explicitly verified title alias: al-Farahidi's "Kitab al-Ayn" is
-        // also cited as "al-Ayn". Do not strip "Kitab" generically because
-        // it can be a meaningful part of other work titles.
+
+    function normalizeBibliographicTitleKey(value) {
+        const key = normalizeIdentityText(getIdentityText(value));
+
+        // Verified alias for al-Farahidi's work. Do not remove "كتاب" generically:
+        // in other titles it may be a meaningful part of the bibliographic identity.
         const aliases = new Map([
             [normalizeIdentityText("كتاب العين"), normalizeIdentityText("العين")],
             [normalizeIdentityText("العين"), normalizeIdentityText("العين")]
         ]);
+
         return aliases.get(key) || key;
     }
 
-    function buildPairs(noteText,suggestion){
-        const refs=Array.isArray(suggestion&&suggestion.references)?suggestion.references:[],news=Array.isArray(suggestion&&suggestion.suggestedTexts)?suggestion.suggestedTexts:[],olds=Array.isArray(suggestion&&suggestion.sourceTexts)?suggestion.sourceTexts:[];
-        const count=Math.min(refs.length,news.length,olds.length),pairs=[];pairs.collapsedCount=0;pairs.unchangedCount=0;const counts=new Map();
-        for(let i=0;i<count;i++){const ref=refs[i],sourceText=String(olds[i]??"").trim(),replacementText=getIdentityText(news[i]);if(!sourceText||!replacementText)continue;
-            const spans=findBibliographicCitationSpans(noteText,sourceText,ref);if(!spans.length)continue;
-            // When the model supplied the entire note as its source anchor, multiple
-            // appearances of the same title are ambiguous. Never choose the first by guess.
-            if(normalizeIdentityText(sourceText)===normalizeIdentityText(noteText)&&spans.length>1)continue;
-            const key=referenceKey(ref)+"::"+normalizeIdentityText(getIdentityText(sourceText));if(!key)continue;
-            const ordinal=counts.get(key)||0;if(spans.length<=ordinal)continue;const span=spans[ordinal];counts.set(key,ordinal+1);
-            if(normalizeIdentityText(span.text)===normalizeIdentityText(replacementText)){pairs.unchangedCount++;continue;}
-            pairs.push({sourceText,identityText:span.text,replacementText,start:span.start,end:span.end,expectedText:span.text,sourceOccurrenceIndex:ordinal,referenceKey:referenceKey(ref)||key});
+    function buildPairs(noteText, suggestion) {
+        const references = Array.isArray(suggestion && suggestion.references)
+            ? suggestion.references
+            : [];
+        const suggestedTexts = Array.isArray(suggestion && suggestion.suggestedTexts)
+            ? suggestion.suggestedTexts
+            : [];
+        const sourceTexts = Array.isArray(suggestion && suggestion.sourceTexts)
+            ? suggestion.sourceTexts
+            : [];
+
+        const count = Math.min(references.length, suggestedTexts.length, sourceTexts.length);
+        const pairs = [];
+        pairs.collapsedCount = 0;
+        pairs.unchangedCount = 0;
+
+        const sourceOccurrenceCounts = new Map();
+
+        for (let index = 0; index < count; index++) {
+            const reference = references[index];
+            const sourceText = String(sourceTexts[index] ?? "").trim();
+            const replacementText = getIdentityText(suggestedTexts[index]);
+            if (!sourceText || !replacementText) continue;
+
+            const spans = findBibliographicCitationSpans(noteText, reference);
+            if (!spans.length) continue;
+
+            // If the AI supplied the whole note and the title occurs more than once,
+            // the occurrence cannot be selected safely. Skip rather than guess.
+            if (
+                normalizeIdentityText(sourceText) === normalizeIdentityText(noteText) &&
+                spans.length > 1
+            ) {
+                continue;
+            }
+
+            const sourceKey =
+                referenceKey(reference) + "::" +
+                normalizeIdentityText(getIdentityText(sourceText));
+
+            if (!sourceKey) continue;
+
+            const occurrenceIndex = sourceOccurrenceCounts.get(sourceKey) || 0;
+            if (spans.length <= occurrenceIndex) continue;
+
+            const span = spans[occurrenceIndex];
+            sourceOccurrenceCounts.set(sourceKey, occurrenceIndex + 1);
+
+            if (normalizeIdentityText(span.text) === normalizeIdentityText(replacementText)) {
+                pairs.unchangedCount++;
+                continue;
+            }
+
+            pairs.push({
+                sourceText,
+                identityText: span.text,
+                replacementText,
+                start: span.start,
+                end: span.end,
+                expectedText: span.text,
+                sourceOccurrenceIndex: occurrenceIndex,
+                referenceKey: referenceKey(reference) || sourceKey
+            });
         }
-        pairs.sort((a,b)=>a.start-b.start||b.end-a.end);const safe=[];for(const pair of pairs){const prev=safe[safe.length-1];if(prev&&pair.start<prev.end)continue;safe.push(pair);}safe.collapsedCount=pairs.collapsedCount;safe.unchangedCount=pairs.unchangedCount;return safe;
+
+        pairs.sort((left, right) =>
+            left.start - right.start || right.end - left.end
+        );
+
+        const nonOverlapping = [];
+        for (const pair of pairs) {
+            const previous = nonOverlapping[nonOverlapping.length - 1];
+            if (previous && pair.start < previous.end) continue;
+            nonOverlapping.push(pair);
+        }
+
+        nonOverlapping.collapsedCount = pairs.collapsedCount;
+        nonOverlapping.unchangedCount = pairs.unchangedCount;
+        return nonOverlapping;
     }
+
     function selectOccurrence(matches, occurrenceIndex) {
         if (!Array.isArray(matches) || !Number.isInteger(occurrenceIndex) || occurrenceIndex < 0) {
             return null;
