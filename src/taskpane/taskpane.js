@@ -29221,6 +29221,13 @@ async function analyzeReferencesWithAI(
                                     material.materialId
                                 );
 
+                            const rawMaterialText = String(material.text || "")
+                                .replace(/^【(?:FOOTNOTE|ENDNOTE)_ID:[^】]+】\\s*/u, "")
+                                .trim();
+                            const proposedSourceText = String(occurrence.sourceText || "").trim();
+                            occurrence.sourceText = proposedSourceText
+                                ? window.FootnoteCitationEngine.findValidatedSourceSpan(rawMaterialText, proposedSourceText)
+                                : "";
 
                             return true;
 
@@ -29579,6 +29586,40 @@ variants تستخدم للصيغ المختلفة للمرجع نفسه فقط.
 ولا يجوز وضع كتاب مختلف داخل variants.
 
 =====================================================
+10.1 النص الأصلي الكامل لكل ظهور في الحواشي
+=====================================================
+
+لكل occurrence تابع لحاشية أو حاشية ختامية،
+أعد الحقل sourceText بوصفه اقتباسًا حرفيًا متصلًا
+من نص المادة الأصلية نفسها.
+
+يجب أن يضم sourceText الإحالة كاملة كما كتبها الباحث:
+اسم المؤلف إن وجد، والعنوان كاملًا، وبيانات الطبعة
+والجزء والصفحة إذا كانت ضمن الإحالة نفسها.
+
+لا تكتفِ ببداية العنوان أو جزء منه.
+إذا كان النص "السيوطي، الأشباه والنظائر، ط1، ص98"
+فلا تُعد "السيوطي، الأشباه" بوصفه sourceText.
+
+لا تعِد صياغة النص ولا توحّد علامات ترقيمه.
+انسخ المقطع كما ورد حرفيًا، مع استبعاد الكلام التفسيري
+المجاور والإحالة المستقلة التالية.
+
+إذا لم تستطع تحديد حدود الإحالة كاملة بثقة،
+اجعل sourceText فارغًا، وارفع needsReview بدل اختراع نطاق.
+
+أضف sourceTextConfidence من 0 إلى 1.
+
+واجعل كل عنصر في variants كائنًا يتضمن:
+text: الصيغة الأصلية الحرفية،
+materialId: هوية الحاشية التي وردت فيها هذه الصيغة،
+source: مصدر المادة،
+noteNumber: رقم الحاشية،
+confidence: الثقة في اكتمال الصيغة.
+
+لا تضع صيغة من حاشية داخل variant مرتبط بحاشية أخرى.
+
+=====================================================
 11. الدقة وعدم الحذف
 =====================================================
 
@@ -29633,12 +29674,22 @@ variants تستخدم للصيغ المختلفة للمرجع نفسه فقط.
       "city": "",
       "year": "",
       "locations": [],
-      "variants": [],
+      "variants": [
+        {
+          "text": "",
+          "materialId": "",
+          "source": "",
+          "noteNumber": null,
+          "confidence": 0.0
+        }
+      ],
       "occurrences": [
         {
           "materialId": "",
           "source": "",
           "noteNumber": null,
+          "sourceText": "",
+          "sourceTextConfidence": 0.0,
           "volume": "",
           "page": "",
           "pageRange": ""
@@ -29695,6 +29746,7 @@ other
             "افصل جميع المراجع المستقلة الموجودة داخل كل مادة.",
 
             "إذا كان المرجع نفسه له أكثر من موضع، احتفظ بجميع مواضعه.",
+            "لكل occurrence في الحواشي، انسخ sourceText كاملًا حرفيًا من الحاشية نفسها، ولا تكتفِ بجزء من العنوان. اربط كل variant بـ materialId الصحيح، ولا تنقل صيغة من حاشية إلى أخرى.",
 
             "",
 
@@ -46937,114 +46989,44 @@ async function buildFootnoteSuggestions(
              * =====================================================
              */
 
-            function findSourceText(
-                originalText,
-                reference,
-                occurrence
-            ) {
+            function findSourceText(originalText, reference, occurrence) {
                 const text = String(originalText || "");
                 if (!text.trim()) return "";
+                const engine = window.FootnoteCitationEngine;
+                if (!engine || typeof engine.findValidatedSourceSpan !== "function") return "";
+                const validate = candidate => engine.findValidatedSourceSpan(text, candidate);
 
-                const variants = Array.isArray(reference?.variants)
-                    ? reference.variants
-                    : [];
+                // Prefer the exact source span returned for this AI occurrence.
+                const occurrenceAnchor = validate(occurrence?.sourceText);
+                if (occurrenceAnchor) return occurrenceAnchor;
 
+                const variants = Array.isArray(reference?.variants) ? reference.variants : [];
                 function getVariantText(item) {
                     if (typeof item === "string") return item.trim();
                     if (!item || typeof item !== "object") return "";
-                    return String(
-                        item.text ||
-                        item.originalText ||
-                        item.cleanedText ||
-                        item.citation ||
-                        item.value ||
-                        ""
-                    ).trim();
+                    return String(item.text || item.originalText || item.cleanedText || item.citation || item.value || "").trim();
                 }
 
-                // Prefer the variant attached to this exact material/note, then
-                // variants from the same note, then other known source spellings.
-                const ranked = variants
-                    .map(function (item, index) {
-                        let score = 0;
-                        if (item && typeof item === "object") {
-                            if (
-                                occurrence?.materialId &&
-                                String(item.materialId || "") === String(occurrence.materialId)
-                            ) score += 100;
-                            if (
-                                occurrence?.source &&
-                                String(item.source || "") === String(occurrence.source)
-                            ) score += 20;
-                            if (
-                                occurrence?.noteNumber != null &&
-                                String(item.noteNumber ?? "") === String(occurrence.noteNumber)
-                            ) score += 10;
-                        }
-                        return { text: getVariantText(item), score: score, index: index };
-                    })
-                    .filter(function (item) {
-                        return item.text &&
-                            item.text !== "[object Object]" &&
-                            item.text.length >= 4;
-                    })
-                    .sort(function (a, b) {
-                        return b.score - a.score || a.index - b.index;
-                    });
+                const materialId = String(occurrence?.materialId || "");
+                const ranked = variants.map(function (item, index) {
+                    const scopedMaterial = String(item?.materialId || "");
+                    // A spelling from another note must never anchor this occurrence.
+                    if (materialId && scopedMaterial !== materialId) return null;
+                    let score = 0;
+                    if (materialId && scopedMaterial === materialId) score += 1000;
+                    if (occurrence?.source && String(item?.source || "") === String(occurrence.source)) score += 100;
+                    if (occurrence?.noteNumber != null && String(item?.noteNumber ?? "") === String(occurrence.noteNumber)) score += 50;
+                    const candidate = getVariantText(item);
+                    return { text: candidate, score, length: engine.normalizeIdentityText(candidate).length, index };
+                }).filter(item => item && item.text && item.text !== "[object Object]" && item.length >= 4)
+                  .sort((a, b) => b.score - a.score || b.length - a.length || a.index - b.index);
 
-                function normalizeWithMap(value) {
-                    const raw = String(value || "");
-                    let normalized = "";
-                    const rawMap = [];
-
-                    for (let i = 0; i < raw.length; i++) {
-                        let ch = raw[i];
-                        if (/[\u064B-\u065F\u0670\u0640]/.test(ch)) continue;
-                        if (/[\u200C-\u200F\u202A-\u202E\uFEFF]/.test(ch)) continue;
-                        if (/[\s\u00A0،,؛:()[\]{}"']/u.test(ch)) continue;
-                        if (/[أإآٱ]/.test(ch)) ch = "ا";
-                        if (ch === "ى") ch = "ي";
-                        ch = ch.toLowerCase();
-                        normalized += ch;
-                        for (let j = 0; j < ch.length; j++) rawMap.push(i);
-                    }
-
-                    return { normalized: normalized, rawMap: rawMap };
+                for (const item of ranked) {
+                    const validated = validate(item.text);
+                    if (validated) return validated;
                 }
 
-                const sourceMap = normalizeWithMap(text);
-
-                for (let i = 0; i < ranked.length; i++) {
-                    const candidate = ranked[i].text;
-                    const escaped = candidate
-                        .replace(/[.*+?^$()|[\]\\]/g, "\\$&")
-                        .replace(/\s+/g, "\\s*");
-
-                    try {
-                        const exact = new RegExp(escaped, "i").exec(text);
-                        if (exact) return exact[0];
-                    } catch (_) {
-                        // Continue with normalized matching.
-                    }
-
-                    const target = normalizeWithMap(candidate).normalized;
-                    if (target.length < 4) continue;
-
-                    const position = sourceMap.normalized.indexOf(target);
-                    if (position === -1) continue;
-
-                    const rawStart = sourceMap.rawMap[position];
-                    const rawEnd = sourceMap.rawMap[position + target.length - 1] + 1;
-                    if (
-                        Number.isInteger(rawStart) &&
-                        Number.isInteger(rawEnd) &&
-                        rawEnd > rawStart
-                    ) {
-                        return text.slice(rawStart, rawEnd);
-                    }
-                }
-
-                return "";
+                return engine.findUniqueBibliographicAnchor(originalText, reference) || "";
             }
 
             /*
