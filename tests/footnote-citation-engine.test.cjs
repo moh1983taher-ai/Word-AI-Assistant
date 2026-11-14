@@ -162,4 +162,50 @@ assert.equal(
     "the fallback should retain a complete title while leaving location metadata untouched"
 );
 
+// Editorial lead-ins remain outside the replaceable bibliographic identity.
+const lookAtNote = "انظر: النووي، المجموع، ج 1، ص 25";
+const lookAtPairs = engine.buildPairs(lookAtNote, {
+    references: [{ author: "النووي", title: "المجموع" }],
+    sourceTexts: ["انظر: النووي، المجموع، ج 1، ص 25"],
+    suggestedTexts: ["النووي، المجموع"]
+});
+assert.equal(lookAtPairs.length, 1);
+assert.equal(lookAtNote.slice(lookAtPairs[0].start, lookAtPairs[0].end), "النووي، المجموع");
+assert.ok(lookAtNote.slice(0, lookAtPairs[0].start).startsWith("انظر:"));
+
+// Page ranges followed by "وما بعدها" remain outside the replacement span.
+const extendedPageNote = "الغزالي، أساس القياس، ص37 - 39، وما بعدها.";
+assert.equal(engine.getIdentityText("الغزالي، أساس القياس، ص37 - 39، وما بعدها"),
+    "الغزالي، أساس القياس");
+const extendedPagePairs = engine.buildPairs(extendedPageNote, {
+    references: [{ author: "الغزالي", title: "أساس القياس" }],
+    sourceTexts: ["الغزالي، أساس القياس، ص37 - 39، وما بعدها"],
+    suggestedTexts: ["الغزالي، أساس القياس"]
+});
+assert.equal(extendedPagePairs.length, 1);
+assert.equal(extendedPageNote.slice(extendedPagePairs[0].start, extendedPagePairs[0].end),
+    "الغزالي، أساس القياس");
+assert.ok(extendedPageNote.slice(extendedPagePairs[0].end).includes("ص37 - 39، وما بعدها"));
+
+// A standalone attached kaf before a definite-article author is a valid anchor boundary.
+const kafNote = "كالزركشي، البحر المحيط، ج 8، ص 85";
+const kafPairs = engine.buildPairs(kafNote, {
+    references: [{ author: "الزركشي", title: "البحر المحيط" }],
+    sourceTexts: ["الزركشي، البحر المحيط"],
+    suggestedTexts: ["الزركشي، البحر المحيط"]
+});
+assert.equal(kafPairs.length, 1);
+assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "كالزركشي، البحر المحيط");
+
+// Hadith takhrij is excluded, while a normal bibliographic reference to al-Bukhari is not.
+assert.equal(engine.isHadithTakhrijReference({ type: "hadith", author: "البخاري", title: "صحيح البخاري" }), true);
+assert.equal(engine.isHadithTakhrijReference({
+    type: "book", author: "البخاري", title: "حديث رقم 123",
+    variants: ["أخرجه البخاري، حديث رقم 123"]
+}), true);
+assert.equal(engine.isHadithTakhrijReference({
+    type: "book", author: "البخاري", title: "صحيح البخاري",
+    variants: ["البخاري، صحيح البخاري، ج 1، ص 20"]
+}), false);
+
 console.log("Footnote citation engine tests passed.");
