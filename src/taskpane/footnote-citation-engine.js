@@ -235,28 +235,28 @@ function getNoteIndex(suggestion, source) {
         const source=String(noteText??"");if(!source||!reference||typeof reference!=="object")return[];
         const title=getIdentityText(reference.title||""),author=String(reference.author||"").trim();if(!title)return[];
         const candidates=[];const add=v=>{v=String(v||"").trim();const k=normalizeIdentityText(v);if(k.length>=5&&!candidates.some(q=>normalizeIdentityText(q)===k))candidates.push(v);};
-        add(title);const short=title.replace(/^كتاب\\s+/u,"").trim();if(short!==title)add(short);const first=short.split(/\\s+/u)[0]||"";if(normalizeIdentityText(first).length>=5)add(first);
+        add(title);const short=title.replace(/^كتاب\s+/u,"").trim();if(short!==title)add(short);const first=short.split(/\s+/u)[0]||"";if(normalizeIdentityText(first).length>=5)add(first);
         const out=[];for(const candidate of candidates){for(const span of findNormalizedSpans(source,candidate)){
-            const prev=source.slice(0,span.start).slice(-1);if(prev&&/[\\p{L}\\p{N}]/u.test(prev))continue;
-            const tail=source.slice(span.end).replace(/^[\\s،,؛:]+/u,"");
-            const location=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]/u.test(tail);
-            const terminal=!tail||/^[.؛،,:؟!\\)\\]}]/u.test(tail);
+            const prev=source.slice(0,span.start).slice(-1);if(prev&&/[\p{L}\p{N}]/u.test(prev))continue;
+            const tail=source.slice(span.end).replace(/^[\s،,؛:]+/u,"");
+            const location=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u.test(tail);
+            const terminal=!tail||/^[.؛،,:؟!\)\]}]/u.test(tail);
             let start=span.start,end=span.end;
             if(author){
                 const as=findNormalizedSpans(source,author);
-                const before=as.filter(a=>a.end<=span.start&&/^[\\s،,؛:]+$/u.test(source.slice(a.end,span.start)));
-                const after=as.filter(a=>a.start>=span.end&&/^[\\s،,؛:]+$/u.test(source.slice(span.end,a.start)));
+                const before=as.filter(a=>a.end<=span.start&&/^[\s،,؛:]+$/u.test(source.slice(a.end,span.start)));
+                const after=as.filter(a=>a.start>=span.end&&/^[\s،,؛:]+$/u.test(source.slice(span.end,a.start)));
                 if(before.length===1)start=before[0].start;
                 else if(after.length===1){
-                    const afterAuthor=source.slice(after[0].end).replace(/^[\\s،,؛:]+/u,"");
-                    const authorThenLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]/u.test(afterAuthor);
-                    const authorThenTerminal=!afterAuthor||/^[.؛،,:؟!\\)\\]}]/u.test(afterAuthor);
+                    const afterAuthor=source.slice(after[0].end).replace(/^[\s،,؛:]+/u,"");
+                    const authorThenLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u.test(afterAuthor);
+                    const authorThenTerminal=!afterAuthor||/^[.؛،,:؟!\)\]}]/u.test(afterAuthor);
                     if(authorThenLocation||authorThenTerminal)end=after[0].end;
                 }
             }
-            const finalTail=source.slice(end).replace(/^[\\s،,؛:]+/u,"");
-            const hasFinalLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]/u.test(finalTail);
-            const hasFinalTerminal=!finalTail||/^[.؛،,:؟!\\)\\]}]/u.test(finalTail);
+            const finalTail=source.slice(end).replace(/^[\s،,؛:]+/u,"");
+            const hasFinalLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\s*)?[0-9٠-٩۰-۹]/u.test(finalTail);
+            const hasFinalTerminal=!finalTail||/^[.؛،,:؟!\)\]}]/u.test(finalTail);
             if(!hasFinalLocation&&!hasFinalTerminal&&!location&&!terminal)continue;
             if(!out.some(q=>q.start===start&&q.end===end))out.push({start,end,text:source.slice(start,end).trim()});
         }if(out.length)break;}return out.sort((a,b)=>a.start-b.start);
