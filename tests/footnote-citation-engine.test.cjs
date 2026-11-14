@@ -144,4 +144,22 @@ assert.equal(engine.findValidatedSourceSpan("السيوطي، الأشباه؛ �
     "السيوطي، الأشباه",
     "a complete short citation may end at a clear delimiter");
 
+
+assert.equal(
+    engine.findUniqueBibliographicAnchor(
+        "السيوطي، الأشباه والنظائر، ص98",
+        { author: "السيوطي", title: "الأشباه" }
+    ),
+    "",
+    "the unique-anchor fallback must also reject a truncated work title"
+);
+assert.equal(
+    engine.findUniqueBibliographicAnchor(
+        "السيوطي، الأشباه والنظائر، ص98",
+        { author: "السيوطي", title: "الأشباه والنظائر" }
+    ),
+    "السيوطي، الأشباه والنظائر",
+    "the fallback should retain a complete title while leaving location metadata untouched"
+);
+
 console.log("Footnote citation engine tests passed.");
