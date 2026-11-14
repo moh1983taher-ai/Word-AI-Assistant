@@ -347,39 +347,33 @@ function getNoteIndex(suggestion, source) {
     function resolveBibliographicIdentitySpan(sourceText, reference) {
         const source = String(sourceText ?? "");
         if (!source || !reference || typeof reference !== "object") return null;
-        const title = String(reference.title ?? "").trim();
+
+        // The model may append a recovered volume/page suffix to the title field.
+        // Remove only a recognized trailing location before locating the title;
+        // those location details must remain outside the replacement range.
+        const rawTitle = String(reference.title ?? "").trim();
+        const authorForTitleCleanup = String(
+            reference.author || reference.sourceAuthor || reference.authorFull || ""
+        ).trim();
+        const title = normalizeBibliographicTitle(
+            getIdentityText(rawTitle),
+            authorForTitleCleanup
+        );
         if (!title) return null;
 
         const titleSpans = findNormalizedTextSpans(source, title);
         if (!titleSpans.length) return null;
 
-        const authorCandidates = [
+        const authorCandidates = Array.from(new Set([
             reference.sourceAuthor,
             reference.authorFull,
             reference.author
-        ].map(value => String(value ?? "").trim()).filter(Boolean);
+        ].map(value => String(value ?? "").trim()).filter(Boolean)));
 
-        let authorSpans = [];
-        const seenAuthorSpans = new Set();
-        for (const candidate of authorCandidates) {
-            const matches = findNormalizedTextSpans(source, candidate);
-            const usable = matches.filter(match =>
-                !titleSpans.some(titleSpan =>
-                    match.start < titleSpan.end && titleSpan.start < match.end
-                )
-            );
-            for (const match of usable) {
-                const key = match.start + ":" + match.end;
-                if (!seenAuthorSpans.has(key)) {
-                    seenAuthorSpans.add(key);
-                    authorSpans.push(match);
-                }
-            }
-            if (authorSpans.length) break;
-        }
-
+        let authorFound = false;
         const isWordCharacter = character =>
             Boolean(character) && /[\p{L}\p{N}]/u.test(character);
+
         function expandAttachedAuthorPrefix(start) {
             const previous = start > 0 ? source[start - 1] : "";
             const beforePrevious = start > 1 ? source[start - 2] : "";
@@ -394,25 +388,41 @@ function getNoteIndex(suggestion, source) {
         }
 
         const separatorOnly = /^[\s\u00A0،,؛;:()[\]{}«»“”"'־\-–—]*$/u;
-        const pairs = [];
-        for (const titleSpan of titleSpans) {
-            for (const authorSpan of authorSpans) {
-                const authorIdentityStart = expandAttachedAuthorPrefix(authorSpan.start);
-                let start, end, separator;
-                if (titleSpan.end <= authorIdentityStart) {
-                    start = titleSpan.start;
-                    end = authorSpan.end;
-                    separator = source.slice(titleSpan.end, authorIdentityStart);
-                } else if (authorSpan.end <= titleSpan.start) {
-                    start = authorIdentityStart;
-                    end = titleSpan.end;
-                    separator = source.slice(authorSpan.end, titleSpan.start);
-                } else {
-                    continue;
-                }
-                if (separatorOnly.test(separator)) {
+
+        // A full author name can appear elsewhere in the same citation (for
+        // example in an editor/biographical field) while the abbreviated author
+        // is the form actually adjacent to the title. Test each candidate for a
+        // valid title-author pair before preferring it; a mere occurrence of the
+        // full name elsewhere must not block the shorter source form.
+        for (const candidate of authorCandidates) {
+            const matches = findNormalizedTextSpans(source, candidate).filter(match =>
+                !titleSpans.some(titleSpan =>
+                    match.start < titleSpan.end && titleSpan.start < match.end
+                )
+            );
+            if (matches.length) authorFound = true;
+
+            const pairs = [];
+            for (const titleSpan of titleSpans) {
+                for (const authorSpan of matches) {
+                    const authorIdentityStart = expandAttachedAuthorPrefix(authorSpan.start);
+                    let start, end, separator;
+                    if (titleSpan.end <= authorIdentityStart) {
+                        start = titleSpan.start;
+                        end = authorSpan.end;
+                        separator = source.slice(titleSpan.end, authorIdentityStart);
+                    } else if (authorSpan.end <= titleSpan.start) {
+                        start = authorIdentityStart;
+                        end = titleSpan.end;
+                        separator = source.slice(authorSpan.end, titleSpan.start);
+                    } else {
+                        continue;
+                    }
+
+                    if (!separatorOnly.test(separator)) continue;
                     pairs.push({
-                        start, end,
+                        start,
+                        end,
                         titleStart: titleSpan.start,
                         titleEnd: titleSpan.end,
                         authorStart: authorIdentityStart,
@@ -424,11 +434,14 @@ function getNoteIndex(suggestion, source) {
                     });
                 }
             }
+
+            if (pairs.length === 1) return pairs[0];
+            // Multiple complete adjacent pairs remain genuinely ambiguous.
+            // Do not guess by dropping to a shorter author variant.
+            if (pairs.length > 1) return null;
         }
 
-        if (pairs.length === 1) return pairs[0];
-        if (pairs.length > 1 || titleSpans.length !== 1) return null;
-
+        if (titleSpans.length !== 1) return null;
         const titleSpan = titleSpans[0];
         return {
             start: titleSpan.start,
@@ -440,18 +453,20 @@ function getNoteIndex(suggestion, source) {
             titleText: titleSpan.text,
             authorText: "",
             includesAuthor: false,
-            authorFound: authorSpans.length > 0
+            authorFound
         };
     }
 
 
-
     function formatBibliographicIdentity(reference, format, includeAuthor = true, authorOverride) {
         if (!reference || typeof reference !== "object") return "";
-        const title = String(reference.title ?? "").trim();
         const author = String(
             authorOverride !== undefined ? authorOverride : reference.author ?? ""
         ).trim();
+        const title = normalizeBibliographicTitle(
+            getIdentityText(reference.title ?? ""),
+            String(reference.author || reference.sourceAuthor || reference.authorFull || author).trim()
+        );
 
         switch (String(format || "author-title")) {
             case "reference-only":
