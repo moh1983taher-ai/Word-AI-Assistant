@@ -279,7 +279,7 @@ assert.equal(ambiguousWholeNotePairs.length,0,
  const narrowPageNote = 'يقول: "نص منقول" المنخول 454.';
  const narrowPagePairs = engine.buildPairs(narrowPageNote, {
      references: [{ author: "الغزالي", title: "المنخول من تعليقات الأصول" }],
-     sourceTexts: ["المنخول 454"],
+     sourceTexts: ["المنخول 454."],
      suggestedTexts: ["الغزالي، المنخول من تعليقات الأصول"]
  });
  assert.equal(narrowPagePairs.length, 1);
