@@ -241,4 +241,5 @@ const الزركشيNote='ومثلها قاعدة الزركشي في العقو
 const الزركشيPairs=engine.buildPairs(الزركشيNote,{references:[{author:"الزركشي",title:"المنثور"}],sourceTexts:[الزركشيNote],suggestedTexts:["الزركشي، المنثور"]});
 assert.equal(الزركشيPairs.length,1);assert.equal(الزركشيNote.slice(الزركشيPairs[0].start,الزركشيPairs[0].end),"المنثور");assert.ok(الزركشيNote.slice(0,الزركشيPairs[0].start).startsWith("ومثلها قاعدة الزركشي"));assert.ok(الزركشيNote.slice(الزركشيPairs[0].end).includes("2/362"));
 assert.equal(engine.normalizeBibliographicTitleKey("كتاب العين"),engine.normalizeBibliographicTitleKey("العين"));
-assert.equal(engine.normalizeBibliographicTitleKey("كتاب الأم"),engine.normalizeBibliographicTitleKey("الأم"));
+assert.notEqual(engine.normalizeBibliographicTitleKey("كتاب الأم"),engine.normalizeBibliographicTitleKey("الأم"),
+    "the word كتاب must not be removed from unrelated titles without a verified alias");
