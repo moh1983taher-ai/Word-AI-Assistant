@@ -47370,7 +47370,16 @@ function mergeEquivalentReferences(references) {
     }
 
     function titleKey(title) {
-        return window.FootnoteCitationEngine.normalizeBibliographicTitleKey(clean(title));
+
+        return window.FootnoteCitationEngine.getIdentityText(
+            clean(title)
+        )
+            .replace(
+                /^الـ/,
+                "ال"
+            )
+            .toLowerCase();
+
     }
 
     /*
@@ -47529,11 +47538,15 @@ function mergeEquivalentReferences(references) {
              * لا نغيّر عنوان المرجع الموجود
              * إلى عنوان أطول لمجرد أنه أطول.
              */
-            if (!clean(existing.title)) {
-                existing.title = title;
-            } else {
-                const oldTitle = clean(existing.title);
-                if (/^كتاب\s+/u.test(title) && !/^كتاب\s+/u.test(oldTitle)) existing.title = title;
+            if (
+                !clean(
+                    existing.title
+                )
+            ) {
+
+                existing.title =
+                    title;
+
             }
 
             /*
