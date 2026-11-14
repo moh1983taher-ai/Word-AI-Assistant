@@ -163,10 +163,10 @@ assert.equal(
 );
 
 // Editorial lead-ins remain outside the replaceable bibliographic identity.
-const lookAtNote = "انظر: النووي، المجموع، ج 1، ص 25";
+const lookAtNote = "انظر: المجموع، النووي، ج 1، ص 25";
 const lookAtPairs = engine.buildPairs(lookAtNote, {
     references: [{ author: "النووي", title: "المجموع" }],
-    sourceTexts: ["انظر: النووي، المجموع، ج 1، ص 25"],
+    sourceTexts: ["انظر: المجموع، النووي، ج 1، ص 25"],
     suggestedTexts: ["النووي، المجموع"]
 });
 assert.equal(lookAtPairs.length, 1);
@@ -174,12 +174,12 @@ assert.equal(lookAtNote.slice(lookAtPairs[0].start, lookAtPairs[0].end), "الن
 assert.ok(lookAtNote.slice(0, lookAtPairs[0].start).startsWith("انظر:"));
 
 // Page ranges followed by "وما بعدها" remain outside the replacement span.
-const extendedPageNote = "الغزالي، أساس القياس، ص37 - 39، وما بعدها.";
+const extendedPageNote = "أساس القياس، الغزالي، ص37 - 39، وما بعدها.";
 assert.equal(engine.getIdentityText("الغزالي، أساس القياس، ص37 - 39، وما بعدها"),
     "الغزالي، أساس القياس");
 const extendedPagePairs = engine.buildPairs(extendedPageNote, {
     references: [{ author: "الغزالي", title: "أساس القياس" }],
-    sourceTexts: ["الغزالي، أساس القياس، ص37 - 39، وما بعدها"],
+    sourceTexts: ["أساس القياس، الغزالي، ص37 - 39، وما بعدها"],
     suggestedTexts: ["الغزالي، أساس القياس"]
 });
 assert.equal(extendedPagePairs.length, 1);
@@ -188,14 +188,14 @@ assert.equal(extendedPageNote.slice(extendedPagePairs[0].start, extendedPagePair
 assert.ok(extendedPageNote.slice(extendedPagePairs[0].end).includes("ص37 - 39، وما بعدها"));
 
 // A standalone attached kaf before a definite-article author is a valid anchor boundary.
-const kafNote = "كالزركشي، البحر المحيط، ج 8، ص 85";
+const kafNote = "كالبحر المحيط، الزركشي، ج 8، ص 85";
 const kafPairs = engine.buildPairs(kafNote, {
     references: [{ author: "الزركشي", title: "البحر المحيط" }],
-    sourceTexts: ["الزركشي، البحر المحيط"],
+    sourceTexts: ["البحر المحيط، الزركشي"],
     suggestedTexts: ["الزركشي، البحر المحيط"]
 });
 assert.equal(kafPairs.length, 1);
-assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "الزركشي، البحر المحيط");
+assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "البحر المحيط، الزركشي");
 assert.equal(kafNote[kafPairs[0].start - 1], "ك",
     "the attached preposition must remain outside the replacement span");
 
