@@ -248,7 +248,8 @@ assert.ok(نقلReversedNote.slice(0,نقلReversedPairs[0].start).startsWith("�
 const الزركشيNote='ومثلها قاعدة الزركشي في العقود: "العادة إذا اطردت ينزل اللفظ في العقود عليها، وإذا اضطربت لم تعتبر ووجب البيان، (وإذا) تعارضت الظنون في اعتبارها فخلاف " المنثور، 2/362.';
 const الزركشيPairs=engine.buildPairs(الزركشيNote,{references:[{author:"الزركشي",title:"المنثور"}],sourceTexts:["المنثور، 2/362"],suggestedTexts:["الزركشي، المنثور"]});
 assert.equal(الزركشيPairs.length,1);assert.equal(الزركشيNote.slice(الزركشيPairs[0].start,الزركشيPairs[0].end),"المنثور");assert.ok(الزركشيNote.slice(0,الزركشيPairs[0].start).startsWith("ومثلها قاعدة الزركشي"));assert.ok(الزركشيNote.slice(الزركشيPairs[0].end).includes("2/362"));
-assert.notEqual(engine.normalizeBibliographicTitleKey("كتاب العين"),engine.normalizeBibliographicTitleKey("العين"),\n    "distinct literal work titles must remain distinct bibliographic identities");
+assert.notEqual(engine.normalizeBibliographicTitleKey("كتاب العين"),engine.normalizeBibliographicTitleKey("العين"),
+    "distinct literal work titles must remain distinct bibliographic identities");
 assert.notEqual(engine.normalizeBibliographicTitleKey("كتاب الأم"),engine.normalizeBibliographicTitleKey("الأم"),
     "the word كتاب must not be removed from unrelated titles without a verified alias");
 
