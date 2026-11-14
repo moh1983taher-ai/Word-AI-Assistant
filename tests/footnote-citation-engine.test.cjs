@@ -131,4 +131,17 @@ assert.equal(engine.selectOccurrence(occurrenceMatches, 1).id, 2,
 assert.equal(engine.selectOccurrence(occurrenceMatches, 2), null,
     "a missing occurrence ordinal must never fall back to the first match");
 
+
+const validatedSpanNote = "السيوطي، الأشباه والنظائر، ط1، ص98";
+assert.equal(engine.findValidatedSourceSpan(validatedSpanNote, "السيوطي: الأشباه"), "",
+    "a short AI variant must be rejected when the note continues with the rest of the title");
+assert.equal(engine.findValidatedSourceSpan(validatedSpanNote, "السيوطي، الأشباه والنظائر"),
+    "السيوطي، الأشباه والنظائر",
+    "a complete title anchor may end before edition/page metadata");
+assert.equal(engine.findValidatedSourceSpan(validatedSpanNote, "الأشباه والنظائر"), "الأشباه والنظائر",
+    "a complete title may be anchored despite author omission");
+assert.equal(engine.findValidatedSourceSpan("السيوطي، الأشباه؛ ثم النووي، المجموع", "السيوطي، الأشباه"),
+    "السيوطي، الأشباه",
+    "a complete short citation may end at a clear delimiter");
+
 console.log("Footnote citation engine tests passed.");
