@@ -262,7 +262,15 @@ function getNoteIndex(suggestion, source) {
         }if(out.length)break;}return out.sort((a,b)=>a.start-b.start);
     }
     function normalizeBibliographicTitleKey(value){
-        let key=normalizeIdentityText(getIdentityText(value));const prefix=normalizeIdentityText("كتاب");if(key.startsWith(prefix)&&key.length>prefix.length)key=key.slice(prefix.length);return key;
+        const key=normalizeIdentityText(getIdentityText(value));
+        // Explicitly verified title alias: al-Farahidi's "Kitab al-Ayn" is
+        // also cited as "al-Ayn". Do not strip "Kitab" generically because
+        // it can be a meaningful part of other work titles.
+        const aliases = new Map([
+            [normalizeIdentityText("كتاب العين"), normalizeIdentityText("العين")],
+            [normalizeIdentityText("العين"), normalizeIdentityText("العين")]
+        ]);
+        return aliases.get(key) || key;
     }
 
     function buildPairs(noteText,suggestion){
