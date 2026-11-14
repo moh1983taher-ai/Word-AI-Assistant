@@ -278,6 +278,9 @@ function getNoteIndex(suggestion, source) {
         const count=Math.min(refs.length,news.length,olds.length),pairs=[];pairs.collapsedCount=0;pairs.unchangedCount=0;const counts=new Map();
         for(let i=0;i<count;i++){const ref=refs[i],sourceText=String(olds[i]??"").trim(),replacementText=getIdentityText(news[i]);if(!sourceText||!replacementText)continue;
             const spans=findBibliographicCitationSpans(noteText,sourceText,ref);if(!spans.length)continue;
+            // When the model supplied the entire note as its source anchor, multiple
+            // appearances of the same title are ambiguous. Never choose the first by guess.
+            if(normalizeIdentityText(sourceText)===normalizeIdentityText(noteText)&&spans.length>1)continue;
             const key=referenceKey(ref)+"::"+normalizeIdentityText(getIdentityText(sourceText));if(!key)continue;
             const ordinal=counts.get(key)||0;if(spans.length<=ordinal)continue;const span=spans[ordinal];counts.set(key,ordinal+1);
             if(normalizeIdentityText(span.text)===normalizeIdentityText(replacementText)){pairs.unchangedCount++;continue;}
