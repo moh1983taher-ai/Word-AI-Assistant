@@ -24,7 +24,7 @@
     "stop": "office-addin-debugging stop manifest.xml",
     "validate": "office-addin-manifest validate manifest.xml",
     "watch": "webpack --mode development --watch",
-    "test": "node tests/footnote-citation-engine.test.cjs"
+    "test": "node tests/footnote-citation-engine.test.cjs && node tests/reference-name-normalization.test.cjs"
   },
   "dependencies": {
     "@orama/orama": "^3.1.18",
