@@ -54,7 +54,7 @@ assert.equal(pairs[0].replacementText, "سيبويه، الكتاب");
 assert.equal(note.slice(pairs[0].start, pairs[0].end), "الكتاب، سيبويه");
 
 assert.equal(
-    engine.buildPairs("الكتاب، سيبويه، 1/3", {
+    engine.buildPairs("ذكر المؤلف في موضع آخر، 1/3", {
         references: [reference],
         sourceTexts: ["عنوان مختلف، 1/3"],
         suggestedTexts: ["سيبويه، الكتاب"]
