@@ -249,19 +249,45 @@ function getNoteIndex(suggestion, source) {
             if (!sourceKey) continue;
 
             const sourceOccurrenceIndex = sourceOccurrenceCounts.get(sourceKey) || 0;
-            const sourceMatches = findExactOccurrences(noteText, sourceText);
+            let matchedSourceText = sourceText;
+            let sourceMatches = findExactOccurrences(noteText, matchedSourceText);
+
+            // If the AI supplied the bibliographic identity without an attached
+            // preposition, allow the unique validated anchor finder to locate it
+            // after a standalone kaf (e.g. "كالزركشي، البحر المحيط").
+            if (sourceMatches.length <= sourceOccurrenceIndex && sourceOccurrenceIndex === 0) {
+                const fallbackAnchor = findUniqueBibliographicAnchor(noteText, reference);
+                if (fallbackAnchor) {
+                    const fallbackMatches = findExactOccurrences(noteText, fallbackAnchor);
+                    if (fallbackMatches.length === 1) {
+                        matchedSourceText = fallbackAnchor;
+                        sourceMatches = fallbackMatches;
+                    }
+                }
+            }
             if (sourceMatches.length <= sourceOccurrenceIndex) continue;
 
             const sourceStart = sourceMatches[sourceOccurrenceIndex];
             sourceOccurrenceCounts.set(sourceKey, sourceOccurrenceIndex + 1);
 
-            const identityOffset = sourceText.indexOf(identityText);
-            if (identityOffset < 0) continue;
+            // The kaf is a grammatical connector, not part of the author's name.
+            // Exclude it from the replaceable span only when the reference author
+            // confirms that the text immediately following it is the actual name.
+            const authorText = String(reference && reference.author || "").trim();
+            const hasAttachedKaf = matchedSourceText === sourceText &&
+                /^ال/u.test(authorText) &&
+                sourceText.startsWith("ك" + authorText) &&
+                (sourceStart === 0 || !/[\\p{L}\\p{N}]/u.test(noteText[sourceStart - 1]));
 
-            // Keep attached prepositions (for example the kaf in "كالزركشي")
-            // outside the bibliographic replacement span.
+            const identitySourceText = hasAttachedKaf ? sourceText.slice(1) : matchedSourceText;
+            const identityText = getIdentityText(identitySourceText);
+            if (!identityText) continue;
+
+            const localIdentityOffset = identitySourceText.indexOf(identityText);
+            if (localIdentityOffset < 0) continue;
+
             const replaceableText = identityText;
-            const start = sourceStart + identityOffset;
+            const start = sourceStart + (hasAttachedKaf ? 1 : 0) + localIdentityOffset;
             const end = start + replaceableText.length;
             if (noteText.slice(start, end) !== replaceableText) continue;
 
