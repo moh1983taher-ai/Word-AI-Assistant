@@ -79,7 +79,43 @@
         return positions;
     }
 
-    function getNoteIndex(suggestion, source) {
+        function findValidatedSourceSpan(noteText, candidateText) {
+        const source = String(noteText ?? "");
+        const candidate = String(candidateText ?? "").trim();
+        if (!source || !candidate) return "";
+        const target = normalizeIdentityText(candidate);
+        if (target.length < 4) return "";
+
+        const normalized = [];
+        const rawMap = [];
+        for (let index = 0; index < source.length; index++) {
+            const part = normalizeIdentityText(source[index]);
+            if (!part) continue;
+            normalized.push(part);
+            for (let offset = 0; offset < part.length; offset++) rawMap.push(index);
+        }
+
+        const haystack = normalized.join("");
+        let from = 0;
+        while (from <= haystack.length - target.length) {
+            const position = haystack.indexOf(target, from);
+            if (position < 0) break;
+            const rawStart = rawMap[position];
+            const rawEnd = rawMap[position + target.length - 1] + 1;
+            from = position + Math.max(1, target.length);
+            if (!Number.isInteger(rawStart) || !Number.isInteger(rawEnd) || rawEnd <= rawStart) continue;
+
+            const previous = rawStart > 0 ? source[rawStart - 1] : "";
+            const next = source.slice(rawEnd).match(/^\\s*/u)?.[0].length || 0;
+            const following = source[rawEnd + next] || "";
+            if (previous && /[\\p{L}\\p{N}]/u.test(previous)) continue;
+            if (following && /[\\p{L}\\p{N}]/u.test(following)) continue;
+            return source.slice(rawStart, rawEnd);
+        }
+        return "";
+    }
+
+function getNoteIndex(suggestion, source) {
         const materialId = String(suggestion && suggestion.materialId || "");
         const pattern = source === "footnote" ? /^footnote-(\d+)$/ : /^endnote-(\d+)$/;
         const match = materialId.match(pattern);
@@ -521,6 +557,7 @@
         apply: apply,
         buildPairs: buildPairs,
         findExactOccurrences: findExactOccurrences,
+        findValidatedSourceSpan: findValidatedSourceSpan,
         getIdentityText: getIdentityText,
         hasUnparsedLocationSuffix: hasUnparsedLocationSuffix,
         normalizeIdentityText: normalizeIdentityText,
