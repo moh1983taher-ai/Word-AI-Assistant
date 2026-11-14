@@ -240,12 +240,24 @@ function getNoteIndex(suggestion, source) {
             const prev=source.slice(0,span.start).slice(-1);if(prev&&/[\\p{L}\\p{N}]/u.test(prev))continue;
             const tail=source.slice(span.end).replace(/^[\\s،,؛:]+/u,"");
             const location=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]/u.test(tail);
-            const terminal=!tail||/^[.؛،,:؟!\\)\\]}]/u.test(tail);if(!location&&!terminal)continue;
-            let start=span.start,end=span.end;if(author){const as=findNormalizedSpans(source,author);
+            const terminal=!tail||/^[.؛،,:؟!\\)\\]}]/u.test(tail);
+            let start=span.start,end=span.end;
+            if(author){
+                const as=findNormalizedSpans(source,author);
                 const before=as.filter(a=>a.end<=span.start&&/^[\\s،,؛:]+$/u.test(source.slice(a.end,span.start)));
                 const after=as.filter(a=>a.start>=span.end&&/^[\\s،,؛:]+$/u.test(source.slice(span.end,a.start)));
-                if(before.length===1)start=before[0].start;else if(after.length===1)end=after[0].end;
+                if(before.length===1)start=before[0].start;
+                else if(after.length===1){
+                    const afterAuthor=source.slice(after[0].end).replace(/^[\\s،,؛:]+/u,"");
+                    const authorThenLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]/u.test(afterAuthor);
+                    const authorThenTerminal=!afterAuthor||/^[.؛،,:؟!\\)\\]}]/u.test(afterAuthor);
+                    if(authorThenLocation||authorThenTerminal)end=after[0].end;
+                }
             }
+            const finalTail=source.slice(end).replace(/^[\\s،,؛:]+/u,"");
+            const hasFinalLocation=/^(?:(?:ج(?:زء)?|المجلد(?:ات)?|ص(?:فحة|فحات)?|صفحات?)\\s*)?[0-9٠-٩۰-۹]/u.test(finalTail);
+            const hasFinalTerminal=!finalTail||/^[.؛،,:؟!\\)\\]}]/u.test(finalTail);
+            if(!hasFinalLocation&&!hasFinalTerminal&&!location&&!terminal)continue;
             if(!out.some(q=>q.start===start&&q.end===end))out.push({start,end,text:source.slice(start,end).trim()});
         }if(out.length)break;}return out.sort((a,b)=>a.start-b.start);
     }
