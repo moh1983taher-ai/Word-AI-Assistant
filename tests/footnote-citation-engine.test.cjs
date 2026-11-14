@@ -235,7 +235,7 @@ assert.equal(
     "a note counter and editorial lead-in must stay outside the bibliographic replacement"
 );
 assert.equal(
-    engine.getIdentityText("1 انظر: الزركشي، المنثور، ج 2، ص 145"),
+    engine.getIdentityText("1) انظر: الزركشي، المنثور، ج 2، ص 145"),
     "الزركشي، المنثور",
     "an unbracketed note counter before an editorial lead-in must remain outside the replacement"
 );
@@ -249,7 +249,7 @@ const protectedContextNote =
     "(1) انظر: الزركشي، المنثور، ج 2، ص 145؛ ويراجع الباحث ذلك في موضع لاحق.";
 const protectedContextPairs = engine.buildPairs(protectedContextNote, {
     references: [{ author: "الزركشي", title: "المنثور" }],
-    sourceTexts: ["(1) انظر: الزركشي، المنثور، ج 2، ص 145"],
+    sourceTexts: ["1) انظر: الزركشي، المنثور، ج 2، ص 145"],
     suggestedTexts: ["الزركشي، المنثور المحقق"]
 });
 assert.equal(protectedContextPairs.length, 1);
@@ -325,7 +325,7 @@ async function testExactWordReplacementPreservesContext() {
             noteNumber: 1,
             originalText: protectedContextNote,
             references: [{ author: "الزركشي", title: "المنثور" }],
-            sourceTexts: ["(1) انظر: الزركشي، المنثور، ج 2، ص 145"],
+            sourceTexts: ["1) انظر: الزركشي، المنثور، ج 2، ص 145"],
             suggestedTexts: ["الزركشي، المنثور المحقق"]
         }]);
 
