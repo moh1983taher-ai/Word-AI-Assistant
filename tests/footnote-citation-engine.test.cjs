@@ -54,13 +54,23 @@ assert.equal(pairs[0].replacementText, "سيبويه، الكتاب");
 assert.equal(note.slice(pairs[0].start, pairs[0].end), "الكتاب، سيبويه");
 
 assert.equal(
-    engine.buildPairs("الكتاب، سيبويه، 1/3", {
+    engine.buildPairs("ذكر المؤلف في موضع آخر، 1/3", {
         references: [reference],
         sourceTexts: ["عنوان مختلف، 1/3"],
         suggestedTexts: ["سيبويه، الكتاب"]
     }).length,
     0,
     "an unanchored source citation must be skipped rather than guessed"
+);
+
+assert.equal(
+    engine.buildPairs("الكتاب، سيبويه، 1/3", {
+        references: [{ author: "شخص آخر", title: "الكتاب" }],
+        sourceTexts: ["عنوان غير مطابق"],
+        suggestedTexts: ["شخص آخر، الكتاب"]
+    }).length,
+    0,
+    "a matching title alone must not authorize a fallback replacement"
 );
 
 
@@ -161,5 +171,61 @@ assert.equal(
     "السيوطي، الأشباه والنظائر",
     "the fallback should retain a complete title while leaving location metadata untouched"
 );
+
+// Editorial lead-ins remain outside the replaceable bibliographic identity.
+const lookAtNote = "انظر: المجموع، النووي، ج 1، ص 25";
+const lookAtPairs = engine.buildPairs(lookAtNote, {
+    references: [{ author: "النووي", title: "المجموع" }],
+    sourceTexts: ["انظر: المجموع، النووي، ج 1، ص 25"],
+    suggestedTexts: ["النووي، المجموع"]
+});
+assert.equal(lookAtPairs.length, 1);
+assert.equal(lookAtNote.slice(lookAtPairs[0].start, lookAtPairs[0].end), "المجموع، النووي",
+    "buildPairs must identify the original source span, not pretend it is already replaced");
+assert.equal(lookAtPairs[0].replacementText, "النووي، المجموع",
+    "the canonical order belongs in replacementText");
+assert.ok(lookAtNote.slice(0, lookAtPairs[0].start).startsWith("انظر:"));
+
+// Page ranges followed by "وما بعدها" remain outside the replacement span.
+const extendedPageNote = "أساس القياس، الغزالي، ص37 - 39، وما بعدها.";
+assert.equal(engine.getIdentityText("الغزالي، أساس القياس، ص37 - 39، وما بعدها"),
+    "الغزالي، أساس القياس");
+const extendedPagePairs = engine.buildPairs(extendedPageNote, {
+    references: [{ author: "الغزالي", title: "أساس القياس" }],
+    sourceTexts: ["أساس القياس، الغزالي، ص37 - 39، وما بعدها"],
+    suggestedTexts: ["الغزالي، أساس القياس"]
+});
+assert.equal(extendedPagePairs.length, 1);
+assert.equal(extendedPageNote.slice(extendedPagePairs[0].start, extendedPagePairs[0].end),
+    "أساس القياس، الغزالي",
+    "the source span retains the author's original order");
+assert.equal(extendedPagePairs[0].replacementText, "الغزالي، أساس القياس");
+assert.ok(extendedPageNote.slice(extendedPagePairs[0].end).includes("ص37 - 39، وما بعدها"));
+
+// A standalone attached kaf before a definite-article author is a valid anchor boundary.
+const kafNote = "كالزركشي، البحر المحيط، ج 8، ص 85";
+const kafPairs = engine.buildPairs(kafNote, {
+    references: [{ author: "الزركشي", title: "البحر المحيط" }],
+    sourceTexts: ["كالزركشي، البحر المحيط"],
+    suggestedTexts: ["البحر المحيط، الزركشي"]
+});
+assert.equal(kafPairs.length, 1);
+assert.equal(kafNote.slice(kafPairs[0].start, kafPairs[0].end), "الزركشي، البحر المحيط",
+    "the author anchor is found after the attached kaf");
+assert.equal(kafNote[kafPairs[0].start - 1], "ك",
+    "the attached preposition must remain outside the replacement span");
+assert.equal(kafPairs[0].replacementText, "البحر المحيط، الزركشي",
+    "the replacement may reorder the author and title without consuming the kaf");
+
+// Hadith takhrij is excluded, while a normal bibliographic reference to al-Bukhari is not.
+assert.equal(engine.isHadithTakhrijReference({ type: "hadith", author: "البخاري", title: "صحيح البخاري" }), true);
+assert.equal(engine.isHadithTakhrijReference({
+    type: "book", author: "البخاري", title: "حديث رقم 123",
+    variants: ["أخرجه البخاري، حديث رقم 123"]
+}), true);
+assert.equal(engine.isHadithTakhrijReference({
+    type: "book", author: "البخاري", title: "صحيح البخاري",
+    variants: ["البخاري، صحيح البخاري، ج 1، ص 20"]
+}), false);
 
 console.log("Footnote citation engine tests passed.");
