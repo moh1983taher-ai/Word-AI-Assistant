@@ -124,30 +124,30 @@ async function fetchCitationJSON(fetchImpl, url, requestOptions, readJSON, provi
     const controller = typeof AbortController !== "undefined"
         ? new AbortController()
         : null;
+    const providerNames = {
+        duckai: "Duck.ai",
+        gemini: "Gemini",
+        groq: "Groq",
+        openai: "OpenAI",
+        openrouter: "OpenRouter",
+        pollinations: "Pollinations"
+    };
+    const providerLabel = providerNames[provider] || provider;
+    const timeoutError = new Error(
+        "تجاوز الاتصال بمزوّد " + providerLabel +
+        " مهلة الانتظار (" + Math.ceil(timeoutMs / 1000) +
+        " ثانية). لم يكتمل التحليل؛ تحقق من اتصال الإنترنت وإعدادات المزوّد ثم أعد المحاولة."
+    );
+    timeoutError.code = "CITATION_REQUEST_TIMEOUT";
+    timeoutError.retryable = true;
+
     let timedOut = false;
     let timeoutId = null;
-
     const timeoutPromise = new Promise(function (_, reject) {
         timeoutId = setTimeout(function () {
             timedOut = true;
             if (controller) controller.abort();
-            const providerNames = {
-                duckai: "Duck.ai",
-                gemini: "Gemini",
-                groq: "Groq",
-                openai: "OpenAI",
-                openrouter: "OpenRouter",
-                pollinations: "Pollinations"
-            };
-            const providerLabel = providerNames[provider] || provider;
-            const error = new Error(
-                "تجاوز الاتصال بمزوّد " + providerLabel +
-                " مهلة الانتظار (" + Math.ceil(timeoutMs / 1000) +
-                " ثانية). لم يكتمل التحليل؛ تحقق من اتصال الإنترنت وإعدادات المزوّد ثم أعد المحاولة."
-            );
-            error.code = "CITATION_REQUEST_TIMEOUT";
-            error.retryable = true;
-            reject(error);
+            reject(timeoutError);
         }, timeoutMs);
     });
 
@@ -164,22 +164,6 @@ async function fetchCitationJSON(fetchImpl, url, requestOptions, readJSON, provi
         return await Promise.race([requestPromise, timeoutPromise]);
     } catch (error) {
         if (timedOut || (error && error.name === "AbortError")) {
-            const providerNames = {
-                duckai: "Duck.ai",
-                gemini: "Gemini",
-                groq: "Groq",
-                openai: "OpenAI",
-                openrouter: "OpenRouter",
-                pollinations: "Pollinations"
-            };
-            const providerLabel = providerNames[provider] || provider;
-            const timeoutError = new Error(
-                "تجاوز الاتصال بمزوّد " + providerLabel +
-                " مهلة الانتظار (" + Math.ceil(timeoutMs / 1000) +
-                " ثانية). لم يكتمل التحليل؛ تحقق من اتصال الإنترنت وإعدادات المزوّد ثم أعد المحاولة."
-            );
-            timeoutError.code = "CITATION_REQUEST_TIMEOUT";
-            timeoutError.retryable = true;
             throw timeoutError;
         }
         throw error;
