@@ -129,6 +129,13 @@ const prompt = CitationWorkflow.createCitationSystemPrompt();
 assert.match(prompt, /sourceText/);
 assert.match(prompt, /لا تنشئ قائمة مراجع/);
 assert.doesNotMatch(prompt, /قائمة المراجع النهائية الموحدة/);
+assert.match(prompt, /خيار استقصاء المؤلف غير مفعّل/);
+
+const authorDiscoveryPrompt = CitationWorkflow.createCitationSystemPrompt({
+    addMissingAuthors: true
+});
+assert.match(authorDiscoveryPrompt, /خيار استقصاء المؤلف مفعّل/);
+assert.match(authorDiscoveryPrompt, /لا تخمّن النسبة/);
 
 const fence = String.fromCharCode(96).repeat(3);
 const parsed = CitationWorkflow.parseCitationJSON(
