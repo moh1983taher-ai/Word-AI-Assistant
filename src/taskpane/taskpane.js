@@ -5376,6 +5376,8 @@ async function analyzeAndBuildFinalReferencesWithAI(
 - رقم مجلد
 - رقم صفحة
 
+إذا ظهر اسم المؤلف كاملًا في نص الإحالة، فاحتفظ به كما ورد في حقل authorFull، ولا تختصر هذا الحقل ولا تستنتج اسمًا كاملًا غير موجود في المادة. ويظل حقل author خاضعًا للتوحيد إلى الاسم العلمي المختصر.
+
 إذا لم تكن المعلومة موجودة فلا تخترعها.
 
 14. إذا كان رقم أو معلومة تبدو خطأ مطبعيًا في المصدر الأصلي:
@@ -5404,6 +5406,7 @@ async function analyzeAndBuildFinalReferencesWithAI(
       "id": "ref-1",
       "type": "book",
       "author": "",
+      "authorFull": "",
       "title": "",
       "edition": "",
       "editor": "",
@@ -29630,29 +29633,23 @@ variants تستخدم للصيغ المختلفة للمرجع نفسه فقط.
 إذا لم تستطع تحديد حدود الإحالة كاملة بثقة،
 اجعل sourceText فارغًا، وارفع needsReview بدل اختراع نطاق.
 
-ضابط حاسم لتحديد sourceText:
-sourceText ليس نص الحاشية، وليس الجملة التي ورد فيها المرجع، وليس الاقتباس
-الذي يسبقه أو يليه؛ بل هو الجزء الببليوغرافي وحده الذي سيُستبدل في Word.
-اتخذ قرار بداية هذا الجزء ونهايته من فهمك للسياق، ولا تعتمد على قاعدة شكلية
-تُلزم وجود اسم المؤلف أو رقم الصفحة أو موضع ثابت للعنوان.
+أمثلة توضيحية لضبط حدود sourceText:
 
-أمثلة تطبيقية:
 - في: يقول: "وللشافعي ... ويرد كل استدلال مرسل" المنخول 454.
-  يكون sourceText هو: "المنخول 454" فقط، ولا تدخل القول المنقول في المصدر.
+  انسخ sourceText هكذا: "المنخول 454"؛ ولا تدخل القول المنقول أو عبارة "يقول".
+  يبقى رقم الصفحة محفوظًا خارج نطاق استبدال الهوية الببليوغرافية.
 - في: كما نقل عنه الإسنوي، نهاية السول في شرح منهاج الوصول،
-  يكون sourceText هو: "الإسنوي، نهاية السول في شرح منهاج الوصول" فقط،
-  وتبقى عبارة "كما نقل عنه" خارج المصدر.
+  يكون sourceText: "الإسنوي، نهاية السول في شرح منهاج الوصول" فقط،
+  وتبقى عبارة "كما نقل عنه" خارج الإحالة.
 - في: ومثلها قاعدة الزركشي في العقود: "العادة إذا اطردت ..." المنثور، 2/362.
-  يكون sourceText هو: "المنثور، 2/362" فقط، وتبقى القاعدة والاقتباس كما هما.
+  يكون sourceText: "المنثور، 2/362"؛ ولا تدخل القاعدة أو الاقتباس في الإحالة.
+  وتبقى بيانات الجزء والصفحة كما وردت في النص الأصلي.
 
-إذا ورد المرجع بصيغة عنوان ثم مؤلف، أو مؤلف ثم عنوان، أو عنوان مجرد،
-فحدّد النص الموجود فعلًا دون إعادة صياغته. لا تُدخل في sourceText كلامًا
-تفسيريًا مثل "يقول" أو "ومثلها قاعدة" أو "كما نقل عنه"، ولا نصًا مقتبسًا.
-وعند وجود أكثر من مرجع في الحاشية، أخرج sourceText مستقلًا لكل ظهور،
-واربطه بالـ occurrence وmaterialId الصحيحين.
-لا تجعل اختلاف الترتيب أو غياب المؤلف أو الصفحة سببًا لإسقاط مرجع واضح.
-لا توحّد صيغ العناوين داخل sourceText؛ اترك قرار الصيغة المعيارية لحقل
-المرجع المقترح، مع الحفاظ على النص الأصلي حرفيًا في sourceText.
+انسخ ترتيب المؤلف والعنوان وعلامات الترقيم كما وردت، ولا تعِد صياغة العنوان
+أو توحّد صيغته داخل sourceText. إذا تعددت الإحالات في الحاشية، فحدّد
+sourceText مستقلًا لكل ظهور، واربطه بالـ occurrence وmaterialId الصحيحين.
+استبعد الكلام التفسيري والاقتباس المجاور، ولا تجعل غياب المؤلف أو رقم الصفحة
+أو اختلاف موضع العنوان سببًا آليًا لإسقاط إحالة واضحة.
 
 أضف sourceTextConfidence من 0 إلى 1.
 
@@ -30459,6 +30456,215 @@ function parseReferenceAIJSON(
     }
 
 }
+
+
+ // =====================================================
+ // DOCUMENT-WIDE REFERENCE NAME NORMALIZATION
+ // توحيد أسماء الكتب والمؤلفين على مستوى المستند كله
+ // =====================================================
+
+ async function canonicalizeReferenceNamesWithAI(
+     references,
+     addMissingAuthors = false
+ ) {
+     if (!Array.isArray(references) || references.length === 0) return [];
+
+     const settings = getSavedSettings();
+     const provider = String(settings?.provider || "openrouter").trim().toLowerCase();
+     const key = String(settings?.key || "").trim();
+     const model = String(settings?.model || "").trim();
+
+     if (!model || (provider !== "duckai" && !key)) {
+         console.warn("تخطي التوحيد النهائي: إعدادات مزود الذكاء الاصطناعي غير مكتملة.");
+         return references;
+     }
+
+     const authorCounts = new Map();
+     const titleCounts = new Map();
+     const addCount = function (map, value, weight) {
+         const name = String(value || "").replace(/\s+/g, " ").trim();
+         if (name) map.set(name, (map.get(name) || 0) + weight);
+     };
+
+     const compactReferences = references.map(function (reference, index) {
+         const occurrenceCount = Array.isArray(reference?.occurrences) ? reference.occurrences.length : 0;
+         const variantCount = Array.isArray(reference?.variants) ? reference.variants.length : 0;
+         const weight = Math.max(1, occurrenceCount, variantCount);
+         addCount(authorCounts, reference?.author, weight);
+         addCount(titleCounts, reference?.title, weight);
+
+         const variantTexts = Array.isArray(reference?.variants)
+             ? reference.variants.map(function (variant) {
+                 if (typeof variant === "string") return variant.trim();
+                 return String(variant?.text || variant?.originalText || variant?.cleanedText || variant?.citation || "").trim();
+             }).filter(Boolean).slice(0, 6)
+             : [];
+
+         return {
+             index: index,
+             type: String(reference?.type || ""),
+             author: String(reference?.author || ""),
+             title: String(reference?.title || ""),
+             variantTexts: variantTexts
+         };
+     });
+
+     const toFrequencyList = function (map) {
+         return Array.from(map.entries())
+             .map(function (entry) { return { form: entry[0], count: entry[1] }; })
+             .sort(function (a, b) { return b.count - a.count || a.form.localeCompare(b.form, "ar"); });
+     };
+
+     const documentFrequency = {
+         authors: toFrequencyList(authorCounts),
+         titles: toFrequencyList(titleCounts)
+     };
+
+     const systemPrompt = `
+أنت محرر ببليوغرافي ينفذ المرحلة النهائية لتوحيد أسماء الكتب والمؤلفين في مستند أكاديمي كامل.
+
+المطلوب: اختيار صيغة موحدة لاسم المؤلف وعنوان الكتاب لكل سجل، اعتمادًا على تكرار الصيغ في المستند كله وقائمة التكرارات المرفقة.
+
+قواعد حاسمة:
+1. اختر للكتاب الصيغة الأكثر تكرارًا في المستند للعنوان نفسه، لا الصيغة الأشهر خارجه. لا تغيّر هوية الكتاب.
+2. اختر للمؤلف الاسم العلمي المختصر المشهور: اللقب أو الشهرة أو النسبة المعروفة، لا الاسم الكامل المطوّل. مثال: «السيوطي» بدل الاسم الكامل المطوّل، و«الغزالي» بدل سرد النسب. أبقِ الصيغة المركبة المشهورة إذا كانت هي الاسم العلمي المتداول.
+3. في اسم المؤلف، قدّم اللقب أو الشهرة العلمية المختصرة المعروفة على سرد الاسم الكامل، ولو تكرر الاسم الكامل أكثر؛ وعند تعدد الألقاب المختصرة اعتمد الأكثر ورودًا. وفي عنوان الكتاب اعتمد الصيغة الأكثر تكرارًا في المستند.
+4. استعمل الصيغ المختلفة في نصوص الإحالات للتعرف على الاسم نفسه، ولا تجعل اختلاف الرسم أو الاختصار سببًا لتعدد الصيغ.
+5. لا توحّد كتابًا مع شرحه أو حاشيته أو مختصره أو كتاب آخر مشابه الاسم. ولا تدمج كتابين لمجرد اتحاد المؤلف.
+6. لا تستبدل عنوانًا أصيلًا باسم المؤلف، ولا تفصل اسمًا هو جزء أصيل من عنوان الكتاب.
+7. إذا ظهر اسم المؤلف في إحالة أخرى للكتاب نفسه داخل المستند، فوحّد السجلين على الاسم المعتمد ولو لم يُفعّل الاستقصاء. ${addMissingAuthors ? "خيار الاستقصاء مفعّل: إذا غاب المؤلف عن المستند كله، فحدّد مؤلف الكتاب من معرفتك الببليوغرافية الموثوقة، ثم أعد لقبه أو شهرته العلمية المختصرة. لا تخمّن؛ اتركه فارغًا إذا لم تثبت النسبة." : "خيار الاستقصاء غير مفعّل: لا تستكمل مؤلفًا غائبًا عن المستند كله؛ أبقِ الحقل فارغًا."}
+8. لا تنشئ سجلًا ولا تحذف سجلًا ولا تدمج السجلات. لا تعدّل إلا author وtitle لكل index.
+9. حافظ على كل البيانات الأخرى كما هي؛ خصوصًا occurrences وsourceText وvariants والصفحات والأجزاء وبيانات الطبعة.
+10. أعد عنصرًا واحدًا لكل index وارد، ولا تغيّر index أو تسقط أي عنصر. إذا لم تكن واثقًا من تغيير صيغة ما، أعد الصيغة الأصلية.
+
+أعد JSON فقط:
+{"items":[{"index":0,"author":"الاسم المختصر المشهور","title":"العنوان المعتمد"}]}
+`;
+
+     const normalized = references.map(function (reference) {
+         if (!reference || typeof reference !== "object") return reference;
+         const authorFull = String(reference.authorFull || reference.author || "").trim();
+         return authorFull && !String(reference.authorFull || "").trim()
+             ? { ...reference, authorFull: authorFull }
+             : reference;
+     });
+     const batchSize = provider === "groq" ? 16 : 24;
+
+     for (let start = 0; start < compactReferences.length; start += batchSize) {
+         const batch = compactReferences.slice(start, start + batchSize);
+         const userPrompt = JSON.stringify({
+             addMissingAuthors: Boolean(addMissingAuthors),
+             documentFrequency: documentFrequency,
+             references: batch
+         });
+
+         let answer = "";
+
+         if (provider === "gemini") {
+             const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" +
+                 encodeURIComponent(normalizeGeminiModel(model)) +
+                 ":generateContent?key=" + encodeURIComponent(key);
+             const response = await fetch(endpoint, {
+                 method: "POST",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({
+                     systemInstruction: { parts: [{ text: systemPrompt }] },
+                     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                     generationConfig: {
+                         temperature: 0.1,
+                         responseMimeType: "application/json",
+                         maxOutputTokens: 5000
+                     }
+                 })
+             });
+             const result = await readJSON(response);
+             if (!response.ok) throw new Error(getAPIError(result, "فشل توحيد أسماء الكتب والمؤلفين."));
+             if (String(result?.candidates?.[0]?.finishReason || "").toUpperCase() === "MAX_TOKENS") {
+                 throw new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
+             }
+             answer = extractGeminiAnswer(result);
+         } else {
+             const endpoint = provider === "duckai"
+                 ? "http://127.0.0.1:8080/v1/chat/completions"
+                 : provider === "openai"
+                     ? "https://api.openai.com/v1/chat/completions"
+                     : provider === "groq"
+                         ? "https://api.groq.com/openai/v1/chat/completions"
+                         : "https://openrouter.ai/api/v1/chat/completions";
+
+             const headers = { "Content-Type": "application/json" };
+             if (provider !== "duckai") headers.Authorization = "Bearer " + key;
+             if (provider === "openrouter") {
+                 headers["HTTP-Referer"] = window.location.href;
+                 headers["X-Title"] = "Research Tools";
+             }
+
+             const response = await fetch(endpoint, {
+                 method: "POST",
+                 headers: headers,
+                 body: JSON.stringify({
+                     model: model,
+                     messages: [
+                         { role: "system", content: systemPrompt },
+                         { role: "user", content: userPrompt }
+                     ],
+                     temperature: 0.1,
+                     response_format: { type: "json_object" },
+                     max_tokens: provider === "groq" ? 4000 : 6000
+                 })
+             });
+             const result = await readJSON(response);
+             if (!response.ok) throw new Error(getAPIError(result, "فشل توحيد أسماء الكتب والمؤلفين."));
+             const finishReason = String(result?.choices?.[0]?.finish_reason || "").toLowerCase();
+             if (["length", "max_tokens", "max_output_tokens"].includes(finishReason)) {
+                 throw new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
+             }
+             answer = extractOpenAIStyleAnswer(result, provider);
+         }
+
+         let parsed;
+         try {
+             const raw = String(answer || "").trim()
+                 .replace(/^\x60{3}(?:json)?\s*/i, "")
+                 .replace(/\s*\x60{3}$/i, "");
+             parsed = JSON.parse(raw);
+         } catch (error) {
+             throw new Error("تعذر قراءة نتيجة توحيد أسماء الكتب والمؤلفين بصيغة JSON.");
+         }
+
+         if (!parsed || !Array.isArray(parsed.items)) {
+             throw new Error("نتيجة توحيد أسماء الكتب والمؤلفين لا تحتوي قائمة items صحيحة.");
+         }
+
+         const batchIndexes = new Set(batch.map(function (item) { return item.index; }));
+         const seenIndexes = new Set();
+
+         parsed.items.forEach(function (item) {
+             const index = Number(item?.index);
+             if (!Number.isInteger(index) || !batchIndexes.has(index) || seenIndexes.has(index)) return;
+             seenIndexes.add(index);
+
+             const original = normalized[index];
+             if (!original || typeof original !== "object") return;
+
+             const canonicalTitle = String(item?.title || "").trim();
+             const canonicalAuthor = String(item?.author || "").trim();
+
+             if (canonicalTitle) normalized[index] = { ...normalized[index], title: canonicalTitle };
+             if (canonicalAuthor) normalized[index] = { ...normalized[index], author: canonicalAuthor };
+         });
+
+         if (seenIndexes.size !== batch.length) {
+             console.warn("توحيد الأسماء أعاد عددًا أقل من السجلات المطلوبة؛ حُفظت الصيغ الأصلية للسجلات الناقصة.", {
+                 expected: batch.length,
+                 received: seenIndexes.size,
+                 batch: start / batchSize + 1
+             });
+         }
+     }
+
+     return normalized;
+ }
 
 // =====================================================
 // AI REFERENCE MERGER
@@ -45243,10 +45449,27 @@ if (referencesContent) {
                                     // 5. استخراج المراجع النهائية
                                     // =================================================
 
+                                    // توحيد أسماء الكتب والمؤلفين بعد اكتمال جميع الدفعات،
+                                    // حتى يستند الاختيار إلى تكرار الصيغ في المستند كله.
+                                    let documentWideReferences = aiAnalysisResult.references;
+                                    if (Array.isArray(documentWideReferences) && documentWideReferences.length) {
+                                        try {
+                                            documentWideReferences = await canonicalizeReferenceNamesWithAI(
+                                                documentWideReferences,
+                                                addMissingAuthors
+                                            );
+                                        } catch (normalizationError) {
+                                            console.warn(
+                                                "تعذر التوحيد النهائي لأسماء الكتب والمؤلفين؛ ستُحفظ نتائج التحليل الأصلية:",
+                                                normalizationError
+                                            );
+                                        }
+                                    }
+
                                     const finalReferenceResults =
-                                        Array.isArray(aiAnalysisResult.references)
+                                        Array.isArray(documentWideReferences)
                                             ? mergeEquivalentReferences(
-                                                aiAnalysisResult.references
+                                                documentWideReferences
                                             )
                                             : [];
 
@@ -47093,49 +47316,16 @@ async function buildFootnoteSuggestions(
              * =====================================================
              */
 
-            function authorExistsInSource(
-                originalText,
-                reference
-            ) {
+            function authorExistsInSource(originalText, reference) {
+                const source = normalizeSearchText(originalText);
+                if (!source) return false;
 
-                const author =
-                    String(
-                        reference?.author ||
-                        ""
-                    )
-                        .trim();
+                const candidates = [
+                    reference?.authorFull,
+                    reference?.author
+                ].map(normalizeSearchText).filter(Boolean);
 
-                if (
-                    !author
-                ) {
-
-                    return false;
-
-                }
-
-                const source =
-                    normalizeSearchText(
-                        originalText
-                    );
-
-                const normalizedAuthor =
-                    normalizeSearchText(
-                        author
-                    );
-
-                if (
-                    !source ||
-                    !normalizedAuthor
-                ) {
-
-                    return false;
-
-                }
-
-                return source.includes(
-                    normalizedAuthor
-                );
-
+                return candidates.some(candidate => source.includes(candidate));
             }
 
             /*
@@ -47237,8 +47427,8 @@ async function buildFootnoteSuggestions(
                                             reference
                                         );
 
-                                    let includeAuthor =
-                                        true;
+                                    let includeAuthor = true;
+                                    let isFirstMention = false;
 
                                     /*
                                      * نمط:
@@ -47249,10 +47439,8 @@ async function buildFootnoteSuggestions(
                                         "title-author-first"
                                     ) {
 
-                                        includeAuthor =
-                                            !seenReferences.has(
-                                                referenceKey
-                                            );
+                                        isFirstMention = !seenReferences.has(referenceKey);
+                                        includeAuthor = isFirstMention;
 
                                         if (
                                             referenceKey
@@ -47290,12 +47478,35 @@ async function buildFootnoteSuggestions(
                                      * فلا يوجد ما يمكن إضافته.
                                      */
                                     if (
-                                        !reference?.author
+                                        !reference?.author &&
+                                        !reference?.authorFull
                                     ) {
 
                                         includeAuthor =
                                             false;
 
+                                    }
+
+                                    if (
+                                        referenceStyle.format === "title-author-first" &&
+                                        isFirstMention &&
+                                        sourceTexts[index]
+                                    ) {
+                                        const firstMentionBuilder = window.FirstMentionCitation;
+                                        if (firstMentionBuilder && typeof firstMentionBuilder.build === "function") {
+                                            return firstMentionBuilder.build(
+                                                sourceTexts[index],
+                                                reference,
+                                                includeAuthor
+                                                    ? (reference.authorFull || reference.author || "")
+                                                    : "",
+                                                Boolean(includeAuthor && addMissingAuthors)
+                                            );
+                                        }
+
+                                        // Fail closed: preserve the original full citation if
+                                        // the focused first-mention helper is unavailable.
+                                        return sourceTexts[index];
                                     }
 
                                     return formatFootnoteReference(
@@ -47556,6 +47767,15 @@ function mergeEquivalentReferences(references) {
 
                 return;
 
+            }
+
+            const incomingFullAuthor = clean(reference.authorFull);
+            const existingFullAuthor = clean(existing.authorFull);
+            if (
+                incomingFullAuthor &&
+                (!existingFullAuthor || existingFullAuthor === clean(existing.author))
+            ) {
+                existing.authorFull = incomingFullAuthor;
             }
 
             /*

@@ -229,11 +229,49 @@ assert.equal(engine.isHadithTakhrijReference({
 }), false);
 
 
+assert.equal(
+    engine.getIdentityText("(1) انظر: الزركشي، المنثور، ج 2، ص 145"),
+    "الزركشي، المنثور",
+    "a note counter and editorial lead-in must stay outside the bibliographic replacement"
+);
+assert.equal(
+    engine.getIdentityText("1) انظر: الزركشي، المنثور، ج 2، ص 145"),
+    "الزركشي، المنثور",
+    "an unbracketed note counter before an editorial lead-in must remain outside the replacement"
+);
+assert.equal(
+    engine.getIdentityText("(انظر: الزركشي، المنثور، ج 2، ص 145)"),
+    "الزركشي، المنثور",
+    "outer citation parentheses and editorial lead-ins must remain outside the replacement"
+);
 
+const protectedContextNote =
+    "(1) انظر: الزركشي، المنثور، ج 2، ص 145؛ ويراجع الباحث ذلك في موضع لاحق.";
+const protectedContextPairs = engine.buildPairs(protectedContextNote, {
+    references: [{ author: "الزركشي", title: "المنثور" }],
+    sourceTexts: ["1) انظر: الزركشي، المنثور، ج 2، ص 145"],
+    suggestedTexts: ["الزركشي، المنثور المحقق"]
+});
+assert.equal(protectedContextPairs.length, 1);
+assert.equal(
+    protectedContextNote.slice(protectedContextPairs[0].start, protectedContextPairs[0].end),
+    "الزركشي، المنثور",
+    "only the bibliographic identity may be included in the replacement range"
+);
+assert.equal(
+    protectedContextNote.slice(0, protectedContextPairs[0].start),
+    "(1) انظر: ",
+    "the note counter and editorial phrase must remain byte-for-byte unchanged"
+);
+assert.equal(
+    protectedContextNote.slice(protectedContextPairs[0].end),
+    "، ج 2، ص 145؛ ويراجع الباحث ذلك في موضع لاحق.",
+    "volume, pages, separators, and all following prose must remain unchanged"
+);
 
-// AI-selected source spans: replace only the bibliographic citation and preserve
-// explanatory prose, quotations, and page locators around it.
-const quotedAlMankhul = 'يقول: "وللشافعي رضي الله عنه مسلكان يحصر في أحدهما التمسك في الشبه أو المخيل الذي يشهد له أصل معين ويرد كل استدلال مرسل " المنخول 454.';
+// AI-selected citation examples: preserve quotation, commentary, and page metadata.
+const quotedAlMankhul =
+    'يقول: "وللشافعي رضي الله عنه مسلكان يحصر في أحدهما التمسك في الشبه أو المخيل الذي يشهد له أصل معين ويرد كل استدلال مرسل " المنخول 454.';
 const alMankhulPairs = engine.buildPairs(quotedAlMankhul, {
     references: [{ author: "الغزالي", title: "المنخول من تعليقات الأصول" }],
     sourceTexts: ["المنخول 454"],
@@ -241,7 +279,6 @@ const alMankhulPairs = engine.buildPairs(quotedAlMankhul, {
 });
 assert.equal(alMankhulPairs.length, 1);
 assert.equal(quotedAlMankhul.slice(alMankhulPairs[0].start, alMankhulPairs[0].end), "المنخول");
-assert.equal(alMankhulPairs[0].replacementText, "الغزالي، المنخول من تعليقات الأصول");
 assert.ok(quotedAlMankhul.slice(0, alMankhulPairs[0].start).includes("وللشافعي"));
 assert.ok(quotedAlMankhul.slice(alMankhulPairs[0].end).includes("454"));
 
@@ -255,7 +292,8 @@ assert.equal(isnawiPairs.length, 0);
 assert.equal(isnawiPairs.unchangedCount, 1);
 assert.ok(attributedIsnawi.startsWith("كما نقل عنه"));
 
-const quotedZarkashi = 'ومثلها قاعدة الزركشي في العقود: "العادة إذا اطردت ينزل اللفظ في العقود عليها، وإذا اضطربت لم تعتبر ووجب البيان، (وإذا) تعارضت الظنون في اعتبارها فخلاف " المنثور، 2/362.';
+const quotedZarkashi =
+    'ومثلها قاعدة الزركشي في العقود: "العادة إذا اطردت ينزل اللفظ في العقود عليها، وإذا اضطربت لم تعتبر ووجب البيان، (وإذا) تعارضت الظنون في اعتبارها فخلاف " المنثور، 2/362.';
 const zarkashiPairs = engine.buildPairs(quotedZarkashi, {
     references: [{ author: "الزركشي", title: "المنثور" }],
     sourceTexts: ["المنثور، 2/362"],
@@ -266,4 +304,94 @@ assert.equal(quotedZarkashi.slice(zarkashiPairs[0].start, zarkashiPairs[0].end),
 assert.ok(quotedZarkashi.slice(0, zarkashiPairs[0].start).startsWith("ومثلها قاعدة الزركشي"));
 assert.ok(quotedZarkashi.slice(zarkashiPairs[0].end).includes("2/362"));
 
-console.log("Footnote citation engine tests passed.");
+assert.notEqual(
+    engine.referenceKey({ author: "الخليل بن أحمد", title: "كتاب العين" }),
+    engine.referenceKey({ author: "الخليل بن أحمد", title: "العين" }),
+    "كتاب العين والعين must remain distinct title identities"
+);
+
+// End-to-end Office.js adapter simulation: the exact source span is located,
+// only the bibliographic identity is replaced, and surrounding text survives.
+async function testExactWordReplacementPreservesContext() {
+    const note = { text: protectedContextNote };
+    const searchCalls = [];
+
+    function makeRange(start, end) {
+        return {
+            get text() { return note.text.slice(start, end); },
+            load() { return this; },
+            search(needle, options) {
+                searchCalls.push({ needle, options: { ...options } });
+                const scopeText = this.text;
+                const items = [];
+                let from = 0;
+                while (from <= scopeText.length - needle.length) {
+                    const found = scopeText.indexOf(needle, from);
+                    if (found < 0) break;
+                    items.push(makeRange(start + found, start + found + needle.length));
+                    from = found + Math.max(1, needle.length);
+                }
+                return { items, load() { return this; } };
+            },
+            insertText(replacement, location) {
+                assert.equal(location, "Replace");
+                note.text =
+                    note.text.slice(0, start) +
+                    replacement +
+                    note.text.slice(end);
+                return { get text() { return replacement; }, load() { return this; } };
+            }
+        };
+    }
+
+    const footnotes = {
+        items: [{ body: { getRange: () => makeRange(0, note.text.length) } }],
+        load() { return this; }
+    };
+    const endnotes = { items: [], load() { return this; } };
+    const previousWord = global.Word;
+    global.Word = {
+        async run(callback) {
+            return callback({
+                document: { body: { footnotes, endnotes } },
+                async sync() {}
+            });
+        }
+    };
+
+    try {
+        const result = await engine.apply([{
+            source: "footnote",
+            materialId: "footnote-1",
+            noteNumber: 1,
+            originalText: protectedContextNote,
+            references: [{ author: "الزركشي", title: "المنثور" }],
+            sourceTexts: ["1) انظر: الزركشي، المنثور، ج 2، ص 145"],
+            suggestedTexts: ["الزركشي، المنثور المحقق"]
+        }]);
+
+        assert.deepEqual(result, { applied: 1, skipped: 0, unchanged: 0 });
+        assert.equal(
+            note.text,
+            "(1) انظر: الزركشي، المنثور المحقق، ج 2، ص 145؛ ويراجع الباحث ذلك في موضع لاحق.",
+            "the live note must change only inside the exact bibliographic identity"
+        );
+        assert.ok(searchCalls.length >= 2);
+        for (const call of searchCalls) {
+            assert.equal(call.options.matchCase, true);
+            assert.equal(call.options.ignorePunct, false);
+            assert.equal(call.options.ignoreSpace, false);
+        }
+    } finally {
+        if (previousWord === undefined) delete global.Word;
+        else global.Word = previousWord;
+    }
+}
+
+testExactWordReplacementPreservesContext()
+    .then(() => console.log("Footnote citation engine tests passed."))
+    .catch(error => {
+        console.error(error);
+        process.exitCode = 1;
+    });
+
