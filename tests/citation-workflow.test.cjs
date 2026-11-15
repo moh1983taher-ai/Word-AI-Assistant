@@ -143,4 +143,47 @@ const parsed = CitationWorkflow.parseCitationJSON(
 );
 assert.equal(parsed.length, 1);
 
-console.log("Independent citation workflow tests passed.");
+(async function testPollinationsProvider() {
+    let request = null;
+    const responseData = {
+        choices: [{
+            message: { content: JSON.stringify({ citations: [] }) },
+            finish_reason: "stop"
+        }]
+    };
+
+    const result = await CitationWorkflow.analyzeCitations(
+        [{
+            id: "footnote-pollinations",
+            source: "footnote",
+            noteNumber: 1,
+            originalText: "السيوطي، الأشباه والنظائر، ص98"
+        }],
+        {
+            provider: "pollinations",
+            key: "test-pollinations-key",
+            model: "openai/gpt-5.4-nano"
+        },
+        {
+            fetch: async function (url, options) {
+                request = { url: url, options: options };
+                return { ok: true };
+            },
+            readJSON: async function () { return responseData; },
+            getAPIError: function () { return "unexpected API error"; },
+            extractOpenAIStyleAnswer: function (data) {
+                return data.choices[0].message.content;
+            }
+        }
+    );
+
+    assert.ok(request, "Pollinations must be called");
+    assert.equal(request.url, "https://gen.pollinations.ai/v1/chat/completions");
+    assert.equal(request.options.headers.Authorization, "Bearer test-pollinations-key");
+    assert.equal(JSON.parse(request.options.body).model, "openai/gpt-5.4-nano");
+    assert.equal(result.citations.length, 0);
+    console.log("Independent citation workflow tests passed, including Pollinations routing.");
+})().catch(function (error) {
+    console.error(error);
+    process.exitCode = 1;
+});
