@@ -62,6 +62,14 @@ assert.match(source, /async function buildFootnoteSuggestions\([\s\S]*?onProgres
 assert.match(source, /reportSuggestionProgress\(source, noteNumber\)/);
 assert.match(source, /await addNotes\(\s*footnotes\.items/);
 assert.match(source, /await addNotes\(\s*endnotes\.items/);
+const suggestionLoop = sectionBetween(
+    "async function addNotes(",
+    "await addNotes(\n                footnotes.items",
+    "asynchronous suggestion progress loop"
+);
+assert.match(suggestionLoop, /matches\.length === 0[\s\S]*?continue;/, "unmatched footnotes must be skipped without stopping the remaining scan");
+assert.doesNotMatch(suggestionLoop, /matches\.length === 0[\s\S]*?return;/, "an unmatched footnote must not terminate the whole scan");
+assert.match(suggestionLoop, /await new Promise\(function \(resolve\) \{ setTimeout\(resolve, 0\); \}\)/, "the UI must be allowed to paint progress during long suggestion scans");
 assert.doesNotMatch(
     citationHandler,
     /readReferenceSources\(|processReferenceSources\(|analyzeReferencesWithAI\(|latestUnifiedReferences/,
