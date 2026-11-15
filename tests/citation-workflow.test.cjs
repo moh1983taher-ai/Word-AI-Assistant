@@ -214,7 +214,35 @@ assert.equal(parsed.length, 1);
     );
     assert.ok(timeoutSignal && timeoutSignal.aborted, "a stalled provider request must be aborted at the timeout");
 
-    console.log("Independent citation workflow tests passed, including Pollinations routing and stalled-request timeout.");
+    await assert.rejects(
+        CitationWorkflow.analyzeCitations(
+            [{
+                id: "footnote-body-timeout",
+                source: "footnote",
+                noteNumber: 1,
+                originalText: "الغزالي، المستصفى، ص22"
+            }],
+            {
+                provider: "pollinations",
+                key: "test-pollinations-key",
+                model: "openai/gpt-5.4-nano"
+            },
+            {
+                fetch: async function () { return { ok: true }; },
+                readJSON: function () {
+                    return new Promise(function () {
+                        // Simulate an HTTP response whose body never finishes.
+                    });
+                },
+                getAPIError: function () { return "unexpected API error"; },
+                extractOpenAIStyleAnswer: function () { return "{}"; },
+                requestTimeoutMs: 20
+            }
+        ),
+        /تجاوز الاتصال بمزوّد Pollinations مهلة الانتظار/
+    );
+
+    console.log("Independent citation workflow tests passed, including stalled network and response-body timeouts.");
 })().catch(function (error) {
     console.error(error);
     process.exitCode = 1;
