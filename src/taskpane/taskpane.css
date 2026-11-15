@@ -6658,18 +6658,18 @@ body.dark #save-settings,
     display: block;
     flex-shrink: 0;
 }
-/* توحيد حجم شعار الترحيب والشريط حتى عند إنشائهما ديناميكيًا */
+/* توحيد حجم شعار الترحيب والشريط */
 .ai-symbol img,
 .brand-icon img {
-    width: 32px !important;
-    height: 32px !important;
-    min-width: 32px;
-    min-height: 32px;
-    max-width: 32px;
-    max-height: 32px;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px;
+    min-height: 44px;
+    max-width: 44px;
+    max-height: 44px;
     object-fit: contain;
     display: block;
-    flex: 0 0 32px;
+    flex: 0 0 44px;
 }
 
 /* =========================================================
