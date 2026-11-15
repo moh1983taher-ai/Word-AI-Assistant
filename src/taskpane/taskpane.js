@@ -44987,7 +44987,7 @@ if (referencesContent) {
                                                 totalBatches: aiResult.batchCount
                                             });
                                             if (statusContainer) {
-                                                statusContainer.innerHTML =
+                                                statusContainer.innerHTML +=
                                                     '<div class="references-analysis-result"><div class="references-analysis-status">لم تُنتج الحواشي مقترحات قابلة للتطبيق.</div></div>';
                                             }
                                             return;
@@ -47487,18 +47487,13 @@ async function buildFootnoteSuggestions(
              * =====================================================
              */
 
-            function addNotes(
+            async function addNotes(
                 notes,
                 source
             ) {
-
-                notes.forEach(
-                    function (
-                        note,
-                        index
-                    ) {
-
-                        const noteNumber =
+                for (let index = 0; index < notes.length; index++) {
+                    const note = notes[index];
+                    const noteNumber =
                             index + 1;
 
                         const materialId =
@@ -47703,17 +47698,20 @@ async function buildFootnoteSuggestions(
                         });
 
                         reportSuggestionProgress(source, noteNumber);
-                    }
-                );
 
+                    // Yield periodically so Word's task pane can paint the updated progress.
+                    if ((index + 1) % 5 === 0) {
+                        await new Promise(function (resolve) { setTimeout(resolve, 0); });
+                    }
+                }
             }
 
-            addNotes(
+            await addNotes(
                 footnotes.items,
                 "footnote"
             );
 
-            addNotes(
+            await addNotes(
                 endnotes.items,
                 "endnote"
             );
