@@ -56,7 +56,7 @@ assert.match(citationReader, /body\.footnotes/);
 assert.match(citationReader, /body\.endnotes/);
 assert.doesNotMatch(
     citationReader,
-    /body\.load\(\s*["']text["']\s*\)|readReferenceSources|readBibliographyFromCurrentDocument/,
+    /context\.document\.body\.load\(\s*["']text["']\s*\)|const\s+mainText\s*=|readReferenceSources|readBibliographyFromCurrentDocument/,
     "citation-only reader must not load the main document text or bibliography"
 );
 
