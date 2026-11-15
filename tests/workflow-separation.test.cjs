@@ -93,15 +93,32 @@ assert.doesNotMatch(
 assert.match(source, /localStorage\.setItem\("BIBLIOGRAPHY_SETTINGS"/);
 assert.match(source, /localStorage\.setItem\("CITATION_SETTINGS"/);
 assert.match(source, /localStorage\.getItem\("REFERENCE_STYLE"/);
-assert.match(source, /id="bibliography-format-select"/, "current-document bibliography format must have its own control");
-assert.match(source, /id="project-reference-format-select"/, "project bibliography format must have its own control");
-assert.match(source, /id="reference-format-select"/, "citation formatting must retain a separate control");
-assert.match(source, /bibliographyFormatSelect\.onchange[\s\S]*?saveBibliographySettings\(\)/);
-assert.match(source, /referenceFormatSelect\.onchange[\s\S]*?saveCitationSettings\(\)/);
+assert.match(source, /id="project-reference-format-select"/, "project bibliography formatting must remain available");
+assert.equal((source.match(/id="reference-format-select"/g) || []).length, 1, "the current-document workflow must expose one shared reference-format selector");
+assert.equal((source.match(/id="reference-add-missing-authors"/g) || []).length, 1, "author discovery must be controlled by one shared checkbox");
+assert.doesNotMatch(source, /id="bibliography-format-select"/, "the duplicated bibliography format selector must be removed");
+assert.doesNotMatch(source, /id="citation-add-missing-authors"/, "the duplicated citation author-discovery checkbox must be removed");
+assert.match(source, /data-reference-operation="bibliography"/, "the bibliography operation must have its own selector");
+assert.match(source, /data-reference-operation="citations"/, "the citation operation must have its own selector");
+assert.match(source, /id="reference-operation-dock"/, "current-document actions must live in the persistent action dock");
+assert.match(source, /actionDock\.appendChild\(applyButton\)/, "the citation apply action must move into the persistent dock");
+assert.match(source, /citation-first-mention/, "the citation-only first-mention behavior must remain available");
+assert.match(source, /localStorage\.setItem\("REFERENCE_SHARED_SETTINGS"/, "shared settings must be persisted as one state");
 assert.match(
     source,
     /CitationWorkflow\.analyzeCitations\([\s\S]*?getSavedSettings\(\)/,
     "citation service must use AI provider configuration without requiring the reference catalogue"
+);
+
+const bibliographyHandler = sectionBetween(
+    "analyzeReferencesBtn.onclick =\n                            async function (e)",
+    "const compareReferencesBtn =",
+    "reference extraction handler"
+);
+assert.equal(
+    (bibliographyHandler.match(/const operationShell/g) || []).length,
+    0,
+    "the bibliography analysis handler must reuse the outer action-shell binding without redeclaring it"
 );
 
 const citationButtonMarkup = source.indexOf('id="analyze-citations-btn"');
