@@ -297,9 +297,44 @@ async function analyzeCitations(notes, settings, dependencies, options) {
     const systemPrompt = createCitationSystemPrompt(options);
     const allCitations = [];
     const allNotes = Array.isArray(notes) ? notes : [];
+    const reportProgress = typeof dependencies.onProgress === "function"
+        ? function (details) {
+            try {
+                dependencies.onProgress(Object.assign({}, details));
+            } catch (error) {
+                // Progress UI must never interrupt citation extraction.
+                if (typeof console !== "undefined" && console.warn) {
+                    console.warn("تعذر تحديث مؤشر تقدم التوثيقات:", error);
+                }
+            }
+        }
+        : function () {};
+    const totalNotes = batches.reduce(function (total, batch) {
+        return total + batch.length;
+    }, 0);
+    let completedNotes = 0;
+
+    reportProgress({
+        stage: "started",
+        totalBatches: batches.length,
+        completedBatches: 0,
+        noteCount: totalNotes,
+        completedNotes: 0,
+        percent: 10
+    });
 
     for (let index = 0; index < batches.length; index++) {
         const batch = batches[index];
+        reportProgress({
+            stage: "batch-start",
+            currentBatch: index + 1,
+            totalBatches: batches.length,
+            completedBatches: index,
+            batchNoteCount: batch.length,
+            noteCount: totalNotes,
+            completedNotes: completedNotes,
+            percent: 10 + Math.round((completedNotes / totalNotes) * 62)
+        });
         const firstIndex = allNotes.findIndex(function (note) {
             return String(note && note.id || "") === batch[0].id;
         });
@@ -334,6 +369,20 @@ async function analyzeCitations(notes, settings, dependencies, options) {
             if (!allowedIds.has(materialId)) return;
             allCitations.push(Object.assign({}, citation, { materialId: materialId }));
         });
+
+        completedNotes += batch.length;
+        reportProgress({
+            stage: "batch-complete",
+            currentBatch: index + 1,
+            totalBatches: batches.length,
+            completedBatches: index + 1,
+            batchNoteCount: batch.length,
+            noteCount: totalNotes,
+            completedNotes: completedNotes,
+            batchCitationCount: batchCitations.length,
+            citationCount: allCitations.length,
+            percent: 10 + Math.round((completedNotes / totalNotes) * 62)
+        });
     }
 
     const order = new Map(allNotes.map(function (note, index) {
@@ -345,10 +394,20 @@ async function analyzeCitations(notes, settings, dependencies, options) {
             (order.get(b.materialId) == null ? Number.MAX_SAFE_INTEGER : order.get(b.materialId));
     });
 
+    reportProgress({
+        stage: "complete",
+        totalBatches: batches.length,
+        completedBatches: batches.length,
+        noteCount: totalNotes,
+        completedNotes: totalNotes,
+        citationCount: allCitations.length,
+        percent: 74
+    });
+
     return {
         citations: allCitations,
         batchCount: batches.length,
-        noteCount: batches.reduce(function (total, batch) { return total + batch.length; }, 0)
+        noteCount: totalNotes
     };
 }
 
