@@ -6920,3 +6920,44 @@ button.primary:hover,
         transition: none;
     }
 }
+
+
+.citation-progress-card[data-state="running"] .citation-progress-heading::after {
+    content: "";
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+    margin-inline-start: auto;
+    border-radius: 50%;
+    background: var(--brand-gold, #C99A43);
+    animation: citationProgressPulse 1.2s ease-in-out infinite;
+}
+
+.citation-progress-card[data-state="running"] .citation-progress-track > span::after {
+    content: "";
+    display: block;
+    width: 42%;
+    height: 100%;
+    margin-right: auto;
+    border-radius: inherit;
+    background: rgba(255, 255, 255, 0.36);
+    animation: citationProgressShimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes citationProgressPulse {
+    0%, 100% { opacity: 0.4; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes citationProgressShimmer {
+    0% { transform: translateX(120%); opacity: 0.15; }
+    50% { opacity: 0.8; }
+    100% { transform: translateX(-160%); opacity: 0.15; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .citation-progress-card[data-state="running"] .citation-progress-heading::after,
+    .citation-progress-card[data-state="running"] .citation-progress-track > span::after {
+        animation: none;
+    }
+}
