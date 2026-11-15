@@ -47460,7 +47460,8 @@ async function buildFootnoteSuggestions(
                                      * فلا يوجد ما يمكن إضافته.
                                      */
                                     if (
-                                        !reference?.author
+                                        !reference?.author &&
+                                        !reference?.authorFull
                                     ) {
 
                                         includeAuthor =
