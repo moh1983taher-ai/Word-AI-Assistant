@@ -6805,3 +6805,14 @@ button.primary:hover,
     background: rgba(201, 154, 67, 0.28);
     color: var(--brand-text);
 }
+
+/* ضبط حجم شعار الشريط الجانبي فقط، مع إبقاء شعار الترحيب بالحجم الحالي */
+.sidebar .brand-icon img {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 32px;
+    max-height: 32px;
+    flex: 0 0 32px;
+}
