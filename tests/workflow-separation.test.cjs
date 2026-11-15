@@ -37,6 +37,11 @@ const citationHandler = sectionBetween(
 
 assert.match(citationHandler, /readCitationSources\(\)/);
 assert.match(citationHandler, /CitationWorkflow\.analyzeCitations\(/);
+const citationService = fs.readFileSync(
+    path.join(__dirname, "../src/taskpane/citation-workflow.js"),
+    "utf8"
+);
+assert.match(citationService, /sourceText/, "exact citation anchors must remain in the citation-only service");
 assert.match(citationHandler, /buildUnifiedFootnoteMap\(/);
 assert.match(citationHandler, /buildFootnoteSuggestions\(/);
 assert.match(citationHandler, /applyFootnoteSuggestions\(/);
