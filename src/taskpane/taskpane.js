@@ -44759,6 +44759,190 @@ if (referencesContent) {
                             `;
 
 
+                        // Bind citation analysis immediately after its markup is created.
+                        // It must not depend on the bibliography button's initialization path.
+                            const analyzeCitationsBtn =
+                                referencesSourceWorkspace.querySelector("#analyze-citations-btn");
+
+                            if (analyzeCitationsBtn) {
+                                analyzeCitationsBtn.onclick = async function (event) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+
+                                    const statusContainer = document.getElementById("citation-analysis-status");
+                                    const suggestionsContainer = document.getElementById("footnote-suggestions-container");
+
+                                    analyzeCitationsBtn.disabled = true;
+                                    analyzeCitationsBtn.textContent = "جارٍ قراءة الحواشي...";
+
+                                    if (statusContainer) statusContainer.innerHTML = "";
+                                    if (suggestionsContainer) suggestionsContainer.innerHTML = "";
+
+                                    try {
+                                        const citationMaterials = await readCitationSources();
+                                        if (!citationMaterials.length) {
+                                            throw new Error("لا توجد حواشٍ سفلية أو ختامية قابلة للتحليل في المستند.");
+                                        }
+
+                                        analyzeCitationsBtn.textContent = "جارٍ تحليل التوثيقات فقط...";
+
+                                        const aiResult = await CitationWorkflow.analyzeCitations(
+                                            citationMaterials,
+                                            getSavedSettings(),
+                                            {
+                                                readJSON: readJSON,
+                                                getAPIError: getAPIError,
+                                                normalizeGeminiModel: normalizeGeminiModel,
+                                                extractGeminiAnswer: extractGeminiAnswer,
+                                                extractOpenAIStyleAnswer: extractOpenAIStyleAnswer
+                                            },
+                                            {
+                                                addMissingAuthors: citationStyle.addMissingAuthors === true
+                                            }
+                                        );
+
+                                        const citationEngine = window.FootnoteCitationEngine;
+                                        if (!citationEngine || typeof citationEngine.findValidatedSourceSpan !== "function") {
+                                            throw new Error("أداة التحقق من نطاق التوثيق غير متاحة.");
+                                        }
+
+                                        const groupedCitations = CitationWorkflow.buildUnifiedCitationReferences(
+                                            aiResult.citations,
+                                            citationMaterials,
+                                            function (originalText, candidateText) {
+                                                return citationEngine.findValidatedSourceSpan(
+                                                    originalText,
+                                                    candidateText
+                                                );
+                                            }
+                                        );
+
+                                        if (!groupedCitations.references.length) {
+                                            throw new Error("لم يُعثر على إحالات ببليوغرافية مؤكدة الحدود داخل الحواشي.");
+                                        }
+
+                                        const citationMap = buildUnifiedFootnoteMap(groupedCitations.references);
+                                        const suggestions = await buildFootnoteSuggestions(
+                                            citationMap,
+                                            citationStyle.addMissingAuthors === true
+                                        );
+
+                                        if (!suggestions.length) {
+                                            analyzeCitationsBtn.textContent = "لم تظهر توثيقات قابلة للتطبيق";
+                                            if (statusContainer) {
+                                                statusContainer.innerHTML =
+                                                    '<div class="references-analysis-result"><div class="references-analysis-status">لم تُنتج الحواشي مقترحات قابلة للتطبيق.</div></div>';
+                                            }
+                                            return;
+                                        }
+
+                                        const suggestionHTML = suggestions.map(function (item) {
+                                            const suggestedTexts = Array.isArray(item.suggestedTexts)
+                                                ? item.suggestedTexts
+                                                : (item.suggestedText ? [item.suggestedText] : []);
+
+                                            if (!suggestedTexts.length) return "";
+
+                                            const suggestedReferencesHTML = suggestedTexts.map(function (suggestedText) {
+                                                return `
+                                                    <div class="footnote-suggestion-reference">
+                                                        <div class="footnote-suggestion-arrow">←</div>
+                                                        <div class="footnote-suggestion-new">${escapeReferenceHTML(suggestedText)}</div>
+                                                    </div>
+                                                `;
+                                            }).join("");
+
+                                            return `
+                                                <div class="footnote-suggestion-item">
+                                                    <span class="footnote-suggestion-number">${item.noteNumber}</span>
+                                                    <div class="footnote-suggestion-content">
+                                                        <div class="footnote-suggestion-original">${escapeReferenceHTML(item.originalText)}</div>
+                                                        <div class="footnote-suggestion-references">${suggestedReferencesHTML}</div>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join("");
+
+                                        if (suggestionsContainer) {
+                                            suggestionsContainer.innerHTML = `
+                                                <div class="footnote-suggestions-result">
+                                                    <div
+                                                        class="footnote-suggestions-title reference-collapsible-header"
+                                                        data-reference-collapse-toggle
+                                                        data-reference-collapse-target="footnote-suggestions-content">
+                                                        <span>التوثيقات المقترحة <strong>${suggestions.filter(function (item) { return item.reference; }).length}</strong></span>
+                                                        <span class="reference-collapsible-arrow">▾</span>
+                                                    </div>
+                                                    <div
+                                                        id="footnote-suggestions-content"
+                                                        class="footnote-suggestions-list reference-collapsible-content">
+                                                        ${suggestionHTML}
+                                                    </div>
+                                                    ${suggestions.some(function (item) { return item.reference; }) ? `
+                                                        <button
+                                                            type="button"
+                                                            id="apply-footnote-suggestions-btn"
+                                                            class="apply-footnote-suggestions-btn">
+                                                            تطبيق التوثيق على الحواشي
+                                                        </button>
+                                                    ` : ""}
+                                                </div>
+                                            `;
+
+                                            const applyButton = document.getElementById("apply-footnote-suggestions-btn");
+                                            if (applyButton) {
+                                                applyButton.onclick = async function () {
+                                                    applyButton.disabled = true;
+                                                    applyButton.textContent = "جارٍ تطبيق التوثيق...";
+                                                    try {
+                                                        const result = await applyFootnoteSuggestions(suggestions);
+                                                        applyButton.textContent = result.skipped > 0
+                                                            ? `✓ طُبّق التوثيق على ${result.applied}، وتعذّر تطبيق ${result.skipped}`
+                                                            : `✓ تم تطبيق التوثيق (${result.applied})`;
+                                                    } catch (error) {
+                                                        console.error("فشل تطبيق التوثيق على الحواشي:", error);
+                                                        applyButton.disabled = false;
+                                                        applyButton.textContent = "تطبيق التوثيق على الحواشي";
+                                                        throw error;
+                                                    }
+                                                };
+                                            }
+                                        }
+
+                                        if (statusContainer) {
+                                            statusContainer.innerHTML = `
+                                                <div class="references-analysis-result">
+                                                    <div class="references-analysis-status success">
+                                                        ✓ اكتمل تحليل التوثيقات بصورة مستقلة
+                                                    </div>
+                                                    <div class="references-analysis-info">
+                                                        الحواشي المفحوصة: <strong>${aiResult.noteCount}</strong>
+                                                        · دفعات التحليل: <strong>${aiResult.batchCount}</strong>
+                                                        · الإحالات المعتمدة الحدود: <strong>${suggestions.reduce(function (total, item) { return total + (Array.isArray(item.suggestedTexts) ? item.suggestedTexts.length : 0); }, 0)}</strong>
+                                                        · إحالات مستبعدة لعدم ثبوت نطاقها: <strong>${groupedCitations.skippedCount}</strong>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }
+
+                                        analyzeCitationsBtn.textContent = "✓ اكتمل توحيد التوثيقات";
+                                    } catch (error) {
+                                        console.error("فشل تحليل التوثيقات المستقل:", error);
+                                        analyzeCitationsBtn.textContent = "تحليل وتوحيد التوثيقات";
+                                        if (statusContainer) {
+                                            statusContainer.innerHTML = `
+                                                <div class="references-analysis-result">
+                                                    <div class="references-analysis-status error">⚠ تعذر تحليل التوثيقات</div>
+                                                    <div class="references-analysis-info">${escapeReferenceHTML(String(error && error.message || "حدث خطأ غير معروف."))}</div>
+                                                </div>
+                                            `;
+                                        }
+                                    } finally {
+                                        analyzeCitationsBtn.disabled = false;
+                                    }
+                                };
+                            }
+
                         const referenceOrderSelect =
                             document.getElementById(
                                 "reference-order-select"
@@ -46561,187 +46745,7 @@ if (referencesContent) {
                             };
 
 
-                            const analyzeCitationsBtn =
-                                document.getElementById("analyze-citations-btn");
 
-                            if (analyzeCitationsBtn) {
-                                analyzeCitationsBtn.onclick = async function (event) {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-
-                                    const statusContainer = document.getElementById("citation-analysis-status");
-                                    const suggestionsContainer = document.getElementById("footnote-suggestions-container");
-
-                                    analyzeCitationsBtn.disabled = true;
-                                    analyzeCitationsBtn.textContent = "جارٍ قراءة الحواشي...";
-
-                                    if (statusContainer) statusContainer.innerHTML = "";
-                                    if (suggestionsContainer) suggestionsContainer.innerHTML = "";
-
-                                    try {
-                                        const citationMaterials = await readCitationSources();
-                                        if (!citationMaterials.length) {
-                                            throw new Error("لا توجد حواشٍ سفلية أو ختامية قابلة للتحليل في المستند.");
-                                        }
-
-                                        analyzeCitationsBtn.textContent = "جارٍ تحليل التوثيقات فقط...";
-
-                                        const aiResult = await CitationWorkflow.analyzeCitations(
-                                            citationMaterials,
-                                            getSavedSettings(),
-                                            {
-                                                readJSON: readJSON,
-                                                getAPIError: getAPIError,
-                                                normalizeGeminiModel: normalizeGeminiModel,
-                                                extractGeminiAnswer: extractGeminiAnswer,
-                                                extractOpenAIStyleAnswer: extractOpenAIStyleAnswer
-                                            },
-                                            {
-                                                addMissingAuthors: citationStyle.addMissingAuthors === true
-                                            }
-                                        );
-
-                                        const citationEngine = window.FootnoteCitationEngine;
-                                        if (!citationEngine || typeof citationEngine.findValidatedSourceSpan !== "function") {
-                                            throw new Error("أداة التحقق من نطاق التوثيق غير متاحة.");
-                                        }
-
-                                        const groupedCitations = CitationWorkflow.buildUnifiedCitationReferences(
-                                            aiResult.citations,
-                                            citationMaterials,
-                                            function (originalText, candidateText) {
-                                                return citationEngine.findValidatedSourceSpan(
-                                                    originalText,
-                                                    candidateText
-                                                );
-                                            }
-                                        );
-
-                                        if (!groupedCitations.references.length) {
-                                            throw new Error("لم يُعثر على إحالات ببليوغرافية مؤكدة الحدود داخل الحواشي.");
-                                        }
-
-                                        const citationMap = buildUnifiedFootnoteMap(groupedCitations.references);
-                                        const suggestions = await buildFootnoteSuggestions(
-                                            citationMap,
-                                            citationStyle.addMissingAuthors === true
-                                        );
-
-                                        if (!suggestions.length) {
-                                            analyzeCitationsBtn.textContent = "لم تظهر توثيقات قابلة للتطبيق";
-                                            if (statusContainer) {
-                                                statusContainer.innerHTML =
-                                                    '<div class="references-analysis-result"><div class="references-analysis-status">لم تُنتج الحواشي مقترحات قابلة للتطبيق.</div></div>';
-                                            }
-                                            return;
-                                        }
-
-                                        const suggestionHTML = suggestions.map(function (item) {
-                                            const suggestedTexts = Array.isArray(item.suggestedTexts)
-                                                ? item.suggestedTexts
-                                                : (item.suggestedText ? [item.suggestedText] : []);
-
-                                            if (!suggestedTexts.length) return "";
-
-                                            const suggestedReferencesHTML = suggestedTexts.map(function (suggestedText) {
-                                                return `
-                                                    <div class="footnote-suggestion-reference">
-                                                        <div class="footnote-suggestion-arrow">←</div>
-                                                        <div class="footnote-suggestion-new">${escapeReferenceHTML(suggestedText)}</div>
-                                                    </div>
-                                                `;
-                                            }).join("");
-
-                                            return `
-                                                <div class="footnote-suggestion-item">
-                                                    <span class="footnote-suggestion-number">${item.noteNumber}</span>
-                                                    <div class="footnote-suggestion-content">
-                                                        <div class="footnote-suggestion-original">${escapeReferenceHTML(item.originalText)}</div>
-                                                        <div class="footnote-suggestion-references">${suggestedReferencesHTML}</div>
-                                                    </div>
-                                                </div>
-                                            `;
-                                        }).join("");
-
-                                        if (suggestionsContainer) {
-                                            suggestionsContainer.innerHTML = `
-                                                <div class="footnote-suggestions-result">
-                                                    <div
-                                                        class="footnote-suggestions-title reference-collapsible-header"
-                                                        data-reference-collapse-toggle
-                                                        data-reference-collapse-target="footnote-suggestions-content">
-                                                        <span>التوثيقات المقترحة <strong>${suggestions.filter(function (item) { return item.reference; }).length}</strong></span>
-                                                        <span class="reference-collapsible-arrow">▾</span>
-                                                    </div>
-                                                    <div
-                                                        id="footnote-suggestions-content"
-                                                        class="footnote-suggestions-list reference-collapsible-content">
-                                                        ${suggestionHTML}
-                                                    </div>
-                                                    ${suggestions.some(function (item) { return item.reference; }) ? `
-                                                        <button
-                                                            type="button"
-                                                            id="apply-footnote-suggestions-btn"
-                                                            class="apply-footnote-suggestions-btn">
-                                                            تطبيق التوثيق على الحواشي
-                                                        </button>
-                                                    ` : ""}
-                                                </div>
-                                            `;
-
-                                            const applyButton = document.getElementById("apply-footnote-suggestions-btn");
-                                            if (applyButton) {
-                                                applyButton.onclick = async function () {
-                                                    applyButton.disabled = true;
-                                                    applyButton.textContent = "جارٍ تطبيق التوثيق...";
-                                                    try {
-                                                        const result = await applyFootnoteSuggestions(suggestions);
-                                                        applyButton.textContent = result.skipped > 0
-                                                            ? `✓ طُبّق التوثيق على ${result.applied}، وتعذّر تطبيق ${result.skipped}`
-                                                            : `✓ تم تطبيق التوثيق (${result.applied})`;
-                                                    } catch (error) {
-                                                        console.error("فشل تطبيق التوثيق على الحواشي:", error);
-                                                        applyButton.disabled = false;
-                                                        applyButton.textContent = "تطبيق التوثيق على الحواشي";
-                                                        throw error;
-                                                    }
-                                                };
-                                            }
-                                        }
-
-                                        if (statusContainer) {
-                                            statusContainer.innerHTML = `
-                                                <div class="references-analysis-result">
-                                                    <div class="references-analysis-status success">
-                                                        ✓ اكتمل تحليل التوثيقات بصورة مستقلة
-                                                    </div>
-                                                    <div class="references-analysis-info">
-                                                        الحواشي المفحوصة: <strong>${aiResult.noteCount}</strong>
-                                                        · دفعات التحليل: <strong>${aiResult.batchCount}</strong>
-                                                        · الإحالات المعتمدة الحدود: <strong>${suggestions.reduce(function (total, item) { return total + (Array.isArray(item.suggestedTexts) ? item.suggestedTexts.length : 0); }, 0)}</strong>
-                                                        · إحالات مستبعدة لعدم ثبوت نطاقها: <strong>${groupedCitations.skippedCount}</strong>
-                                                    </div>
-                                                </div>
-                                            `;
-                                        }
-
-                                        analyzeCitationsBtn.textContent = "✓ اكتمل توحيد التوثيقات";
-                                    } catch (error) {
-                                        console.error("فشل تحليل التوثيقات المستقل:", error);
-                                        analyzeCitationsBtn.textContent = "تحليل وتوحيد التوثيقات";
-                                        if (statusContainer) {
-                                            statusContainer.innerHTML = `
-                                                <div class="references-analysis-result">
-                                                    <div class="references-analysis-status error">⚠ تعذر تحليل التوثيقات</div>
-                                                    <div class="references-analysis-info">${escapeReferenceHTML(String(error && error.message || "حدث خطأ غير معروف."))}</div>
-                                                </div>
-                                            `;
-                                        }
-                                    } finally {
-                                        analyzeCitationsBtn.disabled = false;
-                                    }
-                                };
-                            }
 
 
                     };

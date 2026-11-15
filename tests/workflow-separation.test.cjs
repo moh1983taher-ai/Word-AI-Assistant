@@ -31,7 +31,7 @@ assert.doesNotMatch(
 
 const citationHandler = sectionBetween(
     "const analyzeCitationsBtn =",
-    "function sortUnifiedReferences(",
+    "const referenceOrderSelect =",
     "independent citation handler"
 );
 
@@ -77,6 +77,22 @@ assert.match(
     source,
     /CitationWorkflow\.analyzeCitations\([\s\S]*?getSavedSettings\(\)/,
     "citation service must use AI provider configuration without requiring the reference catalogue"
+);
+
+const citationButtonMarkup = source.indexOf('id="analyze-citations-btn"');
+const citationButtonBinding = source.indexOf("const analyzeCitationsBtn =", citationButtonMarkup);
+const referenceButtonBinding = source.indexOf("const analyzeReferencesBtn =", citationButtonMarkup);
+
+assert.ok(citationButtonMarkup >= 0, "the independent citation button must be rendered");
+assert.ok(
+    citationButtonBinding > citationButtonMarkup &&
+    citationButtonBinding < referenceButtonBinding,
+    "citation click binding must occur immediately after its markup and before bibliography-button initialization"
+);
+assert.match(
+    source.slice(citationButtonBinding, referenceButtonBinding),
+    /referencesSourceWorkspace\.querySelector\("#analyze-citations-btn"\)/,
+    "citation button lookup must be scoped to the workspace that just rendered it"
 );
 
 console.log("Independent bibliography/citation workflow separation tests passed.");
