@@ -46658,7 +46658,9 @@ if (referencesContent) {
                                             errorMessage
                                         );
 
-                                    referencesSourceWorkspace.insertAdjacentHTML(
+                                    referencesSourceWorkspace
+                                        .querySelector("#references-analysis-container")
+                                        .insertAdjacentHTML(
                                         "beforeend",
                                         `
                                         <div class="references-analysis-result">
