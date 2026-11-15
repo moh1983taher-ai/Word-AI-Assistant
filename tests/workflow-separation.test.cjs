@@ -110,6 +110,17 @@ assert.match(
     "citation service must use AI provider configuration without requiring the reference catalogue"
 );
 
+const bibliographyHandler = sectionBetween(
+    "analyzeReferencesBtn.onclick =\n                            async function (e)",
+    "const compareReferencesBtn =",
+    "reference extraction handler"
+);
+assert.equal(
+    (bibliographyHandler.match(/const operationShell/g) || []).length,
+    1,
+    "the bibliography analysis handler must reuse its action-shell binding instead of redeclaring it"
+);
+
 const citationButtonMarkup = source.indexOf('id="analyze-citations-btn"');
 const citationButtonBinding = source.indexOf("const analyzeCitationsBtn =", citationButtonMarkup);
 const referenceButtonBinding = source.indexOf("const analyzeReferencesBtn =", citationButtonMarkup);
