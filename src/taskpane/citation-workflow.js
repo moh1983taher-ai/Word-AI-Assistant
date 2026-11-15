@@ -178,7 +178,9 @@ async function requestCitationCompletion(systemPrompt, userPrompt, settings, dep
             ? "https://api.openai.com/v1/chat/completions"
             : provider === "groq"
                 ? "https://api.groq.com/openai/v1/chat/completions"
-                : "https://openrouter.ai/api/v1/chat/completions";
+                : provider === "pollinations"
+                    ? "https://gen.pollinations.ai/v1/chat/completions"
+                    : "https://openrouter.ai/api/v1/chat/completions";
 
     const headers = { "Content-Type": "application/json" };
     if (provider !== "duckai") headers.Authorization = "Bearer " + key;
