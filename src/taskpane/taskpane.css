@@ -6816,3 +6816,107 @@ button.primary:hover,
     max-height: 32px;
     flex: 0 0 32px;
 }
+
+
+/* =========================================================
+   LIVE CITATION ANALYSIS PROGRESS
+   ========================================================= */
+
+.citation-progress-card {
+    margin-top: 12px;
+    padding: 12px 13px;
+    border: 1px solid var(--brand-border, #D9D0BE);
+    border-radius: 10px;
+    background: var(--brand-surface, #FFFCF6);
+    color: var(--brand-text, #292D2B);
+    direction: rtl;
+}
+
+.citation-progress-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 9px;
+}
+
+.citation-progress-title {
+    color: var(--brand-primary, #063F40);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.6;
+}
+
+.citation-progress-percent {
+    flex: 0 0 auto;
+    color: var(--brand-primary, #063F40);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.citation-progress-track {
+    position: relative;
+    width: 100%;
+    height: 7px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--brand-surface-muted, #E9E1D1);
+}
+
+.citation-progress-track > span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--brand-primary, #063F40);
+    transition: width 240ms ease;
+}
+
+.citation-progress-card[data-state="success"] .citation-progress-track > span {
+    background: #378052;
+}
+
+.citation-progress-card[data-state="error"] .citation-progress-track > span {
+    background: #B43A32;
+}
+
+.citation-progress-card[data-state="error"] .citation-progress-title {
+    color: #B43A32;
+}
+
+.citation-progress-detail {
+    margin-top: 8px;
+    color: var(--brand-text-muted, #68766E);
+    font-size: 11px;
+    line-height: 1.75;
+}
+
+.citation-progress-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 1px solid var(--brand-surface-muted, #E9E1D1);
+    color: var(--brand-text-muted, #68766E);
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.citation-progress-meta strong {
+    color: var(--brand-primary, #063F40);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.citation-progress-separator {
+    color: var(--brand-gold, #C99A43);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .citation-progress-track > span {
+        transition: none;
+    }
+}
