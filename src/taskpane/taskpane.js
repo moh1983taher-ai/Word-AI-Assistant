@@ -45494,9 +45494,6 @@ if (referencesContent) {
                                 latestUnifiedReferences = [];
                                 latestBibliographyComparison = null;
 
-                                const operationShell =
-                                    referencesSourceWorkspace.querySelector(".reference-operation-shell");
-
                                 if (operationShell) {
                                     operationShell.dataset.referencesAnalyzed = "false";
                                     operationShell.dataset.bibliographyCompared = "false";
