@@ -43,6 +43,13 @@ assert.match(citationHandler, /اجتاز التدقيق؛ جارٍ بناء م�
 assert.match(citationHandler, /withCitationOperationTimeout\(\s*buildFootnoteSuggestions\(/);
 
 assert.match(citationHandler, /CitationWorkflow\.analyzeCitations\(/);
+assert.match(citationHandler, /onProgress: function \(progress\)/, "citation analysis must report batch progress to the task pane");
+assert.match(citationHandler, /تحليل الدفعة .* من /, "the UI must identify the active AI batch");
+assert.match(citationHandler, /الحواشي المنجزة:/, "the progress panel must show completed and total footnotes");
+assert.match(citationHandler, /دفعات التحليل:/, "the progress panel must show completed and total batches");
+assert.match(citationHandler, /citation-progress-card[\s\S]*?role="status"/, "progress must be accessible to assistive technology");
+assert.match(citationHandler, /role="progressbar"/, "the progress panel must expose a progress bar");
+assert.match(citationHandler, /اكتمل تحليل التوثيقات وتجهيز المقترحات/, "the UI must display a completed state");
 const citationService = fs.readFileSync(
     path.join(__dirname, "../src/taskpane/citation-workflow.js"),
     "utf8"
@@ -51,6 +58,18 @@ assert.match(citationService, /sourceText/, "exact citation anchors must remain 
 assert.match(citationHandler, /buildUnifiedFootnoteMap\(/);
 assert.match(citationHandler, /buildFootnoteSuggestions\(/);
 assert.match(citationHandler, /applyFootnoteSuggestions\(/);
+assert.match(source, /async function buildFootnoteSuggestions\([\s\S]*?onProgress/);
+assert.match(source, /reportSuggestionProgress\(source, noteNumber\)/);
+assert.match(source, /await addNotes\(\s*footnotes\.items/);
+assert.match(source, /await addNotes\(\s*endnotes\.items/);
+const suggestionLoop = sectionBetween(
+    "async function addNotes(",
+    "await addNotes(\n                footnotes.items",
+    "asynchronous suggestion progress loop"
+);
+assert.match(suggestionLoop, /matches\.length === 0[\s\S]*?continue;/, "unmatched footnotes must be skipped without stopping the remaining scan");
+assert.doesNotMatch(suggestionLoop, /matches\.length === 0[\s\S]*?return;/, "an unmatched footnote must not terminate the whole scan");
+assert.match(suggestionLoop, /await new Promise\(function \(resolve\) \{ setTimeout\(resolve, 0\); \}\)/, "the UI must be allowed to paint progress during long suggestion scans");
 assert.doesNotMatch(
     citationHandler,
     /readReferenceSources\(|processReferenceSources\(|analyzeReferencesWithAI\(|latestUnifiedReferences/,
