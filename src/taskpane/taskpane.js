@@ -984,7 +984,7 @@ function formatReferenceForOutput(
             ""
         ).trim();
 
-    switch (citationStyle.format) {
+    switch (referenceStyle.format) {
 
         case "reference-only":
 
