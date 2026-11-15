@@ -5404,7 +5404,6 @@ async function analyzeAndBuildFinalReferencesWithAI(
       "id": "ref-1",
       "type": "book",
       "author": "",
-      "authorFull": "",
       "title": "",
       "edition": "",
       "editor": "",
@@ -29456,14 +29455,7 @@ analysisRole = "context-only"
 
 اعتمد فقط على المعلومات الموثوقة التي لديك عن الكتاب.
 
-إذا كان المؤلف مذكورًا في المادة الأصلية بوضوح، فاحتفظ باسمه كاملًا
-كما ورد في الإحالة، مع الكنية والنسب واللقب إن وجدت، ولا تختصره
-في مرحلة الاستخراج؛ فمرحلة مستقلة لاحقة تختار الاسم الشائع المختصر
-للاستعمال في الإحالات اللاحقة، مع بقاء الاسم الكامل محفوظًا لأول ذكر.
-
-لا تدمج تاريخ الوفاة أو بيانات التحقيق أو النشر أو الطبعة أو التاريخ
-في حقل author أو title؛ استخرجها في حقولها المستقلة متى أمكن،
-واحتفظ بالنص الأصلي الكامل داخل sourceText.
+إذا كان المؤلف مذكورًا في المادة الأصلية بوضوح، فاحتفظ به.
 
 لا تُنسب الكتب إلى مؤلفين بالاستنتاج؛ نسبة الكتاب إلى مؤلفه
 معلومة ببليوغرافية يجب أن تكون ثابتة وموثوقة.
@@ -30466,14 +30458,6 @@ function parseReferenceAIJSON(
          return references;
      }
 
-     const sourceReferences = references.map(function (reference) {
-         if (!reference || typeof reference !== "object") return reference;
-         const authorFull = String(reference.authorFull || reference.author || "").trim();
-         return authorFull && !String(reference.authorFull || "").trim()
-             ? { ...reference, authorFull: authorFull }
-             : reference;
-     });
-
      const authorCounts = new Map();
      const titleCounts = new Map();
      const addCount = function (map, value, weight) {
@@ -30481,7 +30465,7 @@ function parseReferenceAIJSON(
          if (name) map.set(name, (map.get(name) || 0) + weight);
      };
 
-     const compactReferences = sourceReferences.map(function (reference, index) {
+     const compactReferences = references.map(function (reference, index) {
          const occurrenceCount = Array.isArray(reference?.occurrences) ? reference.occurrences.length : 0;
          const variantCount = Array.isArray(reference?.variants) ? reference.variants.length : 0;
          const weight = Math.max(1, occurrenceCount, variantCount);
@@ -30536,7 +30520,7 @@ function parseReferenceAIJSON(
 {"items":[{"index":0,"author":"الاسم المختصر المشهور","title":"العنوان المعتمد"}]}
 `;
 
-     const normalized = sourceReferences.slice();
+     const normalized = references.slice();
      const batchSize = provider === "groq" ? 16 : 24;
 
      for (let start = 0; start < compactReferences.length; start += batchSize) {
@@ -46860,19 +46844,170 @@ function sortUnifiedReferences(
 
 function formatFootnoteReference(
     reference,
-    includeAuthor = true,
-    authorText
+    occurrence,
+    includeAuthor = true
 ) {
-    const engine = window.FootnoteCitationEngine;
-    if (!engine || typeof engine.formatBibliographicIdentity !== "function") return "";
-    return engine.formatBibliographicIdentity(
-        reference,
-        referenceStyle.format,
-        includeAuthor,
-        authorText
-    );
-}
 
+    if (!reference) {
+        return "";
+    }
+
+    let title = String(reference?.title || "").trim();
+
+    const author =
+        String(
+            reference?.author || ""
+        ).trim();
+
+    let volume = "";
+    let page = "";
+    let pageRange = "";
+
+    if (occurrence) {
+
+        volume =
+            String(
+                occurrence?.volume || ""
+            ).trim();
+
+        page =
+            String(
+                occurrence?.page || ""
+            ).trim();
+
+        pageRange =
+            String(
+                occurrence?.pageRange || ""
+            ).trim();
+
+    }
+
+    /*
+     * إذا لم يحمل occurrence الموضع،
+     * نستخدم أول location للمرجع.
+     */
+    if (
+        !volume &&
+        !page &&
+        !pageRange &&
+        Array.isArray(reference?.locations) &&
+        reference.locations.length
+    ) {
+
+        const location =
+            reference.locations[0];
+
+        volume =
+            String(
+                location?.volume || ""
+            ).trim();
+
+        page =
+            String(
+                location?.page || ""
+            ).trim();
+
+        pageRange =
+            String(
+                location?.pageRange || ""
+            ).trim();
+    }
+
+    let locationText = "";
+
+    if (volume && page) {
+
+        locationText =
+            `${volume}/${page}`;
+
+    }
+    else if (volume && pageRange) {
+
+        locationText =
+            `${volume}/${pageRange}`;
+
+    }
+    else if (pageRange) {
+
+        locationText =
+            `ص ${pageRange}`;
+
+    }
+    else if (page) {
+
+        locationText =
+            `ص ${page}`;
+    }
+
+    // Remove a location suffix from title only when its value is
+    // already available separately and will be appended to the formatted citation.
+    title = window.FootnoteCitationEngine.normalizeBibliographicTitle(
+        title,
+        author,
+        locationText
+    );
+
+    // Location cleanup is handled above using exact, separately recovered values.
+    // Unlabeled trailing numbers are intentionally preserved to avoid deleting title text.
+
+    let base = "";
+
+    switch (
+        referenceStyle.format
+    ) {
+
+        case "reference-only":
+
+            base =
+                title;
+
+            break;
+
+        case "title-author":
+
+            base =
+                [
+                    title,
+                    author
+                ]
+                    .filter(Boolean)
+                    .join("، ");
+
+            break;
+
+        case "title-author-first":
+
+            base =
+                [
+                    title,
+                    includeAuthor
+                        ? author
+                        : ""
+                ]
+                    .filter(Boolean)
+                    .join("، ");
+
+            break;
+
+        case "author-title":
+
+        default:
+
+            base =
+                [
+                    author,
+                    title
+                ]
+                    .filter(Boolean)
+                    .join("، ");
+
+            break;
+    }
+
+    return locationText
+        ? `${base}، ${locationText}`
+        : base;
+}
 
 function buildUnifiedFootnoteMap(unifiedReferences) {
 
@@ -47154,18 +47289,58 @@ async function buildFootnoteSuggestions(
              * =====================================================
              */
 
-            function authorExistsInSource(originalText, reference) {
-                const source = normalizeSearchText(originalText);
-                if (!source) return false;
-                const candidates = [
-                    reference?.authorFull,
-                    reference?.author
-                ].map(value => normalizeSearchText(value)).filter(Boolean);
-                return candidates.some(candidate => source.includes(candidate));
+            function authorExistsInSource(
+                originalText,
+                reference
+            ) {
+
+                const author =
+                    String(
+                        reference?.author ||
+                        ""
+                    )
+                        .trim();
+
+                if (
+                    !author
+                ) {
+
+                    return false;
+
+                }
+
+                const source =
+                    normalizeSearchText(
+                        originalText
+                    );
+
+                const normalizedAuthor =
+                    normalizeSearchText(
+                        author
+                    );
+
+                if (
+                    !source ||
+                    !normalizedAuthor
+                ) {
+
+                    return false;
+
+                }
+
+                return source.includes(
+                    normalizedAuthor
+                );
+
             }
 
+            /*
+             * =====================================================
+             * معالجة الحواشي
+             * =====================================================
+             */
 
-function addNotes(
+            function addNotes(
                 notes,
                 source
             ) {
@@ -47189,36 +47364,10 @@ function addNotes(
                             )
                                 .trim();
 
-                        const sourceOrdinals = new Map();
-                        const matches = (unifiedFootnoteMap.get(materialId) || [])
-                            .map(function (item, originalIndex) {
-                                const sourceText = findSourceText(
-                                    originalText,
-                                    item.reference,
-                                    item.occurrence
-                                ) || window.FootnoteCitationEngine.findUniqueBibliographicAnchor(
-                                    originalText,
-                                    item.reference
-                                );
-                                const key = String(sourceText || "");
-                                const ordinal = key
-                                    ? (sourceOrdinals.get(key) || 0)
-                                    : 0;
-                                if (key) sourceOrdinals.set(key, ordinal + 1);
-                                const positions = key
-                                    ? window.FootnoteCitationEngine.findExactOccurrences(originalText, key)
-                                    : [];
-                                return {
-                                    ...item,
-                                    resolvedSourceText: key,
-                                    sourcePosition: positions[ordinal] ?? positions[0] ?? Number.MAX_SAFE_INTEGER,
-                                    originalIndex: originalIndex
-                                };
-                            })
-                            .sort(function (a, b) {
-                                return a.sourcePosition - b.sourcePosition ||
-                                    a.originalIndex - b.originalIndex;
-                            });
+                        const matches =
+                            unifiedFootnoteMap.get(
+                                materialId
+                            ) || [];
 
                         if (
                             matches.length === 0
@@ -47240,64 +47389,121 @@ function addNotes(
                             );
 
                         const sourceTexts =
-                            matches.map(function (item) {
-                                return item.resolvedSourceText || "";
-                            });
+                            matches.map(
+                                function (
+                                    item
+                                ) {
 
-                        const replacementTexts =
-                            matches.map(function (item, index) {
-                                const reference = item.reference;
-                                const referenceKey = getReferenceKey(reference);
-                                const citationEngine = window.FootnoteCitationEngine;
-                                const identity = citationEngine.resolveBibliographicIdentitySpan(
-                                    sourceTexts[index],
-                                    reference
-                                );
-                                const authorExists = authorExistsInSource(
-                                    sourceTexts[index],
-                                    reference
-                                );
+                                    const knownVariant = findSourceText(
+                                        originalText,
+                                        item.reference,
+                                        item.occurrence
+                                    );
 
-                                let includeAuthor = true;
-                                if (referenceStyle.format === "title-author-first") {
-                                    includeAuthor = !seenReferences.has(referenceKey);
-                                    if (
-                                        referenceKey &&
-                                        identity &&
-                                        (!identity.authorFound || identity.includesAuthor)
-                                    ) {
-                                        seenReferences.add(referenceKey);
-                                    }
+                                    return knownVariant ||
+                                        window.FootnoteCitationEngine.findUniqueBibliographicAnchor(
+                                            originalText,
+                                            item.reference
+                                        );
+
                                 }
-
-                                if (!authorExists && !addMissingAuthors) includeAuthor = false;
-                                if (authorExists && (!identity || !identity.includesAuthor)) includeAuthor = false;
-                                if (!reference?.author && !reference?.authorFull) includeAuthor = false;
-
-                                const authorText =
-                                    referenceStyle.format === "title-author-first" && includeAuthor
-                                        ? (reference.authorFull || reference.author || "")
-                                        : (reference.author || "");
-
-                                return formatFootnoteReference(
-                                    reference,
-                                    includeAuthor,
-                                    authorText
-                                );
-                            });
+                            );
 
                         const suggestedTexts =
-                            replacementTexts.map(function (replacementText, index) {
-                                return window.FootnoteCitationEngine.buildCitationPreview(
-                                    sourceTexts[index],
-                                    references[index],
-                                    replacementText
-                                );
-                            });
+                            matches.map(
+                                function (
+                                    item,
+                                    index
+                                ) {
 
+                                    const reference =
+                                        item.reference;
 
+                                    const referenceKey =
+                                        getReferenceKey(
+                                            reference
+                                        );
 
-suggestions.push({
+                                    /*
+                                     * هل المؤلف موجود أصلًا في الحاشية؟
+                                     */
+                                    const authorExists =
+                                        authorExistsInSource(
+                                            sourceTexts[index],
+                                            reference
+                                        );
+
+                                    let includeAuthor =
+                                        true;
+
+                                    /*
+                                     * نمط:
+                                     * الكتاب والمؤلف عند أول ذكر فقط
+                                     */
+                                    if (
+                                        referenceStyle.format ===
+                                        "title-author-first"
+                                    ) {
+
+                                        includeAuthor =
+                                            !seenReferences.has(
+                                                referenceKey
+                                            );
+
+                                        if (
+                                            referenceKey
+                                        ) {
+
+                                            seenReferences.add(
+                                                referenceKey
+                                            );
+
+                                        }
+
+                                    }
+
+                                    /*
+                                     * =================================================
+                                     * الضابط الجديد:
+                                     *
+                                     * إذا كان المؤلف غير موجود في الحاشية،
+                                     * فلا نضيفه إلا إذا اختار المستخدم ذلك.
+                                     * =================================================
+                                     */
+
+                                    if (
+                                        !authorExists &&
+                                        !addMissingAuthors
+                                    ) {
+
+                                        includeAuthor =
+                                            false;
+
+                                    }
+
+                                    /*
+                                     * إذا لم يوجد مؤلف أصلًا في بيانات المرجع،
+                                     * فلا يوجد ما يمكن إضافته.
+                                     */
+                                    if (
+                                        !reference?.author
+                                    ) {
+
+                                        includeAuthor =
+                                            false;
+
+                                    }
+
+                                    return formatFootnoteReference(
+                                        reference,
+                                        item.occurrence,
+                                        includeAuthor
+                                    );
+
+                                }
+                            );
+
+                        suggestions.push({
 
                             source:
                                 source,
@@ -47324,9 +47530,6 @@ suggestions.push({
 
                             suggestedTexts:
                                 suggestedTexts,
-
-                            replacementTexts:
-                                replacementTexts,
 
                             sourceTexts:
                                 sourceTexts
@@ -47709,12 +47912,6 @@ function mergeEquivalentReferences(references) {
 
                 }
             );
-
-            ["authorFull", "edition", "editor", "publisher", "city", "year"].forEach(function (field) {
-                const currentValue = String(existing[field] ?? "").trim();
-                const incomingValue = String(reference[field] ?? "").trim();
-                if (!currentValue && incomingValue) existing[field] = incomingValue;
-            });
 
             existing.confidence =
                 Math.max(
