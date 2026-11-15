@@ -45094,6 +45094,11 @@ if (referencesContent) {
 
                                                 if (actionDock) {
                                                     actionDock.appendChild(applyButton);
+
+                                                    const dockShell = actionDock.parentElement;
+                                                    if (dockShell && typeof dockShell.updateReferenceActionDock === "function") {
+                                                        dockShell.updateReferenceActionDock();
+                                                    }
                                                 }
 
                                                 applyButton.onclick = async function () {
@@ -45260,28 +45265,36 @@ if (referencesContent) {
                                 const bibliographyActive =
                                     operationShell.dataset.activeOperation !== "citations";
 
+                                const referencesAnalyzed =
+                                    operationShell.dataset.referencesAnalyzed === "true";
+
+                                const bibliographyCompared =
+                                    operationShell.dataset.bibliographyCompared === "true";
+
+                                const applyButton =
+                                    operationShell.querySelector("#apply-footnote-suggestions-btn");
+
                                 if (analyzeBibliographyButton) {
-                                    analyzeBibliographyButton.hidden = !bibliographyActive;
+                                    analyzeBibliographyButton.hidden =
+                                        !bibliographyActive || referencesAnalyzed;
                                 }
 
                                 if (compareBibliographyButton) {
                                     compareBibliographyButton.hidden =
                                         !bibliographyActive ||
-                                        operationShell.dataset.referencesAnalyzed !== "true";
+                                        !referencesAnalyzed ||
+                                        bibliographyCompared;
                                 }
 
                                 if (buildBibliographyButton) {
                                     buildBibliographyButton.hidden =
-                                        !bibliographyActive ||
-                                        operationShell.dataset.bibliographyCompared !== "true";
+                                        !bibliographyActive || !bibliographyCompared;
                                 }
 
                                 if (analyzeCitationsButton) {
-                                    analyzeCitationsButton.hidden = bibliographyActive;
+                                    analyzeCitationsButton.hidden =
+                                        bibliographyActive || Boolean(applyButton);
                                 }
-
-                                const applyButton =
-                                    operationShell.querySelector("#apply-footnote-suggestions-btn");
 
                                 if (applyButton) {
                                     applyButton.hidden = bibliographyActive;
@@ -46677,9 +46690,6 @@ if (referencesContent) {
                                     document.getElementById(
                                         "compare-references-btn"
                                     );
-
-                                const operationShell =
-                                    referencesSourceWorkspace.querySelector(".reference-operation-shell");
 
                                 if (operationShell) {
                                     operationShell.dataset.referencesAnalyzed =
