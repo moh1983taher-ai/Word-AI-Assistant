@@ -46681,50 +46681,50 @@ if (referencesContent) {
                                             if (!suggestedTexts.length) return "";
 
                                             const suggestedReferencesHTML = suggestedTexts.map(function (suggestedText) {
-                                                return \`
+                                                return `
                                                     <div class="footnote-suggestion-reference">
                                                         <div class="footnote-suggestion-arrow">←</div>
-                                                        <div class="footnote-suggestion-new">\${escapeReferenceHTML(suggestedText)}</div>
+                                                        <div class="footnote-suggestion-new">${escapeReferenceHTML(suggestedText)}</div>
                                                     </div>
-                                                \`;
+                                                `;
                                             }).join("");
 
-                                            return \`
+                                            return `
                                                 <div class="footnote-suggestion-item">
-                                                    <span class="footnote-suggestion-number">\${item.noteNumber}</span>
+                                                    <span class="footnote-suggestion-number">${item.noteNumber}</span>
                                                     <div class="footnote-suggestion-content">
-                                                        <div class="footnote-suggestion-original">\${escapeReferenceHTML(item.originalText)}</div>
-                                                        <div class="footnote-suggestion-references">\${suggestedReferencesHTML}</div>
+                                                        <div class="footnote-suggestion-original">${escapeReferenceHTML(item.originalText)}</div>
+                                                        <div class="footnote-suggestion-references">${suggestedReferencesHTML}</div>
                                                     </div>
                                                 </div>
-                                            \`;
+                                            `;
                                         }).join("");
 
                                         if (suggestionsContainer) {
-                                            suggestionsContainer.innerHTML = \`
+                                            suggestionsContainer.innerHTML = `
                                                 <div class="footnote-suggestions-result">
                                                     <div
                                                         class="footnote-suggestions-title reference-collapsible-header"
                                                         data-reference-collapse-toggle
                                                         data-reference-collapse-target="footnote-suggestions-content">
-                                                        <span>التوثيقات المقترحة <strong>\${suggestions.filter(function (item) { return item.reference; }).length}</strong></span>
+                                                        <span>التوثيقات المقترحة <strong>${suggestions.filter(function (item) { return item.reference; }).length}</strong></span>
                                                         <span class="reference-collapsible-arrow">▾</span>
                                                     </div>
                                                     <div
                                                         id="footnote-suggestions-content"
                                                         class="footnote-suggestions-list reference-collapsible-content">
-                                                        \${suggestionHTML}
+                                                        ${suggestionHTML}
                                                     </div>
-                                                    \${suggestions.some(function (item) { return item.reference; }) ? \`
+                                                    ${suggestions.some(function (item) { return item.reference; }) ? `
                                                         <button
                                                             type="button"
                                                             id="apply-footnote-suggestions-btn"
                                                             class="apply-footnote-suggestions-btn">
                                                             تطبيق التوثيق على الحواشي
                                                         </button>
-                                                    \` : ""}
+                                                    ` : ""}
                                                 </div>
-                                            \`;
+                                            `;
 
                                             const applyButton = document.getElementById("apply-footnote-suggestions-btn");
                                             if (applyButton) {
@@ -46734,8 +46734,8 @@ if (referencesContent) {
                                                     try {
                                                         const result = await applyFootnoteSuggestions(suggestions);
                                                         applyButton.textContent = result.skipped > 0
-                                                            ? \`✓ طُبّق التوثيق على \${result.applied}، وتعذّر تطبيق \${result.skipped}\`
-                                                            : \`✓ تم تطبيق التوثيق (\${result.applied})\`;
+                                                            ? `✓ طُبّق التوثيق على ${result.applied}، وتعذّر تطبيق ${result.skipped}`
+                                                            : `✓ تم تطبيق التوثيق (${result.applied})`;
                                                     } catch (error) {
                                                         console.error("فشل تطبيق التوثيق على الحواشي:", error);
                                                         applyButton.disabled = false;
@@ -46747,19 +46747,19 @@ if (referencesContent) {
                                         }
 
                                         if (statusContainer) {
-                                            statusContainer.innerHTML = \`
+                                            statusContainer.innerHTML = `
                                                 <div class="references-analysis-result">
                                                     <div class="references-analysis-status success">
                                                         ✓ اكتمل تحليل التوثيقات بصورة مستقلة
                                                     </div>
                                                     <div class="references-analysis-info">
-                                                        الحواشي المفحوصة: <strong>\${aiResult.noteCount}</strong>
-                                                        · دفعات التحليل: <strong>\${aiResult.batchCount}</strong>
-                                                        · الإحالات المعتمدة الحدود: <strong>\${suggestions.reduce(function (total, item) { return total + (Array.isArray(item.suggestedTexts) ? item.suggestedTexts.length : 0); }, 0)}</strong>
-                                                        · إحالات مستبعدة لعدم ثبوت نطاقها: <strong>\${groupedCitations.skippedCount}</strong>
+                                                        الحواشي المفحوصة: <strong>${aiResult.noteCount}</strong>
+                                                        · دفعات التحليل: <strong>${aiResult.batchCount}</strong>
+                                                        · الإحالات المعتمدة الحدود: <strong>${suggestions.reduce(function (total, item) { return total + (Array.isArray(item.suggestedTexts) ? item.suggestedTexts.length : 0); }, 0)}</strong>
+                                                        · إحالات مستبعدة لعدم ثبوت نطاقها: <strong>${groupedCitations.skippedCount}</strong>
                                                     </div>
                                                 </div>
-                                            \`;
+                                            `;
                                         }
 
                                         analyzeCitationsBtn.textContent = "✓ اكتمل توحيد التوثيقات";
@@ -46767,12 +46767,12 @@ if (referencesContent) {
                                         console.error("فشل تحليل التوثيقات المستقل:", error);
                                         analyzeCitationsBtn.textContent = "تحليل وتوحيد التوثيقات";
                                         if (statusContainer) {
-                                            statusContainer.innerHTML = \`
+                                            statusContainer.innerHTML = `
                                                 <div class="references-analysis-result">
                                                     <div class="references-analysis-status error">⚠ تعذر تحليل التوثيقات</div>
-                                                    <div class="references-analysis-info">\${escapeReferenceHTML(String(error && error.message || "حدث خطأ غير معروف."))}</div>
+                                                    <div class="references-analysis-info">${escapeReferenceHTML(String(error && error.message || "حدث خطأ غير معروف."))}</div>
                                                 </div>
-                                            \`;
+                                            `;
                                         }
                                     } finally {
                                         analyzeCitationsBtn.disabled = false;
