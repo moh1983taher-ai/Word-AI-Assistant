@@ -1,4 +1,6 @@
 // ======================================
+const CitationWorkflow = require("./citation-workflow");
+
 // Word AI Assistant
 // Main Application Controller
 // PART 1
@@ -936,12 +938,34 @@ async function saveWorkingWordFile(
 const referenceStyle = {
 
     order: "appearance",
-    // appearance | author | title
+    // Bibliography ordering.
 
-    format: "author-title"
-    // author-title | title-author
+    format: "author-title",
+    // Bibliography output format retained for compatibility.
 
+    addMissingAuthors: false
+    // Bibliography-only author discovery.
 };
+
+const citationStyle = {
+    format: "author-title",
+    addMissingAuthors: false
+};
+
+function saveBibliographySettings() {
+    localStorage.setItem("BIBLIOGRAPHY_SETTINGS", JSON.stringify({
+        order: referenceStyle.order,
+        format: referenceStyle.format,
+        addMissingAuthors: referenceStyle.addMissingAuthors === true
+    }));
+}
+
+function saveCitationSettings() {
+    localStorage.setItem("CITATION_SETTINGS", JSON.stringify({
+        format: citationStyle.format,
+        addMissingAuthors: citationStyle.addMissingAuthors === true
+    }));
+}
 
 function formatReferenceForOutput(
     reference,
@@ -960,9 +984,7 @@ function formatReferenceForOutput(
             ""
         ).trim();
 
-    switch (
-        referenceStyle.format
-    ) {
+    switch (citationStyle.format) {
 
         case "reference-only":
 
@@ -1809,12 +1831,7 @@ function renderProjectReferenceDocuments() {
                 referenceStyle.order =
                     this.value;
 
-                localStorage.setItem(
-                    "REFERENCE_STYLE",
-                    JSON.stringify(
-                        referenceStyle
-                    )
-                );
+                saveBibliographySettings();
 
             };
 
@@ -1840,12 +1857,7 @@ function renderProjectReferenceDocuments() {
                 referenceStyle.addMissingAuthors =
                     this.checked;
 
-                localStorage.setItem(
-                    "REFERENCE_STYLE",
-                    JSON.stringify(
-                        referenceStyle
-                    )
-                );
+                saveBibliographySettings();
 
             };
 
@@ -4035,6 +4047,57 @@ async function readReferenceSources() {
     );
 
 }
+// =====================================================
+// CITATION-ONLY SNAPSHOT
+// قراءة الحواشي وحدها دون قراءة المتن أو قائمة المراجع
+// =====================================================
+async function readCitationSources() {
+    if (
+        !Office.context.requirements.isSetSupported(
+            "WordApi",
+            "1.5"
+        )
+    ) {
+        throw new Error("قراءة الحواشي تحتاج إلى Word API 1.5 أو أحدث.");
+    }
+
+    return await Word.run(async function (context) {
+        const body = context.document.body;
+        const footnotes = body.footnotes;
+        const endnotes = body.endnotes;
+
+        footnotes.load("items");
+        endnotes.load("items");
+        await context.sync();
+
+        footnotes.items.forEach(function (note) {
+            note.body.load("text");
+        });
+        endnotes.items.forEach(function (note) {
+            note.body.load("text");
+        });
+        await context.sync();
+
+        function mapNotes(items, source) {
+            return items.map(function (note, index) {
+                const originalText = String(note.body && note.body.text || "");
+                return {
+                    id: source + "-" + (index + 1),
+                    source: source,
+                    noteNumber: index + 1,
+                    originalText: originalText,
+                    text: originalText
+                };
+            });
+        }
+
+        return [
+            ...mapNotes(footnotes.items, "footnote"),
+            ...mapNotes(endnotes.items, "endnote")
+        ];
+    });
+}
+
 // =====================================================
 // قراءة قائمة المراجع من المستند
 // =====================================================
@@ -44493,23 +44556,39 @@ if (referencesContent) {
 
         try {
 
-            const saved =
-                JSON.parse(
-                    localStorage.getItem(
-                        "REFERENCE_STYLE"
-                    ) || "{}"
-                );
+            const legacy =
+                JSON.parse(localStorage.getItem("REFERENCE_STYLE") || "{}");
+
+            const bibliographySaved =
+                JSON.parse(localStorage.getItem("BIBLIOGRAPHY_SETTINGS") || "{}");
+
+            const citationSaved =
+                JSON.parse(localStorage.getItem("CITATION_SETTINGS") || "{}");
 
             referenceStyle.order =
-                saved.order ||
+                bibliographySaved.order ||
+                legacy.order ||
                 "appearance";
 
             referenceStyle.format =
-                saved.format ||
+                bibliographySaved.format ||
+                legacy.format ||
                 "author-title";
 
             referenceStyle.addMissingAuthors =
-                saved.addMissingAuthors === true;
+                Object.prototype.hasOwnProperty.call(bibliographySaved, "addMissingAuthors")
+                    ? bibliographySaved.addMissingAuthors === true
+                    : legacy.addMissingAuthors === true;
+
+            citationStyle.format =
+                citationSaved.format ||
+                legacy.format ||
+                "author-title";
+
+            citationStyle.addMissingAuthors =
+                localStorage.getItem("CITATION_SETTINGS")
+                    ? citationSaved.addMissingAuthors === true
+                    : legacy.addMissingAuthors === true;
 
         }
         catch (error) {
@@ -44626,86 +44705,27 @@ if (referencesContent) {
 
                             </div>
 
-                            <div class="reference-style-options">
+                            <div class="reference-style-options bibliography-settings">
 
                                 <div class="reference-style-title">
-                                    نمط قائمة المراجع والحواشي
+                                    إعدادات استخراج المراجع
                                 </div>
 
                                 <div class="reference-style-row">
-
-                                    <label>
-                                        المراجع
-                                    </label>
-
+                                    <label>ترتيب قائمة المراجع</label>
                                     <select id="reference-order-select">
-
-                                        <option value="appearance">
-                                            حسب ترتيب الظهور
-                                        </option>
-
-                                        <option value="author">
-                                            حسب المؤلف
-                                        </option>
-
-                                        <option value="title">
-                                            حسب عنوان الكتاب
-                                        </option>
-
+                                        <option value="appearance">حسب ترتيب الظهور</option>
+                                        <option value="author">حسب المؤلف</option>
+                                        <option value="title">حسب عنوان الكتاب</option>
                                     </select>
-
                                 </div>
 
                                 <div class="reference-style-row">
-
-                                    <label>
-                                        التوثيق
+                                    <label>المؤلفون</label>
+                                    <label class="reference-author-toggle" for="reference-add-missing-authors">
+                                        <input type="checkbox" id="reference-add-missing-authors">
+                                        <span class="reference-author-toggle-text">تقصّي أسماء المؤلفين في قائمة المراجع</span>
                                     </label>
-
-                                    <select id="reference-format-select">
-
-                                        <option value="reference-only">
-                                            المرجع فقط
-                                        </option>
-
-                                        <option value="author-title">
-                                             المؤلف، الكتاب
-                                        </option>
-
-                                        <option value="title-author">
-                                             الكتاب، المؤلف
-                                        </option>
-
-                                        <option value="title-author-first">
-                                            الكتاب والمؤلف عند أول ذكر فقط
-                                        </option>
-
-                                    </select>
-
-                                </div>
-
-                                <div class="reference-style-row">
-
-                                    <label>
-                                        المؤلفون
-                                    </label>
-
-                                    <label
-                                        class="reference-author-toggle"
-                                        for="reference-add-missing-authors"
-                                    >
-
-                                        <input
-                                            type="checkbox"
-                                            id="reference-add-missing-authors"
-                                        >
-
-                                        <span class="reference-author-toggle-text">
-                                            تقصّي أسماء المؤلفين
-                                        </span>
-
-                                    </label>
-
                                 </div>
 
                             </div>
@@ -44752,6 +44772,44 @@ if (referencesContent) {
                                 class="reference-result-container">
                             </div>
 
+                            <div class="reference-style-options citation-settings">
+
+                                <div class="reference-style-title">
+                                    إعدادات توحيد التوثيقات
+                                </div>
+
+                                <div class="reference-style-row">
+                                    <label>صيغة التوثيق</label>
+                                    <select id="reference-format-select">
+                                        <option value="reference-only">المرجع فقط</option>
+                                        <option value="author-title">المؤلف، الكتاب</option>
+                                        <option value="title-author">الكتاب، المؤلف</option>
+                                        <option value="title-author-first">الكتاب والمؤلف عند أول ذكر فقط</option>
+                                    </select>
+                                </div>
+
+                                <div class="reference-style-row">
+                                    <label>المؤلفون</label>
+                                    <label class="reference-author-toggle" for="citation-add-missing-authors">
+                                        <input type="checkbox" id="citation-add-missing-authors">
+                                        <span class="reference-author-toggle-text">إضافة المؤلف إذا لم يرد في الحاشية</span>
+                                    </label>
+                                </div>
+
+                            </div>
+
+                            <button
+                                type="button"
+                                id="analyze-citations-btn"
+                                class="analyze-references-btn">
+                                تحليل وتوحيد التوثيقات
+                            </button>
+
+                            <div
+                                id="citation-analysis-status"
+                                class="reference-result-container">
+                            </div>
+
                             <div
                                 id="footnote-suggestions-container"
                                 class="reference-result-container">
@@ -44774,6 +44832,11 @@ if (referencesContent) {
                                 "reference-add-missing-authors"
                             );
 
+                        const citationAddMissingAuthors =
+                            document.getElementById(
+                                "citation-add-missing-authors"
+                            );
+
                         if (referenceOrderSelect) {
 
                             referenceOrderSelect.value =
@@ -44785,12 +44848,7 @@ if (referencesContent) {
                                     referenceStyle.order =
                                         this.value;
 
-                                    localStorage.setItem(
-                                        "REFERENCE_STYLE",
-                                        JSON.stringify(
-                                            referenceStyle
-                                        )
-                                    );
+                                    saveBibliographySettings();
 
                                 };
 
@@ -44799,21 +44857,12 @@ if (referencesContent) {
                         if (referenceFormatSelect) {
 
                             referenceFormatSelect.value =
-                                referenceStyle.format;
+                                citationStyle.format;
 
                             referenceFormatSelect.onchange =
                                 function () {
-
-                                    referenceStyle.format =
-                                        this.value;
-
-                                    localStorage.setItem(
-                                        "REFERENCE_STYLE",
-                                        JSON.stringify(
-                                            referenceStyle
-                                        )
-                                    );
-
+                                    citationStyle.format = this.value;
+                                    saveCitationSettings();
                                 };
 
                         }
@@ -44831,15 +44880,20 @@ if (referencesContent) {
                                     referenceStyle.addMissingAuthors =
                                         this.checked;
 
-                                    localStorage.setItem(
-                                        "REFERENCE_STYLE",
-                                        JSON.stringify(
-                                            referenceStyle
-                                        )
-                                    );
+                                    saveBibliographySettings();
 
                                 };
 
+                        }
+
+                        if (citationAddMissingAuthors) {
+                            citationAddMissingAuthors.checked =
+                                citationStyle.addMissingAuthors === true;
+
+                            citationAddMissingAuthors.onchange = function () {
+                                citationStyle.addMissingAuthors = this.checked;
+                                saveCitationSettings();
+                            };
                         }
 
                         const analyzeReferencesBtn =
@@ -46025,227 +46079,6 @@ if (referencesContent) {
 
                                     }
 
-                                    const unifiedFootnoteMap =
-                                                buildUnifiedFootnoteMap(
-                                                    latestUnifiedReferences
-                                                );
-
-                                            console.log(
-                                                "خريطة الحواشي والمراجع الموحدة:",
-                                                unifiedFootnoteMap
-                                            );
-
-                                    
-
-                                            const footnoteSuggestions =
-                                                await buildFootnoteSuggestions(
-                                                    unifiedFootnoteMap,
-                                                    referenceAddMissingAuthors
-                                                        ? referenceAddMissingAuthors.checked
-                                                        : false
-                                                );
-
-                                            console.log(
-                                                "توثيق الحواشي المقترح:",
-                                                footnoteSuggestions
-                                            );
-
-                                            const footnoteSuggestionHTML =
-                                                footnoteSuggestions
-                                                    .map(function (item) {
-
-                                                        const suggestedTexts =
-                                                            Array.isArray(
-                                                                item.suggestedTexts
-                                                            )
-                                                                ? item.suggestedTexts
-                                                                : (
-                                                                    item.suggestedText
-                                                                        ? [item.suggestedText]
-                                                                        : []
-                                                                );
-
-                                                        if (
-                                                            suggestedTexts.length === 0
-                                                        ) {
-
-                                                            return "";
-
-                                                        }
-
-                                                        const suggestedReferencesHTML =
-                                                            suggestedTexts
-                                                                .map(function (
-                                                                    suggestedText
-                                                                ) {
-
-                                                                    return `
-                                                                        <div class="footnote-suggestion-reference">
-
-                                                                            <div class="footnote-suggestion-arrow">
-                                                                                ←
-                                                                            </div>
-
-                                                                            <div class="footnote-suggestion-new">
-                                                                                ${escapeReferenceHTML(
-                                                                                    suggestedText
-                                                                                )}
-                                                                            </div>
-
-                                                                        </div>
-                                                                    `;
-
-                                                                })
-                                                                .join("");
-
-                                                        return `
-                                                            <div class="footnote-suggestion-item">
-
-                                                                <span class="footnote-suggestion-number">
-                                                                    ${item.noteNumber}
-                                                                </span>
-
-                                                                <div class="footnote-suggestion-content">
-
-                                                                    <div class="footnote-suggestion-original">
-                                                                        ${escapeReferenceHTML(
-                                                                            item.originalText
-                                                                        )}
-                                                                    </div>
-
-                                                                    <div class="footnote-suggestion-references">
-
-                                                                        ${suggestedReferencesHTML}
-
-                                                                    </div>
-
-                                                                </div>
-
-                                                            </div>
-                                                        `;
-
-                                                    })
-                                                    .join("");
-
-                                            const footnoteSuggestionsContainer =
-                                                document.getElementById(
-                                                    "footnote-suggestions-container"
-                                                );
-
-                                            if (footnoteSuggestionsContainer) {
-
-                                                footnoteSuggestionsContainer.innerHTML =
-                                                    `
-                                                    <div class="footnote-suggestions-result">
-
-                                                        <div
-                                                            class="footnote-suggestions-title reference-collapsible-header"
-                                                            data-reference-collapse-toggle
-                                                            data-reference-collapse-target="footnote-suggestions-content">
-
-                                                            <span>
-
-                                                                توثيق الحواشي المقترح
-
-                                                                <strong>
-                                                                    ${
-                                                                        footnoteSuggestions.filter(
-                                                                            function (item) {
-                                                                                return item.reference;
-                                                                            }
-                                                                        ).length
-                                                                    }
-                                                                </strong>
-
-                                                            </span>
-
-                                                            <span class="reference-collapsible-arrow">
-                                                                ▾
-                                                            </span>
-
-                                                        </div>
-
-                                                        <div
-                                                            id="footnote-suggestions-content"
-                                                            class="footnote-suggestions-list reference-collapsible-content">
-
-                                                            ${footnoteSuggestionHTML}
-
-                                                        </div>
-
-                                                        ${
-                                                            footnoteSuggestions.some(
-                                                                function (item) {
-                                                                    return item.reference;
-                                                                }
-                                                            )
-                                                                ? `
-                                                                    <button
-                                                                        type="button"
-                                                                        id="apply-footnote-suggestions-btn"
-                                                                        class="apply-footnote-suggestions-btn">
-
-                                                                        تطبيق التوثيق على الحواشي
-
-                                                                    </button>
-                                                                `
-                                                                : ""
-                                                        }
-
-                                                    </div>
-                                                    `;
-                                            }
-
-
-                                            const applyFootnoteSuggestionsBtn =
-                                                document.getElementById(
-                                                    "apply-footnote-suggestions-btn"
-                                                );
-
-                                            if (applyFootnoteSuggestionsBtn) {
-
-                                                applyFootnoteSuggestionsBtn.onclick =
-                                                    async function () {
-
-                                                        applyFootnoteSuggestionsBtn.disabled =
-                                                            true;
-
-                                                        applyFootnoteSuggestionsBtn.textContent =
-                                                            "جارٍ تطبيق التوثيق...";
-
-                                                        try {
-
-                                                            const result =
-                                                                await applyFootnoteSuggestions(
-                                                                    footnoteSuggestions
-                                                                );
-
-                                                            applyFootnoteSuggestionsBtn.textContent =
-                                                                result.skipped > 0
-                                                                    ? `✓ طُبّق التوثيق على ${result.applied}، وتعذّر تطبيق ${result.skipped}`
-                                                                    : `✓ تم تطبيق التوثيق (${result.applied})`;
-
-                                                        }
-                                                        catch (error) {
-
-                                                            console.error(
-                                                                "فشل تطبيق التوثيق على الحواشي:",
-                                                                error
-                                                            );
-
-                                                            applyFootnoteSuggestionsBtn.disabled =
-                                                                false;
-
-                                                            applyFootnoteSuggestionsBtn.textContent =
-                                                                "تطبيق التوثيق على الحواشي";
-
-                                                        }
-
-                                                    };
-
-                                            }
-
-                                    // =================================================
                                     // 11. إنهاء التحليل
                                     // =================================================
 
@@ -46768,6 +46601,186 @@ if (referencesContent) {
 
                             };
 
+
+                            const analyzeCitationsBtn =
+                                document.getElementById("analyze-citations-btn");
+
+                            if (analyzeCitationsBtn) {
+                                analyzeCitationsBtn.onclick = async function (event) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+
+                                    const statusContainer = document.getElementById("citation-analysis-status");
+                                    const suggestionsContainer = document.getElementById("footnote-suggestions-container");
+
+                                    analyzeCitationsBtn.disabled = true;
+                                    analyzeCitationsBtn.textContent = "جارٍ قراءة الحواشي...";
+
+                                    if (statusContainer) statusContainer.innerHTML = "";
+                                    if (suggestionsContainer) suggestionsContainer.innerHTML = "";
+
+                                    try {
+                                        const citationMaterials = await readCitationSources();
+                                        if (!citationMaterials.length) {
+                                            throw new Error("لا توجد حواشٍ سفلية أو ختامية قابلة للتحليل في المستند.");
+                                        }
+
+                                        analyzeCitationsBtn.textContent = "جارٍ تحليل التوثيقات فقط...";
+
+                                        const aiResult = await CitationWorkflow.analyzeCitations(
+                                            citationMaterials,
+                                            getSavedSettings(),
+                                            {
+                                                readJSON: readJSON,
+                                                getAPIError: getAPIError,
+                                                normalizeGeminiModel: normalizeGeminiModel,
+                                                extractGeminiAnswer: extractGeminiAnswer,
+                                                extractOpenAIStyleAnswer: extractOpenAIStyleAnswer
+                                            }
+                                        );
+
+                                        const citationEngine = window.FootnoteCitationEngine;
+                                        if (!citationEngine || typeof citationEngine.findValidatedSourceSpan !== "function") {
+                                            throw new Error("أداة التحقق من نطاق التوثيق غير متاحة.");
+                                        }
+
+                                        const groupedCitations = CitationWorkflow.buildUnifiedCitationReferences(
+                                            aiResult.citations,
+                                            citationMaterials,
+                                            function (originalText, candidateText) {
+                                                return citationEngine.findValidatedSourceSpan(
+                                                    originalText,
+                                                    candidateText
+                                                );
+                                            }
+                                        );
+
+                                        if (!groupedCitations.references.length) {
+                                            throw new Error("لم يُعثر على إحالات ببليوغرافية مؤكدة الحدود داخل الحواشي.");
+                                        }
+
+                                        const citationMap = buildUnifiedFootnoteMap(groupedCitations.references);
+                                        const suggestions = await buildFootnoteSuggestions(
+                                            citationMap,
+                                            citationStyle.addMissingAuthors === true
+                                        );
+
+                                        if (!suggestions.length) {
+                                            if (statusContainer) {
+                                                statusContainer.innerHTML =
+                                                    '<div class="references-analysis-result"><div class="references-analysis-status">لم تُنتج الحواشي مقترحات قابلة للتطبيق.</div></div>';
+                                            }
+                                            return;
+                                        }
+
+                                        const suggestionHTML = suggestions.map(function (item) {
+                                            const suggestedTexts = Array.isArray(item.suggestedTexts)
+                                                ? item.suggestedTexts
+                                                : (item.suggestedText ? [item.suggestedText] : []);
+
+                                            if (!suggestedTexts.length) return "";
+
+                                            const suggestedReferencesHTML = suggestedTexts.map(function (suggestedText) {
+                                                return \`
+                                                    <div class="footnote-suggestion-reference">
+                                                        <div class="footnote-suggestion-arrow">←</div>
+                                                        <div class="footnote-suggestion-new">\${escapeReferenceHTML(suggestedText)}</div>
+                                                    </div>
+                                                \`;
+                                            }).join("");
+
+                                            return \`
+                                                <div class="footnote-suggestion-item">
+                                                    <span class="footnote-suggestion-number">\${item.noteNumber}</span>
+                                                    <div class="footnote-suggestion-content">
+                                                        <div class="footnote-suggestion-original">\${escapeReferenceHTML(item.originalText)}</div>
+                                                        <div class="footnote-suggestion-references">\${suggestedReferencesHTML}</div>
+                                                    </div>
+                                                </div>
+                                            \`;
+                                        }).join("");
+
+                                        if (suggestionsContainer) {
+                                            suggestionsContainer.innerHTML = \`
+                                                <div class="footnote-suggestions-result">
+                                                    <div
+                                                        class="footnote-suggestions-title reference-collapsible-header"
+                                                        data-reference-collapse-toggle
+                                                        data-reference-collapse-target="footnote-suggestions-content">
+                                                        <span>التوثيقات المقترحة <strong>\${suggestions.filter(function (item) { return item.reference; }).length}</strong></span>
+                                                        <span class="reference-collapsible-arrow">▾</span>
+                                                    </div>
+                                                    <div
+                                                        id="footnote-suggestions-content"
+                                                        class="footnote-suggestions-list reference-collapsible-content">
+                                                        \${suggestionHTML}
+                                                    </div>
+                                                    \${suggestions.some(function (item) { return item.reference; }) ? \`
+                                                        <button
+                                                            type="button"
+                                                            id="apply-footnote-suggestions-btn"
+                                                            class="apply-footnote-suggestions-btn">
+                                                            تطبيق التوثيق على الحواشي
+                                                        </button>
+                                                    \` : ""}
+                                                </div>
+                                            \`;
+
+                                            const applyButton = document.getElementById("apply-footnote-suggestions-btn");
+                                            if (applyButton) {
+                                                applyButton.onclick = async function () {
+                                                    applyButton.disabled = true;
+                                                    applyButton.textContent = "جارٍ تطبيق التوثيق...";
+                                                    try {
+                                                        const result = await applyFootnoteSuggestions(suggestions);
+                                                        applyButton.textContent = result.skipped > 0
+                                                            ? \`✓ طُبّق التوثيق على \${result.applied}، وتعذّر تطبيق \${result.skipped}\`
+                                                            : \`✓ تم تطبيق التوثيق (\${result.applied})\`;
+                                                    } catch (error) {
+                                                        console.error("فشل تطبيق التوثيق على الحواشي:", error);
+                                                        applyButton.disabled = false;
+                                                        applyButton.textContent = "تطبيق التوثيق على الحواشي";
+                                                        throw error;
+                                                    }
+                                                };
+                                            }
+                                        }
+
+                                        if (statusContainer) {
+                                            statusContainer.innerHTML = \`
+                                                <div class="references-analysis-result">
+                                                    <div class="references-analysis-status success">
+                                                        ✓ اكتمل تحليل التوثيقات بصورة مستقلة
+                                                    </div>
+                                                    <div class="references-analysis-info">
+                                                        الحواشي المفحوصة: <strong>\${aiResult.noteCount}</strong>
+                                                        · دفعات التحليل: <strong>\${aiResult.batchCount}</strong>
+                                                        · الإحالات المعتمدة الحدود: <strong>\${suggestions.reduce(function (total, item) { return total + (Array.isArray(item.suggestedTexts) ? item.suggestedTexts.length : 0); }, 0)}</strong>
+                                                        · إحالات مستبعدة لعدم ثبوت نطاقها: <strong>\${groupedCitations.skippedCount}</strong>
+                                                    </div>
+                                                </div>
+                                            \`;
+                                        }
+
+                                        analyzeCitationsBtn.textContent = "✓ اكتمل توحيد التوثيقات";
+                                    } catch (error) {
+                                        console.error("فشل تحليل التوثيقات المستقل:", error);
+                                        analyzeCitationsBtn.textContent = "تحليل وتوحيد التوثيقات";
+                                        if (statusContainer) {
+                                            statusContainer.innerHTML = \`
+                                                <div class="references-analysis-result">
+                                                    <div class="references-analysis-status error">⚠ تعذر تحليل التوثيقات</div>
+                                                    <div class="references-analysis-info">\${escapeReferenceHTML(String(error && error.message || "حدث خطأ غير معروف."))}</div>
+                                                </div>
+                                            \`;
+                                        }
+                                    } finally {
+                                        analyzeCitationsBtn.disabled = false;
+                                    }
+                                };
+                            }
+
+
                     };
 
             }
@@ -46961,9 +46974,7 @@ function formatFootnoteReference(
 
     let base = "";
 
-    switch (
-        referenceStyle.format
-    ) {
+    switch (citationStyle.format) {
 
         case "reference-only":
 
@@ -47417,8 +47428,7 @@ async function buildFootnoteSuggestions(
                                      * الكتاب والمؤلف عند أول ذكر فقط
                                      */
                                     if (
-                                        referenceStyle.format ===
-                                        "title-author-first"
+                                        citationStyle.format === "title-author-first"
                                     ) {
 
                                         isFirstMention = !seenReferences.has(referenceKey);
@@ -47470,7 +47480,7 @@ async function buildFootnoteSuggestions(
                                     }
 
                                     if (
-                                        referenceStyle.format === "title-author-first" &&
+                                        citationStyle.format === "title-author-first" &&
                                         isFirstMention &&
                                         sourceTexts[index]
                                     ) {
