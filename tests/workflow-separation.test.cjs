@@ -36,6 +36,12 @@ const citationHandler = sectionBetween(
 );
 
 assert.match(citationHandler, /readCitationSources\(\)/);
+assert.match(source, /function withCitationOperationTimeout\(/, "Word read stages must not leave citation analysis pending forever");
+assert.match(citationHandler, /withCitationOperationTimeout\(\s*readCitationSources\(\)/);
+assert.match(citationHandler, /وصل ردّ الذكاء الاصطناعي؛ جارٍ تدقيق الإحالات/, "the UI must expose completion of the AI request");
+assert.match(citationHandler, /اجتاز التدقيق؛ جارٍ بناء مقترحات التوحيد/, "the UI must expose the post-AI suggestion stage");
+assert.match(citationHandler, /withCitationOperationTimeout\(\s*buildFootnoteSuggestions\(/);
+
 assert.match(citationHandler, /CitationWorkflow\.analyzeCitations\(/);
 const citationService = fs.readFileSync(
     path.join(__dirname, "../src/taskpane/citation-workflow.js"),
