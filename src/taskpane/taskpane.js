@@ -5376,6 +5376,8 @@ async function analyzeAndBuildFinalReferencesWithAI(
 - رقم مجلد
 - رقم صفحة
 
+إذا ظهر اسم المؤلف كاملًا في نص الإحالة، فاحتفظ به كما ورد في حقل authorFull، ولا تختصر هذا الحقل ولا تستنتج اسمًا كاملًا غير موجود في المادة. ويظل حقل author خاضعًا للتوحيد إلى الاسم العلمي المختصر.
+
 إذا لم تكن المعلومة موجودة فلا تخترعها.
 
 14. إذا كان رقم أو معلومة تبدو خطأ مطبعيًا في المصدر الأصلي:
@@ -5404,6 +5406,7 @@ async function analyzeAndBuildFinalReferencesWithAI(
       "id": "ref-1",
       "type": "book",
       "author": "",
+      "authorFull": "",
       "title": "",
       "edition": "",
       "editor": "",
