@@ -21,7 +21,7 @@ const authorFirstReference = { title: "الأشباه والنظائر", author:
 const authorFull = "جلال الدين عبد الرحمن بن أبي بكر السيوطي";
 assert.equal(
     citation.build(authorFirstCitation, authorFirstReference, authorFull, false),
-    authorFull + "، الأشباه والنظائر، ط1، ص98",
+    "الأشباه والنظائر، " + authorFull + "، ط1، ص98",
     "the same limited replacement works when the author precedes the title"
 );
 
