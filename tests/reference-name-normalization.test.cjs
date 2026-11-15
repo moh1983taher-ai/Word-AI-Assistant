@@ -18,7 +18,17 @@ assert.ok(finalMerge > normalizeCall, "Name normalization must run before determ
 assert.match(source, /تكرار الصيغ في المستند كله/, "Normalization must use document-wide frequency");
 assert.match(source, /اللقب أو الشهرة أو النسبة المعروفة/, "Author names should prefer the recognized scholarly surname");
 assert.match(source, /خيار الاستقصاء مفعّل/, "Author investigation must be conditional on the user option");
-assert.match(source, /sourceText وvariants والصفحات والأجزاء/, "The prompt must preserve original citation spans and metadata");
+assert.match(source, /occurrences وvariants ومواضع الصفحات والأجزاء/, "The prompt must preserve bibliography occurrences, variants and page metadata");
+
+const referenceAnalyzerStart = source.indexOf("async function analyzeReferencesWithAI(");
+const referenceAnalyzerEnd = source.indexOf("function parseUnifiedReferenceAIResult(", referenceAnalyzerStart);
+assert.ok(referenceAnalyzerStart >= 0 && referenceAnalyzerEnd > referenceAnalyzerStart);
+const referenceAnalyzerSource = source.slice(referenceAnalyzerStart, referenceAnalyzerEnd);
+assert.doesNotMatch(
+    referenceAnalyzerSource,
+    /sourceText|sourceTextConfidence/,
+    "Bibliography extraction must not ask AI to resolve exact citation replacement spans"
+);
 assert.match(source, /لا تنشئ سجلًا ولا تحذف سجلًا ولا تدمج السجلات/, "The normalization pass must not change reference count or identity");
 assert.match(
     source,
