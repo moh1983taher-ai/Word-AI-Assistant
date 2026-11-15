@@ -53,7 +53,6 @@
 
                 const previous = start > 0 ? source[start - 1] : "";
                 const beforePrevious = start > 1 ? source[start - 2] : "";
-                const beforeBeforePrevious = start > 2 ? source[start - 3] : "";
 
                 // Support the written double-lam form "للأزهري" without
                 // accepting a name embedded inside an unrelated word.
@@ -127,8 +126,20 @@
             if (pairs.length > 1) return source;
             if (pairs.length === 1) {
                 const selected = pairs[0].authorSpan;
-                if (normalize(selected.text) === normalize(authorToUse)) return source;
+                const matchedTitle = pairs[0].titleSpan;
 
+                // This option is explicitly title-author on the first mention.
+                // Reorder only the adjacent identity when the source is author-title;
+                // otherwise replace only the author and retain every separator.
+                if (selected.end <= matchedTitle.start) {
+                    const identityStart = selected.start;
+                    const identityEnd = matchedTitle.end;
+                    return source.slice(0, identityStart) +
+                        matchedTitle.text + "، " + authorToUse +
+                        source.slice(identityEnd);
+                }
+
+                if (normalize(selected.text) === normalize(authorToUse)) return source;
                 return source.slice(0, selected.start) +
                     authorToUse +
                     source.slice(selected.end);
