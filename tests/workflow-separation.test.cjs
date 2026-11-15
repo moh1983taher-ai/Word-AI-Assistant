@@ -63,6 +63,11 @@ assert.doesNotMatch(
 assert.match(source, /localStorage\.setItem\("BIBLIOGRAPHY_SETTINGS"/);
 assert.match(source, /localStorage\.setItem\("CITATION_SETTINGS"/);
 assert.match(source, /localStorage\.getItem\("REFERENCE_STYLE"/);
+assert.match(source, /id="bibliography-format-select"/, "current-document bibliography format must have its own control");
+assert.match(source, /id="project-reference-format-select"/, "project bibliography format must have its own control");
+assert.match(source, /id="reference-format-select"/, "citation formatting must retain a separate control");
+assert.match(source, /bibliographyFormatSelect\.onchange[\s\S]*?saveBibliographySettings\(\)/);
+assert.match(source, /referenceFormatSelect\.onchange[\s\S]*?saveCitationSettings\(\)/);
 assert.match(
     source,
     /CitationWorkflow\.analyzeCitations\([\s\S]*?getSavedSettings\(\)/,
