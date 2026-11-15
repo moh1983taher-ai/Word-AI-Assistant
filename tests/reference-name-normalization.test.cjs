@@ -20,5 +20,20 @@ assert.match(source, /اللقب أو الشهرة أو النسبة المعر�
 assert.match(source, /خيار الاستقصاء مفعّل/, "Author investigation must be conditional on the user option");
 assert.match(source, /sourceText وvariants والصفحات والأجزاء/, "The prompt must preserve original citation spans and metadata");
 assert.match(source, /لا تنشئ سجلًا ولا تحذف سجلًا ولا تدمج السجلات/, "The normalization pass must not change reference count or identity");
+assert.match(
+    source,
+    /const normalized = references\.map\(function \(reference\)/,
+    "The original author spelling must be captured before canonicalization"
+);
+assert.match(
+    source,
+    /reference\.authorFull \|\| reference\.author/,
+    "First-mention formatting must use the preserved full author when available"
+);
+assert.match(
+    source,
+    /FirstMentionCitation/,
+    "The first-mention path must use the isolated source-preserving formatter"
+);
 
 console.log("Reference name normalization policy tests passed.");

@@ -5376,6 +5376,8 @@ async function analyzeAndBuildFinalReferencesWithAI(
 - رقم مجلد
 - رقم صفحة
 
+إذا ظهر اسم المؤلف كاملًا في نص الإحالة، فاحتفظ به كما ورد في حقل authorFull، ولا تختصر هذا الحقل ولا تستنتج اسمًا كاملًا غير موجود في المادة. ويظل حقل author خاضعًا للتوحيد إلى الاسم العلمي المختصر.
+
 إذا لم تكن المعلومة موجودة فلا تخترعها.
 
 14. إذا كان رقم أو معلومة تبدو خطأ مطبعيًا في المصدر الأصلي:
@@ -5404,6 +5406,7 @@ async function analyzeAndBuildFinalReferencesWithAI(
       "id": "ref-1",
       "type": "book",
       "author": "",
+      "authorFull": "",
       "title": "",
       "edition": "",
       "editor": "",
@@ -30520,7 +30523,13 @@ function parseReferenceAIJSON(
 {"items":[{"index":0,"author":"الاسم المختصر المشهور","title":"العنوان المعتمد"}]}
 `;
 
-     const normalized = references.slice();
+     const normalized = references.map(function (reference) {
+         if (!reference || typeof reference !== "object") return reference;
+         const authorFull = String(reference.authorFull || reference.author || "").trim();
+         return authorFull && !String(reference.authorFull || "").trim()
+             ? { ...reference, authorFull: authorFull }
+             : reference;
+     });
      const batchSize = provider === "groq" ? 16 : 24;
 
      for (let start = 0; start < compactReferences.length; start += batchSize) {
@@ -47289,49 +47298,16 @@ async function buildFootnoteSuggestions(
              * =====================================================
              */
 
-            function authorExistsInSource(
-                originalText,
-                reference
-            ) {
+            function authorExistsInSource(originalText, reference) {
+                const source = normalizeSearchText(originalText);
+                if (!source) return false;
 
-                const author =
-                    String(
-                        reference?.author ||
-                        ""
-                    )
-                        .trim();
+                const candidates = [
+                    reference?.authorFull,
+                    reference?.author
+                ].map(normalizeSearchText).filter(Boolean);
 
-                if (
-                    !author
-                ) {
-
-                    return false;
-
-                }
-
-                const source =
-                    normalizeSearchText(
-                        originalText
-                    );
-
-                const normalizedAuthor =
-                    normalizeSearchText(
-                        author
-                    );
-
-                if (
-                    !source ||
-                    !normalizedAuthor
-                ) {
-
-                    return false;
-
-                }
-
-                return source.includes(
-                    normalizedAuthor
-                );
-
+                return candidates.some(candidate => source.includes(candidate));
             }
 
             /*
@@ -47433,8 +47409,8 @@ async function buildFootnoteSuggestions(
                                             reference
                                         );
 
-                                    let includeAuthor =
-                                        true;
+                                    let includeAuthor = true;
+                                    let isFirstMention = false;
 
                                     /*
                                      * نمط:
@@ -47445,10 +47421,8 @@ async function buildFootnoteSuggestions(
                                         "title-author-first"
                                     ) {
 
-                                        includeAuthor =
-                                            !seenReferences.has(
-                                                referenceKey
-                                            );
+                                        isFirstMention = !seenReferences.has(referenceKey);
+                                        includeAuthor = isFirstMention;
 
                                         if (
                                             referenceKey
@@ -47486,12 +47460,35 @@ async function buildFootnoteSuggestions(
                                      * فلا يوجد ما يمكن إضافته.
                                      */
                                     if (
-                                        !reference?.author
+                                        !reference?.author &&
+                                        !reference?.authorFull
                                     ) {
 
                                         includeAuthor =
                                             false;
 
+                                    }
+
+                                    if (
+                                        referenceStyle.format === "title-author-first" &&
+                                        isFirstMention &&
+                                        sourceTexts[index]
+                                    ) {
+                                        const firstMentionBuilder = window.FirstMentionCitation;
+                                        if (firstMentionBuilder && typeof firstMentionBuilder.build === "function") {
+                                            return firstMentionBuilder.build(
+                                                sourceTexts[index],
+                                                reference,
+                                                includeAuthor
+                                                    ? (reference.authorFull || reference.author || "")
+                                                    : "",
+                                                Boolean(includeAuthor && addMissingAuthors)
+                                            );
+                                        }
+
+                                        // Fail closed: preserve the original full citation if
+                                        // the focused first-mention helper is unavailable.
+                                        return sourceTexts[index];
                                     }
 
                                     return formatFootnoteReference(
@@ -47752,6 +47749,15 @@ function mergeEquivalentReferences(references) {
 
                 return;
 
+            }
+
+            const incomingFullAuthor = clean(reference.authorFull);
+            const existingFullAuthor = clean(existing.authorFull);
+            if (
+                incomingFullAuthor &&
+                (!existingFullAuthor || existingFullAuthor === clean(existing.author))
+            ) {
+                existing.authorFull = incomingFullAuthor;
             }
 
             /*
