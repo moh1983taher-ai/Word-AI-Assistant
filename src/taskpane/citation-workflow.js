@@ -37,9 +37,15 @@ function parseCitationJSON(answer) {
     throw new Error("تعذر قراءة نتيجة تحليل التوثيقات بصيغة منظمة.");
 }
 
-function createCitationSystemPrompt() {
+function createCitationSystemPrompt(options) {
+    const settings = options || {};
+    const authorDiscoveryInstruction = settings.addMissingAuthors === true
+        ? "خيار استقصاء المؤلف مفعّل: إذا غاب اسم المؤلف عن الحاشية، فحدّد مؤلف الكتاب من معرفتك الببليوغرافية الموثوقة، وأعد الاسم العلمي المختصر. لا تخمّن النسبة؛ اترك المؤلف فارغًا إذا لم تكن متأكدًا."
+        : "خيار استقصاء المؤلف غير مفعّل: لا تستكمل اسم مؤلف غائب عن الحاشية أو مواد السياق؛ اترك حقل author فارغًا إذا لم يرد الاسم.";
+
     return [
         "أنت محلل توثيقات أكاديمية متخصص في الحواشي العربية.",
+        authorDiscoveryInstruction,
         "مهمتك استخراج الإحالات الببليوغرافية الموجودة في الحواشي السفلية والختامية فقط.",
         "لا تنشئ قائمة مراجع، ولا تنفذ توحيدًا ببليوغرافيًا عامًا، ولا تكتب شرحًا.",
         "أخرج كل إحالة مستقلة بوصفها occurrence منفصلًا، مع الاحتفاظ بمعرّف الحاشية.",
@@ -214,13 +220,13 @@ async function requestCitationCompletion(systemPrompt, userPrompt, settings, dep
     return answer;
 }
 
-async function analyzeCitations(notes, settings, dependencies) {
+async function analyzeCitations(notes, settings, dependencies, options) {
     const provider = String(settings && settings.provider || "openrouter").trim().toLowerCase();
     const maxChars = provider === "groq" ? 4200 : provider === "duckai" ? 6500 : 8500;
     const batches = createCitationBatches(notes, maxChars, 12);
     if (!batches.length) return { citations: [], batchCount: 0, noteCount: 0 };
 
-    const systemPrompt = createCitationSystemPrompt();
+    const systemPrompt = createCitationSystemPrompt(options);
     const allCitations = [];
     const allNotes = Array.isArray(notes) ? notes : [];
 
