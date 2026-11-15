@@ -182,7 +182,39 @@ assert.equal(parsed.length, 1);
     assert.equal(request.options.headers.Authorization, "Bearer test-pollinations-key");
     assert.equal(JSON.parse(request.options.body).model, "openai/gpt-5.4-nano");
     assert.equal(result.citations.length, 0);
-    console.log("Independent citation workflow tests passed, including Pollinations routing.");
+
+    let timeoutSignal = null;
+    await assert.rejects(
+        CitationWorkflow.analyzeCitations(
+            [{
+                id: "footnote-timeout",
+                source: "footnote",
+                noteNumber: 1,
+                originalText: "السيوطي، الأشباه والنظائر، ص98"
+            }],
+            {
+                provider: "pollinations",
+                key: "test-pollinations-key",
+                model: "openai/gpt-5.4-nano"
+            },
+            {
+                fetch: function (_url, options) {
+                    timeoutSignal = options.signal;
+                    return new Promise(function () {
+                        // Simulate a provider connection that never settles.
+                    });
+                },
+                readJSON: async function () { return {}; },
+                getAPIError: function () { return "unexpected API error"; },
+                extractOpenAIStyleAnswer: function () { return "{}"; },
+                requestTimeoutMs: 20
+            }
+        ),
+        /تجاوز الاتصال بمزوّد Pollinations مهلة الانتظار/
+    );
+    assert.ok(timeoutSignal && timeoutSignal.aborted, "a stalled provider request must be aborted at the timeout");
+
+    console.log("Independent citation workflow tests passed, including Pollinations routing and stalled-request timeout.");
 })().catch(function (error) {
     console.error(error);
     process.exitCode = 1;
