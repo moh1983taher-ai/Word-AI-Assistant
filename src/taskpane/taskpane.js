@@ -1773,6 +1773,15 @@ function renderProjectReferenceDocuments() {
             </div>
 
             <div class="reference-style-row">
+                <label>صيغة إدراج المؤلف والكتاب</label>
+                <select id="project-reference-format-select">
+                    <option value="author-title">المؤلف، الكتاب</option>
+                    <option value="title-author">الكتاب، المؤلف</option>
+                    <option value="reference-only">عنوان الكتاب فقط</option>
+                </select>
+            </div>
+
+            <div class="reference-style-row">
 
                 <label>
                     المؤلفون
@@ -1837,6 +1846,23 @@ function renderProjectReferenceDocuments() {
 
     }
 
+
+    const bibliographyFormatSelect =
+        document.getElementById(
+            "project-reference-format-select"
+        );
+
+    if (bibliographyFormatSelect) {
+        bibliographyFormatSelect.value =
+            referenceStyle.format === "reference-only" || referenceStyle.format === "title-author"
+                ? referenceStyle.format
+                : "author-title";
+
+        bibliographyFormatSelect.onchange = function () {
+            referenceStyle.format = this.value;
+            saveBibliographySettings();
+        };
+    }
 
     const addAuthors =
         document.getElementById(
@@ -44570,9 +44596,14 @@ if (referencesContent) {
                 legacy.order ||
                 "appearance";
 
+            const legacyBibliographyFormat =
+                legacy.format === "title-author-first"
+                    ? "title-author"
+                    : legacy.format;
+
             referenceStyle.format =
                 bibliographySaved.format ||
-                legacy.format ||
+                legacyBibliographyFormat ||
                 "author-title";
 
             referenceStyle.addMissingAuthors =
@@ -44721,6 +44752,15 @@ if (referencesContent) {
                                 </div>
 
                                 <div class="reference-style-row">
+                                    <label>صيغة قائمة المراجع</label>
+                                    <select id="bibliography-format-select">
+                                        <option value="author-title">المؤلف، الكتاب</option>
+                                        <option value="title-author">الكتاب، المؤلف</option>
+                                        <option value="reference-only">عنوان الكتاب فقط</option>
+                                    </select>
+                                </div>
+
+                                <div class="reference-style-row">
                                     <label>المؤلفون</label>
                                     <label class="reference-author-toggle" for="reference-add-missing-authors">
                                         <input type="checkbox" id="reference-add-missing-authors">
@@ -44822,6 +44862,11 @@ if (referencesContent) {
                                 "reference-order-select"
                             );
 
+                        const bibliographyFormatSelect =
+                            document.getElementById(
+                                "bibliography-format-select"
+                            );
+
                         const referenceFormatSelect =
                             document.getElementById(
                                 "reference-format-select"
@@ -44852,6 +44897,18 @@ if (referencesContent) {
 
                                 };
 
+                        }
+
+                        if (bibliographyFormatSelect) {
+                            bibliographyFormatSelect.value =
+                                referenceStyle.format === "reference-only" || referenceStyle.format === "title-author"
+                                    ? referenceStyle.format
+                                    : "author-title";
+
+                            bibliographyFormatSelect.onchange = function () {
+                                referenceStyle.format = this.value;
+                                saveBibliographySettings();
+                            };
                         }
 
                         if (referenceFormatSelect) {
