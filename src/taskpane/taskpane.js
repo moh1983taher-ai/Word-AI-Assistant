@@ -408,10 +408,32 @@ const closeReferences =
 const referencesContent =
     document.getElementById("references-content");
 
+const referencesSourcePanel =
+    referencesContent
+        ? referencesContent.querySelector(".references-source-panel")
+        : null;
+
 const referencesSourceWorkspace =
     document.getElementById(
         "references-source-workspace"
     );
+
+function showReferenceSourceChooser() {
+    if (referencesSourcePanel) {
+        referencesSourcePanel.classList.remove("is-hidden");
+    }
+
+    if (referencesSourceWorkspace) {
+        referencesSourceWorkspace.innerHTML = "";
+        referencesSourceWorkspace.classList.remove("project-reference-workspace");
+    }
+}
+
+function showReferenceSourceWorkspace() {
+    if (referencesSourcePanel) {
+        referencesSourcePanel.classList.add("is-hidden");
+    }
+}
 
 
 const wordDocumentPicker =
@@ -1617,6 +1639,16 @@ function renderProjectReferenceDocuments() {
 
     referencesSourceWorkspace.classList.add("project-reference-workspace");
 
+    const referenceSourceBackMarkup = `
+        <div class="reference-source-navigation">
+            <button type="button"
+                    class="reference-source-back"
+                    data-reference-navigation="sources">
+                <span aria-hidden="true">→</span>
+                <span>العودة إلى مصادر العمل</span>
+            </button>
+        </div>
+    `;
 
     if (
         !currentProject ||
@@ -1624,7 +1656,7 @@ function renderProjectReferenceDocuments() {
     ) {
 
         referencesSourceWorkspace.innerHTML =
-            `
+            referenceSourceBackMarkup + `
             <div class="references-analysis-result">
 
                 <div class="references-analysis-status error">
@@ -1653,7 +1685,7 @@ function renderProjectReferenceDocuments() {
     ) {
 
         referencesSourceWorkspace.innerHTML =
-            `
+            referenceSourceBackMarkup + `
             <div class="references-analysis-result">
 
                 <div class="references-analysis-status">
@@ -1669,7 +1701,7 @@ function renderProjectReferenceDocuments() {
 
 
     referencesSourceWorkspace.innerHTML =
-        `
+        referenceSourceBackMarkup + `
         <div class="references-selected-source">
 
             <div class="references-selected-icon">
@@ -44394,6 +44426,8 @@ if (referencesBtn && referencesWorkspace) {
             e.preventDefault();
             e.stopPropagation();
 
+            showReferenceSourceChooser();
+
             referencesWorkspace.style.display =
                 "flex";
 
@@ -44594,6 +44628,16 @@ if (referencesContent) {
     }
     loadReferenceStyle();
 
+    referencesContent.addEventListener("click", function (event) {
+        const backButton = event.target.closest('[data-reference-navigation="sources"]');
+        if (!backButton) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        showReferenceSourceChooser();
+    });
+
     referencesContent
         .querySelectorAll(
             ".references-source-option"
@@ -44611,6 +44655,15 @@ if (referencesContent) {
                             button.getAttribute(
                                 "data-reference-source"
                             );
+
+                        if (
+                            source !== "current-document" &&
+                            source !== "project-documents"
+                        ) {
+                            return;
+                        }
+
+                        showReferenceSourceWorkspace();
 
                         // =====================================================
                         // مستندات المشروع
@@ -44654,6 +44707,15 @@ if (referencesContent) {
 
                         referencesSourceWorkspace.innerHTML =
                             `
+                            <div class="reference-source-navigation">
+                                <button type="button"
+                                        class="reference-source-back"
+                                        data-reference-navigation="sources">
+                                    <span aria-hidden="true">→</span>
+                                    <span>العودة إلى مصادر العمل</span>
+                                </button>
+                            </div>
+
                             <div class="references-selected-source">
 
                                 <div class="references-selected-icon">
