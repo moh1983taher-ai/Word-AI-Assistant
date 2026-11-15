@@ -117,8 +117,8 @@ const bibliographyHandler = sectionBetween(
 );
 assert.equal(
     (bibliographyHandler.match(/const operationShell/g) || []).length,
-    1,
-    "the bibliography analysis handler must reuse its action-shell binding instead of redeclaring it"
+    0,
+    "the bibliography analysis handler must reuse the outer action-shell binding without redeclaring it"
 );
 
 const citationButtonMarkup = source.indexOf('id="analyze-citations-btn"');
