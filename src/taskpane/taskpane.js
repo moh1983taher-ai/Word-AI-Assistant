@@ -47515,7 +47515,10 @@ async function buildFootnoteSuggestions(
                             matches.length === 0
                         ) {
                             reportSuggestionProgress(source, noteNumber);
-                            return;
+                            if ((index + 1) % 5 === 0) {
+                                await new Promise(function (resolve) { setTimeout(resolve, 0); });
+                            }
+                            continue;
                         }
 
                         const references =
