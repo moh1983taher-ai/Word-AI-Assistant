@@ -242,7 +242,55 @@ assert.equal(parsed.length, 1);
         /تجاوز الاتصال بمزوّد Pollinations مهلة الانتظار/
     );
 
-    console.log("Independent citation workflow tests passed, including stalled network and response-body timeouts.");
+    const progressEvents = [];
+    const thirteenNotes = Array.from({ length: 13 }, function (_, index) {
+        return {
+            id: "progress-note-" + (index + 1),
+            source: "footnote",
+            noteNumber: index + 1,
+            originalText: "إحالة اختبارية رقم " + (index + 1)
+        };
+    });
+    const progressResult = await CitationWorkflow.analyzeCitations(
+        thirteenNotes,
+        {
+            provider: "pollinations",
+            key: "test-pollinations-key",
+            model: "openai/gpt-5.4-nano"
+        },
+        {
+            fetch: async function () { return { ok: true }; },
+            readJSON: async function () {
+                return {
+                    choices: [{
+                        message: { content: JSON.stringify({ citations: [] }) },
+                        finish_reason: "stop"
+                    }]
+                };
+            },
+            getAPIError: function () { return "unexpected API error"; },
+            extractOpenAIStyleAnswer: function (data) {
+                return data.choices[0].message.content;
+            },
+            onProgress: function (progress) {
+                progressEvents.push(progress);
+            }
+        }
+    );
+    assert.equal(progressResult.batchCount, 2, "13 notes must be analyzed in two bounded batches");
+    assert.equal(progressResult.noteCount, 13);
+    assert.ok(progressEvents.some(function (item) {
+        return item.stage === "batch-start" && item.currentBatch === 1 && item.totalBatches === 2;
+    }), "the UI must be notified when each batch starts");
+    assert.ok(progressEvents.some(function (item) {
+        return item.stage === "batch-complete" && item.currentBatch === 1 && item.completedNotes === 12;
+    }), "the UI must be notified when the first batch completes");
+    assert.ok(progressEvents.some(function (item) {
+        return item.stage === "batch-complete" && item.currentBatch === 2 && item.completedNotes === 13;
+    }), "the UI must be notified when the final batch completes");
+    assert.equal(progressEvents[progressEvents.length - 1].stage, "complete");
+
+    console.log("Independent citation workflow tests passed, including timeouts and live batch progress.");
 })().catch(function (error) {
     console.error(error);
     process.exitCode = 1;
