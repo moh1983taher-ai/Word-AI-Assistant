@@ -46666,6 +46666,7 @@ if (referencesContent) {
                                         );
 
                                         if (!suggestions.length) {
+                                            analyzeCitationsBtn.textContent = "لم تظهر توثيقات قابلة للتطبيق";
                                             if (statusContainer) {
                                                 statusContainer.innerHTML =
                                                     '<div class="references-analysis-result"><div class="references-analysis-status">لم تُنتج الحواشي مقترحات قابلة للتطبيق.</div></div>';
