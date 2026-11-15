@@ -953,17 +953,35 @@ const citationStyle = {
 };
 
 function saveBibliographySettings() {
+    const addMissingAuthors = referenceStyle.addMissingAuthors === true;
+    citationStyle.addMissingAuthors = addMissingAuthors;
+
     localStorage.setItem("BIBLIOGRAPHY_SETTINGS", JSON.stringify({
         order: referenceStyle.order,
         format: referenceStyle.format,
-        addMissingAuthors: referenceStyle.addMissingAuthors === true
+        addMissingAuthors: addMissingAuthors
     }));
+
+    localStorage.setItem("REFERENCE_SHARED_SETTINGS", JSON.stringify({
+        format: referenceStyle.format,
+        addMissingAuthors: addMissingAuthors
+    }));
+
+    saveCitationSettings();
 }
 
 function saveCitationSettings() {
+    const addMissingAuthors = referenceStyle.addMissingAuthors === true;
+    citationStyle.addMissingAuthors = addMissingAuthors;
+
     localStorage.setItem("CITATION_SETTINGS", JSON.stringify({
         format: citationStyle.format,
-        addMissingAuthors: citationStyle.addMissingAuthors === true
+        addMissingAuthors: addMissingAuthors
+    }));
+
+    localStorage.setItem("REFERENCE_SHARED_SETTINGS", JSON.stringify({
+        format: referenceStyle.format,
+        addMissingAuthors: addMissingAuthors
     }));
 }
 
@@ -1596,6 +1614,8 @@ function renderProjectReferenceDocuments() {
 
     referencesSourceWorkspace.innerHTML =
         "";
+
+    referencesSourceWorkspace.classList.add("project-reference-workspace");
 
 
     if (
@@ -44375,7 +44395,7 @@ if (referencesBtn && referencesWorkspace) {
             e.stopPropagation();
 
             referencesWorkspace.style.display =
-                "block";
+                "flex";
 
 
             if (chatArea) {
@@ -44511,6 +44531,9 @@ if (referencesContent) {
             const citationSaved =
                 JSON.parse(localStorage.getItem("CITATION_SETTINGS") || "{}");
 
+            const sharedSaved =
+                JSON.parse(localStorage.getItem("REFERENCE_SHARED_SETTINGS") || "{}");
+
             referenceStyle.order =
                 bibliographySaved.order ||
                 legacy.order ||
@@ -44521,25 +44544,42 @@ if (referencesContent) {
                     ? "title-author"
                     : legacy.format;
 
+            const savedBibliographyFormat =
+                bibliographySaved.format === "title-author-first"
+                    ? "title-author"
+                    : bibliographySaved.format;
+
             referenceStyle.format =
-                bibliographySaved.format ||
+                savedBibliographyFormat ||
+                (citationSaved.format !== "title-author-first" ? citationSaved.format : "") ||
                 legacyBibliographyFormat ||
                 "author-title";
 
-            referenceStyle.addMissingAuthors =
-                Object.prototype.hasOwnProperty.call(bibliographySaved, "addMissingAuthors")
-                    ? bibliographySaved.addMissingAuthors === true
-                    : legacy.addMissingAuthors === true;
-
             citationStyle.format =
-                citationSaved.format ||
-                legacy.format ||
-                "author-title";
+                citationSaved.format === "title-author-first"
+                    ? "title-author-first"
+                    : referenceStyle.format;
 
-            citationStyle.addMissingAuthors =
-                localStorage.getItem("CITATION_SETTINGS")
-                    ? citationSaved.addMissingAuthors === true
-                    : legacy.addMissingAuthors === true;
+            const hasSharedAuthorSetting =
+                Object.prototype.hasOwnProperty.call(sharedSaved, "addMissingAuthors");
+
+            const hasBibliographyAuthorSetting =
+                Object.prototype.hasOwnProperty.call(bibliographySaved, "addMissingAuthors");
+
+            const hasCitationAuthorSetting =
+                Object.prototype.hasOwnProperty.call(citationSaved, "addMissingAuthors");
+
+            const sharedAddMissingAuthors =
+                hasSharedAuthorSetting
+                    ? sharedSaved.addMissingAuthors === true
+                    : hasBibliographyAuthorSetting
+                        ? bibliographySaved.addMissingAuthors === true
+                        : hasCitationAuthorSetting
+                            ? citationSaved.addMissingAuthors === true
+                            : legacy.addMissingAuthors === true;
+
+            referenceStyle.addMissingAuthors = sharedAddMissingAuthors;
+            citationStyle.addMissingAuthors = sharedAddMissingAuthors;
 
         }
         catch (error) {
@@ -44552,7 +44592,6 @@ if (referencesContent) {
         }
 
     }
-
     loadReferenceStyle();
 
     referencesContent
@@ -44611,171 +44650,158 @@ if (referencesContent) {
                         // واجهة اختيار المستند
                         // =====================================================
 
+                        referencesSourceWorkspace.classList.remove("project-reference-workspace");
+
                         referencesSourceWorkspace.innerHTML =
                             `
                             <div class="references-selected-source">
 
                                 <div class="references-selected-icon">
-
                                     <svg xmlns="http://www.w3.org/2000/svg"
                                          viewBox="0 0 24 24"
                                          fill="none"
-                                         stroke="#000000"
+                                         stroke="currentColor"
                                          stroke-width="1"
                                          stroke-linecap="round"
                                          stroke-linejoin="round"
                                          aria-hidden="true">
-
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-
                                         <polyline points="14 2 14 8 20 8"/>
-
                                         <line x1="8" y1="13" x2="16" y2="13"/>
-
                                         <line x1="8" y1="17" x2="16" y2="17"/>
-
                                         <line x1="8" y1="9" x2="10" y2="9"/>
-
                                     </svg>
-
                                 </div>
 
                                 <div class="references-selected-info">
-
                                     <div class="references-selected-title">
                                         المستند المفتوح حاليًا في Word
                                     </div>
-
                                     <div class="references-selected-name">
-                                        سيتم تحليل المستند النشط
+                                        اختر نوع المعالجة التي تريد تنفيذها
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="reference-operation-shell" data-active-operation="bibliography">
+
+                                <div class="reference-operation-scroll">
+
+                                    <div class="reference-operation-picker" role="group" aria-label="نوع المعالجة">
+
+                                        <button type="button"
+                                                class="reference-operation-option is-active"
+                                                data-reference-operation="bibliography"
+                                                aria-pressed="true">
+                                            <span class="reference-operation-option-title">قائمة المراجع</span>
+                                            <span class="reference-operation-option-description">استخراج المراجع وتوحيدها ومقارنتها بالقائمة الموجودة</span>
+                                        </button>
+
+                                        <button type="button"
+                                                class="reference-operation-option"
+                                                data-reference-operation="citations"
+                                                aria-pressed="false">
+                                            <span class="reference-operation-option-title">توثيقات الحواشي</span>
+                                            <span class="reference-operation-option-description">تحليل الإحالات في الحواشي واقتراح توحيدها ومراجعتها</span>
+                                        </button>
+
                                     </div>
 
+                                    <section class="reference-shared-settings" aria-label="الإعدادات المشتركة">
+
+                                        <div class="reference-shared-settings-heading">
+                                            <span class="reference-style-title">إعدادات مشتركة</span>
+                                            <span class="reference-shared-settings-caption">تُطبّق على العمليتين</span>
+                                        </div>
+
+                                        <div class="reference-style-row bibliography-only-setting">
+                                            <label for="reference-order-select">ترتيب القائمة</label>
+                                            <select id="reference-order-select">
+                                                <option value="appearance">حسب ترتيب الظهور</option>
+                                                <option value="author">حسب المؤلف</option>
+                                                <option value="title">حسب عنوان الكتاب</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="reference-style-row">
+                                            <label for="reference-format-select">صيغة المرجع</label>
+                                            <select id="reference-format-select">
+                                                <option value="author-title">المؤلف، الكتاب</option>
+                                                <option value="title-author">الكتاب، المؤلف</option>
+                                                <option value="reference-only">عنوان الكتاب فقط</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="reference-style-row">
+                                            <label for="reference-add-missing-authors">المؤلفون</label>
+                                            <label class="reference-author-toggle" for="reference-add-missing-authors">
+                                                <input type="checkbox" id="reference-add-missing-authors">
+                                                <span class="reference-author-toggle-text">استقصاء أسماء المؤلفين عند غيابها</span>
+                                            </label>
+                                        </div>
+
+                                        <p class="reference-author-responsibility">
+                                            قد يستقصي الذكاء الاصطناعي اسم المؤلف عند غيابه؛ وتبقى مراجعة صحة الاسم واعتماد النتيجة مسؤولية المستخدم.
+                                        </p>
+
+                                    </section>
+
+                                    <section id="bibliography-operation-panel" class="reference-operation-panel is-active">
+                                        <div id="references-analysis-container" class="reference-result-container"></div>
+                                        <div id="references-comparison-container" class="reference-result-container"></div>
+                                        <div id="bibliography-build-container" class="reference-result-container"></div>
+                                    </section>
+
+                                    <section id="citation-operation-panel" class="reference-operation-panel">
+                                        <div class="reference-style-options citation-only-setting">
+                                            <div class="reference-style-title">خيار خاص بالتوثيقات</div>
+                                            <div class="reference-style-row">
+                                                <label for="citation-first-mention">ذكر المؤلف</label>
+                                                <label class="reference-author-toggle" for="citation-first-mention">
+                                                    <input type="checkbox" id="citation-first-mention">
+                                                    <span class="reference-author-toggle-text">إضافة المؤلف عند أول ذكر فقط</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div id="citation-analysis-status" class="reference-result-container"></div>
+                                        <div id="footnote-suggestions-container" class="reference-result-container"></div>
+                                    </section>
+
                                 </div>
 
+                                <div id="reference-operation-dock" class="reference-operation-dock" aria-label="إجراءات المعالجة">
+                                    <button type="button"
+                                            id="analyze-references-btn"
+                                            class="analyze-references-btn">
+                                        تحليل المراجع
+                                    </button>
 
+                                    <button type="button"
+                                            id="compare-references-btn"
+                                            class="compare-references-btn"
+                                            hidden>
+                                        مقارنة قائمة المراجع
+                                    </button>
 
-                            </div>
+                                    <button type="button"
+                                            id="build-bibliography-btn"
+                                            class="build-bibliography-btn"
+                                            hidden>
+                                        إنشاء/تحديث قائمة المراجع
+                                    </button>
 
-                            <div class="reference-style-options bibliography-settings">
-
-                                <div class="reference-style-title">
-                                    إعدادات استخراج المراجع
+                                    <button type="button"
+                                            id="analyze-citations-btn"
+                                            class="analyze-references-btn"
+                                            hidden>
+                                        تحليل وتوحيد التوثيقات
+                                    </button>
                                 </div>
 
-                                <div class="reference-style-row">
-                                    <label>ترتيب قائمة المراجع</label>
-                                    <select id="reference-order-select">
-                                        <option value="appearance">حسب ترتيب الظهور</option>
-                                        <option value="author">حسب المؤلف</option>
-                                        <option value="title">حسب عنوان الكتاب</option>
-                                    </select>
-                                </div>
-
-                                <div class="reference-style-row">
-                                    <label>صيغة قائمة المراجع</label>
-                                    <select id="bibliography-format-select">
-                                        <option value="author-title">المؤلف، الكتاب</option>
-                                        <option value="title-author">الكتاب، المؤلف</option>
-                                        <option value="reference-only">عنوان الكتاب فقط</option>
-                                    </select>
-                                </div>
-
-                                <div class="reference-style-row">
-                                    <label>المؤلفون</label>
-                                    <label class="reference-author-toggle" for="reference-add-missing-authors">
-                                        <input type="checkbox" id="reference-add-missing-authors">
-                                        <span class="reference-author-toggle-text">تقصّي أسماء المؤلفين في قائمة المراجع</span>
-                                    </label>
-                                </div>
-
-                            </div>
-
-                            <button
-                                type="button"
-                                id="analyze-references-btn"
-                                class="analyze-references-btn">
-
-                                تحليل المراجع
-
-                            </button>
-
-                            <div
-                                id="references-analysis-container"
-                                class="reference-result-container">
-                            </div>
-
-                            <button
-                                type="button"
-                                id="compare-references-btn"
-                                class="compare-references-btn">
-
-                                مقارنة قائمة المراجع
-
-                            </button>
-
-                            <div
-                                id="references-comparison-container"
-                                class="reference-result-container">
-                            </div>
-
-                            <button
-                                type="button"
-                                id="build-bibliography-btn"
-                                class="build-bibliography-btn">
-
-                                إنشاء/تحديث قائمة المراجع
-
-                            </button>
-
-                            <div
-                                id="bibliography-build-container"
-                                class="reference-result-container">
-                            </div>
-
-                            <div class="reference-style-options citation-settings">
-
-                                <div class="reference-style-title">
-                                    إعدادات توحيد التوثيقات
-                                </div>
-
-                                <div class="reference-style-row">
-                                    <label>صيغة التوثيق</label>
-                                    <select id="reference-format-select">
-                                        <option value="reference-only">المرجع فقط</option>
-                                        <option value="author-title">المؤلف، الكتاب</option>
-                                        <option value="title-author">الكتاب، المؤلف</option>
-                                        <option value="title-author-first">الكتاب والمؤلف عند أول ذكر فقط</option>
-                                    </select>
-                                </div>
-
-                                <div class="reference-style-row">
-                                    <label>المؤلفون</label>
-                                    <label class="reference-author-toggle" for="citation-add-missing-authors">
-                                        <input type="checkbox" id="citation-add-missing-authors">
-                                        <span class="reference-author-toggle-text">إضافة المؤلف إذا لم يرد في الحاشية</span>
-                                    </label>
-                                </div>
-
-                            </div>
-
-                            <button
-                                type="button"
-                                id="analyze-citations-btn"
-                                class="analyze-references-btn">
-                                تحليل وتوحيد التوثيقات
-                            </button>
-
-                            <div
-                                id="citation-analysis-status"
-                                class="reference-result-container">
-                            </div>
-
-                            <div
-                                id="footnote-suggestions-container"
-                                class="reference-result-container">
                             </div>
                             `;
-
 
                         // Bind citation analysis immediately after its markup is created.
                         // It must not depend on the bibliography button's initialization path.
@@ -44829,6 +44855,21 @@ if (referencesContent) {
                                     analyzeCitationsBtn.textContent = "جارٍ قراءة الحواشي...";
 
                                     if (suggestionsContainer) suggestionsContainer.innerHTML = "";
+
+                                    const previousApplyButton =
+                                        referencesSourceWorkspace.querySelector("#apply-footnote-suggestions-btn");
+
+                                    if (previousApplyButton) {
+                                        previousApplyButton.remove();
+                                    }
+
+                                    const operationShell =
+                                        referencesSourceWorkspace.querySelector(".reference-operation-shell");
+
+                                    if (operationShell && typeof operationShell.updateReferenceActionDock === "function") {
+                                        operationShell.updateReferenceActionDock();
+                                    }
+
                                     updateCitationProgress({
                                         title: "قراءة الحواشي من مستند Word",
                                         detail: "يجري جمع نصوص الحواشي السفلية والختامية تمهيدًا لتحليلها.",
@@ -45048,6 +45089,13 @@ if (referencesContent) {
 
                                             const applyButton = document.getElementById("apply-footnote-suggestions-btn");
                                             if (applyButton) {
+                                                const actionDock =
+                                                    referencesSourceWorkspace.querySelector("#reference-operation-dock");
+
+                                                if (actionDock) {
+                                                    actionDock.appendChild(applyButton);
+                                                }
+
                                                 applyButton.onclick = async function () {
                                                     applyButton.disabled = true;
                                                     applyButton.textContent = "جارٍ تطبيق التوثيق...";
@@ -45117,99 +45165,186 @@ if (referencesContent) {
                             }
 
                         const referenceOrderSelect =
-                            document.getElementById(
-                                "reference-order-select"
-                            );
-
-                        const bibliographyFormatSelect =
-                            document.getElementById(
-                                "bibliography-format-select"
-                            );
+                            document.getElementById("reference-order-select");
 
                         const referenceFormatSelect =
-                            document.getElementById(
-                                "reference-format-select"
-                            );
+                            document.getElementById("reference-format-select");
 
                         const referenceAddMissingAuthors =
-                            document.getElementById(
-                                "reference-add-missing-authors"
-                            );
+                            document.getElementById("reference-add-missing-authors");
 
-                        const citationAddMissingAuthors =
-                            document.getElementById(
-                                "citation-add-missing-authors"
-                            );
+                        const citationFirstMention =
+                            document.getElementById("citation-first-mention");
 
                         if (referenceOrderSelect) {
-
-                            referenceOrderSelect.value =
-                                referenceStyle.order;
-
-                            referenceOrderSelect.onchange =
-                                function () {
-
-                                    referenceStyle.order =
-                                        this.value;
-
-                                    saveBibliographySettings();
-
-                                };
-
-                        }
-
-                        if (bibliographyFormatSelect) {
-                            bibliographyFormatSelect.value =
-                                referenceStyle.format === "reference-only" || referenceStyle.format === "title-author"
-                                    ? referenceStyle.format
-                                    : "author-title";
-
-                            bibliographyFormatSelect.onchange = function () {
-                                referenceStyle.format = this.value;
+                            referenceOrderSelect.value = referenceStyle.order;
+                            referenceOrderSelect.onchange = function () {
+                                referenceStyle.order = this.value;
                                 saveBibliographySettings();
                             };
                         }
 
                         if (referenceFormatSelect) {
-
                             referenceFormatSelect.value =
-                                citationStyle.format;
+                                referenceStyle.format === "title-author" ||
+                                referenceStyle.format === "reference-only"
+                                    ? referenceStyle.format
+                                    : "author-title";
 
-                            referenceFormatSelect.onchange =
-                                function () {
+                            referenceFormatSelect.onchange = function () {
+                                referenceStyle.format = this.value;
+
+                                if (citationStyle.format !== "title-author-first") {
                                     citationStyle.format = this.value;
-                                    saveCitationSettings();
-                                };
+                                }
 
+                                saveBibliographySettings();
+                                saveCitationSettings();
+                            };
                         }
 
-                        if (
-                            referenceAddMissingAuthors
-                        ) {
-
+                        if (referenceAddMissingAuthors) {
                             referenceAddMissingAuthors.checked =
                                 referenceStyle.addMissingAuthors === true;
 
-                            referenceAddMissingAuthors.onchange =
-                                function () {
-
-                                    referenceStyle.addMissingAuthors =
-                                        this.checked;
-
-                                    saveBibliographySettings();
-
-                                };
-
-                        }
-
-                        if (citationAddMissingAuthors) {
-                            citationAddMissingAuthors.checked =
-                                citationStyle.addMissingAuthors === true;
-
-                            citationAddMissingAuthors.onchange = function () {
+                            referenceAddMissingAuthors.onchange = function () {
+                                referenceStyle.addMissingAuthors = this.checked;
                                 citationStyle.addMissingAuthors = this.checked;
+                                saveBibliographySettings();
                                 saveCitationSettings();
                             };
+                        }
+
+                        if (citationFirstMention) {
+                            citationFirstMention.checked =
+                                citationStyle.format === "title-author-first";
+
+                            citationFirstMention.onchange = function () {
+                                citationStyle.format = this.checked
+                                    ? "title-author-first"
+                                    : referenceStyle.format;
+
+                                saveCitationSettings();
+                            };
+                        }
+
+                        const operationShell =
+                            referencesSourceWorkspace.querySelector(".reference-operation-shell");
+
+                        if (operationShell) {
+                            const bibliographyOption =
+                                operationShell.querySelector('[data-reference-operation="bibliography"]');
+
+                            const citationsOption =
+                                operationShell.querySelector('[data-reference-operation="citations"]');
+
+                            const bibliographyPanel =
+                                operationShell.querySelector("#bibliography-operation-panel");
+
+                            const citationsPanel =
+                                operationShell.querySelector("#citation-operation-panel");
+
+                            const analyzeBibliographyButton =
+                                operationShell.querySelector("#analyze-references-btn");
+
+                            const compareBibliographyButton =
+                                operationShell.querySelector("#compare-references-btn");
+
+                            const buildBibliographyButton =
+                                operationShell.querySelector("#build-bibliography-btn");
+
+                            const analyzeCitationsButton =
+                                operationShell.querySelector("#analyze-citations-btn");
+
+                            operationShell.updateReferenceActionDock = function () {
+                                const bibliographyActive =
+                                    operationShell.dataset.activeOperation !== "citations";
+
+                                if (analyzeBibliographyButton) {
+                                    analyzeBibliographyButton.hidden = !bibliographyActive;
+                                }
+
+                                if (compareBibliographyButton) {
+                                    compareBibliographyButton.hidden =
+                                        !bibliographyActive ||
+                                        operationShell.dataset.referencesAnalyzed !== "true";
+                                }
+
+                                if (buildBibliographyButton) {
+                                    buildBibliographyButton.hidden =
+                                        !bibliographyActive ||
+                                        operationShell.dataset.bibliographyCompared !== "true";
+                                }
+
+                                if (analyzeCitationsButton) {
+                                    analyzeCitationsButton.hidden = bibliographyActive;
+                                }
+
+                                const applyButton =
+                                    operationShell.querySelector("#apply-footnote-suggestions-btn");
+
+                                if (applyButton) {
+                                    applyButton.hidden = bibliographyActive;
+                                }
+
+                                const orderSetting =
+                                    operationShell.querySelector(".bibliography-only-setting");
+
+                                if (orderSetting) {
+                                    orderSetting.hidden = !bibliographyActive;
+                                }
+
+                                const citationSetting =
+                                    operationShell.querySelector(".citation-only-setting");
+
+                                if (citationSetting) {
+                                    citationSetting.hidden = bibliographyActive;
+                                }
+                            };
+
+                            const setActiveOperation = function (operation) {
+                                const citationsActive = operation === "citations";
+
+                                operationShell.dataset.activeOperation =
+                                    citationsActive ? "citations" : "bibliography";
+
+                                if (bibliographyOption) {
+                                    const active = !citationsActive;
+                                    bibliographyOption.classList.toggle("is-active", active);
+                                    bibliographyOption.setAttribute("aria-pressed", String(active));
+                                }
+
+                                if (citationsOption) {
+                                    citationsOption.classList.toggle("is-active", citationsActive);
+                                    citationsOption.setAttribute("aria-pressed", String(citationsActive));
+                                }
+
+                                if (bibliographyPanel) {
+                                    bibliographyPanel.classList.toggle("is-active", !citationsActive);
+                                }
+
+                                if (citationsPanel) {
+                                    citationsPanel.classList.toggle("is-active", citationsActive);
+                                }
+
+                                operationShell.updateReferenceActionDock();
+                            };
+
+                            if (bibliographyOption) {
+                                bibliographyOption.onclick = function () {
+                                    setActiveOperation("bibliography");
+                                };
+                            }
+
+                            if (citationsOption) {
+                                citationsOption.onclick = function () {
+                                    setActiveOperation("citations");
+                                };
+                            }
+
+                            operationShell.dataset.referencesAnalyzed = "false";
+                            operationShell.dataset.bibliographyCompared = "false";
+                            operationShell.updateReferenceActionDock();
                         }
 
                         const analyzeReferencesBtn =
@@ -45355,6 +45490,18 @@ if (referencesContent) {
 
                                 e.preventDefault();
                                 e.stopPropagation();
+
+                                latestUnifiedReferences = [];
+                                latestBibliographyComparison = null;
+
+                                const operationShell =
+                                    referencesSourceWorkspace.querySelector(".reference-operation-shell");
+
+                                if (operationShell) {
+                                    operationShell.dataset.referencesAnalyzed = "false";
+                                    operationShell.dataset.bibliographyCompared = "false";
+                                    operationShell.updateReferenceActionDock();
+                                }
 
                                 analyzeReferencesBtn.disabled =
                                     true;
@@ -46534,6 +46681,19 @@ if (referencesContent) {
                                         "compare-references-btn"
                                     );
 
+                                const operationShell =
+                                    referencesSourceWorkspace.querySelector(".reference-operation-shell");
+
+                                if (operationShell) {
+                                    operationShell.dataset.referencesAnalyzed =
+                                        latestUnifiedReferences.length > 0 ? "true" : "false";
+                                    operationShell.dataset.bibliographyCompared = "false";
+
+                                    if (typeof operationShell.updateReferenceActionDock === "function") {
+                                        operationShell.updateReferenceActionDock();
+                                    }
+                                }
+
                                 if (compareReferencesBtn) {
 
                                     compareReferencesBtn.onclick =
@@ -46888,6 +47048,17 @@ if (referencesContent) {
                                                         </div>
                                                         `;
 
+                                                }
+
+                                                const operationShell =
+                                                    referencesSourceWorkspace.querySelector(".reference-operation-shell");
+
+                                                if (operationShell) {
+                                                    operationShell.dataset.bibliographyCompared = "true";
+
+                                                    if (typeof operationShell.updateReferenceActionDock === "function") {
+                                                        operationShell.updateReferenceActionDock();
+                                                    }
                                                 }
 
                                                 compareReferencesBtn.textContent =
