@@ -120,11 +120,82 @@ function createCitationUserPrompt(batch, contextNotes) {
     });
 }
 
+async function fetchCitationJSON(fetchImpl, url, requestOptions, readJSON, provider, timeoutMs) {
+    const controller = typeof AbortController !== "undefined"
+        ? new AbortController()
+        : null;
+    let timedOut = false;
+    let timeoutId = null;
+
+    const timeoutPromise = new Promise(function (_, reject) {
+        timeoutId = setTimeout(function () {
+            timedOut = true;
+            if (controller) controller.abort();
+            const providerNames = {
+                duckai: "Duck.ai",
+                gemini: "Gemini",
+                groq: "Groq",
+                openai: "OpenAI",
+                openrouter: "OpenRouter",
+                pollinations: "Pollinations"
+            };
+            const providerLabel = providerNames[provider] || provider;
+            const error = new Error(
+                "تجاوز الاتصال بمزوّد " + providerLabel +
+                " مهلة الانتظار (" + Math.ceil(timeoutMs / 1000) +
+                " ثانية). لم يكتمل التحليل؛ تحقق من اتصال الإنترنت وإعدادات المزوّد ثم أعد المحاولة."
+            );
+            error.code = "CITATION_REQUEST_TIMEOUT";
+            error.retryable = true;
+            reject(error);
+        }, timeoutMs);
+    });
+
+    const requestPromise = (async function () {
+        const options = Object.assign({}, requestOptions || {});
+        if (controller) options.signal = controller.signal;
+
+        const response = await fetchImpl(url, options);
+        const result = await readJSON(response);
+        return { response: response, result: result };
+    })();
+
+    try {
+        return await Promise.race([requestPromise, timeoutPromise]);
+    } catch (error) {
+        if (timedOut || (error && error.name === "AbortError")) {
+            const providerNames = {
+                duckai: "Duck.ai",
+                gemini: "Gemini",
+                groq: "Groq",
+                openai: "OpenAI",
+                openrouter: "OpenRouter",
+                pollinations: "Pollinations"
+            };
+            const providerLabel = providerNames[provider] || provider;
+            const timeoutError = new Error(
+                "تجاوز الاتصال بمزوّد " + providerLabel +
+                " مهلة الانتظار (" + Math.ceil(timeoutMs / 1000) +
+                " ثانية). لم يكتمل التحليل؛ تحقق من اتصال الإنترنت وإعدادات المزوّد ثم أعد المحاولة."
+            );
+            timeoutError.code = "CITATION_REQUEST_TIMEOUT";
+            timeoutError.retryable = true;
+            throw timeoutError;
+        }
+        throw error;
+    } finally {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+    }
+}
+
 async function requestCitationCompletion(systemPrompt, userPrompt, settings, dependencies) {
     const provider = String(settings && settings.provider || "openrouter").trim().toLowerCase();
     const key = String(settings && settings.key || "").trim();
     const model = String(settings && settings.model || "").trim();
     const fetchImpl = dependencies.fetch || fetch;
+    const requestTimeoutMs = Number(dependencies.requestTimeoutMs) > 0
+        ? Math.floor(Number(dependencies.requestTimeoutMs))
+        : 60000;
 
     if (!model) throw new Error("لم يتم تحديد نموذج الذكاء الاصطناعي.");
     if (provider !== "duckai" && !key) throw new Error("لم يتم إدخال مفتاح الذكاء الاصطناعي.");
@@ -142,7 +213,8 @@ async function requestCitationCompletion(systemPrompt, userPrompt, settings, dep
             throw new Error("أدوات الاتصال بـ Gemini غير متاحة.");
         }
 
-        const response = await fetchImpl(
+        const request = await fetchCitationJSON(
+            fetchImpl,
             "https://generativelanguage.googleapis.com/v1beta/models/" +
                 encodeURIComponent(normalizeGeminiModel(model)) +
                 ":generateContent?key=" + encodeURIComponent(key),
@@ -158,10 +230,13 @@ async function requestCitationCompletion(systemPrompt, userPrompt, settings, dep
                         maxOutputTokens: 6000
                     }
                 })
-            }
+            },
+            readJSON,
+            provider,
+            requestTimeoutMs
         );
-
-        const result = await readJSON(response);
+        const response = request.response;
+        const result = request.result;
         if (!response.ok) throw new Error(getAPIError(result, "فشل تحليل التوثيقات عبر Gemini."));
         if (String(result && result.candidates && result.candidates[0] && result.candidates[0].finishReason || "").toUpperCase() === "MAX_TOKENS") {
             throw new Error("توقف تحليل التوثيقات بسبب حد الإخراج؛ لم تُعتمد النتيجة الجزئية.");
@@ -189,22 +264,29 @@ async function requestCitationCompletion(systemPrompt, userPrompt, settings, dep
         headers["X-Title"] = "Research Tools";
     }
 
-    const response = await fetchImpl(endpoint, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify({
-            model: model,
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt }
-            ],
-            temperature: 0.1,
-            response_format: { type: "json_object" },
-            max_tokens: provider === "groq" ? 4096 : 7000
-        })
-    });
-
-    const result = await readJSON(response);
+    const request = await fetchCitationJSON(
+        fetchImpl,
+        endpoint,
+        {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature: 0.1,
+                response_format: { type: "json_object" },
+                max_tokens: provider === "groq" ? 4096 : 7000
+            })
+        },
+        readJSON,
+        provider,
+        requestTimeoutMs
+    );
+    const response = request.response;
+    const result = request.result;
     if (!response.ok) throw new Error(getAPIError(result, "فشل الاتصال بمزود الذكاء الاصطناعي أثناء تحليل التوثيقات."));
 
     const finishReason = String(result && result.choices && result.choices[0] && result.choices[0].finish_reason || "").toLowerCase();
