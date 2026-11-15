@@ -44789,12 +44789,51 @@ if (referencesContent) {
 
                                     const statusContainer = document.getElementById("citation-analysis-status");
                                     const suggestionsContainer = document.getElementById("footnote-suggestions-container");
+                                    const updateCitationProgress = function (details) {
+                                        if (!statusContainer) return;
+                                        const item = details || {};
+                                        const percent = Math.max(0, Math.min(100, Math.round(Number(item.percent) || 0)));
+                                        const completedNotes = Math.max(0, Math.floor(Number(item.completedNotes) || 0));
+                                        const totalNotes = Math.max(0, Math.floor(Number(item.totalNotes) || 0));
+                                        const completedBatches = Math.max(0, Math.floor(Number(item.completedBatches) || 0));
+                                        const totalBatches = Math.max(0, Math.floor(Number(item.totalBatches) || 0));
+                                        const state = item.state === "success" || item.state === "error"
+                                            ? item.state
+                                            : "running";
+                                        const meta = [];
+                                        if (totalNotes > 0) {
+                                            meta.push("الحواشي المنجزة: <strong>" + completedNotes + " / " + totalNotes + "</strong>");
+                                        }
+                                        if (totalBatches > 0) {
+                                            meta.push("دفعات التحليل: <strong>" + completedBatches + " / " + totalBatches + "</strong>");
+                                        }
+
+                                        statusContainer.innerHTML = `
+                                            <div class="citation-progress-card" data-state="${state}" role="status" aria-live="polite">
+                                                <div class="citation-progress-heading">
+                                                    <span class="citation-progress-title">${escapeReferenceHTML(item.title || "جارٍ تنفيذ تحليل التوثيقات")}</span>
+                                                    <strong class="citation-progress-percent">${percent}%</strong>
+                                                </div>
+                                                <div class="citation-progress-track" role="progressbar"
+                                                    aria-label="نسبة إنجاز تحليل التوثيقات"
+                                                    aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">
+                                                    <span style="width: ${percent}%"></span>
+                                                </div>
+                                                <div class="citation-progress-detail">${escapeReferenceHTML(item.detail || "")}</div>
+                                                ${meta.length ? '<div class="citation-progress-meta">' + meta.join('<span class="citation-progress-separator">·</span>') + '</div>' : ""}
+                                            </div>
+                                        `;
+                                    };
 
                                     analyzeCitationsBtn.disabled = true;
                                     analyzeCitationsBtn.textContent = "جارٍ قراءة الحواشي...";
 
-                                    if (statusContainer) statusContainer.innerHTML = "";
                                     if (suggestionsContainer) suggestionsContainer.innerHTML = "";
+                                    updateCitationProgress({
+                                        title: "قراءة الحواشي من مستند Word",
+                                        detail: "يجري جمع نصوص الحواشي السفلية والختامية تمهيدًا لتحليلها.",
+                                        percent: 4
+                                    });
 
                                     try {
                                         const citationMaterials = await withCitationOperationTimeout(
@@ -44805,6 +44844,13 @@ if (referencesContent) {
                                             throw new Error("لا توجد حواشٍ سفلية أو ختامية قابلة للتحليل في المستند.");
                                         }
 
+                                        updateCitationProgress({
+                                            title: "اكتملت قراءة الحواشي",
+                                            detail: "تم جمع " + citationMaterials.length + " حاشية. بدأ الآن تحليل الإحالات واستخراج بياناتها.",
+                                            percent: 10,
+                                            completedNotes: 0,
+                                            totalNotes: citationMaterials.length
+                                        });
                                         analyzeCitationsBtn.textContent = "جارٍ تحليل التوثيقات فقط...";
 
                                         const aiResult = await CitationWorkflow.analyzeCitations(
@@ -44815,7 +44861,45 @@ if (referencesContent) {
                                                 getAPIError: getAPIError,
                                                 normalizeGeminiModel: normalizeGeminiModel,
                                                 extractGeminiAnswer: extractGeminiAnswer,
-                                                extractOpenAIStyleAnswer: extractOpenAIStyleAnswer
+                                                extractOpenAIStyleAnswer: extractOpenAIStyleAnswer,
+                                                onProgress: function (progress) {
+                                                    const currentBatch = Number(progress.currentBatch) || 0;
+                                                    const totalBatches = Number(progress.totalBatches) || 0;
+                                                    const completedBatches = Number(progress.completedBatches) || 0;
+                                                    const noteCount = Number(progress.noteCount) || citationMaterials.length;
+                                                    const completedNotes = Number(progress.completedNotes) || 0;
+                                                    let title = "تحليل الحواشي بالذكاء الاصطناعي";
+                                                    let detail = "";
+
+                                                    if (progress.stage === "batch-start") {
+                                                        detail = "جارٍ إرسال الدفعة " + currentBatch + " من " + totalBatches +
+                                                            " إلى نموذج الذكاء الاصطناعي؛ تحتوي هذه الدفعة على " +
+                                                            progress.batchNoteCount + " حاشية. قد يستغرق انتظار الرد بعض الوقت.";
+                                                        analyzeCitationsBtn.textContent = "تحليل الدفعة " + currentBatch + " من " + totalBatches + "...";
+                                                    } else if (progress.stage === "batch-complete") {
+                                                        detail = "اكتمل تحليل الدفعة " + currentBatch + " من " + totalBatches +
+                                                            ". جرى تحليل " + completedNotes + " من " + noteCount +
+                                                            " حاشية حتى الآن، واستُخرجت " + (Number(progress.citationCount) || 0) + " إحالة.";
+                                                        analyzeCitationsBtn.textContent = "اكتمل " + completedBatches + " من " + totalBatches + " دفعات";
+                                                    } else if (progress.stage === "complete") {
+                                                        title = "اكتمل التحليل بالذكاء الاصطناعي";
+                                                        detail = "اكتمل تحليل " + noteCount + " حاشية في " + totalBatches +
+                                                            " دفعات. يجري الآن تدقيق مواضع الإحالات.";
+                                                        analyzeCitationsBtn.textContent = "اكتمل تحليل الدفعات؛ جارٍ تدقيق الإحالات...";
+                                                    } else {
+                                                        detail = "تهيئة " + noteCount + " حاشية وتقسيمها إلى دفعات مناسبة للتحليل.";
+                                                    }
+
+                                                    updateCitationProgress({
+                                                        title: title,
+                                                        detail: detail,
+                                                        percent: progress.percent,
+                                                        completedNotes: completedNotes,
+                                                        totalNotes: noteCount,
+                                                        completedBatches: completedBatches,
+                                                        totalBatches: totalBatches
+                                                    });
+                                                }
                                             },
                                             {
                                                 addMissingAuthors: citationStyle.addMissingAuthors === true
@@ -44823,7 +44907,16 @@ if (referencesContent) {
                                         );
 
                                         analyzeCitationsBtn.textContent = "وصل ردّ الذكاء الاصطناعي؛ جارٍ تدقيق الإحالات...";
-                                        
+                                        updateCitationProgress({
+                                            title: "تدقيق الإحالات المستخرجة",
+                                            detail: "عاد رد النموذج بنجاح. يجري الآن التحقق من أن كل إحالة تطابق نصًا حقيقيًا داخل الحاشية قبل بناء المقترحات.",
+                                            percent: 78,
+                                            completedNotes: aiResult.noteCount,
+                                            totalNotes: aiResult.noteCount,
+                                            completedBatches: aiResult.batchCount,
+                                            totalBatches: aiResult.batchCount
+                                        });
+
                                         const citationEngine = window.FootnoteCitationEngine;
                                         if (!citationEngine || typeof citationEngine.findValidatedSourceSpan !== "function") {
                                             throw new Error("أداة التحقق من نطاق التوثيق غير متاحة.");
@@ -44845,17 +44938,54 @@ if (referencesContent) {
                                         }
 
                                         analyzeCitationsBtn.textContent = "اجتاز التدقيق؛ جارٍ بناء مقترحات التوحيد...";
+                                        updateCitationProgress({
+                                            title: "اجتاز التحقق من مواضع الإحالات",
+                                            detail: "تم التحقق من " + groupedCitations.references.length +
+                                                " مرجعًا، واستبعاد " + groupedCitations.skippedCount +
+                                                " إحالة لم يثبت موضعها بدقة. يجري تجهيز صيغ التوحيد للحواشي.",
+                                            percent: 84,
+                                            completedNotes: aiResult.noteCount,
+                                            totalNotes: aiResult.noteCount,
+                                            completedBatches: aiResult.batchCount,
+                                            totalBatches: aiResult.batchCount
+                                        });
                                         const citationMap = buildUnifiedFootnoteMap(groupedCitations.references);
                                         const suggestions = await withCitationOperationTimeout(
                                             buildFootnoteSuggestions(
                                                 citationMap,
-                                                citationStyle.addMissingAuthors === true
+                                                citationStyle.addMissingAuthors === true,
+                                                function (progress) {
+                                                    const sourceLabel = progress.source === "endnote" ? "الختامية" : "السفلية";
+                                                    updateCitationProgress({
+                                                        title: "بناء مقترحات توحيد التوثيقات",
+                                                        detail: "تجري مراجعة الحاشية " + progress.noteNumber + " من الحواشي " +
+                                                            sourceLabel + " (" + progress.completedNotes + " من " +
+                                                            progress.totalNotes + " إجمالًا).",
+                                                        percent: progress.percent,
+                                                        completedNotes: progress.completedNotes,
+                                                        totalNotes: progress.totalNotes,
+                                                        completedBatches: aiResult.batchCount,
+                                                        totalBatches: aiResult.batchCount
+                                                    });
+                                                    analyzeCitationsBtn.textContent = "إعداد المقترحات: " +
+                                                        progress.completedNotes + " / " + progress.totalNotes;
+                                                }
                                             ),
                                             "بناء مقترحات توحيد التوثيقات"
                                         );
 
                                         if (!suggestions.length) {
                                             analyzeCitationsBtn.textContent = "لم تظهر توثيقات قابلة للتطبيق";
+                                            updateCitationProgress({
+                                                title: "اكتمل التحليل دون مقترحات قابلة للتطبيق",
+                                                detail: "اكتملت قراءة الحواشي والتحليل والتدقيق، لكن لم تُنتج البيانات إحالات يمكن تطبيقها بأمان.",
+                                                percent: 100,
+                                                state: "success",
+                                                completedNotes: aiResult.noteCount,
+                                                totalNotes: aiResult.noteCount,
+                                                completedBatches: aiResult.batchCount,
+                                                totalBatches: aiResult.batchCount
+                                            });
                                             if (statusContainer) {
                                                 statusContainer.innerHTML =
                                                     '<div class="references-analysis-result"><div class="references-analysis-status">لم تُنتج الحواشي مقترحات قابلة للتطبيق.</div></div>';
@@ -44936,8 +45066,18 @@ if (referencesContent) {
                                             }
                                         }
 
+                                        updateCitationProgress({
+                                            title: "اكتمل تحليل التوثيقات وتجهيز المقترحات",
+                                            detail: "اكتملت جميع المراحل بنجاح. راجع المقترحات أدناه، ولن يُغيّر المستند إلا بعد الضغط على زر التطبيق.",
+                                            percent: 100,
+                                            state: "success",
+                                            completedNotes: aiResult.noteCount,
+                                            totalNotes: aiResult.noteCount,
+                                            completedBatches: aiResult.batchCount,
+                                            totalBatches: aiResult.batchCount
+                                        });
                                         if (statusContainer) {
-                                            statusContainer.innerHTML = `
+                                            statusContainer.innerHTML += `
                                                 <div class="references-analysis-result">
                                                     <div class="references-analysis-status success">
                                                         ✓ اكتمل تحليل التوثيقات بصورة مستقلة
@@ -44956,8 +45096,14 @@ if (referencesContent) {
                                     } catch (error) {
                                         console.error("فشل تحليل التوثيقات المستقل:", error);
                                         analyzeCitationsBtn.textContent = "تحليل وتوحيد التوثيقات";
+                                        updateCitationProgress({
+                                            title: "توقف تحليل التوثيقات",
+                                            detail: String(error && error.message || "حدث خطأ غير معروف."),
+                                            percent: 0,
+                                            state: "error"
+                                        });
                                         if (statusContainer) {
-                                            statusContainer.innerHTML = `
+                                            statusContainer.innerHTML += `
                                                 <div class="references-analysis-result">
                                                     <div class="references-analysis-status error">⚠ تعذر تحليل التوثيقات</div>
                                                     <div class="references-analysis-info">${escapeReferenceHTML(String(error && error.message || "حدث خطأ غير معروف."))}</div>
@@ -47131,7 +47277,8 @@ function buildUnifiedFootnoteMap(unifiedReferences) {
 
 async function buildFootnoteSuggestions(
     unifiedFootnoteMap,
-    addMissingAuthors = false
+    addMissingAuthors = false,
+    onProgress
 ) {
 
     return await Word.run(
@@ -47173,6 +47320,25 @@ async function buildFootnoteSuggestions(
 
             const suggestions =
                 [];
+            const totalNotes = footnotes.items.length + endnotes.items.length;
+            let processedNotes = 0;
+
+            function reportSuggestionProgress(source, noteNumber) {
+                processedNotes++;
+                if (typeof onProgress !== "function") return;
+                try {
+                    onProgress({
+                        stage: "suggestions",
+                        source: source,
+                        noteNumber: noteNumber,
+                        completedNotes: processedNotes,
+                        totalNotes: totalNotes,
+                        percent: 84 + Math.round((processedNotes / Math.max(totalNotes, 1)) * 12)
+                    });
+                } catch (error) {
+                    console.warn("تعذر تحديث تقدم إعداد مقترحات التوثيق:", error);
+                }
+            }
 
             /*
              * =====================================================
@@ -47353,9 +47519,8 @@ async function buildFootnoteSuggestions(
                         if (
                             matches.length === 0
                         ) {
-
+                            reportSuggestionProgress(source, noteNumber);
                             return;
-
                         }
 
                         const references =
@@ -47537,6 +47702,7 @@ async function buildFootnoteSuggestions(
 
                         });
 
+                        reportSuggestionProgress(source, noteNumber);
                     }
                 );
 
