@@ -160,6 +160,10 @@ const sourceSelectionHandler = sectionBetween(
 assert.match(sourceSelectionHandler, /showReferenceSourceWorkspace\(\)/, "choosing either source must replace the first-level chooser");
 assert.match(sourceSelectionHandler, /data-reference-navigation="sources"/, "current-document screen must provide a back-navigation control");
 assert.equal((source.match(/referenceSourceBackMarkup/g) || []).length, 4, "the project screen and its empty states must all provide a back link");
-assert.match(source, /references-source-panel\.is-hidden/, "the chooser must have a dedicated hidden state");
+const referenceStyles = fs.readFileSync(
+    path.join(__dirname, "../src/taskpane/taskpane.css"),
+    "utf8"
+);
+assert.match(referenceStyles, /\.references-source-panel\.is-hidden\s*\{\s*display:\s*none\s*!important;/, "the source chooser must have a dedicated hidden state");
 assert.match(source, /referencesSourceWorkspace\.innerHTML = ""/, "return navigation must clear the previous workspace rather than stack screens");
 console.log("Reference source navigation tests passed.");
