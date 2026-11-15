@@ -31,7 +31,7 @@ assert.doesNotMatch(
 
 const citationHandler = sectionBetween(
     "const analyzeCitationsBtn =",
-    "function sortUnifiedReferences(",
+    "const referenceOrderSelect =",
     "independent citation handler"
 );
 
