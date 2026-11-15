@@ -138,3 +138,28 @@ assert.match(
 );
 
 console.log("Independent bibliography/citation workflow separation tests passed.");
+
+
+const sourceNavigation = sectionBetween(
+    "function showReferenceSourceChooser()",
+    "const wordDocumentPicker =",
+    "reference source navigation helpers"
+);
+
+assert.match(sourceNavigation, /referencesSourcePanel\.classList\.remove\("is-hidden"\)/);
+assert.match(sourceNavigation, /referencesSourceWorkspace\.innerHTML = ""/);
+assert.match(sourceNavigation, /referencesSourcePanel\.classList\.add\("is-hidden"\)/);
+assert.match(sourceNavigation, /showReferenceSourceChooser\(\)/, "opening References and returning from a sub-screen must show the source chooser");
+
+const sourceSelectionHandler = sectionBetween(
+    'referencesContent\n        .querySelectorAll(\n            ".references-source-option"',
+    "const referenceOrderSelect =",
+    "reference source selection handler"
+);
+
+assert.match(sourceSelectionHandler, /showReferenceSourceWorkspace\(\)/, "choosing either source must replace the first-level chooser");
+assert.match(sourceSelectionHandler, /data-reference-navigation="sources"/, "current-document screen must provide a back-navigation control");
+assert.equal((source.match(/referenceSourceBackMarkup/g) || []).length, 4, "the project screen and its empty states must all provide a back link");
+assert.match(source, /references-source-panel\.is-hidden/, "the chooser must have a dedicated hidden state");
+assert.match(source, /referencesSourceWorkspace\.innerHTML = ""/, "return navigation must clear the previous workspace rather than stack screens");
+console.log("Reference source navigation tests passed.");
