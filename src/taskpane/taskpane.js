@@ -4077,6 +4077,24 @@ async function readReferenceSources() {
 // CITATION-ONLY SNAPSHOT
 // قراءة الحواشي وحدها دون قراءة المتن أو قائمة المراجع
 // =====================================================
+function withCitationOperationTimeout(operation, stageName, timeoutMs) {
+    const limit = Number(timeoutMs) > 0 ? Number(timeoutMs) : 60000;
+    let timeoutId = null;
+    const timeoutPromise = new Promise(function (_, reject) {
+        timeoutId = setTimeout(function () {
+            reject(new Error(
+                "استغرقت مرحلة " + stageName + " أكثر من " +
+                Math.ceil(limit / 1000) +
+                " ثانية. أُوقفت متابعة التحليل؛ أعد المحاولة بعد التأكد من استجابة Word."
+            ));
+        }, limit);
+    });
+
+    return Promise.race([Promise.resolve(operation), timeoutPromise]).finally(function () {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+    });
+}
+
 async function readCitationSources() {
     if (
         !Office.context.requirements.isSetSupported(
@@ -44779,7 +44797,10 @@ if (referencesContent) {
                                     if (suggestionsContainer) suggestionsContainer.innerHTML = "";
 
                                     try {
-                                        const citationMaterials = await readCitationSources();
+                                        const citationMaterials = await withCitationOperationTimeout(
+                                            readCitationSources(),
+                                            "قراءة الحواشي"
+                                        );
                                         if (!citationMaterials.length) {
                                             throw new Error("لا توجد حواشٍ سفلية أو ختامية قابلة للتحليل في المستند.");
                                         }
@@ -44801,6 +44822,8 @@ if (referencesContent) {
                                             }
                                         );
 
+                                        analyzeCitationsBtn.textContent = "وصل ردّ الذكاء الاصطناعي؛ جارٍ تدقيق الإحالات...";
+                                        
                                         const citationEngine = window.FootnoteCitationEngine;
                                         if (!citationEngine || typeof citationEngine.findValidatedSourceSpan !== "function") {
                                             throw new Error("أداة التحقق من نطاق التوثيق غير متاحة.");
@@ -44821,10 +44844,14 @@ if (referencesContent) {
                                             throw new Error("لم يُعثر على إحالات ببليوغرافية مؤكدة الحدود داخل الحواشي.");
                                         }
 
+                                        analyzeCitationsBtn.textContent = "اجتاز التدقيق؛ جارٍ بناء مقترحات التوحيد...";
                                         const citationMap = buildUnifiedFootnoteMap(groupedCitations.references);
-                                        const suggestions = await buildFootnoteSuggestions(
-                                            citationMap,
-                                            citationStyle.addMissingAuthors === true
+                                        const suggestions = await withCitationOperationTimeout(
+                                            buildFootnoteSuggestions(
+                                                citationMap,
+                                                citationStyle.addMissingAuthors === true
+                                            ),
+                                            "بناء مقترحات توحيد التوثيقات"
                                         );
 
                                         if (!suggestions.length) {
