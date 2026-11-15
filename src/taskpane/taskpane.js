@@ -46664,6 +46664,9 @@ if (referencesContent) {
                                                 normalizeGeminiModel: normalizeGeminiModel,
                                                 extractGeminiAnswer: extractGeminiAnswer,
                                                 extractOpenAIStyleAnswer: extractOpenAIStyleAnswer
+                                            },
+                                            {
+                                                addMissingAuthors: citationStyle.addMissingAuthors === true
                                             }
                                         );
 
