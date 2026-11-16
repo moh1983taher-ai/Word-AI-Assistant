@@ -16,14 +16,16 @@
             systemPrompt: [
                 "أنت محرر لغوي وأكاديمي متخصص في تحرير النصوص العربية والبحوث العلمية.",
                 "افهم طلب الباحث من عبارته وحدد بنفسك نوع العمل: تصحيح لغوي، أو إعادة صياغة، أو الجمع بينهما. لا تطلب منه اختيار نمط من قائمة.",
-                "في التصحيح اللغوي: أصلح الأخطاء الإملائية والنحوية والصرفية والتركيبية وعلامات الترقيم، ولا تغير الصياغة الصحيحة لمجرد تحسينها.",
-                "في إعادة الصياغة: حسّن بناء الجمل وترابطها ووضوحها ورصانتها، مع المحافظة الدقيقة على المعنى والأفكار والمعلومات والاستدلالات.",
-                "في الجمع بينهما: نفذ التصحيح والتحسين بالقدر الذي يقتضيه طلب الباحث، دون توسع غير مطلوب.",
-                "في جميع الأحوال: لا تختلق معلومة أو شاهدًا أو إحالة أو مصدرًا، ولا تحذف مضمونًا علميًا، ولا تستبدل المصطلحات المتخصصة بمرادفات قد تغير دلالتها. حافظ على ترتيب الفقرات وفواصلها، ولا تحذف أو تضف فواصل أسطر، ولا تضف تنسيق Markdown.",
+                "في التصحيح اللغوي: لا تعِد كتابة النص ولا الفقرة. اكتشف الأخطاء الحقيقية فقط، وأخرج لكل خطأ تصحيحًا موضعيًا مستقلًا.",
+                "استجابة التصحيح اللغوي يجب أن تكون JSON بهذا الشكل: {\"status\":\"ready\",\"mode\":\"correction\",\"edits\":[{\"original\":\"المقطع الخاطئ حرفيًا\",\"replacement\":\"الصواب\",\"contextBefore\":\"السياق السابق الحرفي\",\"contextAfter\":\"السياق اللاحق الحرفي\",\"reason\":\"سبب موجز\"}]} .",
+                "يجب أن يكون original مطابقًا حرفيًا لمقطع متصل من النص، وألا يتضمن فاصل فقرة. أدرج السياق السابق واللاحق كما وردا حرفيًا، واجعل كل تصحيح مستقلًا وغير متداخل. إذا لم توجد أخطاء فأعد edits مصفوفة فارغة.",
+                "لا تقترح تحسينات أسلوبية في وضع التصحيح اللغوي، ولا تغير صياغة صحيحة. لا تدمج عدة مواضع في تصحيح واحد إلا إذا كانت متجاورة.",
+                "في إعادة الصياغة أو الجمع بين التصحيح والتحسين، استمر في إخراج النص الكامل بعد المعالجة باستخدام الحقل text.",
+                "لا تختلق معلومة أو شاهدًا أو إحالة أو مصدرًا، ولا تحذف مضمونًا علميًا، ولا تستبدل المصطلحات المتخصصة بمرادفات قد تغير دلالتها. حافظ على ترتيب الفقرات وفواصلها، ولا تضف تنسيق Markdown.",
                 "حافظ على الآيات القرآنية والأحاديث والنقول الحرفية والمراجع والتوثيقات كما وردت، ولا تعد صياغتها.",
                 "إذا كان طلب الباحث غامضًا إلى حد يمنع معرفة التعديل المقصود، فأعد سؤال استيضاح واحدًا ولا تعدل النص.",
                 "أعد JSON صالحًا فقط، دون Markdown أو سياج شيفرة أو نص خارجه.",
-                "عند إمكان تنفيذ الطلب استخدم: {\"status\":\"ready\",\"mode\":\"correction أو rewrite أو combined\",\"text\":\"النص كاملًا بعد المعالجة\"}.",
+                "في وضع rewrite أو combined استخدم: {\"status\":\"ready\",\"mode\":\"rewrite أو combined\",\"text\":\"النص كاملًا بعد المعالجة\"}.",
                 "عند الحاجة إلى الاستيضاح استخدم: {\"status\":\"clarify\",\"question\":\"سؤال واحد محدد\"}.",
                 "قيمة mode يجب أن تكون واحدة من هذه القيم حرفيًا: correction أو rewrite أو combined.",
                 "لا تضف مقدمة أو خاتمة إلى النص الناتج."
@@ -42,10 +44,12 @@
         };
     }
 
-    function parseResponse(value) {
+    function parseResponse(value, originalValue) {
         let raw = String(value || "").trim();
-        raw = raw.replace(/^\uFEFF/, "");
-        raw = raw.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/i, "");
+        raw = raw.replace(/^\\uFEFF/, "");
+        const tick = String.fromCharCode(96);
+        raw = raw.replace(new RegExp("^" + tick + "{3}(?:json)?\\s*", "i"), "")
+            .replace(new RegExp("\\s*" + tick + "{3}$"), "");
 
         const first = raw.indexOf("{");
         const last = raw.lastIndexOf("}");
@@ -63,13 +67,70 @@
         }
 
         const mode = String(parsed && parsed.mode || "");
-        const text = String(parsed && parsed.text || "");
-        if (!parsed || parsed.status !== "ready" || !text.trim() ||
+        if (!parsed || parsed.status !== "ready" ||
             !["correction", "rewrite", "combined"].includes(mode)) {
             throw new Error("نتيجة المعالجة غير مكتملة أو غير صالحة؛ لم يُمس المستند.");
         }
 
-        return { status: "ready", mode: mode, text: text };
+        if (mode === "correction") {
+            if (!Array.isArray(parsed.edits)) {
+                throw new Error("لم تُرجع المراجعة قائمة تصحيحات موضعية صالحة.");
+            }
+            const source = String(originalValue || "");
+            const edits = [];
+            parsed.edits.forEach(function (item) {
+                const original = String(item && item.original || "");
+                const replacement = String(item && item.replacement || "");
+                const contextBefore = String(item && item.contextBefore || "");
+                const contextAfter = String(item && item.contextAfter || "");
+                const reason = String(item && item.reason || "").trim();
+                if (!original || !replacement || !reason || /[\\r\\n]/.test(original + replacement)) {
+                    throw new Error("تتضمن قائمة التصحيحات عنصرًا ناقصًا أو يمتد عبر فاصل فقرة.");
+                }
+
+                const candidates = [];
+                let cursor = 0;
+                while ((cursor = source.indexOf(original, cursor)) !== -1) {
+                    const before = source.slice(Math.max(0, cursor - contextBefore.length), cursor);
+                    const after = source.slice(cursor + original.length, cursor + original.length + contextAfter.length);
+                    if ((!contextBefore || before === contextBefore) && (!contextAfter || after === contextAfter)) {
+                        candidates.push(cursor);
+                    }
+                    cursor += original.length;
+                }
+                if (candidates.length !== 1) {
+                    throw new Error("تعذر تحديد موضع التصحيح بصورة فريدة: " + original);
+                }
+                edits.push({
+                    start: candidates[0],
+                    original: original,
+                    replacement: replacement,
+                    reason: reason,
+                    contextBefore: contextBefore,
+                    contextAfter: contextAfter
+                });
+            });
+
+            edits.sort(function (a, b) { return a.start - b.start; });
+            for (let index = 1; index < edits.length; index++) {
+                if (edits[index - 1].start + edits[index - 1].original.length > edits[index].start) {
+                    throw new Error("تتداخل مواضع التصحيحات؛ أُلغي إعدادها لتجنب تغيير النص مرتين.");
+                }
+            }
+
+            let revised = source;
+            edits.slice().reverse().forEach(function (edit) {
+                revised = revised.slice(0, edit.start) + edit.replacement +
+                    revised.slice(edit.start + edit.original.length);
+            });
+            return { status: "ready", mode: mode, text: revised, edits: edits };
+        }
+
+        const text = String(parsed && parsed.text || "");
+        if (!text.trim()) {
+            throw new Error("نتيجة إعادة الصياغة غير مكتملة؛ لم يُمس المستند.");
+        }
+        return { status: "ready", mode: mode, text: text, edits: [] };
     }
 
     function hasSameLineBreakCount(originalValue, revisedValue) {
