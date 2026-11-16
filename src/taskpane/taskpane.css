@@ -7442,60 +7442,60 @@ button.primary:hover,
 
 
 /* Consistent typography for bibliography analysis, comparison, and build results. */
-#bibliography-operation-panel .references-analysis-result,
-#bibliography-operation-panel .references-comparison-result,
-#bibliography-operation-panel .bibliography-build-result {
+.references-analysis-result,
+.references-comparison-result,
+.bibliography-build-result {
     font-family: inherit;
     font-size: 12px;
     line-height: 1.65;
 }
 
-#bibliography-operation-panel .references-analysis-status,
-#bibliography-operation-panel .references-comparison-title,
-#bibliography-operation-panel .bibliography-build-title,
-#bibliography-operation-panel .references-final-results-title,
-#bibliography-operation-panel .reference-collapsible-header {
+.references-analysis-result .references-analysis-status,
+.references-comparison-result .references-comparison-title,
+.bibliography-build-result .bibliography-build-title,
+.references-analysis-result .references-final-results-title,
+.references-analysis-result .reference-collapsible-header {
     font-family: inherit;
     font-size: 12px;
     line-height: 1.55;
     font-weight: 600;
 }
 
-#bibliography-operation-panel .references-analysis-info,
-#bibliography-operation-panel .references-comparison-summary,
-#bibliography-operation-panel .references-comparison-section-title,
-#bibliography-operation-panel .references-comparison-item,
-#bibliography-operation-panel .references-comparison-text,
-#bibliography-operation-panel .references-comparison-source,
-#bibliography-operation-panel .ai-reference-row,
-#bibliography-operation-panel .ai-reference-main,
-#bibliography-operation-panel .ai-reference-type,
-#bibliography-operation-panel .ai-reference-author,
-#bibliography-operation-panel .ai-reference-title,
-#bibliography-operation-panel .ai-reference-location-chip,
-#bibliography-operation-panel .ai-reference-meta,
-#bibliography-operation-panel .ai-reference-review,
-#bibliography-operation-panel .ai-reference-variants summary,
-#bibliography-operation-panel .ai-reference-variant,
-#bibliography-operation-panel .bibliography-build-content {
+.references-analysis-result .references-analysis-info,
+.references-comparison-result .references-comparison-summary,
+.references-comparison-result .references-comparison-section-title,
+.references-comparison-result .references-comparison-item,
+.references-comparison-result .references-comparison-text,
+.references-comparison-result .references-comparison-source,
+.references-analysis-result .ai-reference-row,
+.references-analysis-result .ai-reference-main,
+.references-analysis-result .ai-reference-type,
+.references-analysis-result .ai-reference-author,
+.references-analysis-result .ai-reference-title,
+.references-analysis-result .ai-reference-location-chip,
+.references-analysis-result .ai-reference-meta,
+.references-analysis-result .ai-reference-review,
+.references-analysis-result .ai-reference-variants summary,
+.references-analysis-result .ai-reference-variant,
+.bibliography-build-result .bibliography-build-content {
     font-family: inherit;
     font-size: 12px;
     line-height: 1.65;
 }
 
-#bibliography-operation-panel .references-analysis-info strong,
-#bibliography-operation-panel .references-comparison-summary strong,
-#bibliography-operation-panel .references-comparison-title strong,
-#bibliography-operation-panel .references-comparison-section-title strong,
-#bibliography-operation-panel .references-comparison-text strong,
-#bibliography-operation-panel .ai-reference-meta strong,
-#bibliography-operation-panel .ai-reference-variants summary span,
-#bibliography-operation-panel .references-final-results-title strong {
+.references-analysis-result .references-analysis-info strong,
+.references-comparison-result .references-comparison-summary strong,
+.references-comparison-result .references-comparison-title strong,
+.references-comparison-result .references-comparison-section-title strong,
+.references-comparison-result .references-comparison-text strong,
+.references-analysis-result .ai-reference-meta strong,
+.references-analysis-result .ai-reference-variants summary span,
+.references-analysis-result .references-final-results-title strong {
     font-size: inherit;
 }
 
-#bibliography-operation-panel .ai-reference-index,
-#bibliography-operation-panel .references-comparison-number,
+.references-analysis-result .ai-reference-index,
+.references-comparison-result .references-comparison-number,
 .project-reference-index {
     font-size: 12px;
     line-height: 1.5;
