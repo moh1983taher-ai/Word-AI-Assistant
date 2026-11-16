@@ -114,5 +114,73 @@ assert.deepEqual(
     }
 );
 
+
+const proofreadingSource = "تتطلب هذه المسألة لايمكن إغفالها في البحث، وهي مهمة.";
+const proofreadingResponse = JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: "لايمكن",
+        replacement: "لا يمكن",
+        contextBefore: "تتطلب هذه المسألة ",
+        contextAfter: " إغفالها",
+        reason: "فصل أداة النفي عن الفعل"
+    }]
+});
+const proofreadingResult = revision.parseResponse(proofreadingResponse, proofreadingSource);
+assert.equal(proofreadingResult.text, "تتطلب هذه المسألة لا يمكن إغفالها في البحث، وهي مهمة.");
+assert.equal(proofreadingResult.edits.length, 1);
+assert.equal(proofreadingResult.edits[0].start, proofreadingSource.indexOf("لايمكن"));
+assert.equal(proofreadingResult.edits[0].reason, "فصل أداة النفي عن الفعل");
+
+const repeatedSource = "هذا خطأ لايمكن قبوله، وموضع آخر لايمكن إغفاله.";
+const repeatedResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: "لايمكن",
+        replacement: "لا يمكن",
+        contextBefore: "موضع آخر ",
+        contextAfter: " إغفاله",
+        reason: "تصحيح الفصل"
+    }]
+}), repeatedSource);
+assert.equal(repeatedResult.text, "هذا خطأ لايمكن قبوله، وموضع آخر لا يمكن إغفاله.");
+
+assert.throws(() => revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: "لايمكن",
+        replacement: "لا يمكن",
+        contextBefore: "",
+        contextAfter: "",
+        reason: "تصحيح"
+    }]
+}), repeatedSource), /بصورة فريدة/);
+
+assert.throws(() => revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: "عبارة\\nأخرى",
+        replacement: "عبارة أخرى",
+        contextBefore: "",
+        contextAfter: "",
+        reason: "اختبار"
+    }]
+}), "عبارة\\nأخرى"), /فاصل فقرة/);
+
+assert.deepEqual(revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: []
+}), "نص سليم."), {
+    status: "ready",
+    mode: "correction",
+    text: "نص سليم.",
+    edits: []
+});
+
 assert.throws(() => revision.parseResponse("not json"), /تعذر التحقق/);
 console.log("Document revision tests passed.");
