@@ -46,7 +46,7 @@
 
     function parseResponse(value, originalValue) {
         let raw = String(value || "").trim();
-        raw = raw.replace(/^\uFEFF/, "");
+        raw = raw.replace(new RegExp("^" + String.fromCharCode(65279)), "");
         const tick = String.fromCharCode(96);
         raw = raw.replace(new RegExp("^" + tick + "{3}(?:json)?\\s*", "i"), "")
             .replace(new RegExp("\\s*" + tick + "{3}$"), "");
