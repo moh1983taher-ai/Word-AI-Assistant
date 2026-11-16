@@ -99,6 +99,31 @@ assert.equal(
     source
 );
 
+const offsetSource = "قبل خطأ.\r\nفقرة عليها تعديل.\r\nهذا خطأ هنا، ثم خطأ هناك.";
+const offsetProtectedRange = [{
+    paragraphIndex: 1,
+    start: offsetSource.indexOf("فقرة عليها تعديل."),
+    end: offsetSource.indexOf("فقرة عليها تعديل.") + "فقرة عليها تعديل.".length,
+    text: "فقرة عليها تعديل."
+}];
+const offsetMask = preflight.maskChunk(offsetSource, offsetProtectedRange, 0, "revision-offset");
+const modelVisibleTarget = offsetMask.text.lastIndexOf("خطأ");
+const mappedTarget = preflight.mapMaskedRangeToSource(offsetMask, modelVisibleTarget, "خطأ".length);
+assert.equal(offsetSource.slice(mappedTarget.start, mappedTarget.end), "خطأ");
+assert.equal(
+    mappedTarget.start,
+    offsetSource.lastIndexOf("خطأ")
+);
+const markerStart = offsetMask.text.indexOf(offsetMask.segments[0].token);
+assert.throws(
+    () => preflight.mapMaskedRangeToSource(offsetMask, markerStart + 2, 5),
+    /علامة حماية/
+);
+assert.equal(
+    preflight.mapMaskedOffsetToSource(offsetMask, offsetMask.text.length),
+    offsetSource.length
+);
+
 const revisedWithProtectedToken = maskState.text.replace("مقدمة سليمة.", "مقدمة مصححة.");
 assert.equal(
     preflight.restoreChunk(revisedWithProtectedToken, maskState),
