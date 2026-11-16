@@ -317,11 +317,11 @@
 
                 <div>
 
-                    <div class="references-title">
+                    <div class="references-title" id="references-header-title">
                         المراجع
                     </div>
 
-                    <div class="references-subtitle">
+                    <div class="references-subtitle" id="references-header-subtitle">
                         معالجة مراجع المستندات والمشاريع
                     </div>
 
@@ -330,16 +330,31 @@
             </div>
 
 
-            <button
-                id="close-references"
-                class="close-references"
-                type="button"
-                aria-label="إغلاق المراجع"
-                title="إغلاق">
+            <div class="references-header-actions">
 
-                ×
+                <button
+                    id="back-references-source"
+                    class="references-back-icon"
+                    type="button"
+                    aria-label="العودة إلى مصادر العمل"
+                    title="العودة إلى مصادر العمل"
+                    hidden>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 18l6-6-6-6"/>
+                        <path d="M15 12H3"/>
+                    </svg>
+                </button>
 
-            </button>
+                <button
+                    id="close-references"
+                    class="close-references"
+                    type="button"
+                    aria-label="إغلاق المراجع"
+                    title="إغلاق">
+                    ×
+                </button>
+
+            </div>
 
         </div>
 
