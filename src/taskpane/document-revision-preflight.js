@@ -157,6 +157,34 @@
         return { text: output, source: source, offset: offset, segments: segments };
     }
 
+    function mapMaskedOffsetToSource(maskState, maskedOffset) {
+        if (!maskState || !Array.isArray(maskState.segments) || !maskState.segments.length) {
+            return Number(maskedOffset);
+        }
+
+        const target = Number(maskedOffset);
+        if (!Number.isInteger(target) || target < 0 || target > maskState.text.length) {
+            throw new Error("تعذر تحويل موضع التصحيح من النص المحمي إلى موضعه الأصلي.");
+        }
+
+        let sourceCursor = 0;
+        let maskedCursor = 0;
+
+        for (const segment of maskState.segments) {
+            const sourceLength = segment.start - sourceCursor;
+            const maskedEnd = maskedCursor + sourceLength;
+
+            if (target <= maskedEnd) {
+                return sourceCursor + (target - maskedCursor);
+            }
+
+            maskedCursor = maskedEnd + segment.token.length;
+            sourceCursor = segment.end;
+        }
+
+        return sourceCursor + (target - maskedCursor);
+    }
+
     function countOccurrences(source, needle) {
         if (!needle) return 0;
         let count = 0;
@@ -233,6 +261,7 @@
         extractParagraphXml: extractParagraphXml,
         mapParagraphRanges: mapParagraphRanges,
         findParagraphRange: findParagraphRange,
+        mapMaskedOffsetToSource: mapMaskedOffsetToSource,
         buildProtectedParagraphRanges: buildProtectedParagraphRanges,
         maskChunk: maskChunk,
         restoreChunk: restoreChunk,
