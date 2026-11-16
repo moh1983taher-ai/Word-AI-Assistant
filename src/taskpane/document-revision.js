@@ -114,7 +114,7 @@
         let revisedCore = revisedAfterLeading.slice(0, revisedAfterLeading.length - revisedTrailing.length);
 
         // A paragraph must remain a paragraph; model-generated line breaks are flattened.
-        revisedCore = revisedCore.replace(breakPattern, " ").replace(/[ \t]{2,}/g, " ");
+        revisedCore = revisedCore.replace(breakPattern, " ");
         return leading + revisedCore + trailing;
     }
 
