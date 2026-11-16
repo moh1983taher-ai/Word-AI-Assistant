@@ -92,6 +92,37 @@
         });
     }
 
+    // Restore chunk-edge paragraph separators that language models commonly omit.
+    // Internal paragraph boundaries must still match exactly; otherwise fail safely.
+    function normalizeChunkLineBreaks(originalValue, revisedValue) {
+        const original = String(originalValue || "");
+        const revised = String(revisedValue || "");
+        const breakPattern = /\r\n|\r|\n/g;
+        const leadingMatch = original.match(/^(?:(?:\r\n|\r|\n))+/);
+        const trailingMatch = original.match(/(?:(?:\r\n|\r|\n))+$/);
+        const leading = leadingMatch ? leadingMatch[0] : "";
+        const trailing = trailingMatch ? trailingMatch[0] : "";
+        const originalCore = original.slice(leading.length, trailing.length ? original.length - trailing.length : original.length);
+
+        const revisedLeadingMatch = revised.match(/^(?:(?:\r\n|\r|\n))+/);
+        const revisedTrailingMatch = revised.match(/(?:(?:\r\n|\r|\n))+$/);
+        const revisedLeading = revisedLeadingMatch ? revisedLeadingMatch[0] : "";
+        const revisedTrailing = revisedTrailingMatch ? revisedTrailingMatch[0] : "";
+        const revisedCore = revised.slice(revisedLeading.length, revisedTrailing.length ? revised.length - revisedTrailing.length : revised.length);
+
+        const originalBreaks = originalCore.match(breakPattern) || [];
+        const revisedBreaks = revisedCore.match(breakPattern) || [];
+        if (originalBreaks.length !== revisedBreaks.length) {
+            throw new Error("غيّرت المعالجة فواصل الفقرات داخل جزء من النص؛ أُلغي التطبيق للمحافظة على بنية المستند. أعد المحاولة مع طلب المحافظة على الفقرات.");
+        }
+
+        let breakIndex = 0;
+        const normalizedCore = revisedCore.replace(breakPattern, function () {
+            return originalBreaks[breakIndex++];
+        });
+        return leading + normalizedCore + trailing;
+    }
+
     function tokenize(value) {
         const text = String(value || "");
         const regex = /\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu;
@@ -472,6 +503,7 @@
         diffTextPreservingParagraphs: diffTextPreservingParagraphs,
         splitText: splitText,
         normalizeLineBreaks: normalizeLineBreaks,
+        normalizeChunkLineBreaks: normalizeChunkLineBreaks,
         hasSameLineBreakCount: hasSameLineBreakCount,
         capture: capture,
         apply: apply
