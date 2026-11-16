@@ -103,6 +103,7 @@
                 throw new Error("لم تُرجع المراجعة قائمة تصحيحات موضعية صالحة.");
             }
             const source = sourceText;
+            const matchingSource = maskState ? maskState.text : source;
             const edits = [];
             parsed.edits.forEach(function (item) {
                 const original = String(item && item.original || "");
@@ -117,27 +118,35 @@
                 const candidates = [];
                 const exactMatches = [];
                 let cursor = 0;
-                while ((cursor = source.indexOf(original, cursor)) !== -1) {
+                while ((cursor = matchingSource.indexOf(original, cursor)) !== -1) {
                     exactMatches.push(cursor);
-                    const before = source.slice(Math.max(0, cursor - contextBefore.length), cursor);
-                    const after = source.slice(cursor + original.length, cursor + original.length + contextAfter.length);
+                    const before = matchingSource.slice(Math.max(0, cursor - contextBefore.length), cursor);
+                    const after = matchingSource.slice(cursor + original.length, cursor + original.length + contextAfter.length);
                     if ((!contextBefore || before === contextBefore) && (!contextAfter || after === contextAfter)) {
                         candidates.push(cursor);
                     }
                     cursor += original.length;
                 }
 
-                // Context supplied by a language model can be slightly imprecise.
-                // If the exact phrase occurs only once, that occurrence is still unambiguous.
-                // When it occurs more than once, require the context to identify exactly one.
-                const resolvedStart = candidates.length === 1
+                // Context matching occurs in the exact model-visible text. Convert
+                // the unique target back to original Word coordinates after resolution.
+                const resolvedMaskedStart = candidates.length === 1
                     ? candidates[0]
                     : (exactMatches.length === 1 ? exactMatches[0] : -1);
-                if (resolvedStart < 0) {
+                if (resolvedMaskedStart < 0) {
                     throw new Error("تعذر تحديد موضع التصحيح بصورة فريدة: " + original);
                 }
+
+                const mapped = DocumentRevisionPreflight.mapMaskedRangeToSource(
+                    maskState,
+                    resolvedMaskedStart,
+                    original.length
+                );
+                if (source.slice(mapped.start, mapped.end) !== original) {
+                    throw new Error("لم تتطابق العبارة المستهدفة مع موضعها الأصلي بعد استعادة الفقرات المحمية؛ أُلغي التصحيح.");
+                }
                 edits.push({
-                    start: resolvedStart,
+                    start: mapped.start,
                     original: original,
                     replacement: replacement,
                     reason: reason,
