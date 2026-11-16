@@ -45027,11 +45027,8 @@ async function sendMessage() {
                 break;
             }
 
-            if (!window.DocumentRevision.hasSameLineBreakCount(chunks[index], parsedRevision.text)) {
-                throw new Error("غيّرت المعالجة عدد فواصل الفقرات في أحد أجزاء المستند؛ أُلغي التطبيق للمحافظة على بنية المستند. أعد المحاولة مع طلب المحافظة على الفقرات.");
-            }
             revisedChunks.push(
-                window.DocumentRevision.normalizeLineBreaks(chunks[index], parsedRevision.text)
+                window.DocumentRevision.normalizeChunkLineBreaks(chunks[index], parsedRevision.text)
             );
             if (!revisionMode) {
                 revisionMode = parsedRevision.mode;
