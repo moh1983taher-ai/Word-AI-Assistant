@@ -23,8 +23,49 @@
         return String(value || "").replace(/(?:\r\n|\r|\n)+$/, "");
     }
 
-    function buildProtectedParagraphRanges(fullText, paragraphRecords) {
+    function mapParagraphRanges(fullText, paragraphTexts) {
         const source = String(fullText || "");
+        const records = Array.isArray(paragraphTexts) ? paragraphTexts : [];
+        const mappings = [];
+        let cursor = 0;
+
+        records.forEach(function (record, index) {
+            const rawText = record && typeof record === "object" && "text" in record
+                ? record.text
+                : record;
+            const paragraphText = stripParagraphTerminator(rawText);
+            if (!paragraphText) return;
+
+            const start = source.indexOf(paragraphText, cursor);
+            if (start < 0) {
+                throw new Error("تعذر مطابقة بنية فقرات Word مع النص المستخرج؛ أُوقف التدقيق لمنع تعديل مواضع غير صحيحة.");
+            }
+            const end = start + paragraphText.length;
+            mappings.push({
+                paragraphIndex: Number.isInteger(record && record.index) ? record.index : index,
+                start: start,
+                end: end,
+                text: paragraphText
+            });
+            cursor = end;
+        });
+
+        return mappings;
+    }
+
+    function findParagraphRange(paragraphRanges, startValue, lengthValue) {
+        const ranges = Array.isArray(paragraphRanges) ? paragraphRanges : [];
+        const start = Number(startValue);
+        const length = Math.max(0, Number(lengthValue) || 0);
+        if (!Number.isInteger(start) || start < 0) return null;
+
+        const matches = ranges.filter(function (range) {
+            return start >= range.start && start + length <= range.end;
+        });
+        return matches.length === 1 ? matches[0] : null;
+    }
+
+    function buildProtectedParagraphRanges(fullText, paragraphRecords) {
         const records = Array.isArray(paragraphRecords) ? paragraphRecords : [];
         const protectedIndices = new Set();
 
@@ -36,36 +77,22 @@
 
         if (!protectedIndices.size) return [];
 
-        const ranges = [];
-        let cursor = 0;
-
         records.forEach(function (record, index) {
             const paragraphText = stripParagraphTerminator(record && record.text);
-            if (!paragraphText) {
-                if (protectedIndices.has(Number.isInteger(record && record.index) ? record.index : index)) {
-                    throw new Error("تعذر تحديد فقرة تحتوي على تغييرات متعقبة؛ أُوقف التدقيق حمايةً للمستند.");
-                }
-                return;
+            const paragraphIndex = Number.isInteger(record && record.index) ? record.index : index;
+            if (protectedIndices.has(paragraphIndex) && !paragraphText) {
+                throw new Error("تعذر تحديد فقرة تحتوي على تغييرات متعقبة؛ أُوقف التدقيق حمايةً للمستند.");
             }
-
-            const start = source.indexOf(paragraphText, cursor);
-            if (start < 0) {
-                throw new Error("تعذر مطابقة بنية فقرات Word مع النص المستخرج؛ أُوقف التدقيق لمنع تعديل مواضع غير صحيحة.");
-            }
-
-            const end = start + paragraphText.length;
-            if (protectedIndices.has(Number.isInteger(record && record.index) ? record.index : index)) {
-                ranges.push({
-                    paragraphIndex: Number.isInteger(record && record.index) ? record.index : index,
-                    start: start,
-                    end: end,
-                    text: paragraphText
-                });
-            }
-
-            cursor = end;
         });
 
+        const mappings = mapParagraphRanges(fullText, records);
+        const ranges = mappings.filter(function (mapping) {
+            return protectedIndices.has(mapping.paragraphIndex);
+        });
+
+        if (ranges.length !== protectedIndices.size) {
+            throw new Error("تعذر تحديد جميع الفقرات ذات التغييرات المتعقبة؛ أُوقف التدقيق حمايةً للمستند.");
+        }
         return ranges;
     }
 
@@ -202,6 +229,8 @@
     const api = {
         hasTrackedChanges: hasTrackedChanges,
         extractParagraphXml: extractParagraphXml,
+        mapParagraphRanges: mapParagraphRanges,
+        findParagraphRange: findParagraphRange,
         buildProtectedParagraphRanges: buildProtectedParagraphRanges,
         maskChunk: maskChunk,
         restoreChunk: restoreChunk,
