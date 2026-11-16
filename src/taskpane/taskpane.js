@@ -45034,7 +45034,7 @@ async function sendMessage() {
             }
 
             revisedChunks.push(
-                window.DocumentRevision.normalizeChunkLineBreaks(chunks[index], parsedRevision.text)
+                window.DocumentRevision.normalizeBatchLineBreaks(chunks[index], parsedRevision.text)
             );
             if (Array.isArray(parsedRevision.edits)) {
                 parsedRevision.edits.forEach(function (edit) {
