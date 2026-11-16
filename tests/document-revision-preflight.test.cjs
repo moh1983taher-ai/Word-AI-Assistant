@@ -15,6 +15,34 @@ const xml = [
 ].join("");
 assert.equal(preflight.extractParagraphXml(xml).length, 2);
 
+const mappedParagraphText = "هذا نص مكرر.\r\nهذا نص مكرر.\r\nفقرة أخيرة.";
+const paragraphMap = preflight.mapParagraphRanges(mappedParagraphText, [
+    "هذا نص مكرر.\r",
+    "هذا نص مكرر.",
+    "فقرة أخيرة."
+]);
+assert.equal(paragraphMap.length, 3);
+assert.deepEqual(
+    preflight.findParagraphRange(paragraphMap, mappedParagraphText.indexOf("هذا نص مكرر.") + 2, 3),
+    paragraphMap[0]
+);
+assert.deepEqual(
+    preflight.findParagraphRange(paragraphMap, mappedParagraphText.lastIndexOf("هذا نص مكرر.") + 2, 3),
+    paragraphMap[1]
+);
+assert.equal(
+    preflight.findParagraphRange(paragraphMap, mappedParagraphText.indexOf("\r\n") - 1, 4),
+    null
+);
+assert.equal(
+    preflight.mapParagraphRanges("فقرة أولى.\r\n\r\nفقرة ثالثة.", [
+        "فقرة أولى.",
+        "",
+        "فقرة ثالثة."
+    ]).length,
+    2
+);
+
 const source = "مقدمة سليمة.\r\nفقرة قديمة وفقرة مضافة.\nخاتمة سليمة.";
 const paragraphRecords = [
     { index: 0, text: "مقدمة سليمة.\r", ooxml: "<w:p><w:r/></w:p>" },
