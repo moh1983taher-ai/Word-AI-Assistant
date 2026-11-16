@@ -20,6 +20,63 @@ assert.equal(revision.isRequest("تصحيح لغوي"), true);
 assert.equal(revision.isRequest("أعد صياغة هذه الفقرة بأسلوب أكاديمي"), true);
 assert.equal(revision.isRequest("ما الفرق بين القياس والاستحسان؟"), false);
 
+// Word search-result resolution must work without the desktop-only Range.start/end API.
+// Repeated Arabic words are mapped by their exact occurrence order within the captured range.
+const repeatedArabicSource = "هذا بأن الأمر واضح، ثم وردت كلمة بأن في موضع آخر.";
+const repeatedArabicMatches = [
+    { text: "بأن" },
+    { text: "بأن" }
+];
+assert.equal(
+    revision.resolveSearchMatchByOccurrence(
+        repeatedArabicMatches,
+        repeatedArabicSource,
+        "بأن",
+        repeatedArabicSource.lastIndexOf("بأن")
+    ),
+    repeatedArabicMatches[1]
+);
+assert.equal(
+    revision.resolveSearchMatchByOccurrence(
+        repeatedArabicMatches,
+        repeatedArabicSource,
+        "بأن",
+        repeatedArabicSource.indexOf("بأن")
+    ),
+    repeatedArabicMatches[0]
+);
+
+const repeatedWordSource = "الملاك في المثال الأول، والملاك في المثال الثاني.";
+const repeatedWordMatches = [{ text: "الملاك" }, { text: "الملاك" }];
+assert.equal(
+    revision.resolveSearchMatchByOccurrence(
+        repeatedWordMatches,
+        repeatedWordSource,
+        "الملاك",
+        repeatedWordSource.lastIndexOf("الملاك")
+    ),
+    repeatedWordMatches[1]
+);
+assert.throws(
+    () => revision.resolveSearchMatchByOccurrence(
+        [{ text: "بأن" }],
+        repeatedArabicSource,
+        "بأن",
+        repeatedArabicSource.lastIndexOf("بأن")
+    ),
+    /نتائج Word/
+);
+assert.throws(
+    () => revision.resolveSearchMatchByOccurrence(
+        repeatedArabicMatches,
+        repeatedArabicSource,
+        "بأن",
+        repeatedArabicSource.indexOf("غير موجود")
+    ),
+    /موضع التعديل المحسوب/
+);
+
+
 const samples = [
     ["هذا نص صحيح.", "هذا النص صحيح."],
     ["وتظهر هذه النتيجة في البحث", "وتتضح هذه النتيجة في البحث."],
