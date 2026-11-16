@@ -127,15 +127,15 @@ assert.equal(revision.hasSameLineBreakCount("فقرة واحدة", "فقرة أ�
 
 // Regression: batched chunks can contain multiple paragraphs. Preserve all
 // internal paragraph separators instead of flattening them as in single-paragraph mode.
-const batchedParagraphSource = "فقرة أولى.\\r\\nفقرة ثانية.\\n\\nفقرة ثالثة.";
-const batchedModelOutput = "فقرة أولى مصححة.\\nفقرة ثانية مصححة.\\n\\nفقرة ثالثة.";
+const batchedParagraphSource = "فقرة أولى.\r\nفقرة ثانية.\n\nفقرة ثالثة.";
+const batchedModelOutput = "فقرة أولى مصححة.\nفقرة ثانية مصححة.\n\nفقرة ثالثة.";
 const normalizedBatch = revision.normalizeBatchLineBreaks(
     batchedParagraphSource,
     batchedModelOutput
 );
 assert.equal(
     normalizedBatch,
-    "فقرة أولى مصححة.\\r\\nفقرة ثانية مصححة.\\n\\nفقرة ثالثة."
+    "فقرة أولى مصححة.\r\nفقرة ثانية مصححة.\n\nفقرة ثالثة."
 );
 assert.equal(
     revision.hasSameLineBreakCount(batchedParagraphSource, normalizedBatch),
@@ -148,7 +148,6 @@ assert.throws(
     ),
     /فواصل الفقرات الأصلية/
 );
-
 
 assert.equal(
     revision.normalizeChunkLineBreaks("فقرة أولى.\r\n", "فقرة أولى منقحة."),
