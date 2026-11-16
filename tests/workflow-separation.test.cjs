@@ -141,7 +141,7 @@ console.log("Independent bibliography/citation workflow separation tests passed.
 
 
 const sourceNavigation = sectionBetween(
-    "function showReferenceSourceChooser()",
+    "function setReferencesHeader(",
     "const wordDocumentPicker =",
     "reference source navigation helpers"
 );
@@ -149,7 +149,11 @@ const sourceNavigation = sectionBetween(
 assert.match(sourceNavigation, /referencesSourcePanel\.classList\.remove\("is-hidden"\)/);
 assert.match(sourceNavigation, /referencesSourceWorkspace\.innerHTML = ""/);
 assert.match(sourceNavigation, /referencesSourcePanel\.classList\.add\("is-hidden"\)/);
-assert.match(sourceNavigation, /showReferenceSourceChooser\(\)/, "opening References and returning from a sub-screen must show the source chooser");
+assert.match(sourceNavigation, /backReferencesSource\.hidden = true/);
+assert.match(sourceNavigation, /backReferencesSource\.hidden = false/);
+assert.match(sourceNavigation, /showReferenceSourceChooser\(\)/, "the header back arrow must return to the source chooser");
+assert.match(sourceNavigation, /المستند المفتوح حاليًا في Word/);
+assert.match(sourceNavigation, /اختر المعالجة التي تريد تنفيذها/);
 
 const sourceSelectionHandler = sectionBetween(
     'referencesContent\n        .querySelectorAll(\n            ".references-source-option"',
@@ -157,13 +161,31 @@ const sourceSelectionHandler = sectionBetween(
     "reference source selection handler"
 );
 
-assert.match(sourceSelectionHandler, /showReferenceSourceWorkspace\(\)/, "choosing either source must replace the first-level chooser");
-assert.match(sourceSelectionHandler, /data-reference-navigation="sources"/, "current-document screen must provide a back-navigation control");
-assert.equal((source.match(/referenceSourceBackMarkup/g) || []).length, 4, "the project screen and its empty states must all provide a back link");
+assert.match(sourceSelectionHandler, /showReferenceSourceWorkspace\(source\)/, "choosing a source must update the header and replace the source chooser");
+assert.doesNotMatch(sourceSelectionHandler, /data-reference-navigation="sources"/, "the old large in-content back link must be removed");
+
+const currentDocumentScreen = sectionBetween(
+    "// المستند الحالي",
+    "const referenceOrderSelect =",
+    "current document workspace"
+);
+assert.doesNotMatch(currentDocumentScreen, /class="references-selected-source"/, "the document identification card must not duplicate the header");
+assert.doesNotMatch(currentDocumentScreen, /reference-source-navigation/, "the large text back-navigation row must not consume workspace space");
+
+const referenceMarkup = fs.readFileSync(
+    path.join(__dirname, "../src/taskpane/taskpane.html"),
+    "utf8"
+);
+assert.match(referenceMarkup, /id="back-references-source"/, "the compact back arrow must be in the header");
+assert.match(referenceMarkup, /id="references-header-title"/);
+assert.match(referenceMarkup, /id="references-header-subtitle"/);
+
 const referenceStyles = fs.readFileSync(
     path.join(__dirname, "../src/taskpane/taskpane.css"),
     "utf8"
 );
-assert.match(referenceStyles, /\.references-source-panel\.is-hidden\s*\{\s*display:\s*none\s*!important;/, "the source chooser must have a dedicated hidden state");
+assert.match(referenceStyles, /\.references-source-panel\.is-hidden\s*\{\s*display:\s*none\s*!important;/);
+assert.match(referenceStyles, /\.references-back-icon\s*\{[\s\S]*?width:\s*30px/);
+assert.doesNotMatch(referenceStyles, /\.reference-source-back\s*\{/);
 assert.match(source, /referencesSourceWorkspace\.innerHTML = ""/, "return navigation must clear the previous workspace rather than stack screens");
-console.log("Reference source navigation tests passed.");
+console.log("Compact reference header and workspace tests passed.");
