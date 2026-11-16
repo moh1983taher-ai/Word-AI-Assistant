@@ -30401,7 +30401,7 @@ other
                 normalizeGeminiModel(model)
             )}:generateContent?key=${encodeURIComponent(key)}`;
 
-        const result = await requestAIProviderJSON(
+        result = await requestAIProviderJSON(
             endpoint,
             {
                 method: "POST",
