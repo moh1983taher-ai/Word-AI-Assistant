@@ -44717,26 +44717,33 @@ if (referencesContent) {
                                         <button type="button"
                                                 class="reference-operation-option is-active"
                                                 data-reference-operation="bibliography"
-                                                aria-pressed="true">
+                                                aria-pressed="true"
+                                                title="استخراج المراجع وتوحيدها ومقارنتها بالقائمة الموجودة"
+                                                aria-label="قائمة المراجع. استخراج المراجع وتوحيدها ومقارنتها بالقائمة الموجودة">
                                             <span class="reference-operation-option-title">قائمة المراجع</span>
-                                            <span class="reference-operation-option-description">استخراج المراجع وتوحيدها ومقارنتها بالقائمة الموجودة</span>
                                         </button>
 
                                         <button type="button"
                                                 class="reference-operation-option"
                                                 data-reference-operation="citations"
-                                                aria-pressed="false">
+                                                aria-pressed="false"
+                                                title="تحليل الإحالات في الحواشي واقتراح توحيدها ومراجعتها"
+                                                aria-label="توثيقات الحواشي. تحليل الإحالات في الحواشي واقتراح توحيدها ومراجعتها">
                                             <span class="reference-operation-option-title">توثيقات الحواشي</span>
-                                            <span class="reference-operation-option-description">تحليل الإحالات في الحواشي واقتراح توحيدها ومراجعتها</span>
                                         </button>
+
+                                        <div id="reference-operation-hint"
+                                             class="reference-transient-hint"
+                                             role="status"
+                                             aria-live="polite"
+                                             hidden></div>
 
                                     </div>
 
                                     <section class="reference-shared-settings" aria-label="الإعدادات المشتركة">
 
                                         <div class="reference-shared-settings-heading">
-                                            <span class="reference-style-title">إعدادات مشتركة</span>
-                                            <span class="reference-shared-settings-caption">تُطبّق على العمليتين</span>
+                                            <span class="reference-style-title">الإعدادات</span>
                                         </div>
 
                                         <div class="reference-style-row bibliography-only-setting">
@@ -44757,17 +44764,22 @@ if (referencesContent) {
                                             </select>
                                         </div>
 
-                                        <div class="reference-style-row">
-                                            <label for="reference-add-missing-authors">المؤلفون</label>
-                                            <label class="reference-author-toggle" for="reference-add-missing-authors">
-                                                <input type="checkbox" id="reference-add-missing-authors">
-                                                <span class="reference-author-toggle-text">استقصاء أسماء المؤلفين عند غيابها</span>
+                                        <div class="reference-style-row reference-author-setting">
+                                            <label class="reference-author-toggle"
+                                                   for="reference-add-missing-authors"
+                                                   title="يستقصي الذكاء الاصطناعي أسماء المؤلفين عند غيابها، وقد لا تكون النتيجة دقيقة؛ راجع الاسم قبل اعتماده.">
+                                                <input type="checkbox"
+                                                       id="reference-add-missing-authors"
+                                                       title="استقصاء آلي لأسماء المؤلفين المفقودة؛ تحقق من صحة الاسم قبل اعتماده.">
+                                                <span class="reference-author-toggle-text">استقصاء أسماء المؤلفين</span>
                                             </label>
                                         </div>
 
-                                        <p class="reference-author-responsibility">
-                                            قد يستقصي الذكاء الاصطناعي اسم المؤلف عند غيابه؛ وتبقى مراجعة صحة الاسم واعتماد النتيجة مسؤولية المستخدم.
-                                        </p>
+                                        <div id="reference-author-notice"
+                                             class="reference-author-notice"
+                                             role="status"
+                                             aria-live="polite"
+                                             hidden></div>
 
                                     </section>
 
@@ -44782,9 +44794,13 @@ if (referencesContent) {
                                             <div class="reference-style-title">خيار خاص بالتوثيقات</div>
                                             <div class="reference-style-row">
                                                 <label for="citation-first-mention">ذكر المؤلف</label>
-                                                <label class="reference-author-toggle" for="citation-first-mention">
-                                                    <input type="checkbox" id="citation-first-mention">
-                                                    <span class="reference-author-toggle-text">إضافة المؤلف عند أول ذكر فقط</span>
+                                                <label class="reference-author-toggle"
+                                                       for="citation-first-mention"
+                                                       title="يظهر اسم المؤلف عند أول إحالة، ثم تُستخدم الصيغة المختصرة في الإحالات اللاحقة.">
+                                                    <input type="checkbox"
+                                                           id="citation-first-mention"
+                                                           title="إظهار اسم المؤلف عند أول إحالة فقط.">
+                                                    <span class="reference-author-toggle-text">المؤلف عند أول ذكر</span>
                                                 </label>
                                             </div>
                                         </div>
@@ -45241,6 +45257,35 @@ if (referencesContent) {
                                 citationStyle.addMissingAuthors = this.checked;
                                 saveBibliographySettings();
                                 saveCitationSettings();
+
+                                const authorNotice =
+                                    referencesSourceWorkspace.querySelector("#reference-author-notice");
+
+                                if (authorNotice) {
+                                    if (this.checked) {
+                                        authorNotice.textContent =
+                                            "تنبيه: الاستقصاء اقتراح آلي؛ تحقق من صحة اسم المؤلف قبل اعتماد النتيجة.";
+                                        authorNotice.hidden = false;
+                                        authorNotice.classList.add("is-visible");
+
+                                        if (authorNotice.hideTimer) {
+                                            clearTimeout(authorNotice.hideTimer);
+                                        }
+
+                                        authorNotice.hideTimer = setTimeout(function () {
+                                            authorNotice.classList.remove("is-visible");
+                                            authorNotice.hidden = true;
+                                        }, 4800);
+                                    } else {
+                                        authorNotice.classList.remove("is-visible");
+                                        authorNotice.hidden = true;
+
+                                        if (authorNotice.hideTimer) {
+                                            clearTimeout(authorNotice.hideTimer);
+                                            authorNotice.hideTimer = null;
+                                        }
+                                    }
+                                }
                             };
                         }
 
@@ -45261,6 +45306,29 @@ if (referencesContent) {
                             referencesSourceWorkspace.querySelector(".reference-operation-shell");
 
                         if (operationShell) {
+                            const operationHint =
+                                operationShell.querySelector("#reference-operation-hint");
+
+                            let operationHintTimer = null;
+
+                            const showOperationHint = function (message) {
+                                if (!operationHint) return;
+
+                                operationHint.textContent = message;
+                                operationHint.hidden = false;
+                                operationHint.classList.add("is-visible");
+
+                                if (operationHintTimer) {
+                                    clearTimeout(operationHintTimer);
+                                }
+
+                                operationHintTimer = setTimeout(function () {
+                                    operationHint.classList.remove("is-visible");
+                                    operationHint.hidden = true;
+                                    operationHintTimer = null;
+                                }, 3600);
+                            };
+
                             const bibliographyOption =
                                 operationShell.querySelector('[data-reference-operation="bibliography"]');
 
@@ -45370,12 +45438,18 @@ if (referencesContent) {
                             if (bibliographyOption) {
                                 bibliographyOption.onclick = function () {
                                     setActiveOperation("bibliography");
+                                    showOperationHint(
+                                        "استخراج المراجع وتوحيدها ومقارنتها بالقائمة الموجودة."
+                                    );
                                 };
                             }
 
                             if (citationsOption) {
                                 citationsOption.onclick = function () {
                                     setActiveOperation("citations");
+                                    showOperationHint(
+                                        "تحليل الإحالات في الحواشي، ثم اقتراح توحيدها لمراجعتها."
+                                    );
                                 };
                             }
 
