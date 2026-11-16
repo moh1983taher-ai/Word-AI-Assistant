@@ -2146,6 +2146,7 @@ function renderProjectReferenceDocuments() {
                 // =====================================================
 
                 const allReferences = [];
+                const failedProjectBatches = [];
 
                 let totalMaterials = 0;
 
@@ -2174,7 +2175,16 @@ function renderProjectReferenceDocuments() {
                 // التحليل الفعلي ولا تُنشأ منها occurrences.
                 // =====================================================
 
-                const PROJECT_REFERENCE_CONTEXT_SIZE = 4;
+                const projectProvider = String(getSavedSettings()?.provider || "openrouter").trim().toLowerCase();
+                const projectBatchSize = projectProvider === "groq"
+                    ? Math.min(PROJECT_REFERENCE_BATCH_SIZE, 8)
+                    : PROJECT_REFERENCE_BATCH_SIZE;
+                const projectBatchChars = projectProvider === "groq"
+                    ? 4500
+                    : projectProvider === "duckai"
+                        ? 7000
+                        : 9000;
+                const PROJECT_REFERENCE_CONTEXT_SIZE = projectProvider === "groq" ? 2 : 4;
                 const totalProjectBatches = projectInputs.reduce(
                     function (total, projectInput) {
                         const materials = Array.isArray(projectInput.processedReferences)
@@ -2182,7 +2192,8 @@ function renderProjectReferenceDocuments() {
                             : [];
                         return total + splitReferenceMaterialsIntoBatches(
                             materials,
-                            PROJECT_REFERENCE_BATCH_SIZE
+                            projectBatchSize,
+                            projectBatchChars
                         ).length;
                     },
                     0
@@ -2259,7 +2270,8 @@ function renderProjectReferenceDocuments() {
                     const batches =
                         splitReferenceMaterialsIntoBatches(
                             processedReferences,
-                            PROJECT_REFERENCE_BATCH_SIZE
+                            projectBatchSize,
+                            projectBatchChars
                         );
 
 
@@ -2417,24 +2429,42 @@ function renderProjectReferenceDocuments() {
                         // تحليل الدفعة مع السياق
                         // =================================================
 
-                        const aiAnalysisResult =
-                            await analyzeReferencesWithAI(
-                                batch,
-                                addMissingAuthors,
-                                contextMaterials
-                            );
+                        const recovery = await analyzeReferenceBatchWithRecovery(
+                            batch,
+                            contextMaterials,
+                            "project-" + (documentIndex + 1) + "-" + (batchIndex + 1),
+                            addMissingAuthors
+                        );
+                        recovery.failed.forEach(function (failure) {
+                            failedProjectBatches.push({
+                                ...failure,
+                                documentName: projectInput.documentName || "مستند المشروع"
+                            });
+                        });
 
-
+                        const aiAnalysisResult = recovery.result;
                         if (
                             !aiAnalysisResult ||
-                            typeof aiAnalysisResult !==
-                                "object"
+                            typeof aiAnalysisResult !== "object" ||
+                            !Array.isArray(aiAnalysisResult.references)
                         ) {
-
-                            throw new Error(
-                                `تعذر تحليل الدفعة ${batchIndex + 1} من المستند: ${projectInput.documentName}`
-                            );
-
+                            completedProjectBatches += 1;
+                            totalMaterials += batch.length;
+                            updateProjectReferenceProgress({
+                                title: "تعذر إكمال دفعة من مستند المشروع",
+                                detail: "تعذر تحليل هذه المجموعة بعد محاولات الاستعادة؛ حُفظت هويّات المواد المتعثرة وانتقل العمل إلى بقية الدفعات.",
+                                percent: totalProjectBatches > 0
+                                    ? 14 + Math.round((completedProjectBatches / totalProjectBatches) * 65)
+                                    : 79,
+                                totalBatches: totalProjectBatches,
+                                completedBatches: completedProjectBatches,
+                                totalDocuments: projectInputs.length,
+                                completedDocuments: completedProjectDocuments,
+                                totalMaterials: projectTotalMaterials,
+                                completedMaterials: totalMaterials,
+                                failedBatches: failedProjectBatches.length
+                            });
+                            continue;
                         }
 
 
@@ -2604,8 +2634,11 @@ function renderProjectReferenceDocuments() {
 
                 updateProjectReferenceProgress({
                     title: "تجميع نتائج التحليل",
-                    detail: "اكتمل تحليل الدفعات؛ يجري الآن دمج المراجع المتشابهة وإزالة التكرار.",
+                    detail: failedProjectBatches.length
+                        ? "اكتمل التحليل الجزئي؛ يجري دمج النتائج التي أمكن استعادتها، مع تسجيل " + failedProjectBatches.length + " دفعة متعثرة."
+                        : "اكتمل تحليل الدفعات؛ يجري الآن دمج المراجع المتشابهة وإزالة التكرار.",
                     percent: 82,
+                    failedBatches: failedProjectBatches.length,
                     totalBatches: totalProjectBatches,
                     completedBatches: completedProjectBatches,
                     totalDocuments: projectInputs.length,
@@ -3179,10 +3212,15 @@ function renderProjectReferenceDocuments() {
                     container
                 ) {
                     const completedProgressHTML = updateProjectReferenceProgress({
-                        title: "اكتمل تحليل مراجع مستندات المشروع",
-                        detail: "اكتمل تحليل المستندات المختارة وتجميع قائمة المراجع الموحدة بنجاح.",
+                        title: failedProjectBatches.length
+                            ? "اكتمل تحليل مراجع المشروع جزئيًا"
+                            : "اكتمل تحليل مراجع مستندات المشروع",
+                        detail: failedProjectBatches.length
+                            ? "حُفظت النتائج المستعادة، مع تعذر استكمال " + failedProjectBatches.length + " دفعة. راجع سجل التعثر قبل اعتماد القائمة."
+                            : "اكتمل تحليل المستندات المختارة وتجميع قائمة المراجع الموحدة بنجاح.",
                         percent: 100,
-                        state: "success",
+                        state: failedProjectBatches.length ? "error" : "success",
+                        failedBatches: failedProjectBatches.length,
                         totalBatches: totalProjectBatches,
                         completedBatches: completedProjectBatches,
                         totalDocuments: projectInputs.length,
@@ -3196,13 +3234,13 @@ function renderProjectReferenceDocuments() {
                         <div class="references-analysis-result">
 
                             <div
-                                class="references-analysis-status success
+                                class="references-analysis-status ${failedProjectBatches.length ? "error" : "success"}
                                     reference-collapsible-header"
                                 data-reference-collapse-toggle
                                 data-reference-collapse-target="project-references-analysis-content">
 
                                 <span>
-                                    ✓ تم تحليل وتوحيد مراجع مستندات المشروع
+                                    ${failedProjectBatches.length ? "⚠ اكتمل تحليل مراجع المشروع جزئيًا" : "✓ تم تحليل وتوحيد مراجع مستندات المشروع"}
                                 </span>
 
                                 <span class="reference-collapsible-arrow">
@@ -3217,6 +3255,11 @@ function renderProjectReferenceDocuments() {
                                 class="references-analysis-info
                                     reference-collapsible-content">
 
+${failedProjectBatches.length ? `
+                                <div class="references-analysis-status error">
+                                    تعذر استكمال ${failedProjectBatches.length} دفعة؛ حُفظت نتائج الدفعات الأخرى، ولم تُخفَ المواد المتعثرة.
+                                </div>
+                                ` : ""}
                                 <div>
                                     المستندات المختارة:
                                     <strong>
@@ -30544,7 +30587,8 @@ other
 async function analyzeReferenceBatchWithRecovery(
     targetBatch,
     targetContext,
-    batchLabel
+    batchLabel,
+    addMissingAuthors = false
 ) {
     const provider = String(getSavedSettings()?.provider || "openrouter").trim().toLowerCase();
 
@@ -30556,7 +30600,7 @@ async function analyzeReferenceBatchWithRecovery(
             try {
                 const result = await analyzeReferencesWithAI(
                     batch,
-                    Boolean(getSavedSettings()?.addMissingAuthors),
+                    Boolean(addMissingAuthors),
                     targetContext
                 );
 
@@ -31119,7 +31163,7 @@ function parseReferenceAIJSON(
      const normalizationFailures = [];
 
      const normalizeFrequencyValue = function (value) {
-         return String(value || "").replace(/\\s+/g, " ").trim().toLocaleLowerCase();
+         return String(value || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
      };
 
      const relevantFrequencyForBatch = function (batch) {
@@ -46421,152 +46465,7 @@ if (referencesContent) {
                                         reviewCount: 0
                                     };
 
-                                    // Recover transient DuckAI empty responses by retrying,
-                                    // then recursively splitting only the failed batch. This
-                                    // prevents one empty completion from dropping every citation
-                                    // in that batch while preserving all successful batch results.
-                                    async function analyzeReferenceBatchWithRecovery(
-                                        targetBatch,
-                                        targetContext,
-                                        batchLabel
-                                    ) {
-                                        let lastError = null;
-
-                                        for (let attempt = 0; attempt < 3; attempt++) {
-                                            try {
-                                                const result = await analyzeReferencesWithAI(
-                                                    targetBatch,
-                                                    addMissingAuthors,
-                                                    targetContext
-                                                );
-
-                                                if (
-                                                    !result ||
-                                                    typeof result !== "object" ||
-                                                    !Array.isArray(result.references)
-                                                ) {
-                                                    const invalidResultError = new Error(
-                                                        "لم تصل نتيجة مراجع صحيحة من الدفعة " +
-                                                        batchLabel + "."
-                                                    );
-                                                    invalidResultError.retryable = true;
-                                                    throw invalidResultError;
-                                                }
-
-                                                return { result: result, failed: [] };
-                                            } catch (error) {
-                                                lastError = error;
-                                                const message = String(error?.message || error || "");
-                                                const retryableDuckError =
-                                                    activeProvider === "duckai" &&
-                                                    (
-                                                        error?.retryable === true ||
-                                                        /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(message)
-                                                    );
-
-                                                console.warn(
-                                                    "Reference batch attempt failed:",
-                                                    {
-                                                        batch: batchLabel,
-                                                        attempt: attempt + 1,
-                                                        retryableDuckError: retryableDuckError,
-                                                        materials: targetBatch.length,
-                                                        error: message
-                                                    }
-                                                );
-
-                                                if (!retryableDuckError || attempt === 2) {
-                                                    break;
-                                                }
-
-                                                await new Promise(function (resolve) {
-                                                    setTimeout(resolve, 900 * (attempt + 1));
-                                                });
-                                            }
-                                        }
-
-                                        const lastMessage = String(
-                                            lastError?.message || lastError || "تعذر الحصول على نتيجة صحيحة."
-                                        );
-                                        const canSplit =
-                                            activeProvider === "duckai" &&
-                                            targetBatch.length > 1 &&
-                                            (
-                                                lastError?.retryable === true ||
-                                                /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(lastMessage)
-                                            );
-
-                                        if (canSplit) {
-                                            const midpoint = Math.ceil(targetBatch.length / 2);
-                                            const leftBatch = targetBatch.slice(0, midpoint);
-                                            const rightBatch = targetBatch.slice(midpoint);
-
-                                            console.warn(
-                                                "Splitting failed DuckAI reference batch:",
-                                                {
-                                                    batch: batchLabel,
-                                                    originalMaterials: targetBatch.length,
-                                                    leftMaterials: leftBatch.length,
-                                                    rightMaterials: rightBatch.length,
-                                                    reason: lastMessage
-                                                }
-                                            );
-
-                                            const left = await analyzeReferenceBatchWithRecovery(
-                                                leftBatch,
-                                                targetContext,
-                                                batchLabel + "a"
-                                            );
-                                            const right = await analyzeReferenceBatchWithRecovery(
-                                                rightBatch,
-                                                targetContext,
-                                                batchLabel + "b"
-                                            );
-
-                                            const recoveredReferences = [];
-                                            const recoveredStats = {
-                                                totalMaterials: 0,
-                                                referenceCount: 0,
-                                                multipleReferenceCount: 0,
-                                                ibidCount: 0,
-                                                internalReferenceCount: 0,
-                                                hadithCount: 0,
-                                                explanatoryCount: 0,
-                                                mixedCount: 0,
-                                                reviewCount: 0
-                                            };
-
-                                            [left.result, right.result].forEach(function (partResult) {
-                                                if (!partResult) return;
-                                                recoveredReferences.push(...partResult.references);
-                                                const partStats =
-                                                    partResult.stats && typeof partResult.stats === "object"
-                                                        ? partResult.stats
-                                                        : {};
-                                                Object.keys(recoveredStats).forEach(function (key) {
-                                                    recoveredStats[key] += Number(partStats[key] || 0);
-                                                });
-                                            });
-
-                                            return {
-                                                result: recoveredReferences.length > 0 || (!left.failed.length && !right.failed.length)
-                                                    ? { references: recoveredReferences, stats: recoveredStats }
-                                                    : null,
-                                                failed: [...left.failed, ...right.failed]
-                                            };
-                                        }
-
-                                        return {
-                                            result: null,
-                                            failed: [{
-                                                index: batchLabel,
-                                                message: lastMessage,
-                                                materialIds: targetBatch.map(function (item) {
-                                                    return String(item?.id || "");
-                                                }).filter(Boolean)
-                                            }]
-                                        };
-                                    }
+                                    // Use the shared provider-aware batch recovery routine.
 
                                     for (
                                         let batchIndex = 0;
@@ -46654,7 +46553,8 @@ if (referencesContent) {
                                         const recovery = await analyzeReferenceBatchWithRecovery(
                                             batch,
                                             contextMaterials,
-                                            String(batchIndex + 1)
+                                            String(batchIndex + 1),
+                                            addMissingAuthors
                                         );
                                         const batchResult = recovery.result;
 
@@ -46775,6 +46675,7 @@ if (referencesContent) {
                                     // توحيد أسماء الكتب والمؤلفين بعد اكتمال جميع الدفعات،
                                     // حتى يستند الاختيار إلى تكرار الصيغ في المستند كله.
                                     let documentWideReferences = aiAnalysisResult.references;
+                                    let normalizationFailures = [];
                                     updateReferenceProgress({
                                         title: "توحيد أسماء الكتب والمؤلفين",
                                         detail: "تجري مراجعة الصيغ الواردة في المستند كله لتثبيت الاسم الأرجح قبل دمج السجلات.",
@@ -46794,7 +46695,14 @@ if (referencesContent) {
                                                 documentWideReferences,
                                                 addMissingAuthors
                                             );
+                                            normalizationFailures = Array.isArray(documentWideReferences?.normalizationFailures)
+                                                ? documentWideReferences.normalizationFailures
+                                                : [];
                                         } catch (normalizationError) {
+                                            normalizationFailures = [{
+                                                batch: "all",
+                                                message: String(normalizationError?.message || normalizationError)
+                                            }];
                                             console.warn(
                                                 "تعذر التوحيد النهائي لأسماء الكتب والمؤلفين؛ ستُحفظ نتائج التحليل الأصلية:",
                                                 normalizationError
@@ -47416,8 +47324,8 @@ if (referencesContent) {
                                     // =================================================
 
                                     analyzeReferencesBtn.textContent =
-                                        failedBatches.length > 0
-                                            ? "⚠ اكتمل جزئيًا — أعد التحليل لاستكمال الدفعات"
+                                        failedBatches.length > 0 || normalizationFailures.length > 0
+                                            ? "⚠ اكتمل جزئيًا — راجع الدفعات أو توحيد الأسماء"
                                             : "✓ تم التحليل والتوحيد";
 
                                     analyzeReferencesBtn.disabled =
