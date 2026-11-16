@@ -30529,7 +30529,7 @@ other
         requestBody.max_tokens = provider === "duckai" ? 12000 : 24000;
     }
 
-    const result = await requestAIProviderJSON(
+    result = await requestAIProviderJSON(
         endpoint,
         {
             method: "POST",
