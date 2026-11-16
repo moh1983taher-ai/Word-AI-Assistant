@@ -80,8 +80,14 @@ const projectHandler = sectionBetween(
 );
 assert.match(projectHandler, /await analyzeReferenceBatchWithRecovery\(/, "project extraction must use shared batch recovery");
 assert.match(projectHandler, /failedProjectBatches\.push/, "project batch failures must be retained");
-assert.match(projectHandler, /اكتمل تحليل مراجع المشروع جزئيًا/, "project partial results must not be labeled as complete");
-assert.match(projectHandler, /راجع الدفعات المتعثرة/, "the project action must expose partial completion");
+const projectCompletion = sectionBetween(
+    "const completedProgressHTML = updateProjectReferenceProgress({",
+    "container.innerHTML =",
+    "project final completion state"
+);
+assert.match(projectCompletion, /اكتمل تحليل مراجع المشروع جزئيًا/, "project partial results must not be labeled as complete");
+assert.match(projectCompletion, /state: failedProjectBatches\\.length \\? "error" : "success"/, "project progress must expose partial failure state");
+assert.match(source, /راجع الدفعات المتعثرة/, "the project action must expose partial completion");
 
 const currentHandler = sectionBetween(
     "analyzeReferencesBtn.onclick =\n                            async function (e)",
