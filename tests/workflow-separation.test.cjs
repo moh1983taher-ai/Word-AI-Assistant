@@ -188,4 +188,38 @@ assert.match(referenceStyles, /\.references-source-panel\.is-hidden\s*\{\s*displ
 assert.match(referenceStyles, /\.references-back-icon\s*\{[\s\S]*?width:\s*30px/);
 assert.doesNotMatch(referenceStyles, /\.reference-source-back\s*\{/);
 assert.match(source, /referencesSourceWorkspace\.innerHTML = ""/, "return navigation must clear the previous workspace rather than stack screens");
+
+const referenceWorkspaceSection = sectionBetween(
+    "const referenceSourceBackMarkup",
+    "const referenceOrderSelect =",
+    "compact reference workspace controls"
+);
+assert.doesNotMatch(referenceWorkspaceSection, /reference-operation-option-description/, "operation descriptions must not consume permanent workspace space");
+assert.match(referenceWorkspaceSection, /title="استخراج المراجع وتوحيدها ومقارنتها بالقائمة الموجودة"/, "bibliography guidance must remain available on hover");
+assert.match(referenceWorkspaceSection, /title="تحليل الإحالات في الحواشي واقتراح توحيدها ومراجعتها"/, "citation guidance must remain available on hover");
+assert.match(referenceWorkspaceSection, /<span class="reference-operation-option-title">قائمة المراجع<\/span>/);
+assert.match(referenceWorkspaceSection, /<span class="reference-operation-option-title">توثيقات الحواشي<\/span>/);
+assert.doesNotMatch(referenceWorkspaceSection, /استقصاء أسماء المؤلفين عند غيابها/, "the author checkbox label must be shortened");
+assert.match(referenceWorkspaceSection, /استقصاء أسماء المؤلفين/);
+assert.doesNotMatch(referenceWorkspaceSection, /class="reference-author-responsibility"/, "author responsibility must not be a permanent paragraph");
+assert.match(referenceWorkspaceSection, /id="reference-author-notice"[\s\S]*?hidden/, "the author responsibility notice must be hidden until enabled");
+assert.match(referenceWorkspaceSection, /id="reference-operation-hint"[\s\S]*?hidden/, "operation descriptions must use a transient hint");
+
+const operationHintLogic = sectionBetween(
+    "const operationHint =",
+    "const bibliographyOption =",
+    "temporary operation hint logic"
+);
+assert.match(operationHintLogic, /setTimeout/);
+assert.match(operationHintLogic, /3600/);
+
+const authorToggleLogic = sectionBetween(
+    "referenceAddMissingAuthors.onchange = function ()",
+    "if (citationFirstMention)",
+    "temporary author responsibility notice"
+);
+assert.match(authorToggleLogic, /this\.checked/);
+assert.match(authorToggleLogic, /تنبيه:/);
+assert.match(authorToggleLogic, /4800/);
+
 console.log("Compact reference header and workspace tests passed.");
