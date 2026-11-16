@@ -7439,3 +7439,73 @@ button.primary:hover,
         transition: none;
     }
 }
+
+
+/* Consistent typography for bibliography analysis, comparison, and build results. */
+.references-analysis-result,
+.references-comparison-result,
+.bibliography-build-result {
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.65;
+}
+
+.references-analysis-result .references-analysis-status,
+.references-comparison-result .references-comparison-title,
+.bibliography-build-result .bibliography-build-title,
+.references-analysis-result .references-final-results-title,
+.references-analysis-result .reference-collapsible-header {
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.55;
+    font-weight: 600;
+}
+
+.references-analysis-result .references-analysis-info,
+.references-comparison-result .references-comparison-summary,
+.references-comparison-result .references-comparison-section-title,
+.references-comparison-result .references-comparison-item,
+.references-comparison-result .references-comparison-text,
+.references-comparison-result .references-comparison-source,
+.references-analysis-result .ai-reference-row,
+.references-analysis-result .ai-reference-main,
+.references-analysis-result .ai-reference-type,
+.references-analysis-result .ai-reference-author,
+.references-analysis-result .ai-reference-title,
+.references-analysis-result .ai-reference-location-chip,
+.references-analysis-result .ai-reference-meta,
+.references-analysis-result .ai-reference-review,
+.references-analysis-result .ai-reference-variants summary,
+.references-analysis-result .ai-reference-variant,
+.bibliography-build-result .bibliography-build-content {
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.65;
+}
+
+.references-analysis-result .references-analysis-info strong,
+.references-comparison-result .references-comparison-summary strong,
+.references-comparison-result .references-comparison-title strong,
+.references-comparison-result .references-comparison-section-title strong,
+.references-comparison-result .references-comparison-text strong,
+.references-analysis-result .ai-reference-meta strong,
+.references-analysis-result .ai-reference-variants summary span,
+.references-analysis-result .references-final-results-title strong {
+    font-size: inherit;
+}
+
+.references-analysis-result .ai-reference-index,
+.references-comparison-result .references-comparison-number,
+.project-reference-index {
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.project-reference-content,
+.project-reference-author,
+.project-reference-title,
+.project-reference-meta {
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.65;
+}

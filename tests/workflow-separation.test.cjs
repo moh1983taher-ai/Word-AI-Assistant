@@ -219,3 +219,45 @@ assert.match(authorToggleLogic, /تنبيه:/);
 assert.match(authorToggleLogic, /4800/);
 
 console.log("Compact reference header and workspace tests passed.");
+
+
+const referenceProgressHelper = sectionBetween(
+    "function renderReferenceAnalysisProgress(",
+    "// قراءة مستندات المشروع المحددة",
+    "shared reference analysis progress helper"
+);
+assert.match(referenceProgressHelper, /reference-analysis-progress-card/, "reference progress must use a dedicated card class");
+assert.match(referenceProgressHelper, /role="progressbar"/, "reference progress must expose an accessible progress bar");
+assert.match(referenceProgressHelper, /نسبة إنجاز تحليل المراجع/, "reference progress must identify bibliography analysis");
+assert.match(referenceProgressHelper, /aria-valuenow/, "reference progress must expose the current value accessibly");
+
+const projectBibliographyHandler = sectionBetween(
+    "analyzeProjectReferencesBtn.onclick =",
+    "// قراءة مستندات المشروع المحددة",
+    "project bibliography analysis handler"
+);
+assert.match(projectBibliographyHandler, /updateProjectReferenceProgress/, "project bibliography analysis must report progress");
+assert.match(projectBibliographyHandler, /totalProjectBatches/, "project progress must use actual batch totals");
+assert.match(projectBibliographyHandler, /completedProjectBatches \+= 1/, "project progress must advance after completed batches");
+assert.match(projectBibliographyHandler, /projectInput.documentName/, "project progress must identify the active document");
+assert.match(projectBibliographyHandler, /percent: 100/, "project bibliography analysis must expose completion");
+
+const currentBibliographyHandler = sectionBetween(
+    "analyzeReferencesBtn.onclick =\n                            async function (e)",
+    "const compareReferencesBtn =",
+    "current-document bibliography analysis handler"
+);
+assert.match(currentBibliographyHandler, /updateReferenceProgress/, "current-document bibliography analysis must report progress");
+assert.match(currentBibliographyHandler, /تحليل الدفعة/, "current-document progress must identify the active batch");
+assert.match(currentBibliographyHandler, /completedReferenceBatches \+= 1/, "current-document progress must advance after batch attempts");
+assert.match(currentBibliographyHandler, /percent: 100/, "current-document bibliography analysis must expose completion");
+assert.match(currentBibliographyHandler, /state: "error"/, "current-document bibliography analysis must expose an error state");
+
+const unifiedBibliographyTypography = referenceStyles.slice(
+    referenceStyles.indexOf("/* Consistent typography for bibliography analysis"),
+);
+assert.ok(unifiedBibliographyTypography.length > 0, "the shared bibliography typography rules must exist");
+assert.match(unifiedBibliographyTypography, /\.references-comparison-title[\s\S]*?font-size: 12px;/, "comparison status must use the common result font size");
+assert.match(unifiedBibliographyTypography, /\.bibliography-build-title/, "bibliography update status must use the shared style");
+assert.match(unifiedBibliographyTypography, /\.ai-reference-type[\s\S]*?font-size: 12px;/, "reference type text must use the common row size");
+assert.match(unifiedBibliographyTypography, /\.project-reference-author[\s\S]*?font-size: 12px;/, "project reference rows must use the common text size");
