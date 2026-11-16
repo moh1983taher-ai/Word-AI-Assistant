@@ -71,8 +71,13 @@ assert.throws(
 
 const twoProtectedSource = "أولى.\r\nثانية.\r\nثالثة.";
 const twoProtectedRanges = [
-    { paragraphIndex: 0, start: 0, end: 4, text: "أولى." },
-    { paragraphIndex: 2, start: 13, end: 18, text: "ثالثة." }
+    { paragraphIndex: 0, start: 0, end: "أولى.".length, text: "أولى." },
+    {
+        paragraphIndex: 2,
+        start: twoProtectedSource.indexOf("ثالثة."),
+        end: twoProtectedSource.indexOf("ثالثة.") + "ثالثة.".length,
+        text: "ثالثة."
+    }
 ];
 const orderedMask = preflight.maskChunk(twoProtectedSource, twoProtectedRanges, 0, "revision-order");
 const reversedOutput = orderedMask.text
@@ -87,7 +92,7 @@ assert.throws(
 assert.throws(
     () => preflight.maskChunk(
         "فقرة طويلة مقسمة",
-        [{ paragraphIndex: 4, start: 3, end: 12, text: "رة طويلة" }],
+        [{ paragraphIndex: 4, start: 3, end: 20, text: "نص محمي أطول من الدفعة" }],
         0,
         "revision-partial"
     ),
