@@ -72,6 +72,19 @@
         return { status: "ready", mode: mode, text: text };
     }
 
+    function normalizeLineBreaks(originalValue, revisedValue) {
+        const original = String(originalValue || "");
+        const revised = String(revisedValue || "");
+        const originalBreaks = original.match(/\\r\\n|\\r|\\n/g) || [];
+        const revisedBreaks = revised.match(/\\r\\n|\\r|\\n/g) || [];
+        if (originalBreaks.length !== revisedBreaks.length) return revised;
+
+        let index = 0;
+        return revised.replace(/\\r\\n|\\r|\\n/g, function () {
+            return originalBreaks[index++];
+        });
+    }
+
     function tokenize(value) {
         const text = String(value || "");
         const regex = /\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu;
@@ -414,6 +427,7 @@
         tokenize: tokenize,
         diffText: diffText,
         splitText: splitText,
+        normalizeLineBreaks: normalizeLineBreaks,
         capture: capture,
         apply: apply
     };
