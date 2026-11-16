@@ -45060,13 +45060,13 @@ async function sendMessage() {
             const revisedText = revisedChunks.join("");
             if (window.DocumentRevision.diffText(documentRevisionCapture.originalText, revisedText).length) {
                 if (revisionMode === "correction" && proofreadingEdits.length) {
-                    finalAnswer = "نتائج المراجعة اللغوية: " + proofreadingEdits.length + " موضعًا مقترحًا للتصحيح.\\n\\n" +
+                    finalAnswer = "نتائج المراجعة اللغوية: " + proofreadingEdits.length + " موضعًا مقترحًا للتصحيح.\n\n" +
                         proofreadingEdits.map(function (edit, index) {
-                            return (index + 1) + ". الأصل: «" + edit.original + "»\\n" +
-                                "الصواب: «" + edit.replacement + "»\\n" +
+                            return (index + 1) + ". الأصل: «" + edit.original + "»\n" +
+                                "الصواب: «" + edit.replacement + "»\n" +
                                 "السبب: " + edit.reason;
-                        }).join("\\n\\n") +
-                        "\\n\\nراجع المقترحات، ثم طبّقها على مواضعها في المستند.";
+                        }).join("\n\n") +
+                        "\n\nراجع المقترحات، ثم طبّقها على مواضعها في المستند.";
                 } else {
                     finalAnswer = revisedText;
                 }
