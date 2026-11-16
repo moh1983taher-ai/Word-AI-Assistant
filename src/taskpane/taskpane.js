@@ -21964,7 +21964,7 @@ function renderChat() {
                         msg.documentRevision.applied = true;
                         saveChat(currentChat);
                         applyButton.textContent = "تم تطبيق التعديلات";
-                        applyButton.title = "أُدرجت التغييرات في Word باللون الأحمر";
+                        applyButton.title = "طُبقت التعديلات المقترحة على مواضعها في المستند";
                     } catch (error) {
                         applyButton.disabled = false;
                         applyButton.textContent = "تعذر التطبيق — أعد المحاولة";
@@ -45006,6 +45006,8 @@ async function sendMessage() {
             4200
         );
         const revisedChunks = [];
+        const proofreadingEdits = [];
+        let sourceOffset = 0;
         let revisionMode = "";
         let clarification = "";
 
@@ -45020,7 +45022,10 @@ async function sendMessage() {
                 : "جارٍ مراجعة النص...";
 
             const chunkAnswer = await streamAI(text, function () {});
-            const parsedRevision = window.DocumentRevision.parseResponse(chunkAnswer);
+            const parsedRevision = window.DocumentRevision.parseResponse(
+                chunkAnswer,
+                chunks[index]
+            );
 
             if (parsedRevision.status === "clarify") {
                 clarification = parsedRevision.question;
@@ -45030,6 +45035,18 @@ async function sendMessage() {
             revisedChunks.push(
                 window.DocumentRevision.normalizeChunkLineBreaks(chunks[index], parsedRevision.text)
             );
+            if (Array.isArray(parsedRevision.edits)) {
+                parsedRevision.edits.forEach(function (edit) {
+                    proofreadingEdits.push({
+                        start: sourceOffset + edit.start,
+                        original: edit.original,
+                        replacement: edit.replacement,
+                        reason: edit.reason
+                    });
+                });
+            }
+            sourceOffset += chunks[index].length;
+
             if (!revisionMode) {
                 revisionMode = parsedRevision.mode;
             } else if (revisionMode !== parsedRevision.mode) {
@@ -45040,13 +45057,25 @@ async function sendMessage() {
         if (clarification) {
             finalAnswer = clarification;
         } else {
-            finalAnswer = revisedChunks.join("");
-            if (window.DocumentRevision.diffText(documentRevisionCapture.originalText, finalAnswer).length) {
+            const revisedText = revisedChunks.join("");
+            if (window.DocumentRevision.diffText(documentRevisionCapture.originalText, revisedText).length) {
+                if (revisionMode === "correction" && proofreadingEdits.length) {
+                    finalAnswer = "نتائج المراجعة اللغوية: " + proofreadingEdits.length + " موضعًا مقترحًا للتصحيح.\\n\\n" +
+                        proofreadingEdits.map(function (edit, index) {
+                            return (index + 1) + ". الأصل: «" + edit.original + "»\\n" +
+                                "الصواب: «" + edit.replacement + "»\\n" +
+                                "السبب: " + edit.reason;
+                        }).join("\\n\\n") +
+                        "\\n\\nراجع المقترحات، ثم طبّقها على مواضعها في المستند.";
+                } else {
+                    finalAnswer = revisedText;
+                }
                 revisionMetadata = {
                     id: documentRevisionCapture.id,
                     targetType: documentRevisionCapture.targetType,
                     originalText: documentRevisionCapture.originalText,
-                    text: finalAnswer,
+                    text: revisedText,
+                    edits: proofreadingEdits,
                     mode: revisionMode || "combined",
                     status: "ready",
                     applied: false
