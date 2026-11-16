@@ -24304,6 +24304,19 @@ function getAIProviderRetryDelayMs(headers, attempt) {
     return Math.max(250, Math.min(60000, retryAfter || tokenReset || requestReset || fallback));
 }
 
+function isAIProviderRequestTooLarge(status, message) {
+    const httpStatus = Number(status) || 0;
+
+    // HTTP 429 represents a rate/quota limit, never a request-size failure.
+    // TPM/ITPM/OTPM describe throughput limits, not context size.
+    if (httpStatus === 429) return false;
+    if (httpStatus === 413) return true;
+
+    return /context_length_exceeded|maximum context length|request too large|prompt is too long|input is too large|too many input tokens/i.test(
+        String(message || "")
+    );
+}
+
 function createAIProviderRequestError(message, status, options) {
     const error = new Error(String(message || "تعذر الاتصال بمزود الذكاء الاصطناعي."));
     const settings = options || {};
@@ -24437,10 +24450,6 @@ async function requestAIProviderJSON(endpoint, options, context) {
             response.status === 504;
         const outputLimitExceeded =
             /output tokens per minute|\bOTPM\b/i.test(message);
-        const requestTooLarge =
-            response.status === 413 ||
-            /context_length_exceeded|maximum context length|request too large|prompt is too long|input is too large|too many input tokens|input tokens per minute|\bTPM\b/i.test(message);
-
         const outputBudgetWithinLimit =
             outputLimit > 0 &&
             currentOutputBudget > 0 &&
@@ -24475,7 +24484,7 @@ async function requestAIProviderJSON(endpoint, options, context) {
                 model: model,
                 task: task,
                 retryable: retryableStatus,
-                shouldSplit: outputLimitExceeded || requestTooLarge,
+                shouldSplit: isAIProviderRequestTooLarge(response.status, message),
                 retryAfterMs: getAIProviderRetryDelayMs(response.headers, attempt)
             }
         );
