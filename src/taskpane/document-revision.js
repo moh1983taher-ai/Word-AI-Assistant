@@ -95,8 +95,8 @@
             if (end < text.length) {
                 const minimum = start + Math.floor(limit * 0.55);
                 const paragraphBreak = Math.max(
-                    text.lastIndexOf("\\n", end),
-                    text.lastIndexOf("\\r", end)
+                    text.lastIndexOf("\n", end),
+                    text.lastIndexOf("\r", end)
                 );
                 const sentenceBreak = Math.max(
                     text.lastIndexOf(". ", end),
@@ -109,7 +109,7 @@
 
                 if (paragraphBreak >= minimum) {
                     end = paragraphBreak + 1;
-                    if (text[paragraphBreak] === "\\r" && text[paragraphBreak + 1] === "\\n") end++;
+                    if (text[paragraphBreak] === "\r" && text[paragraphBreak + 1] === "\n") end++;
                 } else if (sentenceBreak >= minimum) {
                     end = sentenceBreak + 1;
                 } else if (spaceBreak >= minimum) {
