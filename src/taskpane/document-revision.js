@@ -74,7 +74,7 @@
 
     function hasSameLineBreakCount(originalValue, revisedValue) {
         const count = function (value) {
-            return (String(value || "").match(/\\r\\n|\\r|\\n/g) || []).length;
+            return (String(value || "").match(/\r\n|\r|\n/g) || []).length;
         };
         return count(originalValue) === count(revisedValue);
     }
