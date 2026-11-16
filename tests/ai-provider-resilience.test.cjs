@@ -37,7 +37,7 @@ assert.match(providerLayer, /requestedOutputMatch/, "the provider's requested ou
 assert.match(providerLayer, /scaledBudget/, "the output budget must be reduced proportionally to the reported OTPM limit");
 assert.match(providerLayer, /max_completion_tokens/, "Groq must use max_completion_tokens");
 assert.match(providerLayer, /delete requestBody\.max_tokens/, "the deprecated max_tokens field must be removed for Groq");
-assert.match(providerLayer, /input tokens per minute|\\\\bTPM\\\\b/i, "input token-rate limits must be distinguished from request-rate limits");
+assert.match(providerLayer, /input tokens per minute|TPM/i, "input token-rate limits must be distinguished from request-rate limits");
 assert.match(providerLayer, /shouldSplit: outputLimitExceeded \|\| requestTooLarge/, "token/context limits must mark a batch for splitting");
 
 const analyzer = sectionBetween(
