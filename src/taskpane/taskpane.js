@@ -21940,6 +21940,40 @@ function renderChat() {
             }
 
 
+            if (msg.role !== "user" && msg.documentRevision &&
+                msg.documentRevision.status === "ready" && !msg.documentRevision.applied) {
+                const applyButton = document.createElement("button");
+                applyButton.type = "button";
+                applyButton.className = "document-revision-apply-btn";
+                applyButton.textContent = "تطبيق التعديلات في مستند Word";
+                applyButton.style.display = "block";
+                applyButton.style.marginTop = "12px";
+                applyButton.style.padding = "8px 14px";
+                applyButton.style.border = "1px solid #0B5553";
+                applyButton.style.borderRadius = "8px";
+                applyButton.style.background = "transparent";
+                applyButton.style.color = "#0B5553";
+                applyButton.style.cursor = "pointer";
+                applyButton.onclick = async function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    applyButton.disabled = true;
+                    applyButton.textContent = "جارٍ تطبيق التعديلات...";
+                    try {
+                        await window.DocumentRevision.apply(msg.documentRevision);
+                        msg.documentRevision.applied = true;
+                        saveChat(currentChat);
+                        applyButton.textContent = "تم تطبيق التعديلات";
+                        applyButton.title = "أُدرجت التغييرات في Word باللون الأحمر";
+                    } catch (error) {
+                        applyButton.disabled = false;
+                        applyButton.textContent = "تعذر التطبيق — أعد المحاولة";
+                        applyButton.title = error && error.message ? error.message : "تعذر تطبيق التعديلات";
+                    }
+                };
+                div.appendChild(applyButton);
+            }
+
             // زر نسخ رد الذكاء الاصطناعي
             // لا يظهر في رسائل المستخدم أو بطاقات نتائج المكتبة.
             if (
@@ -22593,7 +22627,8 @@ function addAIMessage(
     chat,
     text,
     citationSources,
-    libraryResults
+    libraryResults,
+    documentRevision
 ) {
 
     if (!chat) {
@@ -22640,6 +22675,11 @@ function addAIMessage(
                 libraryResults
             )
                 ? libraryResults
+                : null,
+
+        documentRevision:
+            documentRevision && typeof documentRevision === "object"
+                ? { ...documentRevision }
                 : null
 
     });
@@ -23023,6 +23063,17 @@ chats.forEach(
 
                         };
 
+                        if (message.documentRevision && typeof message.documentRevision === "object") {
+                            normalizedMessage.documentRevision = {
+                                id: String(message.documentRevision.id || ""),
+                                targetType: message.documentRevision.targetType === "selection" ? "selection" : "document",
+                                originalText: String(message.documentRevision.originalText || ""),
+                                text: String(message.documentRevision.text || ""),
+                                mode: String(message.documentRevision.mode || "combined"),
+                                status: message.documentRevision.status === "ready" ? "ready" : "",
+                                applied: Boolean(message.documentRevision.applied)
+                            };
+                        }
 
                         // =================================================
                         // رسائل المكتبة
@@ -33119,6 +33170,33 @@ async function buildResearchKnowledgeMap(scope, query, searchId) {
 async function buildStreamingContext(
     text
 ) {
+
+    // طلبات تحرير نص Word تمر عبر مزود الذكاء الاصطناعي الحالي،
+    // مع تجاوز الاسترجاع البحثي حتى لا يختلط النص المراد تحريره بسياق البحث.
+    const revisionRequest = window.__documentRevisionRequest;
+    if (revisionRequest && revisionRequest.systemPrompt && revisionRequest.userPrompt) {
+        currentCitationSources = [];
+        const history = [];
+        if (currentChat && Array.isArray(currentChat.messages)) {
+            currentChat.messages.slice(0, -1).filter(function (message) {
+                return message && message.type !== "library" && message.text;
+            }).slice(-2).forEach(function (message) {
+                history.push({
+                    role: message.role === "ai" ? "assistant" : "user",
+                    content: String(message.text).slice(0, 1200)
+                });
+            });
+        }
+        return {
+            documentContext: null,
+            messages: [
+                { role: "system", content: revisionRequest.systemPrompt },
+                ...history,
+                { role: "user", content: revisionRequest.userPrompt }
+            ],
+            userContent: revisionRequest.userPrompt
+        };
+    }
 
     // =====================================================
     // تحديد نطاق البحث
@@ -44486,6 +44564,8 @@ async function sendMessage() {
     let requestFinished =
         false;
 
+    let isDocumentRevision = false;
+    let documentRevisionCapture = null;
 
     // =================================================
     // تحديث الواجهة
@@ -44519,6 +44599,10 @@ async function sendMessage() {
     function scheduleRender(
         fullText
     ) {
+
+        if (isDocumentRevision) {
+            return;
+        }
 
         pendingRenderText =
             String(
@@ -44569,7 +44653,8 @@ async function sendMessage() {
 
     if (
         researchScope &&
-        researchScope.type === "library"
+        researchScope.type === "library" &&
+        !(window.DocumentRevision && window.DocumentRevision.isRequest(text))
     ) {
 
         console.log("SMART ACTIVITY START");
@@ -44867,6 +44952,20 @@ async function sendMessage() {
 
 
     // =================================================
+    // تحرير النص بطلب طبيعي داخل الدردشة
+    // يحدد النموذج نوع المعالجة من تعليمات الباحث.
+    // =================================================
+    isDocumentRevision = Boolean(
+        window.DocumentRevision &&
+        window.DocumentRevision.isRequest(text)
+    );
+
+    if (isDocumentRevision) {
+        documentRevisionCapture = await window.DocumentRevision.capture();
+        // تُجهّز تعليمات كل جزء عند إرساله؛ لتفادي تجاوز حدود مزود الذكاء الاصطناعي.
+    }
+
+    // =================================================
     // المسار الأصلي للذكاء الاصطناعي
     // =================================================
 
@@ -44898,21 +44997,76 @@ async function sendMessage() {
     }
 
 
-    const answer =
-        await streamAI(
+    let finalAnswer = "";
+    let revisionMetadata = null;
+
+    if (isDocumentRevision) {
+        const chunks = window.DocumentRevision.splitText(
+            documentRevisionCapture.originalText,
+            4200
+        );
+        const revisedChunks = [];
+        let revisionMode = "";
+        let clarification = "";
+
+        for (let index = 0; index < chunks.length; index++) {
+            window.__documentRevisionRequest = window.DocumentRevision.buildRequest(
+                text,
+                chunks[index]
+            );
+
+            loading.textContent = chunks.length > 1
+                ? "جارٍ معالجة الجزء " + (index + 1) + " من " + chunks.length + "..."
+                : "جارٍ مراجعة النص...";
+
+            const chunkAnswer = await streamAI(text, function () {});
+            const parsedRevision = window.DocumentRevision.parseResponse(chunkAnswer);
+
+            if (parsedRevision.status === "clarify") {
+                clarification = parsedRevision.question;
+                break;
+            }
+
+            if (!window.DocumentRevision.hasSameLineBreakCount(chunks[index], parsedRevision.text)) {
+                throw new Error("غيّرت المعالجة عدد فواصل الفقرات في أحد أجزاء المستند؛ أُلغي التطبيق للمحافظة على بنية المستند. أعد المحاولة مع طلب المحافظة على الفقرات.");
+            }
+            revisedChunks.push(
+                window.DocumentRevision.normalizeLineBreaks(chunks[index], parsedRevision.text)
+            );
+            if (!revisionMode) {
+                revisionMode = parsedRevision.mode;
+            } else if (revisionMode !== parsedRevision.mode) {
+                revisionMode = "combined";
+            }
+        }
+
+        if (clarification) {
+            finalAnswer = clarification;
+        } else {
+            finalAnswer = revisedChunks.join("");
+            if (window.DocumentRevision.diffText(documentRevisionCapture.originalText, finalAnswer).length) {
+                revisionMetadata = {
+                    id: documentRevisionCapture.id,
+                    targetType: documentRevisionCapture.targetType,
+                    originalText: documentRevisionCapture.originalText,
+                    text: finalAnswer,
+                    mode: revisionMode || "combined",
+                    status: "ready",
+                    applied: false
+                };
+            } else {
+                finalAnswer = "راجعت النص، ولا توجد تغييرات تستلزم التطبيق.";
+            }
+        }
+    } else {
+        const answer = await streamAI(
             text,
-            function (
-                delta,
-                fullText
-            ) {
-
-                scheduleRender(
-                    fullText
-                );
-
+            function (delta, fullText) {
+                scheduleRender(fullText);
             }
         );
-
+        finalAnswer = String(answer || "");
+    }
 
     requestFinished =
         true;
@@ -44944,7 +45098,7 @@ async function sendMessage() {
 
     pendingRenderText =
         String(
-            answer ||
+            finalAnswer ||
             ""
         );
 
@@ -44982,8 +45136,10 @@ async function sendMessage() {
 
     addAIMessage(
         currentChat,
-        answer,
-        savedSources
+        finalAnswer,
+        savedSources,
+        null,
+        revisionMetadata
     );
 
 
@@ -45068,6 +45224,10 @@ async function sendMessage() {
 
     }
     finally {
+
+        if (window.__documentRevisionRequest) {
+            delete window.__documentRevisionRequest;
+        }
 
         hideSmartSearchActivity();
 
