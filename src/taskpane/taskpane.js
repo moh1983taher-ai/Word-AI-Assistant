@@ -24441,7 +24441,16 @@ async function requestAIProviderJSON(endpoint, options, context) {
             response.status === 413 ||
             /context_length_exceeded|maximum context length|request too large|prompt is too long|input is too large|too many input tokens|input tokens per minute|\bTPM\b/i.test(message);
 
-        if (retryableStatus && attempt < maxAttempts - 1 && !outputLimitExceeded) {
+        const outputBudgetWithinLimit =
+            outputLimit > 0 &&
+            currentOutputBudget > 0 &&
+            currentOutputBudget <= Math.floor(outputLimit * 0.8);
+
+        if (
+            retryableStatus &&
+            attempt < maxAttempts - 1 &&
+            (!outputLimitExceeded || outputBudgetWithinLimit)
+        ) {
             const retryDelayMs = getAIProviderRetryDelayMs(response.headers, attempt);
             console.warn("AI provider rate/transient limit; retrying request:", {
                 provider: provider,
@@ -30442,6 +30451,7 @@ other
         if (!answer || !String(answer).trim()) {
             const emptyAnswerError = new Error("أعاد Gemini استجابة فارغة.");
             emptyAnswerError.retryable = true;
+            emptyAnswerError.shouldSplit = true;
             throw emptyAnswerError;
         }
 
@@ -30570,9 +30580,9 @@ other
         ).trim()
     ) {
 
-        throw new Error(
-            `أعاد ${provider} استجابة فارغة.`
-        );
+        const emptyAnswerError = new Error(`أعاد ${provider} استجابة فارغة.`);
+        emptyAnswerError.shouldSplit = true;
+        throw emptyAnswerError;
 
     }
 
