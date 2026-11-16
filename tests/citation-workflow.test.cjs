@@ -160,7 +160,7 @@ const prompt = CitationWorkflow.createCitationSystemPrompt();
 assert.match(prompt, /sourceText/);
 assert.match(prompt, /المنخول 454/);
 assert.match(prompt, /كما نقل عنه الإسنوي/);
-assert.match(prompt, /المنثور، 2\\/362/);
+assert.ok(prompt.includes("المنثور، 2/362"));
 assert.match(prompt, /كتاب العين/);
 assert.match(prompt, /لا تنشئ قائمة مراجع/);
 assert.doesNotMatch(prompt, /قائمة المراجع النهائية الموحدة/);
