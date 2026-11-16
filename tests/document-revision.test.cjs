@@ -36,9 +36,9 @@ const chunks = revision.splitText(longDocument, 1200);
 assert.ok(chunks.length > 1);
 assert.equal(chunks.join(""), longDocument);
 
-assert.equal(revision.hasSameLineBreakCount("فقرة أولى.\\r\\nفقرة ثانية.", "صياغة أولى.\\nصياغة ثانية."), true);
-assert.equal(revision.normalizeLineBreaks("فقرة أولى.\\r\\nفقرة ثانية.", "صياغة أولى.\\nصياغة ثانية."), "صياغة أولى.\\r\\nصياغة ثانية.");
-assert.equal(revision.hasSameLineBreakCount("فقرة واحدة", "فقرة أولى\\nفقرة ثانية"), false);
+assert.equal(revision.hasSameLineBreakCount("فقرة أولى.\r\nفقرة ثانية.", "صياغة أولى.\nصياغة ثانية."), true);
+assert.equal(revision.normalizeLineBreaks("فقرة أولى.\r\nفقرة ثانية.", "صياغة أولى.\nصياغة ثانية."), "صياغة أولى.\r\nصياغة ثانية.");
+assert.equal(revision.hasSameLineBreakCount("فقرة واحدة", "فقرة أولى\nفقرة ثانية"), false);
 
 const replacement = revision.parseResponse(JSON.stringify({
     status: "ready",
