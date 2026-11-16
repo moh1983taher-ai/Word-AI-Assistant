@@ -71,7 +71,7 @@ assert.equal(
     "أولى منقحة. سطر تابع\r\n"
 );
 assert.equal(
-    revision.normalizeChunkLineBreaks("فقرة أصلية.", "فقرة منقحة.\\nسطر إضافي"),
+    revision.normalizeChunkLineBreaks("فقرة أصلية.", "فقرة منقحة.\nسطر إضافي"),
     "فقرة منقحة. سطر إضافي"
 );
 
