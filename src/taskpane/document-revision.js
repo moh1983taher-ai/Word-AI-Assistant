@@ -656,6 +656,46 @@
                 throw new Error("تغير النص الأصلي في Word بعد إرساله للمعالجة؛ أُلغي التطبيق حمايةً للمستند. أعد المعالجة على النص الحالي.");
             }
 
+            let paragraphTargets = [];
+            if (revision.targetType === "document" && range.paragraphs) {
+                const paragraphCollection = range.paragraphs;
+                paragraphCollection.load("items/text");
+                await context.sync();
+
+                try {
+                    const mappings = DocumentRevisionPreflight.mapParagraphRanges(
+                        originalText,
+                        paragraphCollection.items.map(function (paragraph) {
+                            return paragraph.text;
+                        })
+                    );
+                    paragraphTargets = mappings.map(function (mapping) {
+                        return {
+                            paragraphIndex: mapping.paragraphIndex,
+                            start: mapping.start,
+                            end: mapping.end,
+                            text: mapping.text,
+                            paragraph: paragraphCollection.items[mapping.paragraphIndex]
+                        };
+                    }).filter(function (mapping) {
+                        return !!mapping.paragraph;
+                    });
+                } catch (_) {
+                    // Keep the established exact-occurrence resolver as a safe fallback
+                    // when a Word host exposes paragraph boundaries differently.
+                    paragraphTargets = [];
+                }
+            }
+
+            function findParagraphTarget(start, length) {
+                const mapping = DocumentRevisionPreflight.findParagraphRange(
+                    paragraphTargets,
+                    start,
+                    length
+                );
+                return mapping || null;
+            }
+
             const prepared = [];
             for (const operation of operations) {
                 if (operation.length > 0) {
@@ -663,9 +703,17 @@
                     if (/[\r\n]/.test(oldText)) {
                         throw new Error("تتضمن النتيجة تغييرًا في فواصل الفقرات؛ أُلغي التطبيق حتى لا تتغير بنية المستند.");
                     }
-                    const search = range.search(oldText, { matchCase: true, matchWholeWord: false });
+                    const paragraphTarget = findParagraphTarget(operation.start, operation.length);
+                    const searchRange = paragraphTarget ? paragraphTarget.paragraph : range;
+                    const search = searchRange.search(oldText, { matchCase: true, matchWholeWord: false });
                     search.load("items");
-                    prepared.push({ operation: operation, search: search, kind: "replace" });
+                    prepared.push({
+                        operation: operation,
+                        search: search,
+                        kind: "replace",
+                        searchSourceText: paragraphTarget ? paragraphTarget.text : originalText,
+                        searchExpectedStart: paragraphTarget ? operation.start - paragraphTarget.start : operation.start
+                    });
                 } else {
                     const tokens = tokenize(originalText);
                     const nextToken = tokens.find(function (token) { return token.start === operation.start; });
@@ -681,9 +729,21 @@
                     } else if (operation.start === originalText.length) {
                         prepared.push({ operation: operation, kind: "boundary-end" });
                     } else if (anchor) {
-                        const search = range.search(anchor.token.value, { matchCase: true, matchWholeWord: false });
+                        const paragraphTarget = findParagraphTarget(
+                            anchor.token.start,
+                            anchor.token.value.length
+                        );
+                        const searchRange = paragraphTarget ? paragraphTarget.paragraph : range;
+                        const search = searchRange.search(anchor.token.value, { matchCase: true, matchWholeWord: false });
                         search.load("items");
-                        prepared.push({ operation: operation, search: search, kind: "insert", anchor: anchor });
+                        prepared.push({
+                            operation: operation,
+                            search: search,
+                            kind: "insert",
+                            anchor: anchor,
+                            searchSourceText: paragraphTarget ? paragraphTarget.text : originalText,
+                            searchExpectedStart: paragraphTarget ? anchor.token.start - paragraphTarget.start : anchor.token.start
+                        });
                     } else {
                         throw new Error("تعذر تحديد موضع إضافة إحدى العبارات بأمان؛ لم يُعدّل المستند.");
                     }
@@ -692,8 +752,8 @@
 
             await context.sync();
 
-            // Resolve every queued search in two synchronization rounds, not one round
-            // per edit. This keeps Office.js round-trips bounded for long documents.
+            // Resolve queued searches in one grouped load, then map each result
+            // against its paragraph-local text and expected occurrence.
             const searchable = prepared.filter(function (item) { return !!item.search; });
             searchable.forEach(function (item) {
                 item.search.items.forEach(function (match) { match.load("text"); });
@@ -711,15 +771,17 @@
                     continue;
                 }
 
-                const expectedStart = item.kind === "insert" && item.anchor.location === "After"
-                    ? item.anchor.token.start
-                    : item.operation.start;
                 const expectedText = item.kind === "replace"
                     ? originalText.slice(item.operation.start, item.operation.start + item.operation.length)
                     : item.anchor.token.value;
+                const expectedStart = item.searchExpectedStart !== undefined
+                    ? item.searchExpectedStart
+                    : (item.kind === "insert" && item.anchor.location === "After"
+                        ? item.anchor.token.start
+                        : item.operation.start);
                 const target = resolveSearchMatchByOccurrence(
                     item.search.items,
-                    originalText,
+                    item.searchSourceText || originalText,
                     expectedText,
                     expectedStart
                 );
