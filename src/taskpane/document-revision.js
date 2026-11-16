@@ -130,7 +130,7 @@
         if (!text.trim()) {
             throw new Error("نتيجة إعادة الصياغة غير مكتملة؛ لم يُمس المستند.");
         }
-        return { status: "ready", mode: mode, text: text, edits: [] };
+        return { status: "ready", mode: mode, text: text };
     }
 
     function hasSameLineBreakCount(originalValue, revisedValue) {
