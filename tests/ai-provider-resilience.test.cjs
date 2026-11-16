@@ -35,6 +35,7 @@ assert.match(providerLayer, /maxAttempts = 3/, "transient requests must have a b
 assert.match(providerLayer, /output tokens per minute/i, "Groq OTPM errors must be recognized");
 assert.match(providerLayer, /requestedOutputMatch/, "the provider's requested output estimate must guide adaptive budgeting");
 assert.match(providerLayer, /scaledBudget/, "the output budget must be reduced proportionally to the reported OTPM limit");
+assert.match(providerLayer, /outputBudgetWithinLimit/, "OTPM failures after a budget reduction must still honor provider reset headers");
 assert.match(providerLayer, /max_completion_tokens/, "Groq must use max_completion_tokens");
 assert.match(providerLayer, /delete requestBody\.max_tokens/, "the deprecated max_tokens field must be removed for Groq");
 assert.match(providerLayer, /input tokens per minute|TPM/i, "input token-rate limits must be distinguished from request-rate limits");
@@ -48,6 +49,7 @@ const analyzer = sectionBetween(
 assert.match(analyzer, /requestAIProviderJSON\(/, "reference extraction must use the shared request layer");
 assert.match(analyzer, /requestBody\.max_completion_tokens = 850/, "Groq reference extraction must use a bounded output budget");
 assert.match(analyzer, /truncatedError\.shouldSplit = true/, "truncated provider responses must trigger batch recovery");
+assert.match(analyzer, /emptyAnswerError\.shouldSplit = true/, "empty provider replies must be recoverable by splitting the batch");
 
 const recovery = sectionBetween(
     "async function analyzeReferenceBatchWithRecovery(",
