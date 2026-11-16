@@ -146,6 +146,20 @@ const repeatedResult = revision.parseResponse(JSON.stringify({
     }]
 }), repeatedSource);
 assert.equal(repeatedResult.text, "هذا خطأ لايمكن قبوله، وموضع آخر لا يمكن إغفاله.");
+const uniqueWithImpreciseContext = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: "أن المصلحة",
+        replacement: "أن المصلحةَ",
+        contextBefore: "سياق غير مطابق أرسله النموذج",
+        contextAfter: "سياق لاحق غير مطابق",
+        reason: "ضبط العبارة"
+    }]
+}), "وتبين الدراسة أن المصلحة العامة تقتضي ذلك.");
+assert.equal(uniqueWithImpreciseContext.text, "وتبين الدراسة أن المصلحةَ العامة تقتضي ذلك.");
+assert.equal(uniqueWithImpreciseContext.edits[0].start, "وتبين الدراسة أن المصلحة العامة تقتضي ذلك.".indexOf("أن المصلحة"));
+
 
 assert.throws(() => revision.parseResponse(JSON.stringify({
     status: "ready",
