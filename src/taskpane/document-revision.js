@@ -198,6 +198,46 @@
         return tokens;
     }
 
+    // Resolve Word search results by their document order, without Range.start/end.
+    // Those position properties require WordApiDesktop 1.4, while this add-in
+    // intentionally supports the broader WordApi 1.3 baseline.
+    function resolveSearchMatchByOccurrence(searchItems, sourceValue, expectedText, expectedStart) {
+        const source = String(sourceValue || "");
+        const phrase = String(expectedText || "");
+        if (!phrase) {
+            throw new Error("تعذر تحديد عبارة البحث المطلوبة داخل النص الأصلي.");
+        }
+
+        const positions = [];
+        let cursor = 0;
+        while ((cursor = source.indexOf(phrase, cursor)) !== -1) {
+            positions.push(cursor);
+            cursor += phrase.length;
+        }
+
+        const occurrenceIndex = positions.indexOf(Number(expectedStart));
+        if (occurrenceIndex < 0) {
+            throw new Error("موضع التعديل المحسوب لا يطابق أي ورود حرفي في النص الأصلي.");
+        }
+
+        const exactMatches = Array.from(searchItems || []).filter(function (match) {
+            return String(match && match.text || "") === phrase;
+        });
+
+        if (exactMatches.length !== positions.length) {
+            throw new Error(
+                "تعذر مطابقة نتائج Word مع النص الأصلي بأمان (مواضع النص: " +
+                positions.length + "، نتائج Word المطابقة: " + exactMatches.length + ")."
+            );
+        }
+
+        const target = exactMatches[occurrenceIndex];
+        if (!target || String(target.text || "") !== phrase) {
+            throw new Error("تعذر تعيين نتيجة البحث المقابلة لموضع التعديل بأمان.");
+        }
+        return target;
+    }
+
     function splitLongParagraph(value, limit) {
         const text = String(value || "");
         if (text.length <= limit) return [text];
@@ -456,7 +496,7 @@
         });
         matches.load("items");
         await context.sync();
-        matches.items.forEach(function (match) { match.load("text,start,end"); });
+        matches.items.forEach(function (match) { match.load("text"); });
         await context.sync();
 
         const exactMatches = matches.items.filter(function (match) {
@@ -489,7 +529,7 @@
 
         await Word.run(async function (context) {
             const range = await resolveTarget(context, revision);
-            range.load("text,start");
+            range.load("text");
             await context.sync();
 
             if (String(range.text || "") !== originalText) {
@@ -536,7 +576,7 @@
             // per edit. This keeps Office.js round-trips bounded for long documents.
             const searchable = prepared.filter(function (item) { return !!item.search; });
             searchable.forEach(function (item) {
-                item.search.items.forEach(function (match) { match.load("text,start,end"); });
+                item.search.items.forEach(function (match) { match.load("text"); });
             });
             await context.sync();
 
@@ -551,22 +591,19 @@
                     continue;
                 }
 
-                const expectedStart = Number(range.start) + Number(
-                    item.kind === "insert" && item.anchor.location === "After"
-                        ? item.anchor.token.start
-                        : item.operation.start
-                );
+                const expectedStart = item.kind === "insert" && item.anchor.location === "After"
+                    ? item.anchor.token.start
+                    : item.operation.start;
                 const expectedText = item.kind === "replace"
                     ? originalText.slice(item.operation.start, item.operation.start + item.operation.length)
                     : item.anchor.token.value;
-                const matches = item.search.items.filter(function (match) {
-                    return Number(match.start) === expectedStart &&
-                        String(match.text || "") === expectedText;
-                });
-                if (matches.length !== 1) {
-                    throw new Error("تعذر مطابقة أحد مواضع التغيير بصورة دقيقة؛ أُلغي التطبيق دون تعديل المستند.");
-                }
-                resolved.push({ ...item, target: matches[0] });
+                const target = resolveSearchMatchByOccurrence(
+                    item.search.items,
+                    originalText,
+                    expectedText,
+                    expectedStart
+                );
+                resolved.push({ ...item, target: target });
             }
 
             resolved.sort(function (a, b) { return b.operation.start - a.operation.start; });
@@ -608,6 +645,7 @@
         buildRequest: buildRequest,
         parseResponse: parseResponse,
         tokenize: tokenize,
+        resolveSearchMatchByOccurrence: resolveSearchMatchByOccurrence,
         diffText: diffText,
         diffTextPreservingParagraphs: diffTextPreservingParagraphs,
         splitText: splitText,
