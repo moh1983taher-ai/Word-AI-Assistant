@@ -185,6 +185,30 @@
         return sourceCursor + (target - maskedCursor);
     }
 
+    function mapMaskedRangeToSource(maskState, maskedStart, length) {
+        const start = Number(maskedStart);
+        const span = Math.max(0, Number(length) || 0);
+        const end = start + span;
+
+        if (maskState && Array.isArray(maskState.segments)) {
+            maskState.segments.forEach(function (segment) {
+                const tokenStart = maskState.text.indexOf(segment.token);
+                const tokenEnd = tokenStart + segment.token.length;
+                if (start < tokenEnd && end > tokenStart) {
+                    throw new Error("حاول التصحيح استهداف علامة حماية لفقرة ذات تغييرات متعقبة؛ رُفض التعديل.");
+                }
+            });
+        }
+
+        const sourceStart = mapMaskedOffsetToSource(maskState, start);
+        const sourceEnd = mapMaskedOffsetToSource(maskState, end);
+        return {
+            start: sourceStart,
+            end: sourceEnd,
+            length: sourceEnd - sourceStart
+        };
+    }
+
     function countOccurrences(source, needle) {
         if (!needle) return 0;
         let count = 0;
@@ -262,6 +286,7 @@
         mapParagraphRanges: mapParagraphRanges,
         findParagraphRange: findParagraphRange,
         mapMaskedOffsetToSource: mapMaskedOffsetToSource,
+        mapMaskedRangeToSource: mapMaskedRangeToSource,
         buildProtectedParagraphRanges: buildProtectedParagraphRanges,
         maskChunk: maskChunk,
         restoreChunk: restoreChunk,
