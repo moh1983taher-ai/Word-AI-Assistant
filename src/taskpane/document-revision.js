@@ -92,35 +92,29 @@
         });
     }
 
-    // Restore chunk-edge paragraph separators that language models commonly omit.
-    // Internal paragraph boundaries must still match exactly; otherwise fail safely.
+    // Normalize a single paragraph's model output and restore its original edge separators.
+    // Each model request handles one paragraph. Restore source separators and
+    // flatten any line breaks introduced inside the revised paragraph.
     function normalizeChunkLineBreaks(originalValue, revisedValue) {
         const original = String(originalValue || "");
         const revised = String(revisedValue || "");
         const breakPattern = /\r\n|\r|\n/g;
+
         const leadingMatch = original.match(/^(?:(?:\r\n|\r|\n))+/);
-        const trailingMatch = original.match(/(?:(?:\r\n|\r|\n))+$/);
         const leading = leadingMatch ? leadingMatch[0] : "";
+        const afterLeading = original.slice(leading.length);
+        const trailingMatch = afterLeading.match(/(?:(?:\r\n|\r|\n))+$/);
         const trailing = trailingMatch ? trailingMatch[0] : "";
-        const originalCore = original.slice(leading.length, trailing.length ? original.length - trailing.length : original.length);
-
         const revisedLeadingMatch = revised.match(/^(?:(?:\r\n|\r|\n))+/);
-        const revisedTrailingMatch = revised.match(/(?:(?:\r\n|\r|\n))+$/);
         const revisedLeading = revisedLeadingMatch ? revisedLeadingMatch[0] : "";
+        const revisedAfterLeading = revised.slice(revisedLeading.length);
+        const revisedTrailingMatch = revisedAfterLeading.match(/(?:(?:\r\n|\r|\n))+$/);
         const revisedTrailing = revisedTrailingMatch ? revisedTrailingMatch[0] : "";
-        const revisedCore = revised.slice(revisedLeading.length, revisedTrailing.length ? revised.length - revisedTrailing.length : revised.length);
+        let revisedCore = revisedAfterLeading.slice(0, revisedAfterLeading.length - revisedTrailing.length);
 
-        const originalBreaks = originalCore.match(breakPattern) || [];
-        const revisedBreaks = revisedCore.match(breakPattern) || [];
-        if (originalBreaks.length !== revisedBreaks.length) {
-            throw new Error("غيّرت المعالجة فواصل الفقرات داخل جزء من النص؛ أُلغي التطبيق للمحافظة على بنية المستند. أعد المحاولة مع طلب المحافظة على الفقرات.");
-        }
-
-        let breakIndex = 0;
-        const normalizedCore = revisedCore.replace(breakPattern, function () {
-            return originalBreaks[breakIndex++];
-        });
-        return leading + normalizedCore + trailing;
+        // A paragraph must remain a paragraph; model-generated line breaks are flattened.
+        revisedCore = revisedCore.replace(breakPattern, " ");
+        return leading + revisedCore + trailing;
     }
 
     function tokenize(value) {
@@ -134,21 +128,15 @@
         return tokens;
     }
 
-    function splitText(value, maxChars) {
+    function splitLongParagraph(value, limit) {
         const text = String(value || "");
-        const limit = Math.max(1000, Number(maxChars) || 4200);
         if (text.length <= limit) return [text];
-
         const chunks = [];
         let start = 0;
         while (start < text.length) {
             let end = Math.min(start + limit, text.length);
             if (end < text.length) {
                 const minimum = start + Math.floor(limit * 0.55);
-                const paragraphBreak = Math.max(
-                    text.lastIndexOf("\n", end),
-                    text.lastIndexOf("\r", end)
-                );
                 const sentenceBreak = Math.max(
                     text.lastIndexOf(". ", end),
                     text.lastIndexOf("؟ ", end),
@@ -157,23 +145,61 @@
                     text.lastIndexOf("۔ ", end)
                 );
                 const spaceBreak = text.lastIndexOf(" ", end);
-
-                if (paragraphBreak >= minimum) {
-                    end = paragraphBreak + 1;
-                    if (text[paragraphBreak] === "\r" && text[paragraphBreak + 1] === "\n") end++;
-                } else if (sentenceBreak >= minimum) {
-                    end = sentenceBreak + 1;
-                } else if (spaceBreak >= minimum) {
-                    end = spaceBreak + 1;
-                }
+                if (sentenceBreak >= minimum) end = sentenceBreak + 1;
+                else if (spaceBreak >= minimum) end = spaceBreak + 1;
             }
-
             if (end <= start) end = Math.min(start + limit, text.length);
             chunks.push(text.slice(start, end));
             start = end;
         }
-
         return chunks;
+    }
+
+    function splitText(value, maxChars) {
+        const text = String(value || "");
+        const limit = Math.max(1000, Number(maxChars) || 4200);
+        if (!text) return [text];
+
+        // Split at original paragraph boundaries before sending text to the model.
+        // Keep each separator attached to its paragraph so joining results is lossless.
+        const chunks = [];
+        let cursor = 0;
+        let pendingLeading = "";
+
+        while (cursor < text.length) {
+            let breakIndex = cursor;
+            while (breakIndex < text.length && text[breakIndex] !== "\r" && text[breakIndex] !== "\n") {
+                breakIndex++;
+            }
+            const paragraph = text.slice(cursor, breakIndex);
+            let separator = "";
+            if (breakIndex < text.length) {
+                separator = text[breakIndex] === "\r" && text[breakIndex + 1] === "\n"
+                    ? "\r\n"
+                    : text[breakIndex];
+            }
+
+            if (paragraph.trim()) {
+                const pieces = splitLongParagraph(paragraph, limit);
+                if (pendingLeading) {
+                    pieces[0] = pendingLeading + pieces[0];
+                    pendingLeading = "";
+                }
+                for (let index = 0; index < pieces.length - 1; index++) chunks.push(pieces[index]);
+                chunks.push(pieces[pieces.length - 1] + separator);
+            } else if (paragraph || separator) {
+                const untouched = paragraph + separator;
+                if (chunks.length) chunks[chunks.length - 1] += untouched;
+                else pendingLeading += untouched;
+            }
+            cursor = breakIndex + separator.length;
+        }
+
+        if (pendingLeading) {
+            if (chunks.length) chunks[0] = pendingLeading + chunks[0];
+            else chunks.push(pendingLeading);
+        }
+        return chunks.length ? chunks : [text];
     }
 
     function fallbackDiff(oldText, newText) {

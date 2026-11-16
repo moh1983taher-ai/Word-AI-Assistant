@@ -34,6 +34,21 @@ for (const [original, revised] of samples) {
     assert.equal(applyDiff(original, operations), revised);
 }
 
+const paragraphBoundaries = "الفقرة الأولى.\r\nالفقرة الثانية.\n\nالفقرة الثالثة.";
+const paragraphChunks = revision.splitText(paragraphBoundaries, 1200);
+assert.deepEqual(paragraphChunks, [
+    "الفقرة الأولى.\r\n",
+    "الفقرة الثانية.\n\n",
+    "الفقرة الثالثة."
+]);
+assert.equal(paragraphChunks.join(""), paragraphBoundaries);
+
+const oversizedParagraph = "كلمة ".repeat(600);
+const oversizedChunks = revision.splitText(oversizedParagraph, 1200);
+assert.ok(oversizedChunks.length > 1);
+assert.equal(oversizedChunks.join(""), oversizedParagraph);
+assert.ok(oversizedChunks.every(chunk => !/[\r\n]/.test(chunk)));
+
 const longDocument = ("فقرة أكاديمية تتناول الفكرة وتحافظ على تسلسلها.\r\n").repeat(180);
 const chunks = revision.splitText(longDocument, 1200);
 assert.ok(chunks.length > 1);
@@ -52,12 +67,12 @@ assert.equal(
     "\r\nفقرة ثانية منقحة."
 );
 assert.equal(
-    revision.normalizeChunkLineBreaks("أولى.\r\nثانية.\n", "أولى منقحة.\nثانية منقحة."),
-    "أولى منقحة.\r\nثانية منقحة.\n"
+    revision.normalizeChunkLineBreaks("أولى.\r\n", "أولى منقحة.\nسطر تابع"),
+    "أولى منقحة. سطر تابع\r\n"
 );
-assert.throws(
-    () => revision.normalizeChunkLineBreaks("أولى.\r\nثانية.", "أولى منقحة وثانية منقحة."),
-    /فواصل الفقرات داخل جزء/
+assert.equal(
+    revision.normalizeChunkLineBreaks("فقرة أصلية.", "فقرة منقحة.\nسطر إضافي"),
+    "فقرة منقحة. سطر إضافي"
 );
 
 
