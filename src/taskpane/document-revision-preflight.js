@@ -98,6 +98,25 @@
         return ranges;
     }
 
+    function getParagraphLinePrefix(value, position) {
+        const text = String(value || "");
+        const previousBreak = Math.max(
+            text.lastIndexOf("\r", Math.max(0, position - 1)),
+            text.lastIndexOf("\n", Math.max(0, position - 1))
+        );
+        return text.slice(previousBreak + 1, position);
+    }
+
+    function getParagraphLineSuffix(value, position) {
+        const text = String(value || "");
+        const nextCr = text.indexOf("\r", position);
+        const nextLf = text.indexOf("\n", position);
+        let nextBreak = text.length;
+        if (nextCr >= 0) nextBreak = Math.min(nextBreak, nextCr);
+        if (nextLf >= 0) nextBreak = Math.min(nextBreak, nextLf);
+        return text.slice(position, nextBreak);
+    }
+
     function maskChunk(sourceValue, protectedRanges, baseOffset, revisionId) {
         const source = String(sourceValue || "");
         const ranges = Array.isArray(protectedRanges) ? protectedRanges.slice() : [];
@@ -148,7 +167,9 @@
                 paragraphIndex: range.paragraphIndex,
                 start: localStart,
                 end: localEnd,
-                text: protectedText
+                text: protectedText,
+                paragraphPrefix: getParagraphLinePrefix(source, localStart),
+                paragraphSuffix: getParagraphLineSuffix(source, localEnd)
             });
             cursor = localEnd;
         });
@@ -239,6 +260,11 @@
             if (lineBreakCount(output.slice(0, position)) !==
                 lineBreakCount(maskState.text.slice(0, originalPosition))) {
                 throw new Error("نقل النموذج فقرة محمية إلى موضع آخر؛ أُلغي تجهيز النتيجة.");
+            }
+            const actualPrefix = getParagraphLinePrefix(output, position);
+            const actualSuffix = getParagraphLineSuffix(output, position + segment.token.length);
+            if (actualPrefix !== segment.paragraphPrefix || actualSuffix !== segment.paragraphSuffix) {
+                throw new Error("غيّر النموذج موضع الفقرة المحمية داخل سطرها؛ أُلغي تجهيز النتيجة.");
             }
             positions.push(position);
         });
