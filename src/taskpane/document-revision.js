@@ -168,11 +168,24 @@
         return operations;
     }
 
+    async function releasePendingTarget() {
+        if (!pendingTarget || !pendingTarget.range) return;
+        const previous = pendingTarget;
+        pendingTarget = null;
+        try {
+            await Word.run(async function (context) {
+                previous.range.untrack();
+                await context.sync();
+            });
+        } catch (_) {}
+    }
+
     async function capture() {
         if (typeof Word === "undefined" || !Word.run) {
             throw new Error("اتصال Word غير متاح؛ افتح مستند Word ثم أعد المحاولة.");
         }
 
+        await releasePendingTarget();
         let result = null;
         await Word.run(async function (context) {
             const selection = context.document.getSelection();
@@ -190,11 +203,15 @@
                 throw new Error("لا يوجد نص قابل للمعالجة في التحديد أو المستند المفتوح.");
             }
 
+            range.track();
+            await context.sync();
+
             result = {
                 id: "revision-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
                 targetType: targetType,
                 originalText: originalText
             };
+            pendingTarget = { id: result.id, range: range };
         });
 
         return result;
@@ -217,49 +234,110 @@
         });
         matches.load("items");
         await context.sync();
+        matches.items.forEach(function (match) { match.load("text,start,end"); });
+        await context.sync();
 
-        if (matches.items.length !== 1) {
+        const exactMatches = matches.items.filter(function (match) {
+            return String(match.text || "") === String(revision.originalText || "");
+        });
+        if (exactMatches.length !== 1) {
             throw new Error("تعذر تحديد موضع النص الأصلي بصورة فريدة. أعد تحديد النص في Word ثم أرسل طلب المعالجة من جديد.");
         }
 
-        return matches.items[0];
+        return exactMatches[0];
     }
 
     async function apply(revision) {
         if (!revision || !revision.originalText || !revision.text) {
             throw new Error("بيانات التعديل غير مكتملة.");
         }
+        if (!Office.context.requirements.isSetSupported("WordApi", "1.3")) {
+            throw new Error("إصدار Word الحالي لا يدعم تحديد مواضع التغييرات بدقة؛ لم يُعدّل المستند.");
+        }
 
-        const operations = diffText(revision.originalText, revision.text);
+        const originalText = String(revision.originalText);
+        const operations = diffText(originalText, revision.text);
         if (!operations.length) return { applied: false, unchanged: true, changedParts: 0 };
 
         let appliedCount = 0;
 
         await Word.run(async function (context) {
             const range = await resolveTarget(context, revision);
-            range.load("text");
+            range.load("text,start");
             await context.sync();
 
-            if (String(range.text || "") !== String(revision.originalText)) {
+            if (String(range.text || "") !== originalText) {
                 throw new Error("تغير النص الأصلي في Word بعد إرساله للمعالجة؛ أُلغي التطبيق حمايةً للمستند. أعد المعالجة على النص الحالي.");
             }
 
-            const prepared = operations
-                .slice()
-                .sort(function (a, b) { return b.start - a.start; })
-                .map(function (operation) {
-                    if (typeof range.getSubstring !== "function") {
-                        throw new Error("إصدار Word الحالي لا يدعم تطبيق الفروق الدقيقة المطلوبة بأمان.");
+            const prepared = [];
+            for (const operation of operations) {
+                if (operation.length > 0) {
+                    const oldText = originalText.slice(operation.start, operation.start + operation.length);
+                    if (/[\r\n]/.test(oldText)) {
+                        throw new Error("تتضمن النتيجة تغييرًا في فواصل الفقرات؛ أُلغي التطبيق حتى لا تتغير بنية المستند.");
                     }
-                    return {
-                        operation: operation,
-                        target: range.getSubstring(operation.start, operation.length)
-                    };
-                });
+                    const search = range.search(oldText, { matchCase: true, matchWholeWord: false });
+                    search.load("items");
+                    prepared.push({ operation: operation, search: search, kind: "replace" });
+                } else {
+                    const tokens = tokenize(originalText);
+                    const nextToken = tokens.find(function (token) { return token.start === operation.start; });
+                    const previousToken = tokens.slice().reverse().find(function (token) { return token.end === operation.start; });
+                    const anchor = nextToken && !/^\s+$/.test(nextToken.value)
+                        ? { token: nextToken, location: "Before" }
+                        : previousToken && !/^\s+$/.test(previousToken.value)
+                            ? { token: previousToken, location: "After" }
+                            : null;
 
+                    if (operation.start === 0) {
+                        prepared.push({ operation: operation, kind: "boundary-start" });
+                    } else if (operation.start === originalText.length) {
+                        prepared.push({ operation: operation, kind: "boundary-end" });
+                    } else if (anchor) {
+                        const search = range.search(anchor.token.value, { matchCase: true, matchWholeWord: false });
+                        search.load("items");
+                        prepared.push({ operation: operation, search: search, kind: "insert", anchor: anchor });
+                    } else {
+                        throw new Error("تعذر تحديد موضع إضافة إحدى العبارات بأمان؛ لم يُعدّل المستند.");
+                    }
+                }
+            }
+
+            await context.sync();
+
+            const resolved = [];
+            for (const item of prepared) {
+                if (item.kind === "boundary-start") {
+                    resolved.push({ ...item, target: range.getRange("Start") });
+                    continue;
+                }
+                if (item.kind === "boundary-end") {
+                    resolved.push({ ...item, target: range.getRange("End") });
+                    continue;
+                }
+
+                item.search.items.forEach(function (match) { match.load("text,start,end"); });
+                await context.sync();
+                const expectedStart = Number(range.start) + Number(item.operation.start);
+                const matches = item.search.items.filter(function (match) {
+                    return Number(match.start) === expectedStart &&
+                        (item.kind !== "replace" || String(match.text || "") === originalText.slice(
+                            item.operation.start,
+                            item.operation.start + item.operation.length
+                        ));
+                });
+                if (matches.length !== 1) {
+                    throw new Error("تعذر مطابقة أحد مواضع التغيير بصورة دقيقة؛ أُلغي التطبيق دون تعديل المستند.");
+                }
+                resolved.push({ ...item, target: matches[0] });
+            }
+
+            resolved.sort(function (a, b) { return b.operation.start - a.operation.start; });
             const insertedRanges = [];
-            prepared.forEach(function (item) {
-                const inserted = item.target.insertText(item.operation.replacement, "Replace");
+            resolved.forEach(function (item) {
+                const location = item.kind === "insert" ? item.anchor.location : "Replace";
+                const inserted = item.target.insertText(item.operation.replacement, location);
                 if (item.operation.replacement) {
                     inserted.font.color = "#FF0000";
                     insertedRanges.push(inserted);
@@ -272,7 +350,7 @@
 
             if (pendingTarget && pendingTarget.id === revision.id && pendingTarget.range) {
                 try {
-                    context.trackedObjects.remove(pendingTarget.range);
+                    pendingTarget.range.untrack();
                     await context.sync();
                 } catch (_) {}
                 pendingTarget = null;
