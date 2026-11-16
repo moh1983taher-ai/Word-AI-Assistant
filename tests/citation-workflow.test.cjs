@@ -109,6 +109,37 @@ const sameTitleDifferentAuthors = CitationWorkflow.buildUnifiedCitationReference
 );
 assert.equal(sameTitleDifferentAuthors.references.length, 2, "different authors must never be merged only because titles match");
 
+
+const similarButDistinctTitles = CitationWorkflow.buildUnifiedCitationReferences(
+    [
+        {
+            materialId: "eye-title-1",
+            sourceText: "الخليل بن أحمد، كتاب العين",
+            author: "الخليل بن أحمد",
+            title: "كتاب العين",
+            type: "book"
+        },
+        {
+            materialId: "eye-title-2",
+            sourceText: "الخليل بن أحمد، العين",
+            author: "الخليل بن أحمد",
+            title: "العين",
+            type: "book"
+        }
+    ],
+    [
+        { id: "eye-title-1", source: "footnote", noteNumber: 1, originalText: "الخليل بن أحمد، كتاب العين" },
+        { id: "eye-title-2", source: "footnote", noteNumber: 2, originalText: "الخليل بن أحمد، العين" }
+    ],
+    validateSpan
+);
+assert.equal(
+    similarButDistinctTitles.references.length,
+    2,
+    "كتاب العين and العين must remain distinct title identities"
+);
+
+
 const invalidSpan = CitationWorkflow.buildUnifiedCitationReferences(
     [{
         materialId: "footnote-1",
@@ -127,6 +158,10 @@ assert.equal(batches.length, 3, "batching must be bounded by both note count and
 
 const prompt = CitationWorkflow.createCitationSystemPrompt();
 assert.match(prompt, /sourceText/);
+assert.match(prompt, /المنخول 454/);
+assert.match(prompt, /كما نقل عنه الإسنوي/);
+assert.match(prompt, /المنثور، 2\\/362/);
+assert.match(prompt, /كتاب العين/);
 assert.match(prompt, /لا تنشئ قائمة مراجع/);
 assert.doesNotMatch(prompt, /قائمة المراجع النهائية الموحدة/);
 assert.match(prompt, /خيار استقصاء المؤلف غير مفعّل/);
