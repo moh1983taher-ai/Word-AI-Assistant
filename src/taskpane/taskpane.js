@@ -2146,6 +2146,7 @@ function renderProjectReferenceDocuments() {
                 // =====================================================
 
                 const allReferences = [];
+                const failedProjectBatches = [];
 
                 let totalMaterials = 0;
 
@@ -2174,7 +2175,16 @@ function renderProjectReferenceDocuments() {
                 // التحليل الفعلي ولا تُنشأ منها occurrences.
                 // =====================================================
 
-                const PROJECT_REFERENCE_CONTEXT_SIZE = 4;
+                const projectProvider = String(getSavedSettings()?.provider || "openrouter").trim().toLowerCase();
+                const projectBatchSize = projectProvider === "groq"
+                    ? Math.min(PROJECT_REFERENCE_BATCH_SIZE, 8)
+                    : PROJECT_REFERENCE_BATCH_SIZE;
+                const projectBatchChars = projectProvider === "groq"
+                    ? 4500
+                    : projectProvider === "duckai"
+                        ? 7000
+                        : 9000;
+                const PROJECT_REFERENCE_CONTEXT_SIZE = projectProvider === "groq" ? 2 : 4;
                 const totalProjectBatches = projectInputs.reduce(
                     function (total, projectInput) {
                         const materials = Array.isArray(projectInput.processedReferences)
@@ -2182,7 +2192,8 @@ function renderProjectReferenceDocuments() {
                             : [];
                         return total + splitReferenceMaterialsIntoBatches(
                             materials,
-                            PROJECT_REFERENCE_BATCH_SIZE
+                            projectBatchSize,
+                            projectBatchChars
                         ).length;
                     },
                     0
@@ -2259,7 +2270,8 @@ function renderProjectReferenceDocuments() {
                     const batches =
                         splitReferenceMaterialsIntoBatches(
                             processedReferences,
-                            PROJECT_REFERENCE_BATCH_SIZE
+                            projectBatchSize,
+                            projectBatchChars
                         );
 
 
@@ -2417,24 +2429,42 @@ function renderProjectReferenceDocuments() {
                         // تحليل الدفعة مع السياق
                         // =================================================
 
-                        const aiAnalysisResult =
-                            await analyzeReferencesWithAI(
-                                batch,
-                                addMissingAuthors,
-                                contextMaterials
-                            );
+                        const recovery = await analyzeReferenceBatchWithRecovery(
+                            batch,
+                            contextMaterials,
+                            "project-" + (documentIndex + 1) + "-" + (batchIndex + 1),
+                            addMissingAuthors
+                        );
+                        recovery.failed.forEach(function (failure) {
+                            failedProjectBatches.push({
+                                ...failure,
+                                documentName: projectInput.documentName || "مستند المشروع"
+                            });
+                        });
 
-
+                        const aiAnalysisResult = recovery.result;
                         if (
                             !aiAnalysisResult ||
-                            typeof aiAnalysisResult !==
-                                "object"
+                            typeof aiAnalysisResult !== "object" ||
+                            !Array.isArray(aiAnalysisResult.references)
                         ) {
-
-                            throw new Error(
-                                `تعذر تحليل الدفعة ${batchIndex + 1} من المستند: ${projectInput.documentName}`
-                            );
-
+                            completedProjectBatches += 1;
+                            totalMaterials += batch.length;
+                            updateProjectReferenceProgress({
+                                title: "تعذر إكمال دفعة من مستند المشروع",
+                                detail: "تعذر تحليل هذه المجموعة بعد محاولات الاستعادة؛ حُفظت هويّات المواد المتعثرة وانتقل العمل إلى بقية الدفعات.",
+                                percent: totalProjectBatches > 0
+                                    ? 14 + Math.round((completedProjectBatches / totalProjectBatches) * 65)
+                                    : 79,
+                                totalBatches: totalProjectBatches,
+                                completedBatches: completedProjectBatches,
+                                totalDocuments: projectInputs.length,
+                                completedDocuments: completedProjectDocuments,
+                                totalMaterials: projectTotalMaterials,
+                                completedMaterials: totalMaterials,
+                                failedBatches: failedProjectBatches.length
+                            });
+                            continue;
                         }
 
 
@@ -2604,8 +2634,11 @@ function renderProjectReferenceDocuments() {
 
                 updateProjectReferenceProgress({
                     title: "تجميع نتائج التحليل",
-                    detail: "اكتمل تحليل الدفعات؛ يجري الآن دمج المراجع المتشابهة وإزالة التكرار.",
+                    detail: failedProjectBatches.length
+                        ? "اكتمل التحليل الجزئي؛ يجري دمج النتائج التي أمكن استعادتها، مع تسجيل " + failedProjectBatches.length + " دفعة متعثرة."
+                        : "اكتمل تحليل الدفعات؛ يجري الآن دمج المراجع المتشابهة وإزالة التكرار.",
                     percent: 82,
+                    failedBatches: failedProjectBatches.length,
                     totalBatches: totalProjectBatches,
                     completedBatches: completedProjectBatches,
                     totalDocuments: projectInputs.length,
@@ -3179,10 +3212,15 @@ function renderProjectReferenceDocuments() {
                     container
                 ) {
                     const completedProgressHTML = updateProjectReferenceProgress({
-                        title: "اكتمل تحليل مراجع مستندات المشروع",
-                        detail: "اكتمل تحليل المستندات المختارة وتجميع قائمة المراجع الموحدة بنجاح.",
+                        title: failedProjectBatches.length
+                            ? "اكتمل تحليل مراجع المشروع جزئيًا"
+                            : "اكتمل تحليل مراجع مستندات المشروع",
+                        detail: failedProjectBatches.length
+                            ? "حُفظت النتائج المستعادة، مع تعذر استكمال " + failedProjectBatches.length + " دفعة. راجع سجل التعثر قبل اعتماد القائمة."
+                            : "اكتمل تحليل المستندات المختارة وتجميع قائمة المراجع الموحدة بنجاح.",
                         percent: 100,
-                        state: "success",
+                        state: failedProjectBatches.length ? "error" : "success",
+                        failedBatches: failedProjectBatches.length,
                         totalBatches: totalProjectBatches,
                         completedBatches: completedProjectBatches,
                         totalDocuments: projectInputs.length,
@@ -3196,13 +3234,13 @@ function renderProjectReferenceDocuments() {
                         <div class="references-analysis-result">
 
                             <div
-                                class="references-analysis-status success
+                                class="references-analysis-status ${failedProjectBatches.length ? "error" : "success"}
                                     reference-collapsible-header"
                                 data-reference-collapse-toggle
                                 data-reference-collapse-target="project-references-analysis-content">
 
                                 <span>
-                                    ✓ تم تحليل وتوحيد مراجع مستندات المشروع
+                                    ${failedProjectBatches.length ? "⚠ اكتمل تحليل مراجع المشروع جزئيًا" : "✓ تم تحليل وتوحيد مراجع مستندات المشروع"}
                                 </span>
 
                                 <span class="reference-collapsible-arrow">
@@ -3217,6 +3255,11 @@ function renderProjectReferenceDocuments() {
                                 class="references-analysis-info
                                     reference-collapsible-content">
 
+${failedProjectBatches.length ? `
+                                <div class="references-analysis-status error">
+                                    تعذر استكمال ${failedProjectBatches.length} دفعة؛ حُفظت نتائج الدفعات الأخرى، ولم تُخفَ المواد المتعثرة.
+                                </div>
+                                ` : ""}
                                 <div>
                                     المستندات المختارة:
                                     <strong>
@@ -3339,7 +3382,9 @@ function renderProjectReferenceDocuments() {
 
 
                 analyzeProjectReferencesBtn.textContent =
-                    "✓ تم استخراج المراجع";
+                    failedProjectBatches.length > 0
+                        ? "⚠ اكتمل جزئيًا — راجع الدفعات المتعثرة"
+                        : "✓ تم استخراج المراجع";
 
 
             }
@@ -24214,6 +24259,241 @@ async function readJSON(
 }
 
 
+
+// =====================================================
+// AI provider request resilience
+// إدارة موحدة لحدود المزود وإعادة المحاولة
+// =====================================================
+
+function parseAIRetryDelay(value) {
+    const text = String(value || "").trim();
+    if (!text) return 0;
+
+    const minutes = text.match(/([0-9]+(?:\.[0-9]+)?)\s*m/i);
+    const seconds = text.match(/([0-9]+(?:\.[0-9]+)?)\s*s/i);
+    if (minutes || seconds) {
+        return (
+            (minutes ? Number(minutes[1]) * 60000 : 0) +
+            (seconds ? Number(seconds[1]) * 1000 : 0)
+        );
+    }
+
+    const numeric = Number(text);
+    if (Number.isFinite(numeric) && numeric >= 0) return numeric * 1000;
+
+    const dateValue = Date.parse(text);
+    return Number.isFinite(dateValue) ? Math.max(0, dateValue - Date.now()) : 0;
+}
+
+function getAIProviderRetryDelayMs(headers, attempt) {
+    const getHeader = function (name) {
+        try {
+            return headers && typeof headers.get === "function"
+                ? headers.get(name)
+                : "";
+        } catch (error) {
+            return "";
+        }
+    };
+
+    const retryAfter = parseAIRetryDelay(getHeader("retry-after"));
+    const tokenReset = parseAIRetryDelay(getHeader("x-ratelimit-reset-tokens"));
+    const requestReset = parseAIRetryDelay(getHeader("x-ratelimit-reset-requests"));
+    const fallback = Math.min(12000, 1200 * Math.pow(2, attempt));
+
+    return Math.max(250, Math.min(60000, retryAfter || tokenReset || requestReset || fallback));
+}
+
+function createAIProviderRequestError(message, status, options) {
+    const error = new Error(String(message || "تعذر الاتصال بمزود الذكاء الاصطناعي."));
+    const settings = options || {};
+    error.status = Number(status) || 0;
+    error.retryable = settings.retryable === true;
+    error.shouldSplit = settings.shouldSplit === true;
+    error.retryAfterMs = Number(settings.retryAfterMs) || 0;
+    error.provider = String(settings.provider || "");
+    error.model = String(settings.model || "");
+    error.task = String(settings.task || "");
+    return error;
+}
+
+async function requestAIProviderJSON(endpoint, options, context) {
+    const requestContext = context || {};
+    const provider = String(requestContext.provider || "").trim().toLowerCase();
+    const model = String(requestContext.model || "").trim();
+    const task = String(requestContext.task || "ai-request");
+    const requestOptions = Object.assign({}, options || {});
+    let requestBody = null;
+
+    if (typeof requestOptions.body === "string") {
+        try {
+            requestBody = JSON.parse(requestOptions.body);
+        } catch (error) {
+            requestBody = null;
+        }
+    }
+
+    // Groq documents max_completion_tokens as the supported replacement
+    // for the deprecated max_tokens field. Keep a conservative output budget
+    // and lower it again when the provider reports the account's exact OTPM cap.
+    if (provider === "groq" && requestBody && typeof requestBody === "object") {
+        const defaultBudget = task === "reference-name-normalization" ? 750 : 850;
+        const requestedBudget = Number(
+            requestBody.max_completion_tokens ||
+            requestBody.max_tokens ||
+            requestContext.maxOutputTokens ||
+            defaultBudget
+        );
+        requestBody.max_completion_tokens = Math.max(
+            64,
+            Math.min(
+                Number.isFinite(requestedBudget) && requestedBudget > 0 ? requestedBudget : defaultBudget,
+                Number(requestContext.maxOutputTokens) || defaultBudget,
+                defaultBudget
+            )
+        );
+        delete requestBody.max_tokens;
+        requestOptions.body = JSON.stringify(requestBody);
+    }
+
+    const maxAttempts = 3;
+    let lastNetworkError = null;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        let response;
+
+        try {
+            response = await fetch(endpoint, requestOptions);
+        } catch (networkError) {
+            lastNetworkError = networkError;
+            if (attempt < maxAttempts - 1) {
+                await new Promise(function (resolve) {
+                    setTimeout(resolve, Math.min(12000, 1200 * Math.pow(2, attempt)));
+                });
+                continue;
+            }
+
+            throw createAIProviderRequestError(
+                String(networkError?.message || networkError || "تعذر الوصول إلى مزود الذكاء الاصطناعي."),
+                0,
+                {
+                    provider: provider,
+                    model: model,
+                    task: task,
+                    retryable: true
+                }
+            );
+        }
+
+        const result = await readJSON(response);
+        if (response.ok) return result;
+
+        const message = String(
+            getAPIError(result, "فشل طلب الذكاء الاصطناعي (" + response.status + ").")
+        );
+        const outputLimitMatch = message.match(
+            /output tokens per minute[\s\S]{0,180}?Limit\s*[:=]?\s*(\d+)[\s\S]{0,100}?Requested\s*[:=]?\s*(\d+)/i
+        );
+        const outputLimit = outputLimitMatch ? Number(outputLimitMatch[1]) : 0;
+        const currentOutputBudget = Number(
+            requestBody?.max_completion_tokens ||
+            requestBody?.max_tokens ||
+            0
+        );
+
+        if (
+            provider === "groq" &&
+            outputLimit > 0 &&
+            currentOutputBudget > 0 &&
+            currentOutputBudget > Math.floor(outputLimit * 0.8) &&
+            attempt < maxAttempts - 1
+        ) {
+            const requestedOutputMatch = message.match(/Requested\s*[:=]?\s*(\d+)/i);
+            const requestedOutput = requestedOutputMatch ? Number(requestedOutputMatch[1]) : 0;
+            const scaledBudget = requestedOutput > outputLimit
+                ? Math.floor(currentOutputBudget * (outputLimit / requestedOutput) * 0.8)
+                : Math.floor(outputLimit * 0.8);
+            const adjustedBudget = Math.max(64, Math.min(currentOutputBudget - 1, scaledBudget));
+            requestBody.max_completion_tokens = adjustedBudget;
+            delete requestBody.max_tokens;
+            requestOptions.body = JSON.stringify(requestBody);
+
+            console.warn("Groq output budget adjusted to the reported OTPM limit:", {
+                model: model,
+                task: task,
+                outputTokenLimit: outputLimit,
+                previousBudget: currentOutputBudget,
+                adjustedBudget: adjustedBudget
+            });
+            continue;
+        }
+
+        const retryableStatus =
+            response.status === 408 ||
+            response.status === 429 ||
+            response.status === 500 ||
+            response.status === 502 ||
+            response.status === 503 ||
+            response.status === 504;
+        const outputLimitExceeded =
+            /output tokens per minute|\bOTPM\b/i.test(message);
+        const requestTooLarge =
+            response.status === 413 ||
+            /context_length_exceeded|maximum context length|request too large|prompt is too long|input is too large|too many input tokens|input tokens per minute|\bTPM\b/i.test(message);
+
+        const outputBudgetWithinLimit =
+            outputLimit > 0 &&
+            currentOutputBudget > 0 &&
+            currentOutputBudget <= Math.floor(outputLimit * 0.8);
+
+        if (
+            retryableStatus &&
+            attempt < maxAttempts - 1 &&
+            (!outputLimitExceeded || outputBudgetWithinLimit)
+        ) {
+            const retryDelayMs = getAIProviderRetryDelayMs(response.headers, attempt);
+            console.warn("AI provider rate/transient limit; retrying request:", {
+                provider: provider,
+                model: model,
+                task: task,
+                status: response.status,
+                attempt: attempt + 1,
+                retryDelayMs: retryDelayMs,
+                error: message
+            });
+            await new Promise(function (resolve) {
+                setTimeout(resolve, retryDelayMs);
+            });
+            continue;
+        }
+
+        throw createAIProviderRequestError(
+            message,
+            response.status,
+            {
+                provider: provider,
+                model: model,
+                task: task,
+                retryable: retryableStatus,
+                shouldSplit: outputLimitExceeded || requestTooLarge,
+                retryAfterMs: getAIProviderRetryDelayMs(response.headers, attempt)
+            }
+        );
+    }
+
+    throw createAIProviderRequestError(
+        String(lastNetworkError?.message || lastNetworkError || "نفدت محاولات الاتصال بمزود الذكاء الاصطناعي."),
+        0,
+        {
+            provider: provider,
+            model: model,
+            task: task,
+            retryable: true
+        }
+    );
+}
+
+
 // =====================================================
 // API Error
 // =====================================================
@@ -30124,129 +30404,62 @@ other
     // Gemini
     // =====================================================
 
-    if (
-        provider === "gemini"
-    ) {
+    if (provider === "gemini") {
+        const endpoint =
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+                normalizeGeminiModel(model)
+            )}:generateContent?key=${encodeURIComponent(key)}`;
 
-        const response =
-            await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-                    normalizeGeminiModel(model)
-                )}:generateContent?key=${encodeURIComponent(
-                    key
-                )}`,
-                {
-                    method:
-                        "POST",
+        result = await requestAIProviderJSON(
+            endpoint,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    },
+                    contents: [{
+                        role: "user",
+                        parts: [{ text: userPrompt }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        responseMimeType: "application/json"
+                    }
+                })
+            },
+            {
+                provider: provider,
+                model: model,
+                task: "reference-extraction"
+            }
+        );
 
-                    headers:
-                        {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                    body:
-                        JSON.stringify(
-                            {
-                                systemInstruction:
-                                    {
-                                        parts:
-                                            [
-                                                {
-                                                    text:
-                                                        systemPrompt
-                                                }
-                                            ]
-                                    },
-
-                                contents:
-                                    [
-                                        {
-                                            role:
-                                                "user",
-
-                                            parts:
-                                                [
-                                                    {
-                                                        text:
-                                                            userPrompt
-                                                    }
-                                                ]
-                                        }
-                                    ],
-
-                                generationConfig:
-                                    {
-                                        temperature:
-                                            0.1,
-
-                                        responseMimeType:
-                                            "application/json"
-                                    }
-                            }
-                        )
-                }
-            );
-
-
-        result =
-            await readJSON(
-                response
-            );
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Gemini أثناء تحليل المراجع."
-                )
-            );
-
-        }
-
-
-        // لا نعتمد نتيجة Gemini إذا صرّح بأن التوليد توقف بسبب حدّ الإخراج.
         const geminiFinishReason =
             String(result?.candidates?.[0]?.finishReason || "").toUpperCase();
 
         if (geminiFinishReason === "MAX_TOKENS") {
-            throw new Error(
-                "توقف تحليل المراجع لأن رد Gemini تجاوز حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أعد التحليل بدفعات أصغر."
+            const truncatedError = new Error(
+                "توقف تحليل المراجع لأن رد Gemini تجاوز حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أُعيد تقسيم الدفعة."
             );
+            truncatedError.shouldSplit = true;
+            throw truncatedError;
         }
 
-        const answer =
-            extractGeminiAnswer(
-                result
-            );
-
-
-        if (
-            !answer ||
-            !String(
-                answer
-            ).trim()
-        ) {
-
-            throw new Error(
-                "أعاد Gemini استجابة فارغة."
-            );
-
+        const answer = extractGeminiAnswer(result);
+        if (!answer || !String(answer).trim()) {
+            const emptyAnswerError = new Error("أعاد Gemini استجابة فارغة.");
+            emptyAnswerError.retryable = true;
+            emptyAnswerError.shouldSplit = true;
+            throw emptyAnswerError;
         }
-
 
         return hydrateAIResult(
-            parseUnifiedReferenceAIResult(
-                answer
-            )
+            parseUnifiedReferenceAIResult(answer)
         );
 
     }
-
 
     // =====================================================
     // OpenAI / OpenRouter / Groq
@@ -30310,90 +30523,47 @@ other
             }).length
         );
     }
-    const response =
-        await fetch(
-            endpoint,
-            {
-                method:
-                    "POST",
+    const requestBody = {
+        model: model,
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+    };
 
-                headers:
-                    headers,
-
-                body:
-                    JSON.stringify(
-                        {
-                            model:
-                                model,
-
-                            messages:
-                                [
-                                    {
-                                        role:
-                                            "system",
-
-                                        content:
-                                            systemPrompt
-                                    },
-
-                                    {
-                                        role:
-                                            "user",
-
-                                        content:
-                                            userPrompt
-                                    }
-                                ],
-
-                            temperature:
-                                0.1,
-
-                            response_format:
-                                {
-                                    type:
-                                        "json_object"
-                                },
-
-                            max_tokens:
-                            provider === "duckai"
-                                ? 12000
-                                : provider === "groq"
-                                    ? 4096
-                                    : 24000
-                        }
-                    )
-            }
-        );
-
-
-    result =
-        await readJSON(
-            response
-        );
-
-
-    if (
-        !response.ok
-    ) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                `فشل الاتصال بـ ${provider} أثناء تحليل المراجع.`
-            )
-        );
-
+    if (provider === "groq") {
+        requestBody.max_completion_tokens = 850;
+    } else {
+        requestBody.max_tokens = provider === "duckai" ? 12000 : 24000;
     }
 
+    result = await requestAIProviderJSON(
+        endpoint,
+        {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify(requestBody)
+        },
+        {
+            provider: provider,
+            model: model,
+            task: "reference-extraction",
+            maxOutputTokens: provider === "groq" ? 850 : undefined
+        }
+    );
 
     // لا نعتمد نتيجة جزئية إذا انتهى التوليد عند حدّ الإخراج.
     const finishReason =
         String(result?.choices?.[0]?.finish_reason || "").toLowerCase();
 
     if (["length", "max_tokens", "max_output_tokens"].includes(finishReason)) {
-        throw new Error(
-            `توقف تحليل المراجع لدى ${provider} بسبب حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أعد التحليل بدفعات أصغر.`
+        const truncatedError = new Error(
+            `توقف تحليل المراجع لدى ${provider} بسبب حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أُعيد تقسيم الدفعة.`
         );
+        truncatedError.shouldSplit = true;
+        throw truncatedError;
     }
 
     const answer =
@@ -30410,9 +30580,9 @@ other
         ).trim()
     ) {
 
-        throw new Error(
-            `أعاد ${provider} استجابة فارغة.`
-        );
+        const emptyAnswerError = new Error(`أعاد ${provider} استجابة فارغة.`);
+        emptyAnswerError.shouldSplit = true;
+        throw emptyAnswerError;
 
     }
 
@@ -30423,6 +30593,158 @@ other
         )
     );
 
+}
+
+
+// =====================================================
+// Reference batch recovery
+// استعادة دفعات المراجع لجميع مصادر العمل
+// =====================================================
+
+async function analyzeReferenceBatchWithRecovery(
+    targetBatch,
+    targetContext,
+    batchLabel,
+    addMissingAuthors = false
+) {
+    const provider = String(getSavedSettings()?.provider || "openrouter").trim().toLowerCase();
+
+    async function recover(batch, label, depth) {
+        let lastError = null;
+        const attempts = provider === "duckai" ? 3 : 1;
+
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            try {
+                const result = await analyzeReferencesWithAI(
+                    batch,
+                    Boolean(addMissingAuthors),
+                    targetContext
+                );
+
+                if (!result || typeof result !== "object" || !Array.isArray(result.references)) {
+                    const invalidResultError = new Error(
+                        "لم تصل نتيجة مراجع صحيحة من الدفعة " + label + "."
+                    );
+                    invalidResultError.retryable = true;
+                    throw invalidResultError;
+                }
+
+                return { result: result, failed: [] };
+            } catch (error) {
+                lastError = error;
+                const message = String(error?.message || error || "");
+                const retryableDuckError =
+                    provider === "duckai" &&
+                    (
+                        error?.retryable === true ||
+                        /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(message)
+                    );
+
+                console.warn("Reference batch attempt failed:", {
+                    batch: label,
+                    attempt: attempt + 1,
+                    provider: provider,
+                    materials: batch.length,
+                    shouldSplit: error?.shouldSplit === true,
+                    error: message
+                });
+
+                if (!retryableDuckError || attempt === attempts - 1) break;
+
+                await new Promise(function (resolve) {
+                    setTimeout(resolve, 900 * (attempt + 1));
+                });
+            }
+        }
+
+        const lastMessage = String(
+            lastError?.message || lastError || "تعذر الحصول على نتيجة صحيحة."
+        );
+        const retryableDuckError =
+            provider === "duckai" &&
+            (
+                lastError?.retryable === true ||
+                /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(lastMessage)
+            );
+        const canSplit =
+            batch.length > 1 &&
+            depth < 12 &&
+            (
+                lastError?.shouldSplit === true ||
+                retryableDuckError
+            );
+
+        if (!canSplit) {
+            return {
+                result: null,
+                failed: [{
+                    index: label,
+                    message: lastMessage,
+                    status: Number(lastError?.status || 0),
+                    materialIds: batch.map(function (item) {
+                        return String(item?.id || "");
+                    }).filter(Boolean)
+                }]
+            };
+        }
+
+        const midpoint = Math.ceil(batch.length / 2);
+        const leftBatch = batch.slice(0, midpoint);
+        const rightBatch = batch.slice(midpoint);
+
+        console.warn("Splitting failed reference batch for recovery:", {
+            batch: label,
+            provider: provider,
+            originalMaterials: batch.length,
+            leftMaterials: leftBatch.length,
+            rightMaterials: rightBatch.length,
+            reason: lastMessage
+        });
+
+        const left = await recover(leftBatch, label + "a", depth + 1);
+        const right = await recover(rightBatch, label + "b", depth + 1);
+
+        const recoveredReferences = [];
+        const recoveredStats = {
+            totalMaterials: 0,
+            referenceCount: 0,
+            multipleReferenceCount: 0,
+            ibidCount: 0,
+            internalReferenceCount: 0,
+            hadithCount: 0,
+            explanatoryCount: 0,
+            mixedCount: 0,
+            reviewCount: 0
+        };
+
+        [left.result, right.result].forEach(function (partResult) {
+            if (!partResult) return;
+            recoveredReferences.push(...partResult.references);
+            const partStats =
+                partResult.stats && typeof partResult.stats === "object"
+                    ? partResult.stats
+                    : {};
+            Object.keys(recoveredStats).forEach(function (key) {
+                recoveredStats[key] += Number(partStats[key] || 0);
+            });
+        });
+
+        const failed = [...left.failed, ...right.failed];
+        const hasSuccessfulPart = Boolean(left.result || right.result);
+
+        return {
+            result: hasSuccessfulPart || failed.length === 0
+                ? { references: recoveredReferences, stats: recoveredStats }
+                : null,
+            failed: failed
+        };
+    }
+
+    return recover(
+        Array.isArray(targetBatch) ? targetBatch : [],
+        String(batchLabel || "1"),
+        0
+    );
 }
 
 function normalizeOccurrence(occurrence) {
@@ -30853,121 +31175,213 @@ function parseReferenceAIJSON(
              ? { ...reference, authorFull: authorFull }
              : reference;
      });
-     const batchSize = provider === "groq" ? 16 : 24;
 
-     for (let start = 0; start < compactReferences.length; start += batchSize) {
-         const batch = compactReferences.slice(start, start + batchSize);
+     const batchSize = provider === "groq" ? 6 : 24;
+     const normalizationFailures = [];
+
+     const normalizeFrequencyValue = function (value) {
+         return String(value || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+     };
+
+     const relevantFrequencyForBatch = function (batch) {
+         const terms = [];
+         batch.forEach(function (item) {
+             [item.author, item.title].concat(item.variantTexts || []).forEach(function (value) {
+                 const term = normalizeFrequencyValue(value);
+                 if (term && !terms.includes(term)) terms.push(term);
+             });
+         });
+
+         const filterEntries = function (entries) {
+             return entries.filter(function (entry) {
+                 const form = normalizeFrequencyValue(entry?.form);
+                 if (!form) return false;
+                 return terms.some(function (term) {
+                     return term === form || term.includes(form) || form.includes(term);
+                 });
+             }).slice(0, 40);
+         };
+
+         return {
+             authors: filterEntries(documentFrequency.authors),
+             titles: filterEntries(documentFrequency.titles)
+         };
+     };
+
+     async function normalizeBatchWithRecovery(batch, batchNumber, depth) {
+         const batchTerms = relevantFrequencyForBatch(batch);
          const userPrompt = JSON.stringify({
              addMissingAuthors: Boolean(addMissingAuthors),
-             documentFrequency: documentFrequency,
+             documentFrequency: batchTerms,
              references: batch
          });
 
-         let answer = "";
+         try {
+             let result;
+             let answer = "";
 
-         if (provider === "gemini") {
-             const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" +
-                 encodeURIComponent(normalizeGeminiModel(model)) +
-                 ":generateContent?key=" + encodeURIComponent(key);
-             const response = await fetch(endpoint, {
-                 method: "POST",
-                 headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify({
-                     systemInstruction: { parts: [{ text: systemPrompt }] },
-                     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-                     generationConfig: {
-                         temperature: 0.1,
-                         responseMimeType: "application/json",
-                         maxOutputTokens: 5000
-                     }
-                 })
-             });
-             const result = await readJSON(response);
-             if (!response.ok) throw new Error(getAPIError(result, "فشل توحيد أسماء الكتب والمؤلفين."));
-             if (String(result?.candidates?.[0]?.finishReason || "").toUpperCase() === "MAX_TOKENS") {
-                 throw new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
-             }
-             answer = extractGeminiAnswer(result);
-         } else {
-             const endpoint = provider === "duckai"
-                 ? "http://127.0.0.1:8080/v1/chat/completions"
-                 : provider === "openai"
-                     ? "https://api.openai.com/v1/chat/completions"
-                     : provider === "groq"
-                         ? "https://api.groq.com/openai/v1/chat/completions"
-                         : "https://openrouter.ai/api/v1/chat/completions";
+             if (provider === "gemini") {
+                 const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" +
+                     encodeURIComponent(normalizeGeminiModel(model)) +
+                     ":generateContent?key=" + encodeURIComponent(key);
 
-             const headers = { "Content-Type": "application/json" };
-             if (provider !== "duckai") headers.Authorization = "Bearer " + key;
-             if (provider === "openrouter") {
-                 headers["HTTP-Referer"] = window.location.href;
-                 headers["X-Title"] = "Research Tools";
-             }
+                 result = await requestAIProviderJSON(endpoint, {
+                     method: "POST",
+                     headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify({
+                         systemInstruction: { parts: [{ text: systemPrompt }] },
+                         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                         generationConfig: {
+                             temperature: 0.1,
+                             responseMimeType: "application/json",
+                             maxOutputTokens: 5000
+                         }
+                     })
+                 }, {
+                     provider: provider,
+                     model: model,
+                     task: "reference-name-normalization"
+                 });
 
-             const response = await fetch(endpoint, {
-                 method: "POST",
-                 headers: headers,
-                 body: JSON.stringify({
+                 if (String(result?.candidates?.[0]?.finishReason || "").toUpperCase() === "MAX_TOKENS") {
+                     const truncatedError = new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
+                     truncatedError.shouldSplit = true;
+                     throw truncatedError;
+                 }
+                 answer = extractGeminiAnswer(result);
+             } else {
+                 const endpoint = provider === "duckai"
+                     ? "http://127.0.0.1:8080/v1/chat/completions"
+                     : provider === "openai"
+                         ? "https://api.openai.com/v1/chat/completions"
+                         : provider === "groq"
+                             ? "https://api.groq.com/openai/v1/chat/completions"
+                             : "https://openrouter.ai/api/v1/chat/completions";
+
+                 const headers = { "Content-Type": "application/json" };
+                 if (provider !== "duckai") headers.Authorization = "Bearer " + key;
+                 if (provider === "openrouter") {
+                     headers["HTTP-Referer"] = window.location.href;
+                     headers["X-Title"] = "Research Tools";
+                 }
+
+                 const requestBody = {
                      model: model,
                      messages: [
                          { role: "system", content: systemPrompt },
                          { role: "user", content: userPrompt }
                      ],
                      temperature: 0.1,
-                     response_format: { type: "json_object" },
-                     max_tokens: provider === "groq" ? 4000 : 6000
-                 })
-             });
-             const result = await readJSON(response);
-             if (!response.ok) throw new Error(getAPIError(result, "فشل توحيد أسماء الكتب والمؤلفين."));
-             const finishReason = String(result?.choices?.[0]?.finish_reason || "").toLowerCase();
-             if (["length", "max_tokens", "max_output_tokens"].includes(finishReason)) {
-                 throw new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
+                     response_format: { type: "json_object" }
+                 };
+                 if (provider === "groq") {
+                     requestBody.max_completion_tokens = 700;
+                 } else {
+                     requestBody.max_tokens = 6000;
+                 }
+
+                 result = await requestAIProviderJSON(endpoint, {
+                     method: "POST",
+                     headers: headers,
+                     body: JSON.stringify(requestBody)
+                 }, {
+                     provider: provider,
+                     model: model,
+                     task: "reference-name-normalization",
+                     maxOutputTokens: provider === "groq" ? 700 : undefined
+                 });
+
+                 const finishReason = String(result?.choices?.[0]?.finish_reason || "").toLowerCase();
+                 if (["length", "max_tokens", "max_output_tokens"].includes(finishReason)) {
+                     const truncatedError = new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
+                     truncatedError.shouldSplit = true;
+                     throw truncatedError;
+                 }
+                 answer = extractOpenAIStyleAnswer(result, provider);
              }
-             answer = extractOpenAIStyleAnswer(result, provider);
-         }
 
-         let parsed;
-         try {
-             const raw = String(answer || "").trim()
-                 .replace(/^\x60{3}(?:json)?\s*/i, "")
-                 .replace(/\s*\x60{3}$/i, "");
-             parsed = JSON.parse(raw);
-         } catch (error) {
-             throw new Error("تعذر قراءة نتيجة توحيد أسماء الكتب والمؤلفين بصيغة JSON.");
-         }
+             let parsed;
+             try {
+                 const raw = String(answer || "").trim()
+                     .replace(/^\x60{3}(?:json)?\s*/i, "")
+                     .replace(/\s*\x60{3}$/i, "");
+                 parsed = JSON.parse(raw);
+             } catch (error) {
+                 const invalidJsonError = new Error("تعذر قراءة نتيجة توحيد أسماء الكتب والمؤلفين بصيغة JSON.");
+                 invalidJsonError.shouldSplit = true;
+                 throw invalidJsonError;
+             }
 
-         if (!parsed || !Array.isArray(parsed.items)) {
-             throw new Error("نتيجة توحيد أسماء الكتب والمؤلفين لا تحتوي قائمة items صحيحة.");
-         }
+             if (!parsed || !Array.isArray(parsed.items)) {
+                 const invalidItemsError = new Error("نتيجة توحيد أسماء الكتب والمؤلفين لا تحتوي قائمة items صحيحة.");
+                 invalidItemsError.shouldSplit = true;
+                 throw invalidItemsError;
+             }
 
-         const batchIndexes = new Set(batch.map(function (item) { return item.index; }));
-         const seenIndexes = new Set();
-
-         parsed.items.forEach(function (item) {
-             const index = Number(item?.index);
-             if (!Number.isInteger(index) || !batchIndexes.has(index) || seenIndexes.has(index)) return;
-             seenIndexes.add(index);
-
-             const original = normalized[index];
-             if (!original || typeof original !== "object") return;
-
-             const canonicalTitle = String(item?.title || "").trim();
-             const canonicalAuthor = String(item?.author || "").trim();
-
-             if (canonicalTitle) normalized[index] = { ...normalized[index], title: canonicalTitle };
-             if (canonicalAuthor) normalized[index] = { ...normalized[index], author: canonicalAuthor };
-         });
-
-         if (seenIndexes.size !== batch.length) {
-             console.warn("توحيد الأسماء أعاد عددًا أقل من السجلات المطلوبة؛ حُفظت الصيغ الأصلية للسجلات الناقصة.", {
-                 expected: batch.length,
-                 received: seenIndexes.size,
-                 batch: start / batchSize + 1
+             const batchIndexes = new Set(batch.map(function (item) { return item.index; }));
+             const itemsByIndex = new Map();
+             parsed.items.forEach(function (item) {
+                 const index = Number(item?.index);
+                 if (!Number.isInteger(index) || !batchIndexes.has(index) || itemsByIndex.has(index)) return;
+                 itemsByIndex.set(index, item);
              });
+
+             if (itemsByIndex.size !== batch.length) {
+                 const incompleteError = new Error(
+                     "أعاد نموذج التوحيد " + itemsByIndex.size + " سجلًا من أصل " + batch.length + "."
+                 );
+                 incompleteError.shouldSplit = true;
+                 throw incompleteError;
+             }
+
+             // Apply only after the complete batch has been validated, so a partial
+             // JSON response can never leave a half-updated batch.
+             batch.forEach(function (batchItem) {
+                 const item = itemsByIndex.get(batchItem.index);
+                 const original = normalized[batchItem.index];
+                 if (!original || typeof original !== "object") return;
+
+                 const canonicalTitle = String(item?.title || "").trim();
+                 const canonicalAuthor = String(item?.author || "").trim();
+
+                 if (canonicalTitle) normalized[batchItem.index] = { ...normalized[batchItem.index], title: canonicalTitle };
+                 if (canonicalAuthor) normalized[batchItem.index] = { ...normalized[batchItem.index], author: canonicalAuthor };
+             });
+
+         } catch (error) {
+             if (batch.length > 1 && error?.shouldSplit === true && depth < 8) {
+                 const midpoint = Math.ceil(batch.length / 2);
+                 console.warn("Splitting reference-name normalization batch:", {
+                     batch: batchNumber,
+                     model: model,
+                     originalItems: batch.length,
+                     reason: String(error?.message || error)
+                 });
+                 await normalizeBatchWithRecovery(batch.slice(0, midpoint), batchNumber + "a", depth + 1);
+                 await normalizeBatchWithRecovery(batch.slice(midpoint), batchNumber + "b", depth + 1);
+                 return;
+             }
+
+             const failure = {
+                 batch: String(batchNumber),
+                 indexes: batch.map(function (item) { return item.index; }),
+                 message: String(error?.message || error || "تعذر توحيد هذه المجموعة.")
+             };
+             normalizationFailures.push(failure);
+             console.warn("Reference name normalization batch was preserved in its original form:", failure);
          }
      }
 
+     for (let start = 0, batchNumber = 1; start < compactReferences.length; start += batchSize, batchNumber++) {
+         await normalizeBatchWithRecovery(
+             compactReferences.slice(start, start + batchSize),
+             String(batchNumber),
+             0
+         );
+     }
+
+     normalized.normalizationFailures = normalizationFailures;
+     normalized.normalizationStatus = normalizationFailures.length ? "partial" : "complete";
      return normalized;
  }
 
@@ -46067,152 +46481,7 @@ if (referencesContent) {
                                         reviewCount: 0
                                     };
 
-                                    // Recover transient DuckAI empty responses by retrying,
-                                    // then recursively splitting only the failed batch. This
-                                    // prevents one empty completion from dropping every citation
-                                    // in that batch while preserving all successful batch results.
-                                    async function analyzeReferenceBatchWithRecovery(
-                                        targetBatch,
-                                        targetContext,
-                                        batchLabel
-                                    ) {
-                                        let lastError = null;
-
-                                        for (let attempt = 0; attempt < 3; attempt++) {
-                                            try {
-                                                const result = await analyzeReferencesWithAI(
-                                                    targetBatch,
-                                                    addMissingAuthors,
-                                                    targetContext
-                                                );
-
-                                                if (
-                                                    !result ||
-                                                    typeof result !== "object" ||
-                                                    !Array.isArray(result.references)
-                                                ) {
-                                                    const invalidResultError = new Error(
-                                                        "لم تصل نتيجة مراجع صحيحة من الدفعة " +
-                                                        batchLabel + "."
-                                                    );
-                                                    invalidResultError.retryable = true;
-                                                    throw invalidResultError;
-                                                }
-
-                                                return { result: result, failed: [] };
-                                            } catch (error) {
-                                                lastError = error;
-                                                const message = String(error?.message || error || "");
-                                                const retryableDuckError =
-                                                    activeProvider === "duckai" &&
-                                                    (
-                                                        error?.retryable === true ||
-                                                        /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(message)
-                                                    );
-
-                                                console.warn(
-                                                    "Reference batch attempt failed:",
-                                                    {
-                                                        batch: batchLabel,
-                                                        attempt: attempt + 1,
-                                                        retryableDuckError: retryableDuckError,
-                                                        materials: targetBatch.length,
-                                                        error: message
-                                                    }
-                                                );
-
-                                                if (!retryableDuckError || attempt === 2) {
-                                                    break;
-                                                }
-
-                                                await new Promise(function (resolve) {
-                                                    setTimeout(resolve, 900 * (attempt + 1));
-                                                });
-                                            }
-                                        }
-
-                                        const lastMessage = String(
-                                            lastError?.message || lastError || "تعذر الحصول على نتيجة صحيحة."
-                                        );
-                                        const canSplit =
-                                            activeProvider === "duckai" &&
-                                            targetBatch.length > 1 &&
-                                            (
-                                                lastError?.retryable === true ||
-                                                /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(lastMessage)
-                                            );
-
-                                        if (canSplit) {
-                                            const midpoint = Math.ceil(targetBatch.length / 2);
-                                            const leftBatch = targetBatch.slice(0, midpoint);
-                                            const rightBatch = targetBatch.slice(midpoint);
-
-                                            console.warn(
-                                                "Splitting failed DuckAI reference batch:",
-                                                {
-                                                    batch: batchLabel,
-                                                    originalMaterials: targetBatch.length,
-                                                    leftMaterials: leftBatch.length,
-                                                    rightMaterials: rightBatch.length,
-                                                    reason: lastMessage
-                                                }
-                                            );
-
-                                            const left = await analyzeReferenceBatchWithRecovery(
-                                                leftBatch,
-                                                targetContext,
-                                                batchLabel + "a"
-                                            );
-                                            const right = await analyzeReferenceBatchWithRecovery(
-                                                rightBatch,
-                                                targetContext,
-                                                batchLabel + "b"
-                                            );
-
-                                            const recoveredReferences = [];
-                                            const recoveredStats = {
-                                                totalMaterials: 0,
-                                                referenceCount: 0,
-                                                multipleReferenceCount: 0,
-                                                ibidCount: 0,
-                                                internalReferenceCount: 0,
-                                                hadithCount: 0,
-                                                explanatoryCount: 0,
-                                                mixedCount: 0,
-                                                reviewCount: 0
-                                            };
-
-                                            [left.result, right.result].forEach(function (partResult) {
-                                                if (!partResult) return;
-                                                recoveredReferences.push(...partResult.references);
-                                                const partStats =
-                                                    partResult.stats && typeof partResult.stats === "object"
-                                                        ? partResult.stats
-                                                        : {};
-                                                Object.keys(recoveredStats).forEach(function (key) {
-                                                    recoveredStats[key] += Number(partStats[key] || 0);
-                                                });
-                                            });
-
-                                            return {
-                                                result: recoveredReferences.length > 0 || (!left.failed.length && !right.failed.length)
-                                                    ? { references: recoveredReferences, stats: recoveredStats }
-                                                    : null,
-                                                failed: [...left.failed, ...right.failed]
-                                            };
-                                        }
-
-                                        return {
-                                            result: null,
-                                            failed: [{
-                                                index: batchLabel,
-                                                message: lastMessage,
-                                                materialIds: targetBatch.map(function (item) {
-                                                    return String(item?.id || "");
-                                                }).filter(Boolean)
-                                            }]
-                                        };
-                                    }
+                                    // Use the shared provider-aware batch recovery routine.
 
                                     for (
                                         let batchIndex = 0;
@@ -46300,7 +46569,8 @@ if (referencesContent) {
                                         const recovery = await analyzeReferenceBatchWithRecovery(
                                             batch,
                                             contextMaterials,
-                                            String(batchIndex + 1)
+                                            String(batchIndex + 1),
+                                            addMissingAuthors
                                         );
                                         const batchResult = recovery.result;
 
@@ -46421,6 +46691,7 @@ if (referencesContent) {
                                     // توحيد أسماء الكتب والمؤلفين بعد اكتمال جميع الدفعات،
                                     // حتى يستند الاختيار إلى تكرار الصيغ في المستند كله.
                                     let documentWideReferences = aiAnalysisResult.references;
+                                    let normalizationFailures = [];
                                     updateReferenceProgress({
                                         title: "توحيد أسماء الكتب والمؤلفين",
                                         detail: "تجري مراجعة الصيغ الواردة في المستند كله لتثبيت الاسم الأرجح قبل دمج السجلات.",
@@ -46440,7 +46711,14 @@ if (referencesContent) {
                                                 documentWideReferences,
                                                 addMissingAuthors
                                             );
+                                            normalizationFailures = Array.isArray(documentWideReferences?.normalizationFailures)
+                                                ? documentWideReferences.normalizationFailures
+                                                : [];
                                         } catch (normalizationError) {
+                                            normalizationFailures = [{
+                                                batch: "all",
+                                                message: String(normalizationError?.message || normalizationError)
+                                            }];
                                             console.warn(
                                                 "تعذر التوحيد النهائي لأسماء الكتب والمؤلفين؛ ستُحفظ نتائج التحليل الأصلية:",
                                                 normalizationError
@@ -46881,30 +47159,44 @@ if (referencesContent) {
                                     // 10. عرض النتيجة
                                     // =================================================
 
+                                    const hasPartialReferenceResult =
+                                        failedBatches.length > 0 || normalizationFailures.length > 0;
                                     const completedProgressHTML = updateReferenceProgress({
-                                        title: failedBatches.length > 0
+                                        title: hasPartialReferenceResult
                                             ? "اكتمل تحليل المراجع جزئيًا"
                                             : "اكتمل تحليل المراجع",
-                                        detail: failedBatches.length > 0
-                                            ? "اكتمل تحليل الدفعات الممكنة؛ عُرضت النتائج المتاحة مع توضيح الدفعات المتعثرة."
-                                            : "اكتمل تحليل جميع المواد وتوحيد المراجع وإعداد القائمة النهائية.",
+                                        detail: failedBatches.length > 0 && normalizationFailures.length > 0
+                                            ? "بعض دفعات التحليل وتعذر بعض دفعات توحيد الأسماء؛ حُفظت النتائج المتاحة مع بيان مواضع التعثر."
+                                            : failedBatches.length > 0
+                                                ? "اكتمل تحليل الدفعات الممكنة؛ عُرضت النتائج المتاحة مع توضيح الدفعات المتعثرة."
+                                                : normalizationFailures.length > 0
+                                                    ? "اكتمل استخراج المراجع، لكن تعذر توحيد بعض مجموعات الأسماء؛ بقيت صيغها الأصلية دون تغيير."
+                                                    : "اكتمل تحليل جميع المواد وتوحيد المراجع وإعداد القائمة النهائية.",
                                         percent: 100,
-                                        state: "success",
+                                        state: hasPartialReferenceResult ? "error" : "success",
                                         totalBatches: referenceBatches.length,
                                         completedBatches: completedReferenceBatches,
                                         totalMaterials: processedReferences.length,
                                         completedMaterials: completedReferenceMaterials,
-                                        failedBatches: failedBatches.length
+                                        failedBatches: failedBatches.length + normalizationFailures.length
                                     });
 
                                     const partialBatchWarningHTML =
-                                        failedBatches.length > 0
+                                        hasPartialReferenceResult
                                             ? '<div class="references-analysis-status error">' +
-                                                '⚠ اكتمل التحليل جزئيًا؛ تعذرت الدفعات: ' +
-                                                failedBatches.map(function (item) {
-                                                    return item.index;
-                                                }).join("، ") +
-                                                '. عُرضت النتائج التي اكتملت فقط. أعد التحليل لاستكمال البقية.</div>'
+                                                (failedBatches.length > 0
+                                                    ? '⚠ تعذر استكمال دفعات التحليل: ' +
+                                                        failedBatches.map(function (item) {
+                                                            return item.index;
+                                                        }).join("، ") +
+                                                        '. '
+                                                    : '') +
+                                                (normalizationFailures.length > 0
+                                                    ? 'تعذر توحيد أسماء بعض المجموعات (' +
+                                                        normalizationFailures.length +
+                                                        ')؛ حُفظت الصيغ الأصلية لهذه السجلات ولم يُعلن اكتمال التوحيد. '
+                                                    : '') +
+                                                'عُرضت النتائج التي أمكن استعادتها.</div>'
                                             : '';
 
                                     if (referencesAnalysisContainer) {
@@ -46915,12 +47207,12 @@ if (referencesContent) {
                                                 ${partialBatchWarningHTML}
 
                                                 <div
-                                                    class="references-analysis-status success reference-collapsible-header"
+                                                    class="references-analysis-status ${hasPartialReferenceResult ? "error" : "success"} reference-collapsible-header"
                                                     data-reference-collapse-toggle
                                                     data-reference-collapse-target="references-analysis-content">
 
                                                     <span>
-                                                        ✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي
+                                                        ${hasPartialReferenceResult ? "⚠ اكتمل تحليل المراجع جزئيًا" : "✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي"}
                                                     </span>
 
                                                     <span class="reference-collapsible-arrow">
@@ -47062,8 +47354,8 @@ if (referencesContent) {
                                     // =================================================
 
                                     analyzeReferencesBtn.textContent =
-                                        failedBatches.length > 0
-                                            ? "⚠ اكتمل جزئيًا — أعد التحليل لاستكمال الدفعات"
+                                        failedBatches.length > 0 || normalizationFailures.length > 0
+                                            ? "⚠ اكتمل جزئيًا — راجع الدفعات أو توحيد الأسماء"
                                             : "✓ تم التحليل والتوحيد";
 
                                     analyzeReferencesBtn.disabled =
@@ -47095,6 +47387,12 @@ if (referencesContent) {
                                                 failedBatches.map(function (item) {
                                                     return item.index;
                                                 }),
+
+                                            normalizationStatus:
+                                                normalizationFailures.length > 0 ? "partial" : "complete",
+
+                                            normalizationFailures:
+                                                normalizationFailures,
 
                                             referenceCount:
                                                 referenceCount,
