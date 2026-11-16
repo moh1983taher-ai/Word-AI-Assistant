@@ -92,8 +92,7 @@
         });
     }
 
-    // Restore chunk-edge paragraph separators that language models commonly omit.
-    // Internal paragraph boundaries must still match exactly; otherwise fail safely.
+    // Normalize a single paragraph's model output and restore its original edge separators.
     // Each model request handles one paragraph. Restore source separators and
     // flatten any line breaks introduced inside the revised paragraph.
     function normalizeChunkLineBreaks(originalValue, revisedValue) {
