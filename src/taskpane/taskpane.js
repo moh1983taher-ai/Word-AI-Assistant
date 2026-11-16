@@ -405,6 +405,15 @@ const referencesWorkspace =
 const closeReferences =
     document.getElementById("close-references");
 
+const backReferencesSource =
+    document.getElementById("back-references-source");
+
+const referencesHeaderTitle =
+    document.getElementById("references-header-title");
+
+const referencesHeaderSubtitle =
+    document.getElementById("references-header-subtitle");
+
 const referencesContent =
     document.getElementById("references-content");
 
@@ -418,6 +427,16 @@ const referencesSourceWorkspace =
         "references-source-workspace"
     );
 
+function setReferencesHeader(title, subtitle) {
+    if (referencesHeaderTitle) {
+        referencesHeaderTitle.textContent = title;
+    }
+
+    if (referencesHeaderSubtitle) {
+        referencesHeaderSubtitle.textContent = subtitle;
+    }
+}
+
 function showReferenceSourceChooser() {
     if (referencesSourcePanel) {
         referencesSourcePanel.classList.remove("is-hidden");
@@ -427,12 +446,48 @@ function showReferenceSourceChooser() {
         referencesSourceWorkspace.innerHTML = "";
         referencesSourceWorkspace.classList.remove("project-reference-workspace");
     }
+
+    if (backReferencesSource) {
+        backReferencesSource.hidden = true;
+    }
+
+    setReferencesHeader("المراجع", "معالجة مراجع المستندات والمشاريع");
 }
 
-function showReferenceSourceWorkspace() {
+function showReferenceSourceWorkspace(source) {
     if (referencesSourcePanel) {
         referencesSourcePanel.classList.add("is-hidden");
     }
+
+    if (backReferencesSource) {
+        backReferencesSource.hidden = false;
+    }
+
+    if (source === "project-documents") {
+        const projectName =
+            currentProject && currentProject.name
+                ? " — " + currentProject.name
+                : "";
+
+        setReferencesHeader(
+            "مستندات المشروع",
+            "حدد المستندات المراد معالجة مراجعها" + projectName
+        );
+        return;
+    }
+
+    setReferencesHeader(
+        "المستند المفتوح حاليًا في Word",
+        "اختر المعالجة التي تريد تنفيذها"
+    );
+}
+
+if (backReferencesSource) {
+    backReferencesSource.onclick = function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        showReferenceSourceChooser();
+    };
 }
 
 
@@ -1639,24 +1694,13 @@ function renderProjectReferenceDocuments() {
 
     referencesSourceWorkspace.classList.add("project-reference-workspace");
 
-    const referenceSourceBackMarkup = `
-        <div class="reference-source-navigation">
-            <button type="button"
-                    class="reference-source-back"
-                    data-reference-navigation="sources">
-                <span aria-hidden="true">→</span>
-                <span>العودة إلى مصادر العمل</span>
-            </button>
-        </div>
-    `;
-
     if (
         !currentProject ||
         !currentProject.id
     ) {
 
         referencesSourceWorkspace.innerHTML =
-            referenceSourceBackMarkup + `
+            `
             <div class="references-analysis-result">
 
                 <div class="references-analysis-status error">
@@ -1685,7 +1729,7 @@ function renderProjectReferenceDocuments() {
     ) {
 
         referencesSourceWorkspace.innerHTML =
-            referenceSourceBackMarkup + `
+            `
             <div class="references-analysis-result">
 
                 <div class="references-analysis-status">
@@ -1701,40 +1745,7 @@ function renderProjectReferenceDocuments() {
 
 
     referencesSourceWorkspace.innerHTML =
-        referenceSourceBackMarkup + `
-        <div class="references-selected-source">
-
-            <div class="references-selected-icon">
-
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#000000"
-                    stroke-width="1"
-                    stroke-linecap="round"
-                    stroke-linejoin="round">
-
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-
-                </svg>
-
-            </div>
-
-            <div class="references-selected-info">
-
-                <div class="references-selected-title">
-                    مستندات المشروع
-                </div>
-
-                <div class="references-selected-name">
-                    حدد المستندات
-                </div>
-
-            </div>
-
-        </div>
-
+        `
         <div class="project-reference-documents-box">
 
             <div class="project-reference-documents-actions">
@@ -44628,16 +44639,6 @@ if (referencesContent) {
     }
     loadReferenceStyle();
 
-    referencesContent.addEventListener("click", function (event) {
-        const backButton = event.target.closest('[data-reference-navigation="sources"]');
-        if (!backButton) return;
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        showReferenceSourceChooser();
-    });
-
     referencesContent
         .querySelectorAll(
             ".references-source-option"
@@ -44663,7 +44664,7 @@ if (referencesContent) {
                             return;
                         }
 
-                        showReferenceSourceWorkspace();
+                        showReferenceSourceWorkspace(source);
 
                         // =====================================================
                         // مستندات المشروع
@@ -44707,45 +44708,6 @@ if (referencesContent) {
 
                         referencesSourceWorkspace.innerHTML =
                             `
-                            <div class="reference-source-navigation">
-                                <button type="button"
-                                        class="reference-source-back"
-                                        data-reference-navigation="sources">
-                                    <span aria-hidden="true">→</span>
-                                    <span>العودة إلى مصادر العمل</span>
-                                </button>
-                            </div>
-
-                            <div class="references-selected-source">
-
-                                <div class="references-selected-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                         viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="1"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round"
-                                         aria-hidden="true">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                        <polyline points="14 2 14 8 20 8"/>
-                                        <line x1="8" y1="13" x2="16" y2="13"/>
-                                        <line x1="8" y1="17" x2="16" y2="17"/>
-                                        <line x1="8" y1="9" x2="10" y2="9"/>
-                                    </svg>
-                                </div>
-
-                                <div class="references-selected-info">
-                                    <div class="references-selected-title">
-                                        المستند المفتوح حاليًا في Word
-                                    </div>
-                                    <div class="references-selected-name">
-                                        اختر نوع المعالجة التي تريد تنفيذها
-                                    </div>
-                                </div>
-
-                            </div>
-
                             <div class="reference-operation-shell" data-active-operation="bibliography">
 
                                 <div class="reference-operation-scroll">
