@@ -45027,7 +45027,12 @@ async function sendMessage() {
                 break;
             }
 
-            revisedChunks.push(parsedRevision.text);
+            if (!window.DocumentRevision.hasSameLineBreakCount(chunks[index], parsedRevision.text)) {
+                throw new Error("غيّرت المعالجة عدد فواصل الفقرات في أحد أجزاء المستند؛ أُلغي التطبيق للمحافظة على بنية المستند. أعد المحاولة مع طلب المحافظة على الفقرات.");
+            }
+            revisedChunks.push(
+                window.DocumentRevision.normalizeLineBreaks(chunks[index], parsedRevision.text)
+            );
             if (!revisionMode) {
                 revisionMode = parsedRevision.mode;
             } else if (revisionMode !== parsedRevision.mode) {
