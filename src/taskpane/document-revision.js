@@ -248,13 +248,13 @@
             if (end < text.length) {
                 const minimum = start + Math.floor(limit * 0.55);
                 const sentenceBreak = Math.max(
-                    text.lastIndexOf(". ", end),
-                    text.lastIndexOf("؟ ", end),
-                    text.lastIndexOf("! ", end),
-                    text.lastIndexOf("؛ ", end),
-                    text.lastIndexOf("۔ ", end)
+                    text.lastIndexOf(". ", end - 1),
+                    text.lastIndexOf("؟ ", end - 1),
+                    text.lastIndexOf("! ", end - 1),
+                    text.lastIndexOf("؛ ", end - 1),
+                    text.lastIndexOf("۔ ", end - 1)
                 );
-                const spaceBreak = text.lastIndexOf(" ", end);
+                const spaceBreak = text.lastIndexOf(" ", end - 1);
                 if (sentenceBreak >= minimum) end = sentenceBreak + 1;
                 else if (spaceBreak >= minimum) end = spaceBreak + 1;
             }
@@ -267,8 +267,8 @@
 
     function getRecommendedChunkSize(userInstruction) {
         const instruction = String(userInstruction || "").trim();
-        const asksRewrite = /(?:أعد\\s*صياغ|إعادة\\s*صياغ|حسّن|حسن\\s+(?:الأسلوب|الصياغة)|تحسين\\s+(?:الصياغة|الأسلوب)|اجعل\\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
-        const asksCorrection = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|التصحيح\\s+اللغوي|المراجعة\\s+اللغوية|راجع\\s+(?:لغوي|النص|الفقرة|المستند))/i.test(instruction);
+        const asksRewrite = /(?:أعد\s*صياغ|إعادة\s*صياغ|حسّن|حسن\s+(?:الأسلوب|الصياغة)|تحسين\s+(?:الصياغة|الأسلوب)|اجعل\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
+        const asksCorrection = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|التصحيح\s+اللغوي|المراجعة\s+اللغوية|راجع\s+(?:لغوي|النص|الفقرة|المستند))/i.test(instruction);
 
         // Correction responses contain only localized edits, so they can safely
         // inspect larger batches. Rewriting returns the full text and needs a
@@ -306,16 +306,16 @@
         while (cursor < text.length) {
             let breakIndex = cursor;
             while (breakIndex < text.length &&
-                text[breakIndex] !== "\\r" &&
-                text[breakIndex] !== "\\n") {
+                text[breakIndex] !== "\r" &&
+                text[breakIndex] !== "\n") {
                 breakIndex++;
             }
 
             const paragraph = text.slice(cursor, breakIndex);
             let separator = "";
             if (breakIndex < text.length) {
-                separator = text[breakIndex] === "\\r" && text[breakIndex + 1] === "\\n"
-                    ? "\\r\\n"
+                separator = text[breakIndex] === "\r" && text[breakIndex + 1] === "\n"
+                    ? "\r\n"
                     : text[breakIndex];
             }
 
