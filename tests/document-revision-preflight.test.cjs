@@ -86,7 +86,16 @@ const reversedOutput = orderedMask.text
     .replace("__FIRST__", orderedMask.segments[1].token);
 assert.throws(
     () => preflight.restoreChunk(reversedOutput, orderedMask),
-    /ترتيب الفقرات المحمية/
+    /نقل النموذج|ترتيب الفقرات المحمية/
+);
+
+const movedProtectedToken = orderedMask.text
+    .replace(orderedMask.segments[0].token, "__TOKEN__")
+    .replace(orderedMask.segments[1].token, orderedMask.segments[0].token)
+    .replace("__TOKEN__", orderedMask.segments[1].token);
+assert.throws(
+    () => preflight.restoreChunk(movedProtectedToken, orderedMask),
+    /نقل النموذج|ترتيب الفقرات المحمية/
 );
 
 assert.throws(
