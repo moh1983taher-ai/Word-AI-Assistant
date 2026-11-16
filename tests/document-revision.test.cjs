@@ -93,12 +93,22 @@ for (const [original, revised] of samples) {
 
 const paragraphBoundaries = "الفقرة الأولى.\r\nالفقرة الثانية.\n\nالفقرة الثالثة.";
 const paragraphChunks = revision.splitText(paragraphBoundaries, 1200);
-assert.deepEqual(paragraphChunks, [
-    "الفقرة الأولى.\r\n",
-    "الفقرة الثانية.\n\n",
-    "الفقرة الثالثة."
-]);
+assert.deepEqual(paragraphChunks, [paragraphBoundaries]);
 assert.equal(paragraphChunks.join(""), paragraphBoundaries);
+
+// Many short paragraphs are packed into a few bounded requests, not one request per paragraph.
+const paragraphBatchSource = ("فقرة قصيرة للمراجعة اللغوية.\\r\\n").repeat(180);
+const paragraphBatchChunks = revision.splitText(paragraphBatchSource, 1200);
+assert.ok(paragraphBatchChunks.length > 1);
+assert.ok(paragraphBatchChunks.length < 20);
+assert.equal(paragraphBatchChunks.join(""), paragraphBatchSource);
+assert.ok(paragraphBatchChunks.every(chunk => chunk.length <= 1200));
+
+// Select larger batches for localized proofreading and smaller batches for full rewrites.
+assert.equal(revision.getRecommendedChunkSize("صحح الأخطاء النحوية والإملائية"), 16000);
+assert.equal(revision.getRecommendedChunkSize("أعد صياغة النص بأسلوب أكاديمي"), 8000);
+assert.equal(revision.getRecommendedChunkSize("صحح النص وأعد صياغته"), 8000);
+assert.equal(revision.getRecommendedChunkSize("راجع هذا المستند"), 12000);
 
 const oversizedParagraph = "كلمة ".repeat(600);
 const oversizedChunks = revision.splitText(oversizedParagraph, 1200);
