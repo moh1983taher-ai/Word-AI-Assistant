@@ -2069,8 +2069,34 @@ function renderProjectReferenceDocuments() {
             analyzeProjectReferencesBtn.textContent =
                 "جارٍ قراءة المستندات...";
 
+            const projectAnalysisContainer = document.getElementById(
+                "project-references-analysis-container"
+            );
+            let projectProgressPercent = 2;
+            const updateProjectReferenceProgress = function (details) {
+                const progressDetails = Object.assign({}, details || {});
+                if (progressDetails.percent === undefined) {
+                    progressDetails.percent = projectProgressPercent;
+                }
+                projectProgressPercent = Math.max(
+                    0,
+                    Math.min(100, Math.round(Number(progressDetails.percent) || 0))
+                );
+                return renderReferenceAnalysisProgress(
+                    projectAnalysisContainer,
+                    progressDetails
+                );
+            };
+            updateProjectReferenceProgress({
+                title: "قراءة مستندات المشروع",
+                detail: "يجري تجهيز المستندات المحددة وقراءة مواد المراجع.",
+                percent: projectProgressPercent
+            });
 
             try {
+                await new Promise(function (resolve) {
+                    setTimeout(resolve, 0);
+                });
 
                 // =====================================================
                 // 1. تجهيز المستندات
@@ -2095,6 +2121,25 @@ function renderProjectReferenceDocuments() {
 
                 }
 
+
+                const projectTotalMaterials = projectInputs.reduce(
+                    function (total, projectInput) {
+                        const materials = Array.isArray(projectInput.processedReferences)
+                            ? projectInput.processedReferences
+                            : [];
+                        return total + materials.length;
+                    },
+                    0
+                );
+                updateProjectReferenceProgress({
+                    title: "اكتملت قراءة مستندات المشروع",
+                    detail: "تم تجهيز " + projectInputs.length + " مستندات، ويجري إعداد مواد الإحالة للتحليل.",
+                    percent: 10,
+                    totalDocuments: projectInputs.length,
+                    completedDocuments: 0,
+                    totalMaterials: projectTotalMaterials,
+                    completedMaterials: 0
+                });
 
                 // =====================================================
                 // 2. المتغيرات العامة للنتيجة
@@ -2130,6 +2175,32 @@ function renderProjectReferenceDocuments() {
                 // =====================================================
 
                 const PROJECT_REFERENCE_CONTEXT_SIZE = 4;
+                const totalProjectBatches = projectInputs.reduce(
+                    function (total, projectInput) {
+                        const materials = Array.isArray(projectInput.processedReferences)
+                            ? projectInput.processedReferences
+                            : [];
+                        return total + splitReferenceMaterialsIntoBatches(
+                            materials,
+                            PROJECT_REFERENCE_BATCH_SIZE
+                        ).length;
+                    },
+                    0
+                );
+                let completedProjectBatches = 0;
+                let completedProjectDocuments = 0;
+
+                updateProjectReferenceProgress({
+                    title: "تقسيم مواد المراجع إلى دفعات",
+                    detail: "تم تقسيم " + projectTotalMaterials + " مادة إلى " + totalProjectBatches + " دفعة.",
+                    percent: 14,
+                    totalBatches: totalProjectBatches,
+                    completedBatches: 0,
+                    totalDocuments: projectInputs.length,
+                    completedDocuments: 0,
+                    totalMaterials: projectTotalMaterials,
+                    completedMaterials: 0
+                });
 
 
                 // =====================================================
@@ -2163,9 +2234,21 @@ function renderProjectReferenceDocuments() {
                     if (
                         processedReferences.length === 0
                     ) {
-
+                        completedProjectDocuments += 1;
+                        updateProjectReferenceProgress({
+                            title: "تجاوز مستندًا بلا مواد قابلة للتحليل",
+                            detail: "لا توجد مواد إحالة في " + (projectInput.documentName || "المستند المحدد") + "؛ يستمر التحليل في بقية المستندات.",
+                            percent: totalProjectBatches > 0
+                                ? 14 + Math.round((completedProjectBatches / totalProjectBatches) * 65)
+                                : 79,
+                            totalBatches: totalProjectBatches,
+                            completedBatches: completedProjectBatches,
+                            totalDocuments: projectInputs.length,
+                            completedDocuments: completedProjectDocuments,
+                            totalMaterials: projectTotalMaterials,
+                            completedMaterials: totalMaterials
+                        });
                         continue;
-
                     }
 
 
@@ -2275,6 +2358,24 @@ function renderProjectReferenceDocuments() {
                         analyzeProjectReferencesBtn.textContent =
                             `جارٍ تحليل ${projectInput.documentName} — الدفعة ${batchIndex + 1} من ${batches.length}...`;
 
+                        updateProjectReferenceProgress({
+                            title: "تحليل مستند " + (documentIndex + 1) + " من " + projectInputs.length,
+                            detail: "يجري تحليل " + (projectInput.documentName || "المستند المحدد") +
+                                " — الدفعة " + (batchIndex + 1) + " من " + batches.length +
+                                ". أُرسلت المواد إلى نموذج الذكاء الاصطناعي، ويجري انتظار نتيجة الدفعة.",
+                            percent: totalProjectBatches > 0
+                                ? 14 + Math.round((completedProjectBatches / totalProjectBatches) * 65)
+                                : 79,
+                            totalBatches: totalProjectBatches,
+                            completedBatches: completedProjectBatches,
+                            totalDocuments: projectInputs.length,
+                            completedDocuments: completedProjectDocuments,
+                            totalMaterials: projectTotalMaterials,
+                            completedMaterials: totalMaterials
+                        });
+                        await new Promise(function (resolve) {
+                            setTimeout(resolve, 0);
+                        });
 
                         const addMissingAuthors =
                             addAuthors
@@ -2336,6 +2437,23 @@ function renderProjectReferenceDocuments() {
 
                         }
 
+
+                        completedProjectBatches += 1;
+                        updateProjectReferenceProgress({
+                            title: "اكتملت الدفعة " + completedProjectBatches + " من " + totalProjectBatches,
+                            detail: "اكتمل تحليل " + (projectInput.documentName || "المستند المحدد") +
+                                "؛ جرى استخراج " + (Array.isArray(aiAnalysisResult.references) ? aiAnalysisResult.references.length : 0) +
+                                " مرجعًا من هذه الدفعة.",
+                            percent: totalProjectBatches > 0
+                                ? 14 + Math.round((completedProjectBatches / totalProjectBatches) * 65)
+                                : 79,
+                            totalBatches: totalProjectBatches,
+                            completedBatches: completedProjectBatches,
+                            totalDocuments: projectInputs.length,
+                            completedDocuments: completedProjectDocuments,
+                            totalMaterials: projectTotalMaterials,
+                            completedMaterials: totalMaterials + batch.length
+                        });
 
                         console.log(
                             "نتيجة تحليل دفعة مستند المشروع:",
@@ -2467,8 +2585,34 @@ function renderProjectReferenceDocuments() {
 
                     }
 
+                    completedProjectDocuments += 1;
+                    updateProjectReferenceProgress({
+                        title: "اكتمل تحليل مستند " + completedProjectDocuments + " من " + projectInputs.length,
+                        detail: "اكتملت دفعات هذا المستند؛ يجري الانتقال إلى تجميع المراجع الموحدة.",
+                        percent: totalProjectBatches > 0
+                            ? 14 + Math.round((completedProjectBatches / totalProjectBatches) * 65)
+                            : 79,
+                        totalBatches: totalProjectBatches,
+                        completedBatches: completedProjectBatches,
+                        totalDocuments: projectInputs.length,
+                        completedDocuments: completedProjectDocuments,
+                        totalMaterials: projectTotalMaterials,
+                        completedMaterials: totalMaterials
+                    });
                 }
 
+
+                updateProjectReferenceProgress({
+                    title: "تجميع نتائج التحليل",
+                    detail: "اكتمل تحليل الدفعات؛ يجري الآن دمج المراجع المتشابهة وإزالة التكرار.",
+                    percent: 82,
+                    totalBatches: totalProjectBatches,
+                    completedBatches: completedProjectBatches,
+                    totalDocuments: projectInputs.length,
+                    completedDocuments: completedProjectDocuments,
+                    totalMaterials: projectTotalMaterials,
+                    completedMaterials: totalMaterials
+                });
 
                 // =====================================================
                 // 5. التحقق من النتائج
@@ -2504,6 +2648,18 @@ function renderProjectReferenceDocuments() {
                         finalReferenceResults,
                         referenceStyle.order
                     );
+
+                updateProjectReferenceProgress({
+                    title: "ترتيب قائمة المراجع الموحدة",
+                    detail: "اكتمل دمج المراجع وترتيبها وفق إعدادات القائمة.",
+                    percent: 91,
+                    totalBatches: totalProjectBatches,
+                    completedBatches: completedProjectBatches,
+                    totalDocuments: projectInputs.length,
+                    completedDocuments: completedProjectDocuments,
+                    totalMaterials: projectTotalMaterials,
+                    completedMaterials: totalMaterials
+                });
 
 
                 latestUnifiedReferences =
@@ -2684,6 +2840,18 @@ function renderProjectReferenceDocuments() {
                 // =====================================================
                 // 9. بناء HTML للمراجع
                 // =====================================================
+
+                updateProjectReferenceProgress({
+                    title: "إعداد قائمة المراجع",
+                    detail: "يجري تجهيز عرض المراجع الموحدة وبيانات الاستشهاد المرتبطة بها.",
+                    percent: 96,
+                    totalBatches: totalProjectBatches,
+                    completedBatches: completedProjectBatches,
+                    totalDocuments: projectInputs.length,
+                    completedDocuments: completedProjectDocuments,
+                    totalMaterials: projectTotalMaterials,
+                    completedMaterials: totalMaterials
+                });
 
                 const finalReferenceHTML =
                     finalReferenceResults
@@ -3010,9 +3178,21 @@ function renderProjectReferenceDocuments() {
                 if (
                     container
                 ) {
+                    const completedProgressHTML = updateProjectReferenceProgress({
+                        title: "اكتمل تحليل مراجع مستندات المشروع",
+                        detail: "اكتمل تحليل المستندات المختارة وتجميع قائمة المراجع الموحدة بنجاح.",
+                        percent: 100,
+                        state: "success",
+                        totalBatches: totalProjectBatches,
+                        completedBatches: completedProjectBatches,
+                        totalDocuments: projectInputs.length,
+                        completedDocuments: completedProjectDocuments,
+                        totalMaterials: projectTotalMaterials,
+                        completedMaterials: totalMaterials
+                    });
 
                     container.innerHTML =
-                        `
+                        completedProgressHTML + `
                         <div class="references-analysis-result">
 
                             <div
@@ -3182,9 +3362,21 @@ function renderProjectReferenceDocuments() {
                 if (
                     container
                 ) {
+                    const errorProgressHTML = updateProjectReferenceProgress({
+                        title: "تعذر إكمال تحليل مراجع المشروع",
+                        detail: String(error?.message || "حدث خطأ غير معروف."),
+                        percent: projectProgressPercent,
+                        state: "error",
+                        totalBatches: typeof totalProjectBatches !== "undefined" ? totalProjectBatches : 0,
+                        completedBatches: typeof completedProjectBatches !== "undefined" ? completedProjectBatches : 0,
+                        totalDocuments: typeof projectInputs !== "undefined" && Array.isArray(projectInputs) ? projectInputs.length : selectedIds.length,
+                        completedDocuments: typeof completedProjectDocuments !== "undefined" ? completedProjectDocuments : 0,
+                        totalMaterials: typeof projectTotalMaterials !== "undefined" ? projectTotalMaterials : 0,
+                        completedMaterials: typeof totalMaterials !== "undefined" ? totalMaterials : 0
+                    });
 
                     container.innerHTML =
-                        `
+                        errorProgressHTML + `
                         <div class="references-analysis-result">
 
                             <div class="references-analysis-status error">
@@ -3224,6 +3416,65 @@ function renderProjectReferenceDocuments() {
 }
 
 // =====================================================
+
+function renderReferenceAnalysisProgress(container, details) {
+    const item = details || {};
+    const percent = Math.max(0, Math.min(100, Math.round(Number(item.percent) || 0)));
+    const state = item.state === "success" || item.state === "error"
+        ? item.state
+        : "running";
+    const completedBatches = Math.max(0, Math.floor(Number(item.completedBatches) || 0));
+    const totalBatches = Math.max(0, Math.floor(Number(item.totalBatches) || 0));
+    const completedDocuments = Math.max(0, Math.floor(Number(item.completedDocuments) || 0));
+    const totalDocuments = Math.max(0, Math.floor(Number(item.totalDocuments) || 0));
+    const completedMaterials = Math.max(0, Math.floor(Number(item.completedMaterials) || 0));
+    const totalMaterials = Math.max(0, Math.floor(Number(item.totalMaterials) || 0));
+    const failedBatches = Math.max(0, Math.floor(Number(item.failedBatches) || 0));
+    const meta = [];
+
+    if (totalBatches > 0) {
+        meta.push("دفعات التحليل: <strong>" + completedBatches + " / " + totalBatches + "</strong>");
+    }
+    if (totalMaterials > 0) {
+        meta.push("المواد المعالجة: <strong>" + completedMaterials + " / " + totalMaterials + "</strong>");
+    }
+    if (totalDocuments > 0) {
+        meta.push("المستندات: <strong>" + completedDocuments + " / " + totalDocuments + "</strong>");
+    }
+    if (failedBatches > 0) {
+        meta.push("دفعات متعثرة: <strong>" + failedBatches + "</strong>");
+    }
+
+    const progressHTML = `
+        <div class="citation-progress-card reference-analysis-progress-card"
+             data-state="${state}"
+             role="status"
+             aria-live="polite"
+             aria-busy="${state === "running" ? "true" : "false"}">
+            <div class="citation-progress-heading">
+                <span class="citation-progress-title">${escapeReferenceHTML(item.title || "جارٍ تحليل المراجع")}</span>
+                <strong class="citation-progress-percent">${percent}%</strong>
+            </div>
+            <div class="citation-progress-track"
+                 role="progressbar"
+                 aria-label="نسبة إنجاز تحليل المراجع"
+                 aria-valuemin="0"
+                 aria-valuemax="100"
+                 aria-valuenow="${percent}">
+                <span style="width: ${percent}%"></span>
+            </div>
+            <div class="citation-progress-detail">${escapeReferenceHTML(item.detail || "")}</div>
+            ${meta.length ? '<div class="citation-progress-meta">' + meta.join('<span class="citation-progress-separator">·</span>') + '</div>' : ""}
+        </div>
+    `;
+
+    if (container) {
+        container.innerHTML = progressHTML;
+    }
+
+    return progressHTML;
+}
+
 // قراءة مستندات المشروع المحددة واستخراج نصوصها
 // =====================================================
 
@@ -45617,7 +45868,40 @@ if (referencesContent) {
                                 analyzeReferencesBtn.textContent =
                                     "جارٍ قراءة المستند...";
 
+                                const referencesAnalysisContainer = document.getElementById(
+                                    "references-analysis-container"
+                                );
+                                let referenceProgressPercent = 2;
+                                let completedReferenceBatches = 0;
+                                let completedReferenceMaterials = 0;
+                                const updateReferenceProgress = function (details) {
+                                    const progressDetails = Object.assign({}, details || {});
+                                    if (progressDetails.percent === undefined) {
+                                        progressDetails.percent = referenceProgressPercent;
+                                    }
+                                    referenceProgressPercent = Math.max(
+                                        0,
+                                        Math.min(100, Math.round(Number(progressDetails.percent) || 0))
+                                    );
+                                    return renderReferenceAnalysisProgress(
+                                        referencesAnalysisContainer,
+                                        progressDetails
+                                    );
+                                };
+
+                                if (referencesAnalysisContainer) {
+                                    referencesAnalysisContainer.innerHTML = "";
+                                }
+                                updateReferenceProgress({
+                                    title: "قراءة المستند",
+                                    detail: "يجري جمع نص المتن والحواشي السفلية والختامية لاستخراج مواد الإحالة.",
+                                    percent: referenceProgressPercent
+                                });
+
                                 try {
+                                    await new Promise(function (resolve) {
+                                        setTimeout(resolve, 0);
+                                    });
 
                                     // =================================================
                                     // 1. قراءة المستند
@@ -45668,6 +45952,14 @@ if (referencesContent) {
                                             ? referenceSources.endnotes
                                             : [];
 
+                                    updateReferenceProgress({
+                                        title: "اكتملت قراءة المستند",
+                                        detail: "تم جمع نص المستند و" + footnotes.length +
+                                            " حاشية سفلية و" + endnotes.length +
+                                            " حاشية ختامية. يجري الآن استخراج مواد المراجع.",
+                                        percent: 8
+                                    });
+
                                     // =================================================
                                     // 2. تجهيز المواد الخام
                                     // =================================================
@@ -45692,6 +45984,15 @@ if (referencesContent) {
                                         );
 
                                     }
+
+                                    updateReferenceProgress({
+                                        title: "تجهيز مواد المراجع",
+                                        detail: "تم استخراج " + processedReferences.length +
+                                            " مادة قابلة للتحليل وتنقيتها؛ يجري تقسيمها إلى دفعات.",
+                                        percent: 13,
+                                        totalMaterials: processedReferences.length,
+                                        completedMaterials: 0
+                                    });
 
                                     console.log(
                                         "المواد المرسلة إلى الذكاء الاصطناعي:",
@@ -45737,6 +46038,20 @@ if (referencesContent) {
                                             200,
                                             maxBatchChars
                                         );
+
+                                    completedReferenceBatches = 0;
+                                    completedReferenceMaterials = 0;
+                                    updateReferenceProgress({
+                                        title: "تقسيم مواد المراجع إلى دفعات",
+                                        detail: "تم تقسيم " + processedReferences.length +
+                                            " مادة إلى " + referenceBatches.length +
+                                            " دفعة بحسب حدود مزود الذكاء الاصطناعي.",
+                                        percent: 16,
+                                        totalBatches: referenceBatches.length,
+                                        completedBatches: 0,
+                                        totalMaterials: processedReferences.length,
+                                        completedMaterials: 0
+                                    });
 
                                     const combinedReferences = [];
                                     const failedBatches = [];
@@ -45912,6 +46227,21 @@ if (referencesContent) {
                                                 ? batchStartIndex + batch.length
                                                 : processedReferences.length;
 
+                                        updateReferenceProgress({
+                                            title: "تحليل الدفعة " + (batchIndex + 1) + " من " + referenceBatches.length,
+                                            detail: "يجري إرسال " + batch.length +
+                                                " مادة إلى نموذج الذكاء الاصطناعي لاستخراج بيانات المراجع. ننتظر نتيجة هذه الدفعة.",
+                                            percent: 16 + Math.round((completedReferenceBatches / Math.max(referenceBatches.length, 1)) * 60),
+                                            totalBatches: referenceBatches.length,
+                                            completedBatches: completedReferenceBatches,
+                                            totalMaterials: processedReferences.length,
+                                            completedMaterials: completedReferenceMaterials,
+                                            failedBatches: failedBatches.length
+                                        });
+                                        await new Promise(function (resolve) {
+                                            setTimeout(resolve, 0);
+                                        });
+
                                         // نرفق سياقًا سابقًا ولاحقًا محدود الحجم لفهم
                                         // «المصدر نفسه» دون تضخيم الطلب.
                                         const contextMaterials = [];
@@ -45973,6 +46303,27 @@ if (referencesContent) {
                                             String(batchIndex + 1)
                                         );
                                         const batchResult = recovery.result;
+
+                                        completedReferenceBatches += 1;
+                                        completedReferenceMaterials = Math.max(
+                                            completedReferenceMaterials,
+                                            batchEndIndex
+                                        );
+                                        updateReferenceProgress({
+                                            title: batchResult
+                                                ? "اكتملت الدفعة " + completedReferenceBatches + " من " + referenceBatches.length
+                                                : "تعذر إكمال الدفعة " + completedReferenceBatches + " من " + referenceBatches.length,
+                                            detail: batchResult
+                                                ? "اكتمل تحليل الدفعة واستخراج " + batchResult.references.length +
+                                                    " مرجعًا. ينتقل العمل إلى الدفعة التالية."
+                                                : "تعذر الحصول على نتيجة مكتملة لهذه الدفعة؛ يجري تسجيلها ومتابعة بقية الدفعات.",
+                                            percent: 16 + Math.round((completedReferenceBatches / Math.max(referenceBatches.length, 1)) * 60),
+                                            totalBatches: referenceBatches.length,
+                                            completedBatches: completedReferenceBatches,
+                                            totalMaterials: processedReferences.length,
+                                            completedMaterials: completedReferenceMaterials,
+                                            failedBatches: failedBatches.length + recovery.failed.length
+                                        });
 
                                         if (recovery.failed.length > 0) {
                                             failedBatches.push(...recovery.failed);
@@ -46043,6 +46394,17 @@ if (referencesContent) {
                                     // 4. استخراج الإحصاءات
                                     // =================================================
 
+                                    updateReferenceProgress({
+                                        title: "اكتمل تحليل الدفعات",
+                                        detail: "اكتمل تحليل مواد الدفعات؛ يجري تدقيق صيغ المراجع وتوحيد أسماء الكتب والمؤلفين.",
+                                        percent: 78,
+                                        totalBatches: referenceBatches.length,
+                                        completedBatches: completedReferenceBatches,
+                                        totalMaterials: processedReferences.length,
+                                        completedMaterials: completedReferenceMaterials,
+                                        failedBatches: failedBatches.length
+                                    });
+
                                     const aiStats =
                                         aiAnalysisResult.stats &&
                                         typeof aiAnalysisResult.stats ===
@@ -46059,6 +46421,19 @@ if (referencesContent) {
                                     // توحيد أسماء الكتب والمؤلفين بعد اكتمال جميع الدفعات،
                                     // حتى يستند الاختيار إلى تكرار الصيغ في المستند كله.
                                     let documentWideReferences = aiAnalysisResult.references;
+                                    updateReferenceProgress({
+                                        title: "توحيد أسماء الكتب والمؤلفين",
+                                        detail: "تجري مراجعة الصيغ الواردة في المستند كله لتثبيت الاسم الأرجح قبل دمج السجلات.",
+                                        percent: 82,
+                                        totalBatches: referenceBatches.length,
+                                        completedBatches: completedReferenceBatches,
+                                        totalMaterials: processedReferences.length,
+                                        completedMaterials: completedReferenceMaterials,
+                                        failedBatches: failedBatches.length
+                                    });
+                                    await new Promise(function (resolve) {
+                                        setTimeout(resolve, 0);
+                                    });
                                     if (Array.isArray(documentWideReferences) && documentWideReferences.length) {
                                         try {
                                             documentWideReferences = await canonicalizeReferenceNamesWithAI(
@@ -46072,6 +46447,17 @@ if (referencesContent) {
                                             );
                                         }
                                     }
+
+                                    updateReferenceProgress({
+                                        title: "دمج المراجع المتشابهة",
+                                        detail: "اكتمل تدقيق صيغ الأسماء؛ يجري دمج المراجع المتكررة وإعداد القائمة الموحدة.",
+                                        percent: 90,
+                                        totalBatches: referenceBatches.length,
+                                        completedBatches: completedReferenceBatches,
+                                        totalMaterials: processedReferences.length,
+                                        completedMaterials: completedReferenceMaterials,
+                                        failedBatches: failedBatches.length
+                                    });
 
                                     const finalReferenceResults =
                                         Array.isArray(documentWideReferences)
@@ -46206,6 +46592,17 @@ if (referencesContent) {
                                     // =================================================
                                     // 9. بناء HTML للمراجع النهائية
                                     // =================================================
+
+                                    updateReferenceProgress({
+                                        title: "إعداد قائمة المراجع",
+                                        detail: "يجري تجهيز عرض المراجع الموحدة وبيانات الصفحات ومرات الاستشهاد وصيغ الظهور.",
+                                        percent: 96,
+                                        totalBatches: referenceBatches.length,
+                                        completedBatches: completedReferenceBatches,
+                                        totalMaterials: processedReferences.length,
+                                        completedMaterials: completedReferenceMaterials,
+                                        failedBatches: failedBatches.length
+                                    });
 
                                     const finalReferenceHTML =
                                         finalReferenceResults
@@ -46484,10 +46881,21 @@ if (referencesContent) {
                                     // 10. عرض النتيجة
                                     // =================================================
 
-                                    const referencesAnalysisContainer =
-                                        document.getElementById(
-                                            "references-analysis-container"
-                                        );
+                                    const completedProgressHTML = updateReferenceProgress({
+                                        title: failedBatches.length > 0
+                                            ? "اكتمل تحليل المراجع جزئيًا"
+                                            : "اكتمل تحليل المراجع",
+                                        detail: failedBatches.length > 0
+                                            ? "اكتمل تحليل الدفعات الممكنة؛ عُرضت النتائج المتاحة مع توضيح الدفعات المتعثرة."
+                                            : "اكتمل تحليل جميع المواد وتوحيد المراجع وإعداد القائمة النهائية.",
+                                        percent: 100,
+                                        state: "success",
+                                        totalBatches: referenceBatches.length,
+                                        completedBatches: completedReferenceBatches,
+                                        totalMaterials: processedReferences.length,
+                                        completedMaterials: completedReferenceMaterials,
+                                        failedBatches: failedBatches.length
+                                    });
 
                                     const partialBatchWarningHTML =
                                         failedBatches.length > 0
@@ -46502,7 +46910,7 @@ if (referencesContent) {
                                     if (referencesAnalysisContainer) {
 
                                         referencesAnalysisContainer.innerHTML =
-                                            `
+                                            completedProgressHTML + `
                                             <div class="references-analysis-result">
                                                 ${partialBatchWarningHTML}
 
@@ -46755,6 +47163,16 @@ if (referencesContent) {
                                         escapeReferenceHTML(
                                             errorMessage
                                         );
+
+                                    updateReferenceProgress({
+                                        title: "تعذر إكمال تحليل المراجع",
+                                        detail: errorMessage,
+                                        percent: referenceProgressPercent,
+                                        state: "error",
+                                        completedBatches: completedReferenceBatches,
+                                        totalMaterials: typeof processedReferences !== "undefined" ? processedReferences.length : 0,
+                                        completedMaterials: completedReferenceMaterials
+                                    });
 
                                     referencesSourceWorkspace
                                         .querySelector("#references-analysis-container")
