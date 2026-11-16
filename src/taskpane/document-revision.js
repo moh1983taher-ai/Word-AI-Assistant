@@ -539,6 +539,12 @@
                 throw new Error("لا يوجد نص قابل للمعالجة في التحديد أو المستند المفتوح.");
             }
 
+            if (typeof Office === "undefined" || !Office.context ||
+                !Office.context.requirements ||
+                !Office.context.requirements.isSetSupported("WordApi", "1.3")) {
+                throw new Error("يتطلب التدقيق الآمن WordApi 1.3 على الأقل لضمان شمول الفقرات داخل الجداول وتحديد مواضع التطبيق؛ لم يُرسل النص إلى الذكاء الاصطناعي.");
+            }
+
             let protectedRanges = [];
             const supportsNativeTrackedChanges = typeof Office !== "undefined" &&
                 Office.context &&
