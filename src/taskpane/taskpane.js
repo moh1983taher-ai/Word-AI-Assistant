@@ -24224,8 +24224,8 @@ function parseAIRetryDelay(value) {
     const text = String(value || "").trim();
     if (!text) return 0;
 
-    const minutes = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*m/i);
-    const seconds = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*s/i);
+    const minutes = text.match(/([0-9]+(?:\.[0-9]+)?)\s*m/i);
+    const seconds = text.match(/([0-9]+(?:\.[0-9]+)?)\s*s/i);
     if (minutes || seconds) {
         return (
             (minutes ? Number(minutes[1]) * 60000 : 0) +
@@ -24347,7 +24347,7 @@ async function requestAIProviderJSON(endpoint, options, context) {
             getAPIError(result, "فشل طلب الذكاء الاصطناعي (" + response.status + ").")
         );
         const outputLimitMatch = message.match(
-            /output tokens per minute[\\s\\S]{0,180}?Limit\\s*[:=]?\\s*(\\d+)[\\s\\S]{0,100}?Requested\\s*[:=]?\\s*(\\d+)/i
+            /output tokens per minute[\s\S]{0,180}?Limit\s*[:=]?\s*(\d+)[\s\S]{0,100}?Requested\s*[:=]?\s*(\d+)/i
         );
         const outputLimit = outputLimitMatch ? Number(outputLimitMatch[1]) : 0;
         const currentOutputBudget = Number(
@@ -24386,7 +24386,7 @@ async function requestAIProviderJSON(endpoint, options, context) {
             response.status === 503 ||
             response.status === 504;
         const outputLimitExceeded =
-            /output tokens per minute|\\bOTPM\\b/i.test(message);
+            /output tokens per minute|\bOTPM\b/i.test(message);
         const requestTooLarge =
             response.status === 413 ||
             /context_length_exceeded|maximum context length|request too large|prompt is too long|input is too large|too many input tokens/i.test(message);
@@ -30345,129 +30345,61 @@ other
     // Gemini
     // =====================================================
 
-    if (
-        provider === "gemini"
-    ) {
+    if (provider === "gemini") {
+        const endpoint =
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+                normalizeGeminiModel(model)
+            )}:generateContent?key=${encodeURIComponent(key)}`;
 
-        const response =
-            await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-                    normalizeGeminiModel(model)
-                )}:generateContent?key=${encodeURIComponent(
-                    key
-                )}`,
-                {
-                    method:
-                        "POST",
+        const result = await requestAIProviderJSON(
+            endpoint,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    },
+                    contents: [{
+                        role: "user",
+                        parts: [{ text: userPrompt }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.1,
+                        responseMimeType: "application/json"
+                    }
+                })
+            },
+            {
+                provider: provider,
+                model: model,
+                task: "reference-extraction"
+            }
+        );
 
-                    headers:
-                        {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                    body:
-                        JSON.stringify(
-                            {
-                                systemInstruction:
-                                    {
-                                        parts:
-                                            [
-                                                {
-                                                    text:
-                                                        systemPrompt
-                                                }
-                                            ]
-                                    },
-
-                                contents:
-                                    [
-                                        {
-                                            role:
-                                                "user",
-
-                                            parts:
-                                                [
-                                                    {
-                                                        text:
-                                                            userPrompt
-                                                    }
-                                                ]
-                                        }
-                                    ],
-
-                                generationConfig:
-                                    {
-                                        temperature:
-                                            0.1,
-
-                                        responseMimeType:
-                                            "application/json"
-                                    }
-                            }
-                        )
-                }
-            );
-
-
-        result =
-            await readJSON(
-                response
-            );
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                getAPIError(
-                    result,
-                    "فشل الاتصال بـ Gemini أثناء تحليل المراجع."
-                )
-            );
-
-        }
-
-
-        // لا نعتمد نتيجة Gemini إذا صرّح بأن التوليد توقف بسبب حدّ الإخراج.
         const geminiFinishReason =
             String(result?.candidates?.[0]?.finishReason || "").toUpperCase();
 
         if (geminiFinishReason === "MAX_TOKENS") {
-            throw new Error(
-                "توقف تحليل المراجع لأن رد Gemini تجاوز حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أعد التحليل بدفعات أصغر."
+            const truncatedError = new Error(
+                "توقف تحليل المراجع لأن رد Gemini تجاوز حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أُعيد تقسيم الدفعة."
             );
+            truncatedError.shouldSplit = true;
+            throw truncatedError;
         }
 
-        const answer =
-            extractGeminiAnswer(
-                result
-            );
-
-
-        if (
-            !answer ||
-            !String(
-                answer
-            ).trim()
-        ) {
-
-            throw new Error(
-                "أعاد Gemini استجابة فارغة."
-            );
-
+        const answer = extractGeminiAnswer(result);
+        if (!answer || !String(answer).trim()) {
+            const emptyAnswerError = new Error("أعاد Gemini استجابة فارغة.");
+            emptyAnswerError.retryable = true;
+            throw emptyAnswerError;
         }
-
 
         return hydrateAIResult(
-            parseUnifiedReferenceAIResult(
-                answer
-            )
+            parseUnifiedReferenceAIResult(answer)
         );
 
     }
-
 
     // =====================================================
     // OpenAI / OpenRouter / Groq
@@ -30531,90 +30463,47 @@ other
             }).length
         );
     }
-    const response =
-        await fetch(
-            endpoint,
-            {
-                method:
-                    "POST",
+    const requestBody = {
+        model: model,
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+    };
 
-                headers:
-                    headers,
-
-                body:
-                    JSON.stringify(
-                        {
-                            model:
-                                model,
-
-                            messages:
-                                [
-                                    {
-                                        role:
-                                            "system",
-
-                                        content:
-                                            systemPrompt
-                                    },
-
-                                    {
-                                        role:
-                                            "user",
-
-                                        content:
-                                            userPrompt
-                                    }
-                                ],
-
-                            temperature:
-                                0.1,
-
-                            response_format:
-                                {
-                                    type:
-                                        "json_object"
-                                },
-
-                            max_tokens:
-                            provider === "duckai"
-                                ? 12000
-                                : provider === "groq"
-                                    ? 4096
-                                    : 24000
-                        }
-                    )
-            }
-        );
-
-
-    result =
-        await readJSON(
-            response
-        );
-
-
-    if (
-        !response.ok
-    ) {
-
-        throw new Error(
-            getAPIError(
-                result,
-                `فشل الاتصال بـ ${provider} أثناء تحليل المراجع.`
-            )
-        );
-
+    if (provider === "groq") {
+        requestBody.max_completion_tokens = 850;
+    } else {
+        requestBody.max_tokens = provider === "duckai" ? 12000 : 24000;
     }
 
+    const result = await requestAIProviderJSON(
+        endpoint,
+        {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify(requestBody)
+        },
+        {
+            provider: provider,
+            model: model,
+            task: "reference-extraction",
+            maxOutputTokens: provider === "groq" ? 850 : undefined
+        }
+    );
 
     // لا نعتمد نتيجة جزئية إذا انتهى التوليد عند حدّ الإخراج.
     const finishReason =
         String(result?.choices?.[0]?.finish_reason || "").toLowerCase();
 
     if (["length", "max_tokens", "max_output_tokens"].includes(finishReason)) {
-        throw new Error(
-            `توقف تحليل المراجع لدى ${provider} بسبب حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أعد التحليل بدفعات أصغر.`
+        const truncatedError = new Error(
+            `توقف تحليل المراجع لدى ${provider} بسبب حد الإخراج؛ لم تُعتمد النتيجة الجزئية. أُعيد تقسيم الدفعة.`
         );
+        truncatedError.shouldSplit = true;
+        throw truncatedError;
     }
 
     const answer =
@@ -30644,6 +30533,157 @@ other
         )
     );
 
+}
+
+
+// =====================================================
+// Reference batch recovery
+// استعادة دفعات المراجع لجميع مصادر العمل
+// =====================================================
+
+async function analyzeReferenceBatchWithRecovery(
+    targetBatch,
+    targetContext,
+    batchLabel
+) {
+    const provider = String(getSavedSettings()?.provider || "openrouter").trim().toLowerCase();
+
+    async function recover(batch, label, depth) {
+        let lastError = null;
+        const attempts = provider === "duckai" ? 3 : 1;
+
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            try {
+                const result = await analyzeReferencesWithAI(
+                    batch,
+                    Boolean(getSavedSettings()?.addMissingAuthors),
+                    targetContext
+                );
+
+                if (!result || typeof result !== "object" || !Array.isArray(result.references)) {
+                    const invalidResultError = new Error(
+                        "لم تصل نتيجة مراجع صحيحة من الدفعة " + label + "."
+                    );
+                    invalidResultError.retryable = true;
+                    throw invalidResultError;
+                }
+
+                return { result: result, failed: [] };
+            } catch (error) {
+                lastError = error;
+                const message = String(error?.message || error || "");
+                const retryableDuckError =
+                    provider === "duckai" &&
+                    (
+                        error?.retryable === true ||
+                        /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(message)
+                    );
+
+                console.warn("Reference batch attempt failed:", {
+                    batch: label,
+                    attempt: attempt + 1,
+                    provider: provider,
+                    materials: batch.length,
+                    shouldSplit: error?.shouldSplit === true,
+                    error: message
+                });
+
+                if (!retryableDuckError || attempt === attempts - 1) break;
+
+                await new Promise(function (resolve) {
+                    setTimeout(resolve, 900 * (attempt + 1));
+                });
+            }
+        }
+
+        const lastMessage = String(
+            lastError?.message || lastError || "تعذر الحصول على نتيجة صحيحة."
+        );
+        const retryableDuckError =
+            provider === "duckai" &&
+            (
+                lastError?.retryable === true ||
+                /x-vqd-hash-1|VQD|500|502|503|504|Internal Server Error|لا يحتوي على نص قابل للاستخراج|استجابة فارغة|JSON الصادر/i.test(lastMessage)
+            );
+        const canSplit =
+            batch.length > 1 &&
+            depth < 12 &&
+            (
+                lastError?.shouldSplit === true ||
+                retryableDuckError
+            );
+
+        if (!canSplit) {
+            return {
+                result: null,
+                failed: [{
+                    index: label,
+                    message: lastMessage,
+                    status: Number(lastError?.status || 0),
+                    materialIds: batch.map(function (item) {
+                        return String(item?.id || "");
+                    }).filter(Boolean)
+                }]
+            };
+        }
+
+        const midpoint = Math.ceil(batch.length / 2);
+        const leftBatch = batch.slice(0, midpoint);
+        const rightBatch = batch.slice(midpoint);
+
+        console.warn("Splitting failed reference batch for recovery:", {
+            batch: label,
+            provider: provider,
+            originalMaterials: batch.length,
+            leftMaterials: leftBatch.length,
+            rightMaterials: rightBatch.length,
+            reason: lastMessage
+        });
+
+        const left = await recover(leftBatch, label + "a", depth + 1);
+        const right = await recover(rightBatch, label + "b", depth + 1);
+
+        const recoveredReferences = [];
+        const recoveredStats = {
+            totalMaterials: 0,
+            referenceCount: 0,
+            multipleReferenceCount: 0,
+            ibidCount: 0,
+            internalReferenceCount: 0,
+            hadithCount: 0,
+            explanatoryCount: 0,
+            mixedCount: 0,
+            reviewCount: 0
+        };
+
+        [left.result, right.result].forEach(function (partResult) {
+            if (!partResult) return;
+            recoveredReferences.push(...partResult.references);
+            const partStats =
+                partResult.stats && typeof partResult.stats === "object"
+                    ? partResult.stats
+                    : {};
+            Object.keys(recoveredStats).forEach(function (key) {
+                recoveredStats[key] += Number(partStats[key] || 0);
+            });
+        });
+
+        const failed = [...left.failed, ...right.failed];
+        const hasSuccessfulPart = Boolean(left.result || right.result);
+
+        return {
+            result: hasSuccessfulPart || failed.length === 0
+                ? { references: recoveredReferences, stats: recoveredStats }
+                : null,
+            failed: failed
+        };
+    }
+
+    return recover(
+        Array.isArray(targetBatch) ? targetBatch : [],
+        String(batchLabel || "1"),
+        0
+    );
 }
 
 function normalizeOccurrence(occurrence) {
@@ -31074,122 +31114,215 @@ function parseReferenceAIJSON(
              ? { ...reference, authorFull: authorFull }
              : reference;
      });
-     const batchSize = provider === "groq" ? 16 : 24;
 
-     for (let start = 0; start < compactReferences.length; start += batchSize) {
-         const batch = compactReferences.slice(start, start + batchSize);
+     const batchSize = provider === "groq" ? 6 : 24;
+     const normalizationFailures = [];
+
+     const normalizeFrequencyValue = function (value) {
+         return String(value || "").replace(/\\s+/g, " ").trim().toLocaleLowerCase();
+     };
+
+     const relevantFrequencyForBatch = function (batch) {
+         const terms = [];
+         batch.forEach(function (item) {
+             [item.author, item.title].concat(item.variantTexts || []).forEach(function (value) {
+                 const term = normalizeFrequencyValue(value);
+                 if (term && !terms.includes(term)) terms.push(term);
+             });
+         });
+
+         const filterEntries = function (entries) {
+             return entries.filter(function (entry) {
+                 const form = normalizeFrequencyValue(entry?.form);
+                 if (!form) return false;
+                 return terms.some(function (term) {
+                     return term === form || term.includes(form) || form.includes(term);
+                 });
+             }).slice(0, 40);
+         };
+
+         return {
+             authors: filterEntries(documentFrequency.authors),
+             titles: filterEntries(documentFrequency.titles)
+         };
+     };
+
+     async function normalizeBatchWithRecovery(batch, batchNumber, depth) {
+         const batchTerms = relevantFrequencyForBatch(batch);
          const userPrompt = JSON.stringify({
              addMissingAuthors: Boolean(addMissingAuthors),
-             documentFrequency: documentFrequency,
+             documentFrequency: batchTerms,
              references: batch
          });
 
-         let answer = "";
+         try {
+             let result;
+             let answer = "";
 
-         if (provider === "gemini") {
-             const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" +
-                 encodeURIComponent(normalizeGeminiModel(model)) +
-                 ":generateContent?key=" + encodeURIComponent(key);
-             const response = await fetch(endpoint, {
-                 method: "POST",
-                 headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify({
-                     systemInstruction: { parts: [{ text: systemPrompt }] },
-                     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-                     generationConfig: {
-                         temperature: 0.1,
-                         responseMimeType: "application/json",
-                         maxOutputTokens: 5000
-                     }
-                 })
-             });
-             const result = await readJSON(response);
-             if (!response.ok) throw new Error(getAPIError(result, "فشل توحيد أسماء الكتب والمؤلفين."));
-             if (String(result?.candidates?.[0]?.finishReason || "").toUpperCase() === "MAX_TOKENS") {
-                 throw new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
-             }
-             answer = extractGeminiAnswer(result);
-         } else {
-             const endpoint = provider === "duckai"
-                 ? "http://127.0.0.1:8080/v1/chat/completions"
-                 : provider === "openai"
-                     ? "https://api.openai.com/v1/chat/completions"
-                     : provider === "groq"
-                         ? "https://api.groq.com/openai/v1/chat/completions"
-                         : "https://openrouter.ai/api/v1/chat/completions";
+             if (provider === "gemini") {
+                 const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" +
+                     encodeURIComponent(normalizeGeminiModel(model)) +
+                     ":generateContent?key=" + encodeURIComponent(key);
 
-             const headers = { "Content-Type": "application/json" };
-             if (provider !== "duckai") headers.Authorization = "Bearer " + key;
-             if (provider === "openrouter") {
-                 headers["HTTP-Referer"] = window.location.href;
-                 headers["X-Title"] = "Research Tools";
-             }
+                 result = await requestAIProviderJSON(endpoint, {
+                     method: "POST",
+                     headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify({
+                         systemInstruction: { parts: [{ text: systemPrompt }] },
+                         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+                         generationConfig: {
+                             temperature: 0.1,
+                             responseMimeType: "application/json",
+                             maxOutputTokens: 5000
+                         }
+                     })
+                 }, {
+                     provider: provider,
+                     model: model,
+                     task: "reference-name-normalization"
+                 });
 
-             const response = await fetch(endpoint, {
-                 method: "POST",
-                 headers: headers,
-                 body: JSON.stringify({
+                 if (String(result?.candidates?.[0]?.finishReason || "").toUpperCase() === "MAX_TOKENS") {
+                     const truncatedError = new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
+                     truncatedError.shouldSplit = true;
+                     throw truncatedError;
+                 }
+                 answer = extractGeminiAnswer(result);
+             } else {
+                 const endpoint = provider === "duckai"
+                     ? "http://127.0.0.1:8080/v1/chat/completions"
+                     : provider === "openai"
+                         ? "https://api.openai.com/v1/chat/completions"
+                         : provider === "groq"
+                             ? "https://api.groq.com/openai/v1/chat/completions"
+                             : "https://openrouter.ai/api/v1/chat/completions";
+
+                 const headers = { "Content-Type": "application/json" };
+                 if (provider !== "duckai") headers.Authorization = "Bearer " + key;
+                 if (provider === "openrouter") {
+                     headers["HTTP-Referer"] = window.location.href;
+                     headers["X-Title"] = "Research Tools";
+                 }
+
+                 const requestBody = {
                      model: model,
                      messages: [
                          { role: "system", content: systemPrompt },
                          { role: "user", content: userPrompt }
                      ],
                      temperature: 0.1,
-                     response_format: { type: "json_object" },
-                     max_tokens: provider === "groq" ? 4000 : 6000
-                 })
-             });
-             const result = await readJSON(response);
-             if (!response.ok) throw new Error(getAPIError(result, "فشل توحيد أسماء الكتب والمؤلفين."));
-             const finishReason = String(result?.choices?.[0]?.finish_reason || "").toLowerCase();
-             if (["length", "max_tokens", "max_output_tokens"].includes(finishReason)) {
-                 throw new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
+                     response_format: { type: "json_object" }
+                 };
+                 if (provider === "groq") {
+                     requestBody.max_completion_tokens = 700;
+                 } else {
+                     requestBody.max_tokens = 6000;
+                 }
+
+                 result = await requestAIProviderJSON(endpoint, {
+                     method: "POST",
+                     headers: headers,
+                     body: JSON.stringify(requestBody)
+                 }, {
+                     provider: provider,
+                     model: model,
+                     task: "reference-name-normalization",
+                     maxOutputTokens: provider === "groq" ? 700 : undefined
+                 });
+
+                 const finishReason = String(result?.choices?.[0]?.finish_reason || "").toLowerCase();
+                 if (["length", "max_tokens", "max_output_tokens"].includes(finishReason)) {
+                     const truncatedError = new Error("تجاوزت نتيجة توحيد الأسماء حد الإخراج.");
+                     truncatedError.shouldSplit = true;
+                     throw truncatedError;
+                 }
+                 answer = extractOpenAIStyleAnswer(result, provider);
              }
-             answer = extractOpenAIStyleAnswer(result, provider);
-         }
 
-         let parsed;
-         try {
-             const raw = String(answer || "").trim()
-                 .replace(/^\x60{3}(?:json)?\s*/i, "")
-                 .replace(/\s*\x60{3}$/i, "");
-             parsed = JSON.parse(raw);
-         } catch (error) {
-             throw new Error("تعذر قراءة نتيجة توحيد أسماء الكتب والمؤلفين بصيغة JSON.");
-         }
+             let parsed;
+             try {
+                 const raw = String(answer || "").trim()
+                     .replace(/^\x60{3}(?:json)?\s*/i, "")
+                     .replace(/\s*\x60{3}$/i, "");
+                 parsed = JSON.parse(raw);
+             } catch (error) {
+                 const invalidJsonError = new Error("تعذر قراءة نتيجة توحيد أسماء الكتب والمؤلفين بصيغة JSON.");
+                 invalidJsonError.shouldSplit = true;
+                 throw invalidJsonError;
+             }
 
-         if (!parsed || !Array.isArray(parsed.items)) {
-             throw new Error("نتيجة توحيد أسماء الكتب والمؤلفين لا تحتوي قائمة items صحيحة.");
-         }
+             if (!parsed || !Array.isArray(parsed.items)) {
+                 const invalidItemsError = new Error("نتيجة توحيد أسماء الكتب والمؤلفين لا تحتوي قائمة items صحيحة.");
+                 invalidItemsError.shouldSplit = true;
+                 throw invalidItemsError;
+             }
 
-         const batchIndexes = new Set(batch.map(function (item) { return item.index; }));
-         const seenIndexes = new Set();
-
-         parsed.items.forEach(function (item) {
-             const index = Number(item?.index);
-             if (!Number.isInteger(index) || !batchIndexes.has(index) || seenIndexes.has(index)) return;
-             seenIndexes.add(index);
-
-             const original = normalized[index];
-             if (!original || typeof original !== "object") return;
-
-             const canonicalTitle = String(item?.title || "").trim();
-             const canonicalAuthor = String(item?.author || "").trim();
-
-             if (canonicalTitle) normalized[index] = { ...normalized[index], title: canonicalTitle };
-             if (canonicalAuthor) normalized[index] = { ...normalized[index], author: canonicalAuthor };
-         });
-
-         if (seenIndexes.size !== batch.length) {
-             console.warn("توحيد الأسماء أعاد عددًا أقل من السجلات المطلوبة؛ حُفظت الصيغ الأصلية للسجلات الناقصة.", {
-                 expected: batch.length,
-                 received: seenIndexes.size,
-                 batch: start / batchSize + 1
+             const batchIndexes = new Set(batch.map(function (item) { return item.index; }));
+             const itemsByIndex = new Map();
+             parsed.items.forEach(function (item) {
+                 const index = Number(item?.index);
+                 if (!Number.isInteger(index) || !batchIndexes.has(index) || itemsByIndex.has(index)) return;
+                 itemsByIndex.set(index, item);
              });
+
+             if (itemsByIndex.size !== batch.length) {
+                 const incompleteError = new Error(
+                     "أعاد نموذج التوحيد " + itemsByIndex.size + " سجلًا من أصل " + batch.length + "."
+                 );
+                 incompleteError.shouldSplit = true;
+                 throw incompleteError;
+             }
+
+             // Apply only after the complete batch has been validated, so a partial
+             // JSON response can never leave a half-updated batch.
+             batch.forEach(function (batchItem) {
+                 const item = itemsByIndex.get(batchItem.index);
+                 const original = normalized[batchItem.index];
+                 if (!original || typeof original !== "object") return;
+
+                 const canonicalTitle = String(item?.title || "").trim();
+                 const canonicalAuthor = String(item?.author || "").trim();
+
+                 if (canonicalTitle) normalized[batchItem.index] = { ...normalized[batchItem.index], title: canonicalTitle };
+                 if (canonicalAuthor) normalized[batchItem.index] = { ...normalized[batchItem.index], author: canonicalAuthor };
+             });
+
+         } catch (error) {
+             if (batch.length > 1 && error?.shouldSplit === true && depth < 8) {
+                 const midpoint = Math.ceil(batch.length / 2);
+                 console.warn("Splitting reference-name normalization batch:", {
+                     batch: batchNumber,
+                     model: model,
+                     originalItems: batch.length,
+                     reason: String(error?.message || error)
+                 });
+                 await normalizeBatchWithRecovery(batch.slice(0, midpoint), batchNumber + "a", depth + 1);
+                 await normalizeBatchWithRecovery(batch.slice(midpoint), batchNumber + "b", depth + 1);
+                 return;
+             }
+
+             const failure = {
+                 batch: String(batchNumber),
+                 indexes: batch.map(function (item) { return item.index; }),
+                 message: String(error?.message || error || "تعذر توحيد هذه المجموعة.")
+             };
+             normalizationFailures.push(failure);
+             console.warn("Reference name normalization batch was preserved in its original form:", failure);
          }
      }
 
+     for (let start = 0, batchNumber = 1; start < compactReferences.length; start += batchSize, batchNumber++) {
+         await normalizeBatchWithRecovery(
+             compactReferences.slice(start, start + batchSize),
+             String(batchNumber),
+             0
+         );
+     }
+
+     normalized.normalizationFailures = normalizationFailures;
+     normalized.normalizationStatus = normalizationFailures.length ? "partial" : "complete";
      return normalized;
+ }     return normalized;
  }
 
 // =====================================================
