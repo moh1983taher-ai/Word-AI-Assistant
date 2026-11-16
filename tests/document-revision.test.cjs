@@ -31,6 +31,11 @@ for (const [original, revised] of samples) {
     assert.equal(applyDiff(original, operations), revised);
 }
 
+const longDocument = ("فقرة أكاديمية تتناول الفكرة وتحافظ على تسلسلها.\\r\\n").repeat(180);
+const chunks = revision.splitText(longDocument, 1200);
+assert.ok(chunks.length > 1);
+assert.equal(chunks.join(""), longDocument);
+
 const replacement = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "rewrite",
