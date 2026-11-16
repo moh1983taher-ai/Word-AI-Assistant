@@ -1,6 +1,8 @@
 (function (global) {
     "use strict";
 
+    const DocumentRevisionPreflight = require("./document-revision-preflight");
+
     const MAX_DIFF_CELLS = 2000000;
     let pendingTarget = null;
 
@@ -12,6 +14,23 @@
     }
 
     function buildRequest(userInstruction, originalText) {
+        const sourceText = String(originalText || "");
+        let requestText = sourceText;
+        let maskState = null;
+
+        if (pendingTarget && Array.isArray(pendingTarget.protectedRanges)) {
+            const chunkOffset = Number(pendingTarget.requestCursor) || 0;
+            maskState = DocumentRevisionPreflight.maskChunk(
+                sourceText,
+                pendingTarget.protectedRanges,
+                chunkOffset,
+                pendingTarget.id
+            );
+            requestText = maskState.text;
+            pendingTarget.lastMaskedChunk = maskState;
+            pendingTarget.requestCursor = chunkOffset + sourceText.length;
+        }
+
         return {
             systemPrompt: [
                 "أنت محرر لغوي وأكاديمي متخصص في تحرير النصوص العربية والبحوث العلمية.",
@@ -23,6 +42,7 @@
                 "في إعادة الصياغة أو الجمع بين التصحيح والتحسين، استمر في إخراج النص الكامل بعد المعالجة باستخدام الحقل text.",
                 "لا تختلق معلومة أو شاهدًا أو إحالة أو مصدرًا، ولا تحذف مضمونًا علميًا، ولا تستبدل المصطلحات المتخصصة بمرادفات قد تغير دلالتها. حافظ على ترتيب الفقرات وفواصلها، ولا تضف تنسيق Markdown.",
                 "حافظ على الآيات القرآنية والأحاديث والنقول الحرفية والمراجع والتوثيقات كما وردت، ولا تعد صياغتها.",
+                "قد تظهر في النص علامات حماية خاصة على صورة [[WB_KEEP_...]] بدل فقرات تحتوي على تغييرات متعقبة سابقة. هذه العلامات تمثل نصًا موجودًا في المستند ويجب إبقاؤها حرفيًا، مرة واحدة، وفي موضعها وترتيبها؛ لا تترجمها ولا تعدلها ولا تحذفها ولا تنقلها.",
                 "إذا كان طلب الباحث غامضًا إلى حد يمنع معرفة التعديل المقصود، فأعد سؤال استيضاح واحدًا ولا تعدل النص.",
                 "أعد JSON صالحًا فقط، دون Markdown أو سياج شيفرة أو نص خارجه.",
                 "في وضع rewrite أو combined استخدم: {\"status\":\"ready\",\"mode\":\"rewrite أو combined\",\"text\":\"النص كاملًا بعد المعالجة\"}.",
@@ -36,15 +56,20 @@
                 "",
                 "النص المطلوب معالجته:",
                 "<<<BEGIN_TEXT>>>",
-                String(originalText || ""),
+                requestText,
                 "<<<END_TEXT>>>",
                 "",
-                "نفذ طلب الباحث على النص المحصور بين العلامتين. في التصحيح اللغوي أخرج قائمة edits فقط، وفي إعادة الصياغة أو الجمع أخرج النص الكامل."
+                "نفذ طلب الباحث على النص المحصور بين العلامتين. في التصحيح اللغوي أخرج قائمة edits فقط، وفي إعادة الصياغة أو الجمع أخرج النص الكامل. حافظ على علامات الحماية كما هي تمامًا."
             ].join("\n")
         };
     }
 
     function parseResponse(value, originalValue) {
+        const sourceText = String(originalValue || "");
+        const maskState = pendingTarget && pendingTarget.lastMaskedChunk &&
+            pendingTarget.lastMaskedChunk.source === sourceText
+            ? pendingTarget.lastMaskedChunk
+            : null;
         let raw = String(value || "").trim();
         raw = raw.replace(new RegExp("^" + String.fromCharCode(65279)), "");
         const tick = String.fromCharCode(96);
@@ -63,6 +88,7 @@
         }
 
         if (parsed && parsed.status === "clarify" && String(parsed.question || "").trim()) {
+            if (pendingTarget) pendingTarget.lastMaskedChunk = null;
             return { status: "clarify", question: String(parsed.question).trim() };
         }
 
@@ -76,7 +102,8 @@
             if (!Array.isArray(parsed.edits)) {
                 throw new Error("لم تُرجع المراجعة قائمة تصحيحات موضعية صالحة.");
             }
-            const source = String(originalValue || "");
+            const source = sourceText;
+            const matchingSource = maskState ? maskState.text : source;
             const edits = [];
             parsed.edits.forEach(function (item) {
                 const original = String(item && item.original || "");
@@ -91,27 +118,35 @@
                 const candidates = [];
                 const exactMatches = [];
                 let cursor = 0;
-                while ((cursor = source.indexOf(original, cursor)) !== -1) {
+                while ((cursor = matchingSource.indexOf(original, cursor)) !== -1) {
                     exactMatches.push(cursor);
-                    const before = source.slice(Math.max(0, cursor - contextBefore.length), cursor);
-                    const after = source.slice(cursor + original.length, cursor + original.length + contextAfter.length);
+                    const before = matchingSource.slice(Math.max(0, cursor - contextBefore.length), cursor);
+                    const after = matchingSource.slice(cursor + original.length, cursor + original.length + contextAfter.length);
                     if ((!contextBefore || before === contextBefore) && (!contextAfter || after === contextAfter)) {
                         candidates.push(cursor);
                     }
                     cursor += original.length;
                 }
 
-                // Context supplied by a language model can be slightly imprecise.
-                // If the exact phrase occurs only once, that occurrence is still unambiguous.
-                // When it occurs more than once, require the context to identify exactly one.
-                const resolvedStart = candidates.length === 1
+                // Context matching occurs in the exact model-visible text. Convert
+                // the unique target back to original Word coordinates after resolution.
+                const resolvedMaskedStart = candidates.length === 1
                     ? candidates[0]
                     : (exactMatches.length === 1 ? exactMatches[0] : -1);
-                if (resolvedStart < 0) {
+                if (resolvedMaskedStart < 0) {
                     throw new Error("تعذر تحديد موضع التصحيح بصورة فريدة: " + original);
                 }
+
+                const mapped = DocumentRevisionPreflight.mapMaskedRangeToSource(
+                    maskState,
+                    resolvedMaskedStart,
+                    original.length
+                );
+                if (source.slice(mapped.start, mapped.end) !== original) {
+                    throw new Error("لم تتطابق العبارة المستهدفة مع موضعها الأصلي بعد استعادة الفقرات المحمية؛ أُلغي التصحيح.");
+                }
                 edits.push({
-                    start: resolvedStart,
+                    start: mapped.start,
                     original: original,
                     replacement: replacement,
                     reason: reason,
@@ -127,18 +162,25 @@
                 }
             }
 
+            DocumentRevisionPreflight.assertNoProtectedEdits(edits, maskState);
+
             let revised = source;
             edits.slice().reverse().forEach(function (edit) {
                 revised = revised.slice(0, edit.start) + edit.replacement +
                     revised.slice(edit.start + edit.original.length);
             });
+            if (pendingTarget) pendingTarget.lastMaskedChunk = null;
             return { status: "ready", mode: mode, text: revised, edits: edits };
         }
 
-        const text = String(parsed && parsed.text || "");
+        let text = String(parsed && parsed.text || "");
         if (!text.trim()) {
             throw new Error("نتيجة إعادة الصياغة غير مكتملة؛ لم يُمس المستند.");
         }
+        if (maskState) {
+            text = DocumentRevisionPreflight.restoreChunk(text, maskState);
+        }
+        if (pendingTarget) pendingTarget.lastMaskedChunk = null;
         return { status: "ready", mode: mode, text: text };
     }
 
@@ -506,15 +548,107 @@
                 throw new Error("لا يوجد نص قابل للمعالجة في التحديد أو المستند المفتوح.");
             }
 
+            if (typeof Office === "undefined" || !Office.context ||
+                !Office.context.requirements ||
+                !Office.context.requirements.isSetSupported("WordApi", "1.3")) {
+                throw new Error("يتطلب التدقيق الآمن WordApi 1.3 على الأقل لضمان شمول الفقرات داخل الجداول وتحديد مواضع التطبيق؛ لم يُرسل النص إلى الذكاء الاصطناعي.");
+            }
+
+            let protectedRanges = [];
+            const supportsNativeTrackedChanges = typeof Office !== "undefined" &&
+                Office.context &&
+                Office.context.requirements &&
+                Office.context.requirements.isSetSupported("WordApi", "1.6");
+
+            if (targetType === "selection") {
+                let detectedChanges = false;
+                if (supportsNativeTrackedChanges && typeof range.getTrackedChanges === "function") {
+                    const trackedChanges = range.getTrackedChanges();
+                    trackedChanges.load("items/type,items/text");
+                    await context.sync();
+                    detectedChanges = trackedChanges.items.length > 0;
+                } else {
+                    if (typeof range.getOoxml !== "function") {
+                        throw new Error("يتعذر فحص التغييرات المتعقبة في التحديد بهذا الإصدار من Word؛ لم يُرسل النص إلى الذكاء الاصطناعي.");
+                    }
+                    const selectionOoxml = range.getOoxml();
+                    await context.sync();
+                    detectedChanges = DocumentRevisionPreflight.hasTrackedChanges(selectionOoxml.value);
+                }
+
+                if (detectedChanges) {
+                    throw new Error("يتضمن التحديد تغييرات متعقبة سابقة. اقبلها أو ارفضها في Word قبل تدقيق هذا التحديد؛ لم يُرسل النص إلى الذكاء الاصطناعي.");
+                }
+            } else {
+                const paragraphs = context.document.body.paragraphs;
+                paragraphs.load("items/text");
+                await context.sync();
+
+                const paragraphRecords = [];
+                const canUseNativeParagraphTracking = supportsNativeTrackedChanges &&
+                    paragraphs.items.every(function (paragraph) {
+                        return typeof paragraph.getTrackedChanges === "function";
+                    });
+
+                if (canUseNativeParagraphTracking) {
+                    const trackedCollections = paragraphs.items.map(function (paragraph) {
+                        return paragraph.getTrackedChanges();
+                    });
+                    trackedCollections.forEach(function (collection) {
+                        collection.load("items/type,items/text");
+                    });
+                    await context.sync();
+
+                    paragraphs.items.forEach(function (paragraph, index) {
+                        paragraphRecords.push({
+                            index: index,
+                            text: paragraph.text,
+                            trackedChangesCount: trackedCollections[index].items.length
+                        });
+                    });
+                } else {
+                    if (!paragraphs.items.every(function (paragraph) {
+                        return typeof paragraph.getOoxml === "function";
+                    })) {
+                        throw new Error("يتعذر فحص التغييرات المتعقبة في فقرات المستند بهذا الإصدار من Word؛ أُوقف التدقيق حمايةً للمراجعات السابقة.");
+                    }
+
+                    const paragraphResults = paragraphs.items.map(function (paragraph) {
+                        return paragraph.getOoxml();
+                    });
+                    await context.sync();
+
+                    paragraphs.items.forEach(function (paragraph, index) {
+                        paragraphRecords.push({
+                            index: index,
+                            text: paragraph.text,
+                            ooxml: paragraphResults[index].value
+                        });
+                    });
+                }
+
+                protectedRanges = DocumentRevisionPreflight.buildProtectedParagraphRanges(
+                    originalText,
+                    paragraphRecords
+                );
+            }
+
             range.track();
             await context.sync();
 
             result = {
                 id: "revision-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
                 targetType: targetType,
-                originalText: originalText
+                originalText: originalText,
+                protectedParagraphCount: protectedRanges.length
             };
-            pendingTarget = { id: result.id, range: range };
+            pendingTarget = {
+                id: result.id,
+                range: range,
+                protectedRanges: protectedRanges,
+                requestCursor: 0,
+                lastMaskedChunk: null
+            };
         });
 
         return result;
@@ -577,6 +711,46 @@
                 throw new Error("تغير النص الأصلي في Word بعد إرساله للمعالجة؛ أُلغي التطبيق حمايةً للمستند. أعد المعالجة على النص الحالي.");
             }
 
+            let paragraphTargets = [];
+            if (revision.targetType === "document" && range.paragraphs) {
+                const paragraphCollection = range.paragraphs;
+                paragraphCollection.load("items/text");
+                await context.sync();
+
+                try {
+                    const mappings = DocumentRevisionPreflight.mapParagraphRanges(
+                        originalText,
+                        paragraphCollection.items.map(function (paragraph) {
+                            return paragraph.text;
+                        })
+                    );
+                    paragraphTargets = mappings.map(function (mapping) {
+                        return {
+                            paragraphIndex: mapping.paragraphIndex,
+                            start: mapping.start,
+                            end: mapping.end,
+                            text: mapping.text,
+                            paragraph: paragraphCollection.items[mapping.paragraphIndex]
+                        };
+                    }).filter(function (mapping) {
+                        return !!mapping.paragraph;
+                    });
+                } catch (_) {
+                    // Keep the established exact-occurrence resolver as a safe fallback
+                    // when a Word host exposes paragraph boundaries differently.
+                    paragraphTargets = [];
+                }
+            }
+
+            function findParagraphTarget(start, length) {
+                const mapping = DocumentRevisionPreflight.findParagraphRange(
+                    paragraphTargets,
+                    start,
+                    length
+                );
+                return mapping || null;
+            }
+
             const prepared = [];
             for (const operation of operations) {
                 if (operation.length > 0) {
@@ -584,9 +758,17 @@
                     if (/[\r\n]/.test(oldText)) {
                         throw new Error("تتضمن النتيجة تغييرًا في فواصل الفقرات؛ أُلغي التطبيق حتى لا تتغير بنية المستند.");
                     }
-                    const search = range.search(oldText, { matchCase: true, matchWholeWord: false });
+                    const paragraphTarget = findParagraphTarget(operation.start, operation.length);
+                    const searchRange = paragraphTarget ? paragraphTarget.paragraph : range;
+                    const search = searchRange.search(oldText, { matchCase: true, matchWholeWord: false });
                     search.load("items");
-                    prepared.push({ operation: operation, search: search, kind: "replace" });
+                    prepared.push({
+                        operation: operation,
+                        search: search,
+                        kind: "replace",
+                        searchSourceText: paragraphTarget ? paragraphTarget.text : originalText,
+                        searchExpectedStart: paragraphTarget ? operation.start - paragraphTarget.start : operation.start
+                    });
                 } else {
                     const tokens = tokenize(originalText);
                     const nextToken = tokens.find(function (token) { return token.start === operation.start; });
@@ -602,9 +784,21 @@
                     } else if (operation.start === originalText.length) {
                         prepared.push({ operation: operation, kind: "boundary-end" });
                     } else if (anchor) {
-                        const search = range.search(anchor.token.value, { matchCase: true, matchWholeWord: false });
+                        const paragraphTarget = findParagraphTarget(
+                            anchor.token.start,
+                            anchor.token.value.length
+                        );
+                        const searchRange = paragraphTarget ? paragraphTarget.paragraph : range;
+                        const search = searchRange.search(anchor.token.value, { matchCase: true, matchWholeWord: false });
                         search.load("items");
-                        prepared.push({ operation: operation, search: search, kind: "insert", anchor: anchor });
+                        prepared.push({
+                            operation: operation,
+                            search: search,
+                            kind: "insert",
+                            anchor: anchor,
+                            searchSourceText: paragraphTarget ? paragraphTarget.text : originalText,
+                            searchExpectedStart: paragraphTarget ? anchor.token.start - paragraphTarget.start : anchor.token.start
+                        });
                     } else {
                         throw new Error("تعذر تحديد موضع إضافة إحدى العبارات بأمان؛ لم يُعدّل المستند.");
                     }
@@ -613,8 +807,8 @@
 
             await context.sync();
 
-            // Resolve every queued search in two synchronization rounds, not one round
-            // per edit. This keeps Office.js round-trips bounded for long documents.
+            // Resolve queued searches in one grouped load, then map each result
+            // against its paragraph-local text and expected occurrence.
             const searchable = prepared.filter(function (item) { return !!item.search; });
             searchable.forEach(function (item) {
                 item.search.items.forEach(function (match) { match.load("text"); });
@@ -632,15 +826,17 @@
                     continue;
                 }
 
-                const expectedStart = item.kind === "insert" && item.anchor.location === "After"
-                    ? item.anchor.token.start
-                    : item.operation.start;
                 const expectedText = item.kind === "replace"
                     ? originalText.slice(item.operation.start, item.operation.start + item.operation.length)
                     : item.anchor.token.value;
+                const expectedStart = item.searchExpectedStart !== undefined
+                    ? item.searchExpectedStart
+                    : (item.kind === "insert" && item.anchor.location === "After"
+                        ? item.anchor.token.start
+                        : item.operation.start);
                 const target = resolveSearchMatchByOccurrence(
                     item.search.items,
-                    originalText,
+                    item.searchSourceText || originalText,
                     expectedText,
                     expectedStart
                 );

@@ -21942,6 +21942,18 @@ function renderChat() {
 
             if (msg.role !== "user" && msg.documentRevision &&
                 msg.documentRevision.status === "ready" && !msg.documentRevision.applied) {
+                const protectedParagraphCount = Number(msg.documentRevision.protectedParagraphCount) || 0;
+                if (protectedParagraphCount > 0) {
+                    const revisionNotice = document.createElement("div");
+                    revisionNotice.className = "document-revision-protection-note";
+                    revisionNotice.textContent = "استُثنيت " + protectedParagraphCount +
+                        " فقرة تحتوي على تغييرات متعقبة سابقة من التدقيق حفاظًا عليها.";
+                    revisionNotice.style.marginTop = "8px";
+                    revisionNotice.style.fontSize = "12px";
+                    revisionNotice.style.lineHeight = "1.6";
+                    revisionNotice.style.color = "#667085";
+                    div.appendChild(revisionNotice);
+                }
                 const applyButton = document.createElement("button");
                 applyButton.type = "button";
                 applyButton.className = "document-revision-apply-btn";
@@ -45077,6 +45089,7 @@ async function sendMessage() {
                     originalText: documentRevisionCapture.originalText,
                     text: revisedText,
                     edits: proofreadingEdits,
+                    protectedParagraphCount: Number(documentRevisionCapture.protectedParagraphCount) || 0,
                     mode: revisionMode || "combined",
                     status: "ready",
                     applied: false
