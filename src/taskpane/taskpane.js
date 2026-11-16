@@ -24214,6 +24214,227 @@ async function readJSON(
 }
 
 
+
+// =====================================================
+// AI provider request resilience
+// إدارة موحدة لحدود المزود وإعادة المحاولة
+// =====================================================
+
+function parseAIRetryDelay(value) {
+    const text = String(value || "").trim();
+    if (!text) return 0;
+
+    const minutes = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*m/i);
+    const seconds = text.match(/([0-9]+(?:\\.[0-9]+)?)\\s*s/i);
+    if (minutes || seconds) {
+        return (
+            (minutes ? Number(minutes[1]) * 60000 : 0) +
+            (seconds ? Number(seconds[1]) * 1000 : 0)
+        );
+    }
+
+    const numeric = Number(text);
+    if (Number.isFinite(numeric) && numeric >= 0) return numeric * 1000;
+
+    const dateValue = Date.parse(text);
+    return Number.isFinite(dateValue) ? Math.max(0, dateValue - Date.now()) : 0;
+}
+
+function getAIProviderRetryDelayMs(headers, attempt) {
+    const getHeader = function (name) {
+        try {
+            return headers && typeof headers.get === "function"
+                ? headers.get(name)
+                : "";
+        } catch (error) {
+            return "";
+        }
+    };
+
+    const retryAfter = parseAIRetryDelay(getHeader("retry-after"));
+    const tokenReset = parseAIRetryDelay(getHeader("x-ratelimit-reset-tokens"));
+    const requestReset = parseAIRetryDelay(getHeader("x-ratelimit-reset-requests"));
+    const fallback = Math.min(12000, 1200 * Math.pow(2, attempt));
+
+    return Math.max(250, Math.min(60000, retryAfter || tokenReset || requestReset || fallback));
+}
+
+function createAIProviderRequestError(message, status, options) {
+    const error = new Error(String(message || "تعذر الاتصال بمزود الذكاء الاصطناعي."));
+    const settings = options || {};
+    error.status = Number(status) || 0;
+    error.retryable = settings.retryable === true;
+    error.shouldSplit = settings.shouldSplit === true;
+    error.retryAfterMs = Number(settings.retryAfterMs) || 0;
+    error.provider = String(settings.provider || "");
+    error.model = String(settings.model || "");
+    error.task = String(settings.task || "");
+    return error;
+}
+
+async function requestAIProviderJSON(endpoint, options, context) {
+    const requestContext = context || {};
+    const provider = String(requestContext.provider || "").trim().toLowerCase();
+    const model = String(requestContext.model || "").trim();
+    const task = String(requestContext.task || "ai-request");
+    const requestOptions = Object.assign({}, options || {});
+    let requestBody = null;
+
+    if (typeof requestOptions.body === "string") {
+        try {
+            requestBody = JSON.parse(requestOptions.body);
+        } catch (error) {
+            requestBody = null;
+        }
+    }
+
+    // Groq documents max_completion_tokens as the supported replacement
+    // for the deprecated max_tokens field. Keep a conservative output budget
+    // and lower it again when the provider reports the account's exact OTPM cap.
+    if (provider === "groq" && requestBody && typeof requestBody === "object") {
+        const defaultBudget = task === "reference-name-normalization" ? 750 : 850;
+        const requestedBudget = Number(
+            requestBody.max_completion_tokens ||
+            requestBody.max_tokens ||
+            requestContext.maxOutputTokens ||
+            defaultBudget
+        );
+        requestBody.max_completion_tokens = Math.max(
+            128,
+            Math.min(
+                Number.isFinite(requestedBudget) && requestedBudget > 0 ? requestedBudget : defaultBudget,
+                Number(requestContext.maxOutputTokens) || defaultBudget,
+                defaultBudget
+            )
+        );
+        delete requestBody.max_tokens;
+        requestOptions.body = JSON.stringify(requestBody);
+    }
+
+    const maxAttempts = 3;
+    let lastNetworkError = null;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        let response;
+
+        try {
+            response = await fetch(endpoint, requestOptions);
+        } catch (networkError) {
+            lastNetworkError = networkError;
+            if (attempt < maxAttempts - 1) {
+                await new Promise(function (resolve) {
+                    setTimeout(resolve, Math.min(12000, 1200 * Math.pow(2, attempt)));
+                });
+                continue;
+            }
+
+            throw createAIProviderRequestError(
+                String(networkError?.message || networkError || "تعذر الوصول إلى مزود الذكاء الاصطناعي."),
+                0,
+                {
+                    provider: provider,
+                    model: model,
+                    task: task,
+                    retryable: true
+                }
+            );
+        }
+
+        const result = await readJSON(response);
+        if (response.ok) return result;
+
+        const message = String(
+            getAPIError(result, "فشل طلب الذكاء الاصطناعي (" + response.status + ").")
+        );
+        const outputLimitMatch = message.match(
+            /output tokens per minute[\\s\\S]{0,180}?Limit\\s*[:=]?\\s*(\\d+)[\\s\\S]{0,100}?Requested\\s*[:=]?\\s*(\\d+)/i
+        );
+        const outputLimit = outputLimitMatch ? Number(outputLimitMatch[1]) : 0;
+        const currentOutputBudget = Number(
+            requestBody?.max_completion_tokens ||
+            requestBody?.max_tokens ||
+            0
+        );
+
+        if (
+            provider === "groq" &&
+            outputLimit > 0 &&
+            currentOutputBudget > 0 &&
+            currentOutputBudget > Math.floor(outputLimit * 0.8) &&
+            attempt < maxAttempts - 1
+        ) {
+            const adjustedBudget = Math.max(128, Math.floor(outputLimit * 0.8));
+            requestBody.max_completion_tokens = adjustedBudget;
+            delete requestBody.max_tokens;
+            requestOptions.body = JSON.stringify(requestBody);
+
+            console.warn("Groq output budget adjusted to the reported OTPM limit:", {
+                model: model,
+                task: task,
+                outputTokenLimit: outputLimit,
+                previousBudget: currentOutputBudget,
+                adjustedBudget: adjustedBudget
+            });
+            continue;
+        }
+
+        const retryableStatus =
+            response.status === 408 ||
+            response.status === 429 ||
+            response.status === 500 ||
+            response.status === 502 ||
+            response.status === 503 ||
+            response.status === 504;
+        const outputLimitExceeded =
+            /output tokens per minute|\\bOTPM\\b/i.test(message);
+        const requestTooLarge =
+            response.status === 413 ||
+            /context_length_exceeded|maximum context length|request too large|prompt is too long|input is too large|too many input tokens/i.test(message);
+
+        if (retryableStatus && attempt < maxAttempts - 1 && !outputLimitExceeded) {
+            const retryDelayMs = getAIProviderRetryDelayMs(response.headers, attempt);
+            console.warn("AI provider rate/transient limit; retrying request:", {
+                provider: provider,
+                model: model,
+                task: task,
+                status: response.status,
+                attempt: attempt + 1,
+                retryDelayMs: retryDelayMs,
+                error: message
+            });
+            await new Promise(function (resolve) {
+                setTimeout(resolve, retryDelayMs);
+            });
+            continue;
+        }
+
+        throw createAIProviderRequestError(
+            message,
+            response.status,
+            {
+                provider: provider,
+                model: model,
+                task: task,
+                retryable: retryableStatus,
+                shouldSplit: outputLimitExceeded || requestTooLarge,
+                retryAfterMs: getAIProviderRetryDelayMs(response.headers, attempt)
+            }
+        );
+    }
+
+    throw createAIProviderRequestError(
+        String(lastNetworkError?.message || lastNetworkError || "نفدت محاولات الاتصال بمزود الذكاء الاصطناعي."),
+        0,
+        {
+            provider: provider,
+            model: model,
+            task: task,
+            retryable: true
+        }
+    );
+}
+
+
 // =====================================================
 // API Error
 // =====================================================
