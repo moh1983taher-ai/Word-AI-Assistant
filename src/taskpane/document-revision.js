@@ -8,7 +8,7 @@
         const text = String(value || "").trim();
         if (!text) return false;
 
-        return /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|أعد\s*صياغ|إعادة\s*صياغ|صياغة|حرر\s+(?:النص|الفقرة)|راجع\s+(?:لغوي|النص|الفقرة|المستند)|حسّن\s+(?:الأسلوب|الصياغة|العبارة|ترابط)|حسن\s+(?:الأسلوب|الصياغة|العبارة|ترابط)|تحسين\s+(?:الصياغة|الأسلوب|الترابط)|اجعل\s+(?:النص|العبارة|الفقرة)\s+(?:أوضح|أكثر\s+(?:وضوحا|وضوحًا|رصانة|سلاسة|أكاديمية)))/i.test(text);
+        return /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|أعد\s*صياغ|إعادة\s*صياغ|صياغة|حرر\s+(?:النص|الفقرة)|راجع\s+(?:لغوي|النص|الفقرة|المستند)|حسّن\s+(?:الأسلوب|الصياغة|العبارة|ترابط)|حسن\s+(?:الأسلوب|الصياغة|العبارة|ترابط)|تحسين\s+(?:الصياغة|الأسلوب|الترابط)|(?:النص\s+)?المحدد\s+لغوي(?:ا|ًا)|(?:صحح|راجع|دقق|نقح)\s+(?:هذا\s+)?النص|اجعل\s+(?:النص|العبارة|الفقرة)\s+(?:أوضح|أكثر\s+(?:وضوحا|وضوحًا|رصانة|سلاسة|أكاديمية)))/i.test(text);
     }
 
     function buildRequest(userInstruction, originalText) {
@@ -159,6 +159,38 @@
 
         if (oldEnd === start && newEnd === start) return [];
         return [{ start: start, length: oldEnd - start, replacement: newText.slice(start, newEnd) }];
+    }
+
+    function diffTextPreservingParagraphs(oldValue, newValue) {
+        const oldText = String(oldValue || "");
+        const newText = String(newValue || "");
+        if (!hasSameLineBreakCount(oldText, newText)) {
+            throw new Error("غيّرت المعالجة عدد فواصل الفقرات؛ أُلغي التطبيق للمحافظة على بنية المستند. أعد المحاولة مع طلب المحافظة على الفقرات.");
+        }
+
+        const oldParts = oldText.split(/(\r\n|\r|\n)/);
+        const newParts = newText.split(/(\r\n|\r|\n)/);
+        const operations = [];
+        let offset = 0;
+
+        for (let index = 0; index < oldParts.length; index++) {
+            const oldPart = oldParts[index];
+            const newPart = newParts[index] === undefined ? "" : newParts[index];
+            if (index % 2 === 0) {
+                diffText(oldPart, newPart).forEach(function (operation) {
+                    operations.push({
+                        start: offset + operation.start,
+                        length: operation.length,
+                        replacement: operation.replacement
+                    });
+                });
+            } else if (oldPart !== newPart && oldPart.length !== newPart.length) {
+                throw new Error("تعذر مطابقة فواصل الفقرات بأمان؛ أُلغي التطبيق للمحافظة على بنية المستند.");
+            }
+            offset += oldPart.length;
+        }
+
+        return operations;
     }
 
     function diffText(oldValue, newValue) {
@@ -319,7 +351,11 @@
         }
 
         const originalText = String(revision.originalText);
-        const operations = diffText(originalText, revision.text);
+        if (!hasSameLineBreakCount(originalText, revision.text)) {
+            throw new Error("غيّرت المعالجة عدد فواصل الفقرات؛ أُلغي التطبيق للمحافظة على بنية المستند. أعد المحاولة مع طلب المحافظة على الفقرات.");
+        }
+        const safeRevisedText = normalizeLineBreaks(originalText, revision.text);
+        const operations = diffTextPreservingParagraphs(originalText, safeRevisedText);
         if (!operations.length) return { applied: false, unchanged: true, changedParts: 0 };
 
         let appliedCount = 0;
@@ -433,6 +469,7 @@
         parseResponse: parseResponse,
         tokenize: tokenize,
         diffText: diffText,
+        diffTextPreservingParagraphs: diffTextPreservingParagraphs,
         splitText: splitText,
         normalizeLineBreaks: normalizeLineBreaks,
         hasSameLineBreakCount: hasSameLineBreakCount,
