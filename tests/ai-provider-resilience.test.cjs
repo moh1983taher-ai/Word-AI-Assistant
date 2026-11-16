@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const source = fs.readFileSync(
     path.join(__dirname, "../src/taskpane/taskpane.js"),
@@ -39,7 +40,20 @@ assert.match(providerLayer, /outputBudgetWithinLimit/, "OTPM failures after a bu
 assert.match(providerLayer, /max_completion_tokens/, "Groq must use max_completion_tokens");
 assert.match(providerLayer, /delete requestBody\.max_tokens/, "the deprecated max_tokens field must be removed for Groq");
 assert.match(providerLayer, /input tokens per minute|TPM/i, "input token-rate limits must be distinguished from request-rate limits");
-assert.match(providerLayer, /shouldSplit: outputLimitExceeded \|\| requestTooLarge/, "token/context limits must mark a batch for splitting");
+assert.match(providerLayer, /shouldSplit: isAIProviderRequestTooLarge\\(response\\.status, message\\)/, "only request-size failures may mark a batch for splitting");
+
+const sizeClassifierSource = sectionBetween(
+    "function isAIProviderRequestTooLarge(",
+    "function createAIProviderRequestError(",
+    "request-size classifier"
+);
+const isRequestTooLarge = vm.runInNewContext("(" + sizeClassifierSource.trim() + ")");
+assert.equal(isRequestTooLarge(429, "Rate limit reached for tokens per minute (TPM)"), false, "TPM 429 must not split batches");
+assert.equal(isRequestTooLarge(429, "Rate limit reached for output tokens per minute (OTPM)"), false, "OTPM 429 must not split batches");
+assert.equal(isRequestTooLarge(429, "Request too large"), false, "HTTP 429 must remain a rate-limit response");
+assert.equal(isRequestTooLarge(400, "Input tokens per minute limit exceeded"), false, "input token-rate limits must not split batches");
+assert.equal(isRequestTooLarge(413, "Payload too large"), true, "HTTP 413 must split oversized batches");
+assert.equal(isRequestTooLarge(400, "context_length_exceeded: maximum context length"), true, "context overflow must split batches");
 
 const analyzer = sectionBetween(
     "async function analyzeReferencesWithAI(",
