@@ -83,6 +83,48 @@
         return tokens;
     }
 
+    function splitText(value, maxChars) {
+        const text = String(value || "");
+        const limit = Math.max(1000, Number(maxChars) || 4200);
+        if (text.length <= limit) return [text];
+
+        const chunks = [];
+        let start = 0;
+        while (start < text.length) {
+            let end = Math.min(start + limit, text.length);
+            if (end < text.length) {
+                const minimum = start + Math.floor(limit * 0.55);
+                const paragraphBreak = Math.max(
+                    text.lastIndexOf("\\n", end),
+                    text.lastIndexOf("\\r", end)
+                );
+                const sentenceBreak = Math.max(
+                    text.lastIndexOf(". ", end),
+                    text.lastIndexOf("؟ ", end),
+                    text.lastIndexOf("! ", end),
+                    text.lastIndexOf("؛ ", end),
+                    text.lastIndexOf("۔ ", end)
+                );
+                const spaceBreak = text.lastIndexOf(" ", end);
+
+                if (paragraphBreak >= minimum) {
+                    end = paragraphBreak + 1;
+                    if (text[paragraphBreak] === "\\r" && text[paragraphBreak + 1] === "\\n") end++;
+                } else if (sentenceBreak >= minimum) {
+                    end = sentenceBreak + 1;
+                } else if (spaceBreak >= minimum) {
+                    end = spaceBreak + 1;
+                }
+            }
+
+            if (end <= start) end = Math.min(start + limit, text.length);
+            chunks.push(text.slice(start, end));
+            start = end;
+        }
+
+        return chunks;
+    }
+
     function fallbackDiff(oldText, newText) {
         let start = 0;
         const maxPrefix = Math.min(oldText.length, newText.length);
@@ -371,6 +413,7 @@
         parseResponse: parseResponse,
         tokenize: tokenize,
         diffText: diffText,
+        splitText: splitText,
         capture: capture,
         apply: apply
     };
