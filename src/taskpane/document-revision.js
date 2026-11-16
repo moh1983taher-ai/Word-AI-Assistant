@@ -265,50 +265,74 @@
         return chunks;
     }
 
+    function getRecommendedChunkSize(userInstruction) {
+        const instruction = String(userInstruction || "").trim();
+        const asksRewrite = /(?:أعد\\s*صياغ|إعادة\\s*صياغ|حسّن|حسن\\s+(?:الأسلوب|الصياغة)|تحسين\\s+(?:الصياغة|الأسلوب)|اجعل\\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
+        const asksCorrection = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|التصحيح\\s+اللغوي|المراجعة\\s+اللغوية|راجع\\s+(?:لغوي|النص|الفقرة|المستند))/i.test(instruction);
+
+        // Correction responses contain only localized edits, so they can safely
+        // inspect larger batches. Rewriting returns the full text and needs a
+        // smaller batch to stay within provider output limits.
+        if (asksRewrite) return 8000;
+        if (asksCorrection) return 16000;
+        return 12000;
+    }
+
     function splitText(value, maxChars) {
         const text = String(value || "");
-        const limit = Math.max(1000, Number(maxChars) || 4200);
+        const limit = Math.max(1000, Number(maxChars) || 12000);
         if (!text) return [text];
 
-        // Split at original paragraph boundaries before sending text to the model.
-        // Keep each separator attached to its paragraph so joining results is lossless.
+        // Preserve every original paragraph separator, but pack adjacent
+        // paragraphs into bounded batches instead of issuing one request per
+        // paragraph. Only exceptionally long paragraphs are split internally.
         const chunks = [];
+        let current = "";
         let cursor = 0;
-        let pendingLeading = "";
+
+        function flush() {
+            if (!current) return;
+            chunks.push(current);
+            current = "";
+        }
+
+        function appendSegment(segment) {
+            if (!segment) return;
+            if (current && current.length + segment.length > limit) flush();
+            current += segment;
+            if (current.length >= limit) flush();
+        }
 
         while (cursor < text.length) {
             let breakIndex = cursor;
-            while (breakIndex < text.length && text[breakIndex] !== "\r" && text[breakIndex] !== "\n") {
+            while (breakIndex < text.length &&
+                text[breakIndex] !== "\\r" &&
+                text[breakIndex] !== "\\n") {
                 breakIndex++;
             }
+
             const paragraph = text.slice(cursor, breakIndex);
             let separator = "";
             if (breakIndex < text.length) {
-                separator = text[breakIndex] === "\r" && text[breakIndex + 1] === "\n"
-                    ? "\r\n"
+                separator = text[breakIndex] === "\\r" && text[breakIndex + 1] === "\\n"
+                    ? "\\r\\n"
                     : text[breakIndex];
             }
 
             if (paragraph.trim()) {
                 const pieces = splitLongParagraph(paragraph, limit);
-                if (pendingLeading) {
-                    pieces[0] = pendingLeading + pieces[0];
-                    pendingLeading = "";
-                }
-                for (let index = 0; index < pieces.length - 1; index++) chunks.push(pieces[index]);
-                chunks.push(pieces[pieces.length - 1] + separator);
-            } else if (paragraph || separator) {
-                const untouched = paragraph + separator;
-                if (chunks.length) chunks[chunks.length - 1] += untouched;
-                else pendingLeading += untouched;
+                pieces.forEach(function (piece, index) {
+                    appendSegment(piece + (index === pieces.length - 1 ? separator : ""));
+                });
+            } else {
+                // Keep blank lines and whitespace-only paragraphs verbatim.
+                appendSegment(paragraph + separator);
             }
+
             cursor = breakIndex + separator.length;
         }
 
-        if (pendingLeading) {
-            if (chunks.length) chunks[0] = pendingLeading + chunks[0];
-            else chunks.push(pendingLeading);
-        }
+        flush();
         return chunks.length ? chunks : [text];
     }
 
@@ -648,6 +672,7 @@
         resolveSearchMatchByOccurrence: resolveSearchMatchByOccurrence,
         diffText: diffText,
         diffTextPreservingParagraphs: diffTextPreservingParagraphs,
+        getRecommendedChunkSize: getRecommendedChunkSize,
         splitText: splitText,
         normalizeLineBreaks: normalizeLineBreaks,
         normalizeChunkLineBreaks: normalizeChunkLineBreaks,
