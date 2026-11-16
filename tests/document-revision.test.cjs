@@ -97,7 +97,7 @@ assert.deepEqual(paragraphChunks, [paragraphBoundaries]);
 assert.equal(paragraphChunks.join(""), paragraphBoundaries);
 
 // Many short paragraphs are packed into a few bounded requests, not one request per paragraph.
-const paragraphBatchSource = ("فقرة قصيرة للمراجعة اللغوية.\\r\\n").repeat(180);
+const paragraphBatchSource = ("فقرة قصيرة للمراجعة اللغوية.\r\n").repeat(180);
 const paragraphBatchChunks = revision.splitText(paragraphBatchSource, 1200);
 assert.ok(paragraphBatchChunks.length > 1);
 assert.ok(paragraphBatchChunks.length < 20);
