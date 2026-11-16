@@ -44962,11 +44962,7 @@ async function sendMessage() {
 
     if (isDocumentRevision) {
         documentRevisionCapture = await window.DocumentRevision.capture();
-        const revisionRequest = window.DocumentRevision.buildRequest(
-            text,
-            documentRevisionCapture.originalText
-        );
-        window.__documentRevisionRequest = revisionRequest;
+        // تُجهّز تعليمات كل جزء عند إرساله؛ لتفادي تجاوز حدود مزود الذكاء الاصطناعي.
     }
 
     // =================================================
@@ -45001,37 +44997,55 @@ async function sendMessage() {
     }
 
 
-    const answer =
-        await streamAI(
-            text,
-            function (
-                delta,
-                fullText
-            ) {
-
-                scheduleRender(
-                    fullText
-                );
-
-            }
-        );
-
-    let finalAnswer = String(answer || "");
+    let finalAnswer = "";
     let revisionMetadata = null;
 
     if (isDocumentRevision) {
-        const parsedRevision = window.DocumentRevision.parseResponse(answer);
-        if (parsedRevision.status === "clarify") {
-            finalAnswer = parsedRevision.question;
+        const chunks = window.DocumentRevision.splitText(
+            documentRevisionCapture.originalText,
+            4200
+        );
+        const revisedChunks = [];
+        let revisionMode = "";
+        let clarification = "";
+
+        for (let index = 0; index < chunks.length; index++) {
+            window.__documentRevisionRequest = window.DocumentRevision.buildRequest(
+                text,
+                chunks[index]
+            );
+
+            loading.textContent = chunks.length > 1
+                ? "جارٍ معالجة الجزء " + (index + 1) + " من " + chunks.length + "..."
+                : "جارٍ مراجعة النص...";
+
+            const chunkAnswer = await streamAI(text, function () {});
+            const parsedRevision = window.DocumentRevision.parseResponse(chunkAnswer);
+
+            if (parsedRevision.status === "clarify") {
+                clarification = parsedRevision.question;
+                break;
+            }
+
+            revisedChunks.push(parsedRevision.text);
+            if (!revisionMode) {
+                revisionMode = parsedRevision.mode;
+            } else if (revisionMode !== parsedRevision.mode) {
+                revisionMode = "combined";
+            }
+        }
+
+        if (clarification) {
+            finalAnswer = clarification;
         } else {
-            finalAnswer = parsedRevision.text;
+            finalAnswer = revisedChunks.join("");
             if (window.DocumentRevision.diffText(documentRevisionCapture.originalText, finalAnswer).length) {
                 revisionMetadata = {
                     id: documentRevisionCapture.id,
                     targetType: documentRevisionCapture.targetType,
                     originalText: documentRevisionCapture.originalText,
                     text: finalAnswer,
-                    mode: parsedRevision.mode,
+                    mode: revisionMode || "combined",
                     status: "ready",
                     applied: false
                 };
@@ -45039,6 +45053,14 @@ async function sendMessage() {
                 finalAnswer = "راجعت النص، ولا توجد تغييرات تستلزم التطبيق.";
             }
         }
+    } else {
+        const answer = await streamAI(
+            text,
+            function (delta, fullText) {
+                scheduleRender(fullText);
+            }
+        );
+        finalAnswer = String(answer || "");
     }
 
     requestFinished =
