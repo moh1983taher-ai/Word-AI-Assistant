@@ -163,13 +163,13 @@ assert.throws(() => revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
     edits: [{
-        original: "عبارة\\nأخرى",
+        original: "عبارة\nأخرى",
         replacement: "عبارة أخرى",
         contextBefore: "",
         contextAfter: "",
         reason: "اختبار"
     }]
-}), "عبارة\\nأخرى"), /فاصل فقرة/);
+}), "عبارة\nأخرى"), /فاصل فقرة/);
 
 assert.deepEqual(revision.parseResponse(JSON.stringify({
     status: "ready",
