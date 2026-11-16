@@ -62,6 +62,25 @@ assert.deepEqual(
     ]),
     []
 );
+
+// Native WordApi 1.6 tracked-change metadata is preferred when available;
+// OOXML remains the compatibility fallback for older Word hosts.
+assert.deepEqual(
+    preflight.buildProtectedParagraphRanges(source, [
+        { index: 0, text: "مقدمة سليمة.", trackedChangesCount: 0 },
+        { index: 1, text: "فقرة قديمة وفقرة مضافة.", trackedChangesCount: 2 },
+        { index: 2, text: "خاتمة سليمة.", trackedChangesCount: 0 }
+    ]),
+    protectedRanges
+);
+assert.deepEqual(
+    preflight.buildProtectedParagraphRanges(source, [
+        { index: 0, text: "مقدمة سليمة.", hasTrackedChanges: false },
+        { index: 1, text: "فقرة قديمة وفقرة مضافة.", hasTrackedChanges: true },
+        { index: 2, text: "خاتمة سليمة.", hasTrackedChanges: false }
+    ]),
+    protectedRanges
+);
 assert.throws(
     () => preflight.buildProtectedParagraphRanges(source, [
         { index: 0, text: "فقرة غير موجودة", ooxml: "<w:p><w:ins/></w:p>" }
