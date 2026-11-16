@@ -528,9 +528,6 @@
             selection.load("text");
             const bodyRange = context.document.body.getRange();
             bodyRange.load("text");
-            const paragraphs = context.document.body.paragraphs;
-            paragraphs.load("items/text");
-            const bodyOoxml = bodyRange.getOoxml();
             await context.sync();
 
             const selectedText = String(selection.text || "");
@@ -544,42 +541,37 @@
 
             let protectedRanges = [];
             if (targetType === "selection") {
+                if (typeof range.getOoxml !== "function") {
+                    throw new Error("يتعذر فحص التغييرات المتعقبة في التحديد بهذا الإصدار من Word؛ لم يُرسل النص إلى الذكاء الاصطناعي.");
+                }
                 const selectionOoxml = range.getOoxml();
                 await context.sync();
                 if (DocumentRevisionPreflight.hasTrackedChanges(selectionOoxml.value)) {
                     throw new Error("يتضمن التحديد تغييرات متعقبة سابقة. اقبلها أو ارفضها في Word قبل تدقيق هذا التحديد؛ لم يُرسل النص إلى الذكاء الاصطناعي.");
                 }
-            } else if (DocumentRevisionPreflight.hasTrackedChanges(bodyOoxml.value)) {
-                let paragraphXml = DocumentRevisionPreflight.extractParagraphXml(bodyOoxml.value);
-                let paragraphRecords = [];
+            } else {
+                const paragraphs = context.document.body.paragraphs;
+                paragraphs.load("items/text");
+                await context.sync();
 
-                if (paragraphXml.length === paragraphs.items.length) {
-                    paragraphRecords = paragraphs.items.map(function (paragraph, index) {
-                        return {
-                            index: index,
-                            text: paragraph.text,
-                            ooxml: paragraphXml[index]
-                        };
-                    });
-                } else {
-                    if (!paragraphs.items.every(function (paragraph) {
-                        return typeof paragraph.getOoxml === "function";
-                    })) {
-                        throw new Error("تعذر فحص التغييرات المتعقبة في فقرات المستند؛ أُوقف التدقيق حمايةً للمراجعات السابقة.");
-                    }
-                    const paragraphResults = paragraphs.items.map(function (paragraph) {
-                        return paragraph.getOoxml();
-                    });
-                    await context.sync();
-                    paragraphRecords = paragraphs.items.map(function (paragraph, index) {
-                        return {
-                            index: index,
-                            text: paragraph.text,
-                            ooxml: paragraphResults[index].value
-                        };
-                    });
+                if (!paragraphs.items.every(function (paragraph) {
+                    return typeof paragraph.getOoxml === "function";
+                })) {
+                    throw new Error("يتعذر فحص التغييرات المتعقبة في فقرات المستند بهذا الإصدار من Word؛ أُوقف التدقيق حمايةً للمراجعات السابقة.");
                 }
 
+                const paragraphResults = paragraphs.items.map(function (paragraph) {
+                    return paragraph.getOoxml();
+                });
+                await context.sync();
+
+                const paragraphRecords = paragraphs.items.map(function (paragraph, index) {
+                    return {
+                        index: index,
+                        text: paragraph.text,
+                        ooxml: paragraphResults[index].value
+                    };
+                });
                 protectedRanges = DocumentRevisionPreflight.buildProtectedParagraphRanges(
                     originalText,
                     paragraphRecords
