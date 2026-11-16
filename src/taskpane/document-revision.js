@@ -1,6 +1,8 @@
 (function (global) {
     "use strict";
 
+    const DocumentRevisionPreflight = require("./document-revision-preflight");
+
     const MAX_DIFF_CELLS = 2000000;
     let pendingTarget = null;
 
@@ -12,6 +14,23 @@
     }
 
     function buildRequest(userInstruction, originalText) {
+        const sourceText = String(originalText || "");
+        let requestText = sourceText;
+        let maskState = null;
+
+        if (pendingTarget && Array.isArray(pendingTarget.protectedRanges)) {
+            const chunkOffset = Number(pendingTarget.requestCursor) || 0;
+            maskState = DocumentRevisionPreflight.maskChunk(
+                sourceText,
+                pendingTarget.protectedRanges,
+                chunkOffset,
+                pendingTarget.id
+            );
+            requestText = maskState.text;
+            pendingTarget.lastMaskedChunk = maskState;
+            pendingTarget.requestCursor = chunkOffset + sourceText.length;
+        }
+
         return {
             systemPrompt: [
                 "أنت محرر لغوي وأكاديمي متخصص في تحرير النصوص العربية والبحوث العلمية.",
@@ -23,6 +42,7 @@
                 "في إعادة الصياغة أو الجمع بين التصحيح والتحسين، استمر في إخراج النص الكامل بعد المعالجة باستخدام الحقل text.",
                 "لا تختلق معلومة أو شاهدًا أو إحالة أو مصدرًا، ولا تحذف مضمونًا علميًا، ولا تستبدل المصطلحات المتخصصة بمرادفات قد تغير دلالتها. حافظ على ترتيب الفقرات وفواصلها، ولا تضف تنسيق Markdown.",
                 "حافظ على الآيات القرآنية والأحاديث والنقول الحرفية والمراجع والتوثيقات كما وردت، ولا تعد صياغتها.",
+                "قد تظهر في النص علامات حماية خاصة على صورة [[WB_KEEP_...]] بدل فقرات تحتوي على تغييرات متعقبة سابقة. هذه العلامات تمثل نصًا موجودًا في المستند ويجب إبقاؤها حرفيًا، مرة واحدة، وفي موضعها وترتيبها؛ لا تترجمها ولا تعدلها ولا تحذفها ولا تنقلها.",
                 "إذا كان طلب الباحث غامضًا إلى حد يمنع معرفة التعديل المقصود، فأعد سؤال استيضاح واحدًا ولا تعدل النص.",
                 "أعد JSON صالحًا فقط، دون Markdown أو سياج شيفرة أو نص خارجه.",
                 "في وضع rewrite أو combined استخدم: {\"status\":\"ready\",\"mode\":\"rewrite أو combined\",\"text\":\"النص كاملًا بعد المعالجة\"}.",
@@ -36,15 +56,20 @@
                 "",
                 "النص المطلوب معالجته:",
                 "<<<BEGIN_TEXT>>>",
-                String(originalText || ""),
+                requestText,
                 "<<<END_TEXT>>>",
                 "",
-                "نفذ طلب الباحث على النص المحصور بين العلامتين. في التصحيح اللغوي أخرج قائمة edits فقط، وفي إعادة الصياغة أو الجمع أخرج النص الكامل."
+                "نفذ طلب الباحث على النص المحصور بين العلامتين. في التصحيح اللغوي أخرج قائمة edits فقط، وفي إعادة الصياغة أو الجمع أخرج النص الكامل. حافظ على علامات الحماية كما هي تمامًا."
             ].join("\n")
         };
     }
 
     function parseResponse(value, originalValue) {
+        const sourceText = String(originalValue || "");
+        const maskState = pendingTarget && pendingTarget.lastMaskedChunk &&
+            pendingTarget.lastMaskedChunk.source === sourceText
+            ? pendingTarget.lastMaskedChunk
+            : null;
         let raw = String(value || "").trim();
         raw = raw.replace(new RegExp("^" + String.fromCharCode(65279)), "");
         const tick = String.fromCharCode(96);
@@ -63,6 +88,7 @@
         }
 
         if (parsed && parsed.status === "clarify" && String(parsed.question || "").trim()) {
+            if (pendingTarget) pendingTarget.lastMaskedChunk = null;
             return { status: "clarify", question: String(parsed.question).trim() };
         }
 
@@ -76,7 +102,7 @@
             if (!Array.isArray(parsed.edits)) {
                 throw new Error("لم تُرجع المراجعة قائمة تصحيحات موضعية صالحة.");
             }
-            const source = String(originalValue || "");
+            const source = sourceText;
             const edits = [];
             parsed.edits.forEach(function (item) {
                 const original = String(item && item.original || "");
@@ -127,18 +153,25 @@
                 }
             }
 
+            DocumentRevisionPreflight.assertNoProtectedEdits(edits, maskState);
+
             let revised = source;
             edits.slice().reverse().forEach(function (edit) {
                 revised = revised.slice(0, edit.start) + edit.replacement +
                     revised.slice(edit.start + edit.original.length);
             });
+            if (pendingTarget) pendingTarget.lastMaskedChunk = null;
             return { status: "ready", mode: mode, text: revised, edits: edits };
         }
 
-        const text = String(parsed && parsed.text || "");
+        let text = String(parsed && parsed.text || "");
         if (!text.trim()) {
             throw new Error("نتيجة إعادة الصياغة غير مكتملة؛ لم يُمس المستند.");
         }
+        if (maskState) {
+            text = DocumentRevisionPreflight.restoreChunk(text, maskState);
+        }
+        if (pendingTarget) pendingTarget.lastMaskedChunk = null;
         return { status: "ready", mode: mode, text: text };
     }
 
@@ -495,6 +528,9 @@
             selection.load("text");
             const bodyRange = context.document.body.getRange();
             bodyRange.load("text");
+            const paragraphs = context.document.body.paragraphs;
+            paragraphs.load("items/text");
+            const bodyOoxml = bodyRange.getOoxml();
             await context.sync();
 
             const selectedText = String(selection.text || "");
@@ -506,15 +542,66 @@
                 throw new Error("لا يوجد نص قابل للمعالجة في التحديد أو المستند المفتوح.");
             }
 
+            let protectedRanges = [];
+            if (targetType === "selection") {
+                const selectionOoxml = range.getOoxml();
+                await context.sync();
+                if (DocumentRevisionPreflight.hasTrackedChanges(selectionOoxml.value)) {
+                    throw new Error("يتضمن التحديد تغييرات متعقبة سابقة. اقبلها أو ارفضها في Word قبل تدقيق هذا التحديد؛ لم يُرسل النص إلى الذكاء الاصطناعي.");
+                }
+            } else if (DocumentRevisionPreflight.hasTrackedChanges(bodyOoxml.value)) {
+                let paragraphXml = DocumentRevisionPreflight.extractParagraphXml(bodyOoxml.value);
+                let paragraphRecords = [];
+
+                if (paragraphXml.length === paragraphs.items.length) {
+                    paragraphRecords = paragraphs.items.map(function (paragraph, index) {
+                        return {
+                            index: index,
+                            text: paragraph.text,
+                            ooxml: paragraphXml[index]
+                        };
+                    });
+                } else {
+                    if (!paragraphs.items.every(function (paragraph) {
+                        return typeof paragraph.getOoxml === "function";
+                    })) {
+                        throw new Error("تعذر فحص التغييرات المتعقبة في فقرات المستند؛ أُوقف التدقيق حمايةً للمراجعات السابقة.");
+                    }
+                    const paragraphResults = paragraphs.items.map(function (paragraph) {
+                        return paragraph.getOoxml();
+                    });
+                    await context.sync();
+                    paragraphRecords = paragraphs.items.map(function (paragraph, index) {
+                        return {
+                            index: index,
+                            text: paragraph.text,
+                            ooxml: paragraphResults[index].value
+                        };
+                    });
+                }
+
+                protectedRanges = DocumentRevisionPreflight.buildProtectedParagraphRanges(
+                    originalText,
+                    paragraphRecords
+                );
+            }
+
             range.track();
             await context.sync();
 
             result = {
                 id: "revision-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
                 targetType: targetType,
-                originalText: originalText
+                originalText: originalText,
+                protectedParagraphCount: protectedRanges.length
             };
-            pendingTarget = { id: result.id, range: range };
+            pendingTarget = {
+                id: result.id,
+                range: range,
+                protectedRanges: protectedRanges,
+                requestCursor: 0,
+                lastMaskedChunk: null
+            };
         });
 
         return result;
