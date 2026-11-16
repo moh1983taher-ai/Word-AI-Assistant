@@ -150,7 +150,16 @@
             if (countOccurrences(output, segment.token) !== 1) {
                 throw new Error("لم يحافظ النموذج على علامة حماية إحدى الفقرات ذات التغييرات المتعقبة؛ أُلغي تجهيز النتيجة.");
             }
-            positions.push(output.indexOf(segment.token));
+            const position = output.indexOf(segment.token);
+            const originalPosition = maskState.text.indexOf(segment.token);
+            const lineBreakCount = function (value) {
+                return (String(value || "").match(/\r\n|\r|\n/g) || []).length;
+            };
+            if (lineBreakCount(output.slice(0, position)) !==
+                lineBreakCount(maskState.text.slice(0, originalPosition))) {
+                throw new Error("نقل النموذج فقرة محمية إلى موضع آخر؛ أُلغي تجهيز النتيجة.");
+            }
+            positions.push(position);
         });
 
         for (let index = 1; index < positions.length; index++) {
