@@ -165,6 +165,23 @@
     // Normalize a single paragraph's model output and restore its original edge separators.
     // Each model request handles one paragraph. Restore source separators and
     // flatten any line breaks introduced inside the revised paragraph.
+    // Batched requests may contain several original paragraphs.
+    // Unlike normalizeChunkLineBreaks (single-paragraph mode), preserve every
+    // internal line break and restore the exact original separator sequence.
+    function normalizeBatchLineBreaks(originalValue, revisedValue) {
+        const original = String(originalValue || "");
+        const revised = String(revisedValue || "");
+
+        if (!hasSameLineBreakCount(original, revised)) {
+            throw new Error(
+                "لم تحافظ معالجة إحدى الدفعات على فواصل الفقرات الأصلية؛ " +
+                "أُلغي تجهيز التعديلات حمايةً لبنية المستند. أعد المحاولة مع طلب المحافظة على الفقرات."
+            );
+        }
+
+        return normalizeLineBreaks(original, revised);
+    }
+
     function normalizeChunkLineBreaks(originalValue, revisedValue) {
         const original = String(originalValue || "");
         const revised = String(revisedValue || "");
@@ -675,6 +692,7 @@
         getRecommendedChunkSize: getRecommendedChunkSize,
         splitText: splitText,
         normalizeLineBreaks: normalizeLineBreaks,
+        normalizeBatchLineBreaks: normalizeBatchLineBreaks,
         normalizeChunkLineBreaks: normalizeChunkLineBreaks,
         hasSameLineBreakCount: hasSameLineBreakCount,
         capture: capture,
