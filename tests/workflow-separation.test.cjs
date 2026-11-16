@@ -172,9 +172,13 @@ const currentDocumentScreen = sectionBetween(
 assert.doesNotMatch(currentDocumentScreen, /class="references-selected-source"/, "the document identification card must not duplicate the header");
 assert.doesNotMatch(currentDocumentScreen, /reference-source-navigation/, "the large text back-navigation row must not consume workspace space");
 
-assert.match(source, /id="back-references-source"/, "the compact back arrow must be in the header");
-assert.match(source, /id="references-header-title"/);
-assert.match(source, /id="references-header-subtitle"/);
+const referenceMarkup = fs.readFileSync(
+    path.join(__dirname, "../src/taskpane/taskpane.html"),
+    "utf8"
+);
+assert.match(referenceMarkup, /id="back-references-source"/, "the compact back arrow must be in the header");
+assert.match(referenceMarkup, /id="references-header-title"/);
+assert.match(referenceMarkup, /id="references-header-subtitle"/);
 
 const referenceStyles = fs.readFileSync(
     path.join(__dirname, "../src/taskpane/taskpane.css"),
