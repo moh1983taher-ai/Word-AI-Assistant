@@ -3382,7 +3382,9 @@ ${failedProjectBatches.length ? `
 
 
                 analyzeProjectReferencesBtn.textContent =
-                    "✓ تم استخراج المراجع";
+                    failedProjectBatches.length > 0
+                        ? "⚠ اكتمل جزئيًا — راجع الدفعات المتعثرة"
+                        : "✓ تم استخراج المراجع";
 
 
             }
@@ -24343,7 +24345,7 @@ async function requestAIProviderJSON(endpoint, options, context) {
             defaultBudget
         );
         requestBody.max_completion_tokens = Math.max(
-            128,
+            64,
             Math.min(
                 Number.isFinite(requestedBudget) && requestedBudget > 0 ? requestedBudget : defaultBudget,
                 Number(requestContext.maxOutputTokens) || defaultBudget,
@@ -24406,7 +24408,12 @@ async function requestAIProviderJSON(endpoint, options, context) {
             currentOutputBudget > Math.floor(outputLimit * 0.8) &&
             attempt < maxAttempts - 1
         ) {
-            const adjustedBudget = Math.max(128, Math.floor(outputLimit * 0.8));
+            const requestedOutputMatch = message.match(/Requested\s*[:=]?\s*(\d+)/i);
+            const requestedOutput = requestedOutputMatch ? Number(requestedOutputMatch[1]) : 0;
+            const scaledBudget = requestedOutput > outputLimit
+                ? Math.floor(currentOutputBudget * (outputLimit / requestedOutput) * 0.8)
+                : Math.floor(outputLimit * 0.8);
+            const adjustedBudget = Math.max(64, Math.min(currentOutputBudget - 1, scaledBudget));
             requestBody.max_completion_tokens = adjustedBudget;
             delete requestBody.max_tokens;
             requestOptions.body = JSON.stringify(requestBody);
@@ -24432,7 +24439,7 @@ async function requestAIProviderJSON(endpoint, options, context) {
             /output tokens per minute|\bOTPM\b/i.test(message);
         const requestTooLarge =
             response.status === 413 ||
-            /context_length_exceeded|maximum context length|request too large|prompt is too long|input is too large|too many input tokens/i.test(message);
+            /context_length_exceeded|maximum context length|request too large|prompt is too long|input is too large|too many input tokens|input tokens per minute|\bTPM\b/i.test(message);
 
         if (retryableStatus && attempt < maxAttempts - 1 && !outputLimitExceeded) {
             const retryDelayMs = getAIProviderRetryDelayMs(response.headers, attempt);
@@ -31366,7 +31373,6 @@ function parseReferenceAIJSON(
      normalized.normalizationFailures = normalizationFailures;
      normalized.normalizationStatus = normalizationFailures.length ? "partial" : "complete";
      return normalized;
- }     return normalized;
  }
 
 // =====================================================
@@ -47143,30 +47149,44 @@ if (referencesContent) {
                                     // 10. عرض النتيجة
                                     // =================================================
 
+                                    const hasPartialReferenceResult =
+                                        failedBatches.length > 0 || normalizationFailures.length > 0;
                                     const completedProgressHTML = updateReferenceProgress({
-                                        title: failedBatches.length > 0
+                                        title: hasPartialReferenceResult
                                             ? "اكتمل تحليل المراجع جزئيًا"
                                             : "اكتمل تحليل المراجع",
-                                        detail: failedBatches.length > 0
-                                            ? "اكتمل تحليل الدفعات الممكنة؛ عُرضت النتائج المتاحة مع توضيح الدفعات المتعثرة."
-                                            : "اكتمل تحليل جميع المواد وتوحيد المراجع وإعداد القائمة النهائية.",
+                                        detail: failedBatches.length > 0 && normalizationFailures.length > 0
+                                            ? "بعض دفعات التحليل وتعذر بعض دفعات توحيد الأسماء؛ حُفظت النتائج المتاحة مع بيان مواضع التعثر."
+                                            : failedBatches.length > 0
+                                                ? "اكتمل تحليل الدفعات الممكنة؛ عُرضت النتائج المتاحة مع توضيح الدفعات المتعثرة."
+                                                : normalizationFailures.length > 0
+                                                    ? "اكتمل استخراج المراجع، لكن تعذر توحيد بعض مجموعات الأسماء؛ بقيت صيغها الأصلية دون تغيير."
+                                                    : "اكتمل تحليل جميع المواد وتوحيد المراجع وإعداد القائمة النهائية.",
                                         percent: 100,
-                                        state: "success",
+                                        state: hasPartialReferenceResult ? "error" : "success",
                                         totalBatches: referenceBatches.length,
                                         completedBatches: completedReferenceBatches,
                                         totalMaterials: processedReferences.length,
                                         completedMaterials: completedReferenceMaterials,
-                                        failedBatches: failedBatches.length
+                                        failedBatches: failedBatches.length + normalizationFailures.length
                                     });
 
                                     const partialBatchWarningHTML =
-                                        failedBatches.length > 0
+                                        hasPartialReferenceResult
                                             ? '<div class="references-analysis-status error">' +
-                                                '⚠ اكتمل التحليل جزئيًا؛ تعذرت الدفعات: ' +
-                                                failedBatches.map(function (item) {
-                                                    return item.index;
-                                                }).join("، ") +
-                                                '. عُرضت النتائج التي اكتملت فقط. أعد التحليل لاستكمال البقية.</div>'
+                                                (failedBatches.length > 0
+                                                    ? '⚠ تعذر استكمال دفعات التحليل: ' +
+                                                        failedBatches.map(function (item) {
+                                                            return item.index;
+                                                        }).join("، ") +
+                                                        '. '
+                                                    : '') +
+                                                (normalizationFailures.length > 0
+                                                    ? 'تعذر توحيد أسماء بعض المجموعات (' +
+                                                        normalizationFailures.length +
+                                                        ')؛ حُفظت الصيغ الأصلية لهذه السجلات ولم يُعلن اكتمال التوحيد. '
+                                                    : '') +
+                                                'عُرضت النتائج التي أمكن استعادتها.</div>'
                                             : '';
 
                                     if (referencesAnalysisContainer) {
@@ -47177,12 +47197,12 @@ if (referencesContent) {
                                                 ${partialBatchWarningHTML}
 
                                                 <div
-                                                    class="references-analysis-status success reference-collapsible-header"
+                                                    class="references-analysis-status ${hasPartialReferenceResult ? "error" : "success"} reference-collapsible-header"
                                                     data-reference-collapse-toggle
                                                     data-reference-collapse-target="references-analysis-content">
 
                                                     <span>
-                                                        ✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي
+                                                        ${hasPartialReferenceResult ? "⚠ اكتمل تحليل المراجع جزئيًا" : "✓ تم تحليل وتوحيد المراجع بالذكاء الاصطناعي"}
                                                     </span>
 
                                                     <span class="reference-collapsible-arrow">
@@ -47357,6 +47377,12 @@ if (referencesContent) {
                                                 failedBatches.map(function (item) {
                                                     return item.index;
                                                 }),
+
+                                            normalizationStatus:
+                                                normalizationFailures.length > 0 ? "partial" : "complete",
+
+                                            normalizationFailures:
+                                                normalizationFailures,
 
                                             referenceCount:
                                                 referenceCount,
