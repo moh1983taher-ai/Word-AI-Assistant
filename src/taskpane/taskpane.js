@@ -45001,9 +45001,10 @@ async function sendMessage() {
     let revisionMetadata = null;
 
     if (isDocumentRevision) {
+        const revisionChunkSize = window.DocumentRevision.getRecommendedChunkSize(text);
         const chunks = window.DocumentRevision.splitText(
             documentRevisionCapture.originalText,
-            4200
+            revisionChunkSize
         );
         const revisedChunks = [];
         const proofreadingEdits = [];
