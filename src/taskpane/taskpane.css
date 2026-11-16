@@ -7101,10 +7101,10 @@ button.primary:hover,
     flex-direction: column;
     align-items: flex-start;
     justify-content: center;
-    gap: 5px;
+    gap: 0;
     min-width: 0;
-    min-height: 72px;
-    padding: 10px 12px;
+    min-height: 48px;
+    padding: 9px 12px;
     border: 1px solid #E9E1D1;
     border-radius: 11px;
     background: #FFFCF6;
@@ -7132,12 +7132,6 @@ button.primary:hover,
     line-height: 1.45;
 }
 
-.reference-operation-option-description {
-    color: #68766E;
-    font-size: 10px;
-    line-height: 1.55;
-}
-
 .reference-shared-settings {
     margin-bottom: 12px;
     padding: 11px 12px;
@@ -7149,20 +7143,15 @@ button.primary:hover,
 .reference-shared-settings-heading {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 8px;
-    margin-bottom: 7px;
+    margin-bottom: 4px;
 }
 
 .reference-shared-settings-heading .reference-style-title {
     margin: 0;
     color: #063F40;
     font-size: 12px;
-}
-
-.reference-shared-settings-caption {
-    color: #879087;
-    font-size: 10px;
 }
 
 .reference-shared-settings .reference-style-row {
@@ -7185,15 +7174,6 @@ button.primary:hover,
 .reference-shared-settings .reference-author-toggle {
     width: auto;
     flex: 1 1 auto;
-}
-
-.reference-author-responsibility {
-    margin: 8px 0 0;
-    padding-top: 7px;
-    border-top: 1px solid #F1EBDE;
-    color: #7A786D;
-    font-size: 10px;
-    line-height: 1.65;
 }
 
 .reference-operation-panel {
@@ -7280,10 +7260,6 @@ button.primary:hover,
         padding: 9px;
     }
 
-    .reference-operation-option-description {
-        font-size: 9px;
-    }
-
     .reference-shared-settings .reference-style-row > label:first-child {
         width: 74px;
         flex-basis: 74px;
@@ -7352,4 +7328,114 @@ button.primary:hover,
 
 .reference-operation-scroll {
     padding-top: 0;
+}
+
+
+/* Compact controls: guidance appears only on hover or brief interaction. */
+.reference-operation-picker {
+    position: relative;
+    gap: 7px;
+    margin-bottom: 8px;
+}
+
+.reference-operation-option {
+    position: relative;
+    min-height: 46px;
+    align-items: center;
+    text-align: center;
+}
+
+.reference-operation-option-title {
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.reference-transient-hint {
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    left: 0;
+    z-index: 12;
+    padding: 8px 11px;
+    border: 1px solid #D8CCB7;
+    border-radius: 8px;
+    background: #FFFDF8;
+    box-shadow: 0 5px 14px rgba(28, 39, 33, 0.13);
+    color: #45544B;
+    font-size: 10px;
+    line-height: 1.65;
+    text-align: right;
+    opacity: 0;
+    transform: translateY(-3px);
+    transition: opacity 140ms ease, transform 140ms ease;
+    pointer-events: none;
+}
+
+.reference-transient-hint.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.reference-transient-hint[hidden],
+.reference-author-notice[hidden] {
+    display: none !important;
+}
+
+.reference-author-setting {
+    margin-top: 6px !important;
+}
+
+.reference-author-setting .reference-author-toggle {
+    gap: 7px;
+    font-size: 11px;
+}
+
+.reference-author-setting .reference-author-toggle-text {
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.reference-author-notice {
+    position: absolute;
+    right: 10px;
+    left: 10px;
+    top: calc(100% + 5px);
+    z-index: 13;
+    padding: 8px 10px;
+    border: 1px solid #E2D2AD;
+    border-radius: 8px;
+    background: #FFF8E9;
+    box-shadow: 0 5px 14px rgba(28, 39, 33, 0.12);
+    color: #705C32;
+    font-size: 10px;
+    line-height: 1.65;
+    opacity: 0;
+    transform: translateY(-3px);
+    transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.reference-author-notice.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.reference-shared-settings {
+    position: relative;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+}
+
+.reference-shared-settings .reference-style-row {
+    margin-top: 6px;
+}
+
+.reference-shared-settings .reference-style-row select {
+    min-height: 28px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reference-transient-hint,
+    .reference-author-notice {
+        transition: none;
+    }
 }
