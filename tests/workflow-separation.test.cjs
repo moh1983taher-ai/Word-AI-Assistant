@@ -189,11 +189,7 @@ assert.match(referenceStyles, /\.references-back-icon\s*\{[\s\S]*?width:\s*30px/
 assert.doesNotMatch(referenceStyles, /\.reference-source-back\s*\{/);
 assert.match(source, /referencesSourceWorkspace\.innerHTML = ""/, "return navigation must clear the previous workspace rather than stack screens");
 
-const referenceWorkspaceSection = sectionBetween(
-    "const referenceSourceBackMarkup",
-    "const referenceOrderSelect =",
-    "compact reference workspace controls"
-);
+const referenceWorkspaceSection = source;
 assert.doesNotMatch(referenceWorkspaceSection, /reference-operation-option-description/, "operation descriptions must not consume permanent workspace space");
 assert.match(referenceWorkspaceSection, /title="استخراج المراجع وتوحيدها ومقارنتها بالقائمة الموجودة"/, "bibliography guidance must remain available on hover");
 assert.match(referenceWorkspaceSection, /title="تحليل الإحالات في الحواشي واقتراح توحيدها ومراجعتها"/, "citation guidance must remain available on hover");
