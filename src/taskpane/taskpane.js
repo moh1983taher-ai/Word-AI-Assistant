@@ -44653,7 +44653,8 @@ async function sendMessage() {
 
     if (
         researchScope &&
-        researchScope.type === "library"
+        researchScope.type === "library" &&
+        !(window.DocumentRevision && window.DocumentRevision.isRequest(text))
     ) {
 
         console.log("SMART ACTIVITY START");
