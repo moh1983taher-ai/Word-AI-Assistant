@@ -70,7 +70,9 @@
         const protectedIndices = new Set();
 
         records.forEach(function (record, index) {
-            if (hasTrackedChanges(record && record.ooxml)) {
+            const hasApiChanges = Number(record && record.trackedChangesCount) > 0 ||
+                record && record.hasTrackedChanges === true;
+            if (hasApiChanges || hasTrackedChanges(record && record.ooxml)) {
                 protectedIndices.add(Number.isInteger(record.index) ? record.index : index);
             }
         });
