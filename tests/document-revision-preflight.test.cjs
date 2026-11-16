@@ -161,6 +161,15 @@ assert.throws(
     /نقل النموذج|ترتيب الفقرات المحمية/
 );
 
+const movedWithinLine = orderedMask.text.replace(
+    orderedMask.segments[0].token,
+    "نص أُضيف قبل الفقرة " + orderedMask.segments[0].token
+);
+assert.throws(
+    () => preflight.restoreChunk(movedWithinLine, orderedMask),
+    /موضع الفقرة المحمية داخل سطرها/
+);
+
 const movedProtectedToken = orderedMask.text
     .replace(orderedMask.segments[0].token, "__TOKEN__")
     .replace(orderedMask.segments[1].token, orderedMask.segments[0].token)
