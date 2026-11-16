@@ -43,6 +43,24 @@ assert.equal(revision.hasSameLineBreakCount("فقرة أولى.\r\nفقرة ثا
 assert.equal(revision.normalizeLineBreaks("فقرة أولى.\r\nفقرة ثانية.", "صياغة أولى.\nصياغة ثانية."), "صياغة أولى.\r\nصياغة ثانية.");
 assert.equal(revision.hasSameLineBreakCount("فقرة واحدة", "فقرة أولى\nفقرة ثانية"), false);
 
+assert.equal(
+    revision.normalizeChunkLineBreaks("فقرة أولى.\r\n", "فقرة أولى منقحة."),
+    "فقرة أولى منقحة.\r\n"
+);
+assert.equal(
+    revision.normalizeChunkLineBreaks("\r\nفقرة ثانية.", "فقرة ثانية منقحة."),
+    "\r\nفقرة ثانية منقحة."
+);
+assert.equal(
+    revision.normalizeChunkLineBreaks("أولى.\r\nثانية.\n", "أولى منقحة.\nثانية منقحة."),
+    "أولى منقحة.\r\nثانية منقحة.\n"
+);
+assert.throws(
+    () => revision.normalizeChunkLineBreaks("أولى.\r\nثانية.", "أولى منقحة وثانية منقحة."),
+    /فواصل الفقرات داخل جزء/
+);
+
+
 const paragraphSource = "فقرة أولى قديمة.\r\nفقرة ثانية قديمة.";
 const paragraphRevision = "فقرة أولى منقحة.\nفقرة ثانية مصححة.";
 const paragraphOps = revision.diffTextPreservingParagraphs(
