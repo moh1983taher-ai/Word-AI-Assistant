@@ -532,6 +532,14 @@
 
             await context.sync();
 
+            // Resolve every queued search in two synchronization rounds, not one round
+            // per edit. This keeps Office.js round-trips bounded for long documents.
+            const searchable = prepared.filter(function (item) { return !!item.search; });
+            searchable.forEach(function (item) {
+                item.search.items.forEach(function (match) { match.load("text,start,end"); });
+            });
+            await context.sync();
+
             const resolved = [];
             for (const item of prepared) {
                 if (item.kind === "boundary-start") {
@@ -543,19 +551,17 @@
                     continue;
                 }
 
-                item.search.items.forEach(function (match) { match.load("text,start,end"); });
-                await context.sync();
                 const expectedStart = Number(range.start) + Number(
                     item.kind === "insert" && item.anchor.location === "After"
                         ? item.anchor.token.start
                         : item.operation.start
                 );
+                const expectedText = item.kind === "replace"
+                    ? originalText.slice(item.operation.start, item.operation.start + item.operation.length)
+                    : item.anchor.token.value;
                 const matches = item.search.items.filter(function (match) {
                     return Number(match.start) === expectedStart &&
-                        (item.kind !== "replace" || String(match.text || "") === originalText.slice(
-                            item.operation.start,
-                            item.operation.start + item.operation.length
-                        ));
+                        String(match.text || "") === expectedText;
                 });
                 if (matches.length !== 1) {
                     throw new Error("تعذر مطابقة أحد مواضع التغيير بصورة دقيقة؛ أُلغي التطبيق دون تعديل المستند.");
@@ -570,12 +576,19 @@
                 const inserted = item.target.insertText(item.operation.replacement, location);
                 if (item.operation.replacement) {
                     inserted.font.color = "#FF0000";
-                    insertedRanges.push(inserted);
+                    insertedRanges.push({ range: inserted, expectedText: item.operation.replacement });
                 }
             });
 
-            insertedRanges.forEach(function (item) { item.load("text"); });
+            insertedRanges.forEach(function (item) { item.range.load("text"); });
             await context.sync();
+
+            const unverifiable = insertedRanges.find(function (item) {
+                return String(item.range.text || "") !== item.expectedText;
+            });
+            if (unverifiable) {
+                throw new Error("لم يجتز أحد التعديلات التحقق بعد إدراجه في Word؛ راجع المستند قبل متابعة العمل.");
+            }
             appliedCount = insertedRanges.length;
 
             if (pendingTarget && pendingTarget.id === revision.id && pendingTarget.range) {
