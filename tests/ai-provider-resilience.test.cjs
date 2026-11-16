@@ -40,7 +40,7 @@ assert.match(providerLayer, /outputBudgetWithinLimit/, "OTPM failures after a bu
 assert.match(providerLayer, /max_completion_tokens/, "Groq must use max_completion_tokens");
 assert.match(providerLayer, /delete requestBody\.max_tokens/, "the deprecated max_tokens field must be removed for Groq");
 assert.match(providerLayer, /input tokens per minute|TPM/i, "input token-rate limits must be distinguished from request-rate limits");
-assert.match(providerLayer, /shouldSplit: isAIProviderRequestTooLarge\\(response\\.status, message\\)/, "only request-size failures may mark a batch for splitting");
+assert.match(providerLayer, /shouldSplit: isAIProviderRequestTooLarge\(response\.status, message\)/, "only request-size failures may mark a batch for splitting");
 
 const sizeClassifierSource = sectionBetween(
     "function isAIProviderRequestTooLarge(",
