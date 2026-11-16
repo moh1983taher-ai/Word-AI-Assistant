@@ -84,7 +84,7 @@
                 const contextBefore = String(item && item.contextBefore || "");
                 const contextAfter = String(item && item.contextAfter || "");
                 const reason = String(item && item.reason || "").trim();
-                if (!original || !replacement || !reason || /[\\r\\n]/.test(original + replacement)) {
+                if (!original || !reason || /[\r\n]/.test(original + replacement)) {
                     throw new Error("تتضمن قائمة التصحيحات عنصرًا ناقصًا أو يمتد عبر فاصل فقرة.");
                 }
 
