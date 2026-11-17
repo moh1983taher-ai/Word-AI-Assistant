@@ -262,7 +262,7 @@ global.Word = {
 
     // Rewriting several paragraphs must preserve the original CRLF separators
     // and apply every rewritten paragraph to the full-document target.
-    documentText = "الفقرة الأولى تحتاج إلى تحسين.\\r\\nالفقرة الثانية تحتاج إلى توضيح.";
+    documentText = "الفقرة الأولى تحتاج إلى تحسين.\r\nالفقرة الثانية تحتاج إلى توضيح.";
     selectionText = "";
     const documentRewriteCapture = await revision.capture({ scope: "document" });
     const documentRewriteRequest = revision.buildRequest(
@@ -283,7 +283,7 @@ global.Word = {
     }), documentRewriteCapture.originalText, documentRewriteRequest.revision);
     assert.equal(
         documentRewriteParsed.text,
-        "تحتاج الفقرة الأولى إلى تحرير أدق.\\r\\nتحتاج الفقرة الثانية إلى مزيد من البيان."
+        "تحتاج الفقرة الأولى إلى تحرير أدق.\r\nتحتاج الفقرة الثانية إلى مزيد من البيان."
     );
     const documentRewriteResult = await revision.apply(Object.assign(
         {},
@@ -293,7 +293,7 @@ global.Word = {
     assert.equal(documentRewriteResult.applied, true);
     assert.equal(
         documentText,
-        "تحتاج الفقرة الأولى إلى تحرير أدق.\\r\\nتحتاج الفقرة الثانية إلى مزيد من البيان."
+        "تحتاج الفقرة الأولى إلى تحرير أدق.\r\nتحتاج الفقرة الثانية إلى مزيد من البيان."
     );
 
     // The document-wide path must use the captured target's RequestContext too.
