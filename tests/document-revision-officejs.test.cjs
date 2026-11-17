@@ -9,6 +9,7 @@ let itemLoads = 0;
 
 function makeRange(textGetter) {
     return {
+        context: null,
         text: "",
         load(property) {
             if (property === "text") this.text = String(textGetter());
@@ -23,6 +24,7 @@ function makeRange(textGetter) {
             const matches = index < 0 ? [] : [makeMatch(query)];
             let itemsLoaded = false;
             return {
+                context: this.context,
                 load(property) {
                     assert.equal(property, "items");
                     itemsLoaded = true;
@@ -75,17 +77,46 @@ global.Office = {
     }
 };
 
+let requestContextCount = 0;
 global.Word = {
-    run(callback) {
-        const context = {
-            document: {
-                getSelection() { return selectedRange; },
-                body: { getRange() { return bodyRange; } }
-            },
-            trackedObjects: { add() {} },
-            async sync() {}
-        };
-        return callback(context);
+    run(objectOrCallback, maybeCallback) {
+        if (typeof objectOrCallback === "function") {
+            const context = {
+                id: ++requestContextCount,
+                document: {
+                    getSelection() {
+                        selectedRange.context = context;
+                        return selectedRange;
+                    },
+                    body: {
+                        getRange() {
+                            bodyRange.context = context;
+                            return bodyRange;
+                        }
+                    }
+                },
+                trackedObjects: {
+                    add(object) {
+                        assert.equal(
+                            object.context,
+                            context,
+                            "tracked object must belong to the active RequestContext"
+                        );
+                    }
+                },
+                async sync() {}
+            };
+            return objectOrCallback(context);
+        }
+
+        const objects = Array.isArray(objectOrCallback)
+            ? objectOrCallback
+            : [objectOrCallback];
+        const context = objects[0] && objects[0].context;
+        assert.ok(context, "Word.run(object, callback) must receive a proxy with its owner context");
+        assert.ok(objects.every(object => object.context === context));
+        assert.equal(typeof maybeCallback, "function");
+        return maybeCallback(context);
     }
 };
 
@@ -95,6 +126,8 @@ global.Word = {
     assert.equal(selectedRange.text, documentText, "capture must load selection text before reading it");
     assert.equal(captured.targetType, "selection");
     assert.equal(captured.originalText, "هذا خطا واضح");
+    const captureContext = selectedRange.context;
+    assert.ok(captureContext, "capture should attach the selected Range to its RequestContext");
 
     const parsed = revision.parseResponse(JSON.stringify({
         status: "ready",
@@ -109,6 +142,11 @@ global.Word = {
     }), captured.originalText);
 
     const result = await revision.apply(Object.assign({}, captured, parsed));
+    assert.equal(
+        selectedRange.context,
+        captureContext,
+        "apply must reuse the selected Range's owning RequestContext"
+    );
     assert.equal(result.applied, true);
     assert.equal(documentText, "هذا خطأ واضح");
     assert.ok(collectionLoads > 0, "search collection items should be explicitly loaded");
