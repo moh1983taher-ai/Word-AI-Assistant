@@ -151,7 +151,7 @@ assert.throws(
 
 // Rewriting uses explicit boundary tokens so the model cannot silently merge
 // paragraphs or turn line wrapping into new Word paragraph marks.
-const rewriteSource = "الفقرة الأولى الأصلية.\\r\\nالفقرة الثانية الأصلية.\\n\\nالفقرة الثالثة الأصلية.";
+const rewriteSource = "الفقرة الأولى الأصلية.\r\nالفقرة الثانية الأصلية.\n\nالفقرة الثالثة الأصلية.";
 const rewriteRequest = revision.buildRequest(
     "أعد صياغة النص بأسلوب أكاديمي مع المحافظة على ترتيب الفقرات.",
     rewriteSource
@@ -168,12 +168,12 @@ assert.match(
 
 const rewriteMarkers = rewriteRequest.revision.paragraphMarkers;
 const rewrittenWithModelWrapping = [
-    "صياغة أكاديمية للفقرة الأولى.\\n",
+    "صياغة أكاديمية للفقرة الأولى.\n",
     rewriteMarkers[0],
-    "\\nصياغة أكاديمية للفقرة الثانية.\\n",
+    "\nصياغة أكاديمية للفقرة الثانية.\n",
     rewriteMarkers[1],
     rewriteMarkers[2],
-    "\\nصياغة أكاديمية للفقرة الثالثة."
+    "\nصياغة أكاديمية للفقرة الثالثة."
 ].join("");
 const rewrittenParsed = revision.parseResponse(JSON.stringify({
     status: "ready",
@@ -182,7 +182,7 @@ const rewrittenParsed = revision.parseResponse(JSON.stringify({
 }), rewriteSource, rewriteRequest.revision);
 assert.equal(
     rewrittenParsed.text,
-    "صياغة أكاديمية للفقرة الأولى.\\r\\nصياغة أكاديمية للفقرة الثانية.\\n\\nصياغة أكاديمية للفقرة الثالثة."
+    "صياغة أكاديمية للفقرة الأولى.\r\nصياغة أكاديمية للفقرة الثانية.\n\nصياغة أكاديمية للفقرة الثالثة."
 );
 assert.equal(
     revision.hasSameLineBreakCount(rewriteSource, rewrittenParsed.text),
@@ -205,7 +205,7 @@ assert.throws(
         "نص جديد" + rewriteMarkers[0] + rewriteMarkers[0] + rewriteMarkers[1] + rewriteMarkers[2],
         rewriteMarkers
     ),
-    /علامة حدود الفقرات/
+    /علامات حدود الفقرات/
 );
 
 // For a one-paragraph selection, model-generated line wraps are flattened;
@@ -219,10 +219,11 @@ assert.deepEqual(singleParagraphRequest.revision.paragraphMarkers, []);
 const singleParagraphParsed = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "rewrite",
-    text: "هذه صياغة أكاديمية جديدة.\\nوهذا سطر تابع ولّده النموذج."
+    text: "هذه صياغة أكاديمية جديدة.\nوهذا سطر تابع ولّده النموذج."
 }), singleParagraphSource, singleParagraphRequest.revision);
 assert.equal(singleParagraphParsed.text, "هذه صياغة أكاديمية جديدة. وهذا سطر تابع ولّده النموذج.");
-assert.equal(/[\\r\\n]/.test(singleParagraphParsed.text), false);
+assert.equal(/[\r\n]/.test(singleParagraphParsed.text), false);
+
 
 assert.equal(
     revision.normalizeChunkLineBreaks("فقرة أولى.\r\n", "فقرة أولى منقحة."),
