@@ -21,6 +21,35 @@
         return correction && !rewrite;
     }
 
+    function createParagraphBoundaryLayout(value, seed) {
+        const source = String(value || "");
+        const separators = source.match(/\r\n|\r|\n/g) || [];
+        if (!separators.length) {
+            return { text: source, markers: [] };
+        }
+
+        const safeSeed = String(seed || "0").replace(/[^a-zA-Z0-9_-]/g, "_");
+        let prefix = "[[WB_PARAGRAPH_BOUNDARY_" + safeSeed + "_";
+        while (source.includes(prefix)) {
+            prefix += "X_";
+        }
+
+        const markers = [];
+        const text = source.replace(/\r\n|\r|\n/g, function () {
+            const marker = prefix + String(markers.length + 1).padStart(4, "0") + "]]";
+            markers.push(marker);
+            return marker;
+        });
+
+        return { text: text, markers: markers };
+    }
+
+    function normalizeGeneratedParagraphSegment(value) {
+        return String(value || "")
+            .replace(/\r\n|\r|\n/g, " ")
+            .replace(/^[\\t \\u00a0]+|[\\t \\u00a0]+$/g, "");
+    }
+
     function getRequestedScope(value) {
         const instruction = String(value || "").trim();
         if (/(?:المستند|الوثيقة|الملف)(?:\s+(?:كامل(?:ا|ًا)?|كله|بأكمله|بالكامل))?|(?:كامل(?:ا|ًا)?|كامل\s+)?(?:المستند|الوثيقة|الملف)/i.test(instruction)) {
@@ -260,6 +289,15 @@
                 })
             })
             : requestText;
+        const paragraphLayout = !structuredCorrection && !maskState
+            ? createParagraphBoundaryLayout(
+                requestText,
+                String(pendingTarget && pendingTarget.id || "selection") + "_" + String(chunkOffset)
+            )
+            : { text: requestText, markers: [] };
+        const requestPayload = structuredCorrection
+            ? structuredParagraphText
+            : paragraphLayout.text;
 
         const revisionMetadata = {
             structuredCorrection: structuredCorrection,
@@ -268,7 +306,8 @@
             paragraphBaseIndex: paragraphBaseIndex,
             chunkLength: sourceText.length,
             userInstruction: String(userInstruction || ""),
-            paragraphRecords: paragraphRecords
+            paragraphRecords: paragraphRecords,
+            paragraphMarkers: paragraphLayout.markers
         };
         if (pendingTarget) {
             pendingTarget.lastRevisionMetadata = revisionMetadata;
@@ -290,6 +329,11 @@
                     : "يجب أن يكون original مقطعًا حرفيًا متصلًا من النص المحدد، وألا يتضمن فاصل فقرة. اجعل contextBefore وcontextAfter أقصر سياق حرفي كافٍ للفصل بين المواضع المتكررة داخل النص المحدد. لا تطلب من الباحث توضيح معرّف الفقرة. اجعل التصحيحات مستقلة وغير متداخلة، وإذا لم توجد أخطاء فأعد edits مصفوفة فارغة.",
                 "لا تقترح تحسينات أسلوبية في وضع التصحيح اللغوي، ولا تغير صياغة صحيحة. لا تدمج عدة مواضع في تصحيح واحد إلا إذا كانت متجاورة.",
                 "في إعادة الصياغة أو الجمع بين التصحيح والتحسين، استمر في إخراج النص الكامل بعد المعالجة باستخدام الحقل text.",
+                !structuredCorrection && paragraphLayout.markers.length
+                    ? "النص يتضمن علامات بنيوية خاصة على صورة [[WB_PARAGRAPH_BOUNDARY_...]]، وكل علامة تمثل فاصل فقرة أصليًا. هذه العلامات ليست جزءًا من النص النهائي. انقل كل علامة كما هي حرفيًا مرة واحدة، وبالترتيب نفسه، ولا تحذفها أو تبدلها أو تنشئ غيرها، ولا تستبدلها بفاصل سطر."
+                    : (!structuredCorrection && !maskState
+                        ? "النص المقدم فقرة واحدة؛ أخرجها فقرة واحدة ولا تضف فواصل أسطر داخلها."
+                        : ""),
                 "لا تختلق معلومة أو شاهدًا أو إحالة أو مصدرًا، ولا تحذف مضمونًا علميًا، ولا تستبدل المصطلحات المتخصصة بمرادفات قد تغير دلالتها. حافظ على ترتيب الفقرات وفواصلها، ولا تضف تنسيق Markdown.",
                 "حافظ على الآيات القرآنية والأحاديث والنقول الحرفية والمراجع والتوثيقات كما وردت، ولا تعد صياغتها.",
                 "قد تظهر في النص علامات حماية خاصة على صورة [[WB_KEEP_...]] بدل فقرات تحتوي على تغييرات متعقبة سابقة. هذه العلامات تمثل نصًا موجودًا في المستند ويجب إبقاؤها حرفيًا، مرة واحدة، وفي موضعها وترتيبها؛ لا تترجمها ولا تعدلها ولا تحذفها ولا تنقلها.",
@@ -306,12 +350,12 @@
                 "",
                 "النص المطلوب معالجته:",
                 "<<<BEGIN_TEXT>>>",
-                structuredParagraphText,
+                requestPayload,
                 "<<<END_TEXT>>>",
                 "",
                 structuredCorrection
                     ? "نفذ التصحيح اللغوي على الفقرات المسجلة في JSON. أخرج edits فقط، ويجب أن يحمل كل عنصر paragraphId صحيحًا من المدخلات. اجعل السياق من الفقرة نفسها."
-                    : "نفذ طلب الباحث على النص المحصور بين العلامتين. في التصحيح اللغوي أخرج قائمة edits فقط، وفي إعادة الصياغة أو الجمع أخرج النص الكامل. حافظ على علامات الحماية كما هي تمامًا."
+                    : "نفذ طلب الباحث على النص المحصور بين العلامتين. في التصحيح اللغوي أخرج قائمة edits فقط، وفي إعادة الصياغة أو الجمع أخرج النص الكامل. حافظ على علامات الحماية وعلامات حدود الفقرات كما هي تمامًا."
             ].join("\n"),
             revision: revisionMetadata
         };
@@ -707,6 +751,17 @@
         if (maskState) {
             text = DocumentRevisionPreflight.restoreChunk(text, maskState);
         }
+        const paragraphMarkers = activeRequestMetadata &&
+            Array.isArray(activeRequestMetadata.paragraphMarkers)
+            ? activeRequestMetadata.paragraphMarkers
+            : [];
+        if (paragraphMarkers.length) {
+            text = normalizeBatchLineBreaks(sourceText, text, paragraphMarkers);
+        } else if (!/[\\r\\n]/.test(sourceText)) {
+            text = normalizeChunkLineBreaks(sourceText, text);
+        } else if (hasSameLineBreakCount(sourceText, text)) {
+            text = normalizeLineBreaks(sourceText, text);
+        }
         if (pendingTarget) pendingTarget.lastMaskedChunk = null;
         return { status: "ready", mode: mode, text: text };
     }
@@ -737,9 +792,72 @@
     // Batched requests may contain several original paragraphs.
     // Unlike normalizeChunkLineBreaks (single-paragraph mode), preserve every
     // internal line break and restore the exact original separator sequence.
-    function normalizeBatchLineBreaks(originalValue, revisedValue) {
+    function normalizeBatchLineBreaks(originalValue, revisedValue, paragraphMarkers) {
         const original = String(originalValue || "");
         const revised = String(revisedValue || "");
+        const originalSeparators = original.match(/\r\n|\r|\n/g) || [];
+        const markers = Array.isArray(paragraphMarkers)
+            ? paragraphMarkers.map(function (marker) { return String(marker || ""); }).filter(Boolean)
+            : [];
+
+        // A single source paragraph must remain a single paragraph. Models may
+        // wrap the rewritten sentence onto extra lines; flatten those generated
+        // breaks instead of rejecting an otherwise valid rewrite.
+        if (!originalSeparators.length) {
+            return normalizeChunkLineBreaks(original, revised);
+        }
+
+        if (markers.length) {
+            if (markers.length !== originalSeparators.length) {
+                throw new Error("تعذر مطابقة علامات حدود الفقرات مع النص الأصلي؛ لم يُطبق أي تعديل.");
+            }
+
+            const markerPositions = markers.map(function (marker) {
+                return revised.indexOf(marker);
+            });
+            const allMissing = markerPositions.every(function (position) { return position < 0; });
+            if (allMissing && hasSameLineBreakCount(original, revised)) {
+                // Backward compatibility for providers that preserve the exact
+                // paragraph-break count but echo the old line-break format.
+                return normalizeLineBreaks(original, revised);
+            }
+
+            let cursor = 0;
+            let normalized = "";
+            for (let index = 0; index < markers.length; index++) {
+                const marker = markers[index];
+                const markerPosition = revised.indexOf(marker, cursor);
+                if (markerPosition < 0 ||
+                    revised.indexOf(marker, markerPosition + marker.length) >= 0) {
+                    throw new Error(
+                        "لم تُعِد استجابة إعادة الصياغة علامات حدود الفقرات كما وردت؛ " +
+                        "أُوقف التطبيق حتى لا تندمج الفقرات أو يتغير ترتيبها."
+                    );
+                }
+
+                const segment = revised.slice(cursor, markerPosition);
+                if (markers.some(function (otherMarker, otherIndex) {
+                    return otherIndex !== index && segment.includes(otherMarker);
+                })) {
+                    throw new Error("تغير ترتيب علامات الفقرات في استجابة إعادة الصياغة؛ لم يُطبق أي تعديل.");
+                }
+
+                normalized += normalizeGeneratedParagraphSegment(segment);
+                normalized += originalSeparators[index];
+                cursor = markerPosition + marker.length;
+            }
+
+            const remainder = revised.slice(cursor);
+            if (markers.some(function (marker) { return remainder.includes(marker); })) {
+                throw new Error("تكررت علامة فقرة أو انتقلت إلى موضع غير صحيح؛ لم يُطبق أي تعديل.");
+            }
+            normalized += normalizeGeneratedParagraphSegment(remainder);
+
+            if (!hasSameLineBreakCount(original, normalized)) {
+                throw new Error("تعذر استعادة فواصل الفقرات الأصلية بعد إعادة الصياغة؛ لم يُطبق أي تعديل.");
+            }
+            return normalized;
+        }
 
         if (!hasSameLineBreakCount(original, revised)) {
             throw new Error(
