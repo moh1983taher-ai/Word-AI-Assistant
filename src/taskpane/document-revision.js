@@ -667,7 +667,10 @@
         const previous = pendingTarget;
         pendingTarget = null;
         try {
-            await Word.run(async function (context) {
+            // Re-enter the RequestContext that owns the tracked Range.
+            // Word.run(callback) would create a different context and cannot
+            // synchronize commands queued by previous.range.
+            await Word.run(previous.range, async function (context) {
                 previous.range.untrack();
                 await context.sync();
             });
@@ -713,9 +716,10 @@
                 let detectedChanges = false;
                 if (supportsNativeTrackedChanges && typeof range.getTrackedChanges === "function") {
                     const trackedChanges = range.getTrackedChanges();
-                    trackedChanges.load("items/type,items/text");
-                    await context.sync();
-                    detectedChanges = trackedChanges.items.length > 0;
+                    const trackedItems = await loadOfficeCollectionItems(
+                        context, trackedChanges, "type,text", "التغييرات المتعقبة في التحديد"
+                    );
+                    detectedChanges = trackedItems.length > 0;
                 } else {
                     if (typeof range.getOoxml !== "function") {
                         throw new Error("يتعذر فحص التغييرات المتعقبة في التحديد بهذا الإصدار من Word؛ لم يُرسل النص إلى الذكاء الاصطناعي.");
@@ -730,44 +734,53 @@
                 }
             } else {
                 const paragraphs = context.document.body.paragraphs;
-                paragraphs.load("items/text");
-                await context.sync();
+                const paragraphItems = await loadOfficeCollectionItems(
+                    context, paragraphs, "text", "فقرات المستند"
+                );
 
                 const paragraphRecords = [];
                 const canUseNativeParagraphTracking = supportsNativeTrackedChanges &&
-                    paragraphs.items.every(function (paragraph) {
+                    paragraphItems.every(function (paragraph) {
                         return typeof paragraph.getTrackedChanges === "function";
                     });
 
                 if (canUseNativeParagraphTracking) {
-                    const trackedCollections = paragraphs.items.map(function (paragraph) {
+                    const trackedCollections = paragraphItems.map(function (paragraph) {
                         return paragraph.getTrackedChanges();
                     });
                     trackedCollections.forEach(function (collection) {
-                        collection.load("items/type,items/text");
+                        collection.load("items");
                     });
                     await context.sync();
 
-                    paragraphs.items.forEach(function (paragraph, index) {
+                    const trackedItemsByParagraph = trackedCollections.map(function (collection) {
+                        return collection.items;
+                    });
+                    trackedItemsByParagraph.forEach(function (items) {
+                        items.forEach(function (item) { item.load("type,text"); });
+                    });
+                    await context.sync();
+
+                    paragraphItems.forEach(function (paragraph, index) {
                         paragraphRecords.push({
                             index: index,
                             text: paragraph.text,
-                            trackedChangesCount: trackedCollections[index].items.length
+                            trackedChangesCount: trackedItemsByParagraph[index].length
                         });
                     });
                 } else {
-                    if (!paragraphs.items.every(function (paragraph) {
+                    if (!paragraphItems.every(function (paragraph) {
                         return typeof paragraph.getOoxml === "function";
                     })) {
                         throw new Error("يتعذر فحص التغييرات المتعقبة في فقرات المستند بهذا الإصدار من Word؛ أُوقف التدقيق حمايةً للمراجعات السابقة.");
                     }
 
-                    const paragraphResults = paragraphs.items.map(function (paragraph) {
+                    const paragraphResults = paragraphItems.map(function (paragraph) {
                         return paragraph.getOoxml();
                     });
                     await context.sync();
 
-                    paragraphs.items.forEach(function (paragraph, index) {
+                    paragraphItems.forEach(function (paragraph, index) {
                         paragraphRecords.push({
                             index: index,
                             text: paragraph.text,
@@ -803,6 +816,47 @@
         return result;
     }
 
+    async function loadOfficeCollectionItems(context, collection, itemProperties, label) {
+        if (!collection || typeof collection.load !== "function") {
+            throw new Error("تعذر الوصول إلى مجموعة " + label + " من Word.");
+        }
+
+        try {
+            // A collection can be produced by a proxy object retained from
+            // an earlier Word.run. Always synchronize the RequestContext
+            // which owns the collection, not a merely current/new context.
+            const requestContext = collection.context || context;
+            if (requestContext !== context) {
+                throw new Error("مجموعة Word مرتبطة بسياق طلب مختلف عن سياق التنفيذ.");
+            }
+
+            // Load the collection's items separately before touching .items.
+            collection.load("items");
+            await requestContext.sync();
+            const items = collection.items;
+
+            if (!Array.isArray(items)) {
+                throw new Error("لم يُرجع Word قائمة عناصر صالحة.");
+            }
+
+            if (itemProperties && items.length) {
+                items.forEach(function (item) {
+                    item.load(itemProperties);
+                });
+                await requestContext.sync();
+            }
+            return items;
+        } catch (error) {
+            const failure = new Error(
+                "تعذر تحميل عناصر " + label + " من Word قبل قراءتها. " +
+                String(error && error.message || error)
+            );
+            failure.code = "REVISION_OFFICE_COLLECTION_LOAD";
+            failure.cause = error;
+            throw failure;
+        }
+    }
+
     async function resolveTarget(context, revision) {
         const body = context.document.body;
         if (revision.targetType === "document") {
@@ -810,7 +864,8 @@
         }
 
         if (pendingTarget && pendingTarget.id === revision.id && pendingTarget.range) {
-            context.trackedObjects.add(pendingTarget.range);
+            // This callback is run with pendingTarget.range.context, so the
+            // tracked Range already belongs to this RequestContext.
             return pendingTarget.range;
         }
 
@@ -818,12 +873,11 @@
             matchCase: true,
             matchWholeWord: false
         });
-        matches.load("items");
-        await context.sync();
-        matches.items.forEach(function (match) { match.load("text"); });
-        await context.sync();
+        const matchItems = await loadOfficeCollectionItems(
+            context, matches, "text", "نتائج البحث عن النص المحدد"
+        );
 
-        const exactMatches = matches.items.filter(function (match) {
+        const exactMatches = matchItems.filter(function (match) {
             return String(match.text || "") === String(revision.originalText || "");
         });
         if (exactMatches.length !== 1) {
@@ -851,7 +905,11 @@
 
         let appliedCount = 0;
 
-        await Word.run(async function (context) {
+        const trackedTarget = pendingTarget && pendingTarget.id === revision.id && pendingTarget.range
+            ? pendingTarget.range
+            : null;
+
+        const applyBatch = async function (context) {
             const range = await resolveTarget(context, revision);
             range.load("text");
             await context.sync();
@@ -863,13 +921,14 @@
             let paragraphTargets = [];
             if (revision.targetType === "document" && range.paragraphs) {
                 const paragraphCollection = range.paragraphs;
-                paragraphCollection.load("items/text");
-                await context.sync();
+                const paragraphItems = await loadOfficeCollectionItems(
+                    context, paragraphCollection, "text", "فقرات نطاق التطبيق"
+                );
 
                 try {
                     const mappings = DocumentRevisionPreflight.mapParagraphRanges(
                         originalText,
-                        paragraphCollection.items.map(function (paragraph) {
+                        paragraphItems.map(function (paragraph) {
                             return paragraph.text;
                         })
                     );
@@ -879,7 +938,7 @@
                             start: mapping.start,
                             end: mapping.end,
                             text: mapping.text,
-                            paragraph: paragraphCollection.items[mapping.paragraphIndex]
+                            paragraph: paragraphItems[mapping.paragraphIndex]
                         };
                     }).filter(function (mapping) {
                         return !!mapping.paragraph;
@@ -956,9 +1015,14 @@
 
             await context.sync();
 
-            // Resolve queued searches in one grouped load, then map each result
-            // against its paragraph-local text and expected occurrence.
+            // Load every search collection's item array before reading .items.
+            // Then load each match's text in a second, explicit synchronization.
             const searchable = prepared.filter(function (item) { return !!item.search; });
+            searchable.forEach(function (item) {
+                item.search.load("items");
+            });
+            await context.sync();
+
             searchable.forEach(function (item) {
                 item.search.items.forEach(function (match) { match.load("text"); });
             });
@@ -1021,7 +1085,16 @@
                 } catch (_) {}
                 pendingTarget = null;
             }
-        });
+        };
+
+        // Reuse the captured target's owning RequestContext for both
+        // selection and document scopes. The target proxy was tracked during
+        // capture; all ranges and collections in this batch now share its context.
+        if (trackedTarget) {
+            await Word.run(trackedTarget, applyBatch);
+        } else {
+            await Word.run(applyBatch);
+        }
 
         return { applied: true, unchanged: false, changedParts: appliedCount };
     }
