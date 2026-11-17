@@ -35713,259 +35713,120 @@ async function processOpenAICompatibleStream(
     onChunk,
     providerName
 ) {
-
-    if (!response.body) {
-
-        const error =
-            new Error(
-                "المتصفح لا يدعم استقبال الرد المتدفق من " +
-                providerName +
-                "."
-            );
-
-
-        error.retryable =
-            false;
-
-
+    if (!response.body || typeof response.body.getReader !== "function") {
+        const error = new Error("المتصفح لا يدعم استقبال الرد المتدفق من " + providerName + ".");
+        error.retryable = false;
+        error.noRetry = true;
         throw error;
-
     }
 
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let fullAnswer = "";
+    let finishReason = "";
+    let providerError = "";
 
-    const reader =
-        response.body.getReader();
+    function processSSELine(line) {
+        const cleanLine = String(line || "").trim();
+        if (!cleanLine || cleanLine.startsWith(":") || !cleanLine.startsWith("data:")) return;
 
-
-    const decoder =
-        new TextDecoder(
-            "utf-8"
-        );
-
-
-    let buffer =
-        "";
-
-
-    let fullAnswer =
-        "";
-
-
-    function processSSELine(
-        line
-    ) {
-
-        const cleanLine =
-            String(
-                line ||
-                ""
-            ).trim();
-
-
-        if (
-            !cleanLine ||
-            !cleanLine.startsWith(
-                "data:"
-            )
-        ) {
-
-            return;
-
-        }
-
-
-        const dataText =
-            cleanLine.substring(
-                5
-            ).trim();
-
-
-        if (
-            !dataText ||
-            dataText ===
-                "[DONE]"
-        ) {
-
-            return;
-
-        }
-
+        const dataText = cleanLine.slice(5).trim();
+        if (!dataText || dataText === "[DONE]") return;
 
         let parsed;
-
-
         try {
-
-            parsed =
-                JSON.parse(
-                    dataText
-                );
-
-        }
-        catch (
-            error
-        ) {
-
+            parsed = JSON.parse(dataText);
+        } catch (_) {
+            // A malformed transport frame is not model content. Ignore it,
+            // but final response validation below will reject an empty stream.
             return;
-
         }
 
-
-        const delta =
-            parsed &&
-            parsed.choices &&
-            parsed.choices[0] &&
-            parsed.choices[0].delta
-                ? parsed.choices[0].delta.content
-                : "";
-
-
-        if (
-            typeof delta !==
-                "string" ||
-            !delta
-        ) {
-
+        if (parsed && parsed.error) {
+            providerError = String(parsed.error.message || parsed.error.code || "خطأ غير محدد من المزود");
             return;
-
         }
 
+        const choice = parsed && Array.isArray(parsed.choices) ? parsed.choices[0] : null;
+        if (!choice) return;
 
-        fullAnswer +=
-            delta;
+        if (choice.finish_reason) finishReason = String(choice.finish_reason);
+        const delta = choice.delta && choice.delta.content;
 
-
-        if (
-            typeof onChunk ===
-            "function"
-        ) {
-
-            onChunk(
-                delta,
-                fullAnswer
-            );
-
-        }
-
-    }
-
-
-    while (true) {
-
-        const streamResult =
-            await reader.read();
-
-
-        if (
-            streamResult.done
-        ) {
-
-            break;
-
-        }
-
-
-        buffer +=
-            decoder.decode(
-                streamResult.value,
-                {
-                    stream:
-                        true
+        if (typeof delta === "string" && delta) {
+            fullAnswer += delta;
+            if (typeof onChunk === "function") onChunk(delta, fullAnswer);
+        } else if (Array.isArray(delta)) {
+            delta.forEach(function (part) {
+                if (part && typeof part.text === "string" && part.text) {
+                    fullAnswer += part.text;
+                    if (typeof onChunk === "function") onChunk(part.text, fullAnswer);
                 }
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r\n/g,
-                "\n"
-            );
-
-
-        buffer =
-            buffer.replace(
-                /\r/g,
-                "\n"
-            );
-
-
-        let newlineIndex =
-            buffer.indexOf(
-                "\n"
-            );
-
-
-        while (
-            newlineIndex !==
-            -1
-        ) {
-
-            const line =
-                buffer.substring(
-                    0,
-                    newlineIndex
-                );
-
-
-            buffer =
-                buffer.substring(
-                    newlineIndex + 1
-                );
-
-
-            processSSELine(
-                line
-            );
-
-
-            newlineIndex =
-                buffer.indexOf(
-                    "\n"
-                );
-
+            });
         }
-
     }
 
-
-    if (
-        buffer.trim()
-    ) {
-
-        processSSELine(
-            buffer
-        );
-
+    function drainLines(final) {
+        buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex !== -1) {
+            processSSELine(buffer.slice(0, newlineIndex));
+            buffer = buffer.slice(newlineIndex + 1);
+            newlineIndex = buffer.indexOf("\n");
+        }
+        if (final && buffer.trim()) {
+            processSSELine(buffer);
+            buffer = "";
+        }
     }
 
+    try {
+        while (true) {
+            const result = await reader.read();
+            if (result.done) break;
+            buffer += decoder.decode(result.value, { stream: true });
+            drainLines(false);
+        }
+        buffer += decoder.decode();
+        drainLines(true);
+    } catch (streamError) {
+        try { await reader.cancel(); } catch (_) {}
+        streamError.code = streamError.code || "AI_STREAM_INTERRUPTED";
+        streamError.retryable = true;
+        throw streamError;
+    } finally {
+        try { reader.releaseLock(); } catch (_) {}
+    }
 
-    if (
-        !fullAnswer.trim()
-    ) {
-
-        const error =
-            new Error(
-                "لم يصل نص من " +
-                providerName +
-                " عبر البث المتدفق."
-            );
-
-
-        // ==================================
-        // الرد الفارغ قابل لإعادة المحاولة
-        // ==================================
-
-        error.retryable =
-            true;
-
-
+    if (providerError) {
+        const error = new Error("أعاد " + providerName + " خطأ أثناء البث: " + providerError);
+        error.code = "AI_STREAM_PROVIDER_ERROR";
+        error.retryable = true;
         throw error;
-
     }
 
+    if (["length", "max_tokens", "max_output_tokens"].includes(finishReason.toLowerCase())) {
+        const error = new Error(
+            "انقطعت استجابة " + providerName +
+            " بسبب بلوغ الحد الأقصى لرموز الإخراج؛ لم يكتمل النص المنظم، ولذلك أُوقفت المعالجة دون تطبيق أي تغييرات. " +
+            "خفّض حجم النص المطلوب مراجعته أو استخدم نموذجًا يتيح حد إخراج أعلى."
+        );
+        error.code = "AI_RESPONSE_TRUNCATED";
+        error.finishReason = finishReason;
+        error.shouldSplit = true;
+        error.noRetry = true;
+        throw error;
+    }
+
+    if (!fullAnswer.trim()) {
+        const error = new Error("لم يصل نص من " + providerName + " عبر البث المتدفق.");
+        error.code = "AI_STREAM_EMPTY";
+        error.retryable = true;
+        throw error;
+    }
 
     return fullAnswer.trim();
-
 }
 
 
