@@ -171,6 +171,7 @@
                 "لم تُطبق أي تغييرات. التفاصيل: " + diagnostic
             );
             failure.code = "REVISION_INVALID_RESPONSE";
+            failure.shouldSplit = /الاستجابة مبتورة/.test(diagnostic);
             failure.cause = error;
             throw failure;
         }
