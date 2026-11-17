@@ -326,8 +326,11 @@ global.Word = {
         "تحتاج الفقرة الأولى إلى تحرير أدق.\r\nتحتاج الفقرة الثانية إلى مزيد من البيان."
     );
 
-    // The document-wide path must use the captured target's RequestContext too.
+    // Restore the base fixture for the existing document-correction tests.
+    documentText = "هذا خطأ واضح";
     selectionText = "";
+
+    // The document-wide path must use the captured target's RequestContext too.
     const documentCapture = await revision.capture();
     assert.equal(documentCapture.targetType, "document");
     assert.equal(documentCapture.originalText, documentText);
