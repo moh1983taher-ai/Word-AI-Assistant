@@ -667,7 +667,10 @@
         const previous = pendingTarget;
         pendingTarget = null;
         try {
-            await Word.run(async function (context) {
+            // Re-enter the RequestContext that owns the tracked Range.
+            // Word.run(callback) would create a different context and cannot
+            // synchronize commands queued by previous.range.
+            await Word.run(previous.range, async function (context) {
                 previous.range.untrack();
                 await context.sync();
             });
@@ -819,9 +822,17 @@
         }
 
         try {
+            // A collection can be produced by a proxy object retained from
+            // an earlier Word.run. Always synchronize the RequestContext
+            // which owns the collection, not a merely current/new context.
+            const requestContext = collection.context || context;
+            if (requestContext !== context) {
+                throw new Error("مجموعة Word مرتبطة بسياق طلب مختلف عن سياق التنفيذ.");
+            }
+
             // Load the collection's items separately before touching .items.
             collection.load("items");
-            await context.sync();
+            await requestContext.sync();
             const items = collection.items;
 
             if (!Array.isArray(items)) {
@@ -832,7 +843,7 @@
                 items.forEach(function (item) {
                     item.load(itemProperties);
                 });
-                await context.sync();
+                await requestContext.sync();
             }
             return items;
         } catch (error) {
@@ -853,7 +864,8 @@
         }
 
         if (pendingTarget && pendingTarget.id === revision.id && pendingTarget.range) {
-            context.trackedObjects.add(pendingTarget.range);
+            // This callback is run with pendingTarget.range.context, so the
+            // tracked Range already belongs to this RequestContext.
             return pendingTarget.range;
         }
 
@@ -893,7 +905,12 @@
 
         let appliedCount = 0;
 
-        await Word.run(async function (context) {
+        const trackedSelection = revision.targetType === "selection" &&
+            pendingTarget && pendingTarget.id === revision.id && pendingTarget.range
+            ? pendingTarget.range
+            : null;
+
+        const applyBatch = async function (context) {
             const range = await resolveTarget(context, revision);
             range.load("text");
             await context.sync();
@@ -1069,7 +1086,15 @@
                 } catch (_) {}
                 pendingTarget = null;
             }
-        });
+        };
+
+        // Reuse the tracked selection's owning RequestContext. For document
+        // scope, create a fresh context because the body range is reacquired.
+        if (trackedSelection) {
+            await Word.run(trackedSelection, applyBatch);
+        } else {
+            await Word.run(applyBatch);
+        }
 
         return { applied: true, unchanged: false, changedParts: appliedCount };
     }
