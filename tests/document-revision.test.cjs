@@ -196,7 +196,7 @@ assert.deepEqual(replacement, {
 
 // Rewrite requests use explicit paragraph segments instead of relying on the
 // model to reproduce the source's exact newline count.
-const rewriteSource = "فقرة أولى قديمة.\\r\\nفقرة ثانية قديمة.\\n\\nفقرة ثالثة قديمة.";
+const rewriteSource = "فقرة أولى قديمة.\r\nفقرة ثانية قديمة.\n\nفقرة ثالثة قديمة.";
 const rewriteRequest = revision.buildRequest(
     "أعد صياغة النص بأسلوب أكاديمي",
     rewriteSource
@@ -224,7 +224,7 @@ const structuredRewrite = revision.parseResponse(JSON.stringify({
 }), rewriteSource, rewriteRequest.revision);
 assert.equal(
     structuredRewrite.text,
-    "صياغة أولى منقحة.\\r\\nصياغة ثانية أكثر إحكامًا.\\n\\nصياغة ثالثة مترابطة."
+    "صياغة أولى منقحة.\r\nصياغة ثانية أكثر إحكامًا.\n\nصياغة ثالثة مترابطة."
 );
 assert.equal(
     revision.hasSameLineBreakCount(rewriteSource, structuredRewrite.text),
@@ -233,14 +233,14 @@ assert.equal(
 
 // Legacy flat-text responses remain supported only when their paragraph
 // count is unambiguous; original CRLF/LF separators are then restored.
-const legacyRewriteSource = "فقرة أصلية أولى.\\r\\nفقرة أصلية ثانية.";
+const legacyRewriteSource = "فقرة أصلية أولى.\r\nفقرة أصلية ثانية.";
 const legacyRewriteRequest = revision.buildRequest("أعد صياغة النص", legacyRewriteSource);
 const legacyRewrite = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "rewrite",
-    text: "صياغة أولى جديدة.\\nصياغة ثانية جديدة."
+    text: "صياغة أولى جديدة.\nصياغة ثانية جديدة."
 }), legacyRewriteSource, legacyRewriteRequest.revision);
-assert.equal(legacyRewrite.text, "صياغة أولى جديدة.\\r\\nصياغة ثانية جديدة.");
+assert.equal(legacyRewrite.text, "صياغة أولى جديدة.\r\nصياغة ثانية جديدة.");
 assert.throws(
     () => revision.parseResponse(JSON.stringify({
         status: "ready",
