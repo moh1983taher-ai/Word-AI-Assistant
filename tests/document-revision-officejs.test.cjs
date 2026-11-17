@@ -389,10 +389,10 @@ global.Word = {
     const makeLongToken = seed => Array.from({ length: 320 }, (_, index) =>
         (index + seed).toString(36).padStart(3, "0")
     ).join("");
-    const longOriginalOne = makeLongToken(1);
-    const longOriginalTwo = makeLongToken(500);
-    const longRevisedOne = makeLongToken(900);
-    const longRevisedTwo = makeLongToken(1300);
+    const longOriginalOne = "بداية " + makeLongToken(1) + " نهاية";
+    const longOriginalTwo = "بداية " + makeLongToken(500) + " نهاية";
+    const longRevisedOne = "بداية " + makeLongToken(900) + " نهاية";
+    const longRevisedTwo = "بداية " + makeLongToken(1300) + " نهاية";
     documentText = longOriginalOne + "\r\n" + longOriginalTwo;
     selectionText = "";
     const longRewriteCapture = await revision.capture({ scope: "document" });
