@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const revision = require("../src/taskpane/document-revision");
 
 let documentText = "هذا خطا واضح";
+let selectionText = documentText;
 let collectionLoads = 0;
 let itemLoads = 0;
 
@@ -64,7 +65,7 @@ function makeMatch(initialText) {
     };
 }
 
-const selectedRange = makeRange(() => documentText);
+const selectedRange = makeRange(() => selectionText);
 const bodyRange = makeRange(() => documentText);
 
 global.Office = {
@@ -151,7 +152,32 @@ global.Word = {
     assert.equal(documentText, "هذا خطأ واضح");
     assert.ok(collectionLoads > 0, "search collection items should be explicitly loaded");
     assert.ok(itemLoads > 0, "search result text should be explicitly loaded");
-    process.stdout.write("document-revision-officejs: collection loading and selected-text apply passed\n");
+
+    // The document-wide path must use the captured target's RequestContext too.
+    selectionText = "";
+    const documentCapture = await revision.capture();
+    assert.equal(documentCapture.targetType, "document");
+    assert.equal(documentCapture.originalText, documentText);
+    const documentContext = bodyRange.context;
+
+    const documentParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "correction",
+        edits: [{
+            original: "واضح",
+            replacement: "بيّن",
+            contextBefore: "هذا خطأ ",
+            contextAfter: "",
+            reason: "تصويب اختباري"
+        }]
+    }), documentCapture.originalText);
+
+    const documentResult = await revision.apply(Object.assign({}, documentCapture, documentParsed));
+    assert.equal(bodyRange.context, documentContext);
+    assert.equal(documentResult.applied, true);
+    assert.equal(documentText, "هذا خطأ بيّن");
+
+    process.stdout.write("document-revision-officejs: collection loading, selection and document context tests passed\n");
 })().catch(error => {
     process.stderr.write(String(error && error.stack || error) + "\n");
     process.exitCode = 1;
