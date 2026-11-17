@@ -93,6 +93,32 @@ global.Word = {
                         getRange() {
                             bodyRange.context = context;
                             return bodyRange;
+                        },
+                        get paragraphs() {
+                            const paragraph = {
+                                text: "",
+                                load(property) {
+                                    assert.equal(property, "text");
+                                    this.text = documentText;
+                                },
+                                getOoxml() {
+                                    return {
+                                        value: "<w:p><w:r><w:t>" + documentText + "</w:t></w:r></w:p>"
+                                    };
+                                }
+                            };
+                            let itemsLoaded = false;
+                            return {
+                                context,
+                                load(property) {
+                                    assert.equal(property, "items");
+                                    itemsLoaded = true;
+                                },
+                                get items() {
+                                    assert.equal(itemsLoaded, true, "paragraph items must be loaded before access");
+                                    return [paragraph];
+                                }
+                            };
                         }
                     }
                 },
