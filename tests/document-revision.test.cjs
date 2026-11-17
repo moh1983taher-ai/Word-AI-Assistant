@@ -252,6 +252,63 @@ assert.equal(uniqueWithImpreciseContext.text, "وتبين الدراسة أن ا
 assert.equal(uniqueWithImpreciseContext.edits[0].start, "وتبين الدراسة أن المصلحة العامة تقتضي ذلك.".indexOf("أن المصلحة"));
 
 
+// Regression: a phrase can occur more than once in a full-document batch.
+// A slightly inaccurate long context must not abort the whole batch when the
+// adjacent boundary words uniquely identify the intended occurrence.
+const repeatedPhrase = "أن تعارف الناس أمراً ما";
+const repeatedPhraseSource =
+    "كان من عادة أهل القرية أن تعارف الناس أمراً ما في المجالس القديمة، ثم يتناقلونه. " +
+    "وفي سياق آخر، سمعنا عبارة أن تعارف الناس أمراً ما بين الأصدقاء، فتنتشر سريعاً.";
+const repeatedPhraseResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: repeatedPhrase,
+        replacement: "أن يتعارف الناس على أمر ما",
+        contextBefore: "وذكر النص أنه كان من عادة أهل القرية",
+        contextAfter: "في المجالس القديمة ثم يتداولونه",
+        reason: "تصحيح التركيب النحوي"
+    }]
+}), repeatedPhraseSource);
+const firstRepeatedPhraseStart = repeatedPhraseSource.indexOf(repeatedPhrase);
+assert.equal(repeatedPhraseResult.edits.length, 1);
+assert.equal(repeatedPhraseResult.edits[0].start, firstRepeatedPhraseStart);
+assert.ok(repeatedPhraseResult.text.startsWith(
+    "كان من عادة أهل القرية أن يتعارف الناس على أمر ما في المجالس القديمة"
+));
+
+// Arabic diacritics in the model's boundary context do not prevent locating
+// the exact undiacritized source phrase.
+const diacriticContextResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: repeatedPhrase,
+        replacement: "أن يتعارف الناس أمراً ما",
+        contextBefore: "من عادة أهلُ القريةِ",
+        contextAfter: "في المجالس القديمة ثم",
+        reason: "تصحيح اختباري"
+    }]
+}), repeatedPhraseSource);
+assert.equal(diacriticContextResult.edits[0].start, firstRepeatedPhraseStart);
+
+// When two identical phrases also have indistinguishable adjacent context,
+// the resolver must refuse rather than choose the first occurrence.
+const indistinguishableSource =
+    "وكان أهل القرية يرون أن تعارف الناس أمراً ما بينهم. " +
+    "وكان أهل القرية يرون أن تعارف الناس أمراً ما بينهم.";
+assert.throws(() => revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: repeatedPhrase,
+        replacement: "أن يتعارف الناس أمراً ما",
+        contextBefore: "وكان أهل القرية يرون",
+        contextAfter: "بينهم",
+        reason: "تصحيح اختباري"
+    }]
+}), indistinguishableSource), /وردت 2 مرات/);
+
 assert.throws(() => revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
@@ -262,7 +319,7 @@ assert.throws(() => revision.parseResponse(JSON.stringify({
         contextAfter: "",
         reason: "تصحيح"
     }]
-}), repeatedSource), /بصورة فريدة/);
+}), repeatedSource), /وردت 2 مرات، ولم يكفِ السياق المحيط/);
 
 assert.throws(() => revision.parseResponse(JSON.stringify({
     status: "ready",

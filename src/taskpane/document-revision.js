@@ -37,7 +37,7 @@
                 "افهم طلب الباحث من عبارته وحدد بنفسك نوع العمل: تصحيح لغوي، أو إعادة صياغة، أو الجمع بينهما. لا تطلب منه اختيار نمط من قائمة.",
                 "في التصحيح اللغوي: لا تعِد كتابة النص ولا الفقرة. اكتشف الأخطاء الحقيقية فقط، وأخرج لكل خطأ تصحيحًا موضعيًا مستقلًا.",
                 "استجابة التصحيح اللغوي يجب أن تكون JSON بهذا الشكل: {\"status\":\"ready\",\"mode\":\"correction\",\"edits\":[{\"original\":\"المقطع الخاطئ حرفيًا\",\"replacement\":\"الصواب\",\"contextBefore\":\"السياق السابق الحرفي\",\"contextAfter\":\"السياق اللاحق الحرفي\",\"reason\":\"سبب موجز\"}]} .",
-                "يجب أن يكون original مطابقًا حرفيًا لمقطع متصل من النص، وألا يتضمن فاصل فقرة. أدرج السياق السابق واللاحق كما وردا حرفيًا، واجعل كل تصحيح مستقلًا وغير متداخل. إذا لم توجد أخطاء فأعد edits مصفوفة فارغة.",
+                "يجب أن يكون original مطابقًا حرفيًا لمقطع متصل من النص، وألا يتضمن فاصل فقرة. اجعل contextBefore آخر 4 إلى 6 كلمات متصلة تسبق original مباشرة، وcontextAfter أول 4 إلى 6 كلمات متصلة تليه مباشرة؛ انسخهما حرفيًا دون تلخيص أو إعادة صياغة أو إضافة علامات حذف. لا تضع فاصل فقرة في السياق. اجعل كل تصحيح مستقلًا وغير متداخل. إذا لم توجد أخطاء فأعد edits مصفوفة فارغة.",
                 "لا تقترح تحسينات أسلوبية في وضع التصحيح اللغوي، ولا تغير صياغة صحيحة. لا تدمج عدة مواضع في تصحيح واحد إلا إذا كانت متجاورة.",
                 "في إعادة الصياغة أو الجمع بين التصحيح والتحسين، استمر في إخراج النص الكامل بعد المعالجة باستخدام الحقل text.",
                 "لا تختلق معلومة أو شاهدًا أو إحالة أو مصدرًا، ولا تحذف مضمونًا علميًا، ولا تستبدل المصطلحات المتخصصة بمرادفات قد تغير دلالتها. حافظ على ترتيب الفقرات وفواصلها، ولا تضف تنسيق Markdown.",
@@ -212,6 +212,76 @@
         }
     }
 
+    function normalizeContextWord(value) {
+        return String(value || "")
+            .normalize("NFD")
+            .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640\u200E\u200F]/g, "")
+            .normalize("NFC");
+    }
+
+    function getContextWords(value) {
+        const matches = String(value || "").match(/[\p{L}\p{M}\p{N}_]+/gu) || [];
+        return matches.map(normalizeContextWord).filter(Boolean);
+    }
+
+    function countBoundaryWordMatches(expectedWords, actualWords, fromEnd) {
+        let matched = 0;
+        while (matched < expectedWords.length && matched < actualWords.length) {
+            const expectedIndex = fromEnd ? expectedWords.length - 1 - matched : matched;
+            const actualIndex = fromEnd ? actualWords.length - 1 - matched : matched;
+            if (expectedWords[expectedIndex] !== actualWords[actualIndex]) break;
+            matched++;
+        }
+        return matched;
+    }
+
+    // Resolve a repeated phrase only when the adjacent word context identifies
+    // one occurrence with a clear margin. Context farther from the edited phrase
+    // may contain a model typo; therefore compare contiguous words outward from
+    // the phrase boundary instead of requiring the entire context string to match.
+    function scoreContextOccurrence(source, start, original, contextBefore, contextAfter) {
+        const beforeText = source.slice(Math.max(0, start - 320), start);
+        const afterStart = start + original.length;
+        const afterText = source.slice(afterStart, Math.min(source.length, afterStart + 320));
+        const expectedBefore = getContextWords(contextBefore).slice(-6);
+        const expectedAfter = getContextWords(contextAfter).slice(0, 6);
+        const actualBefore = getContextWords(beforeText);
+        const actualAfter = getContextWords(afterText);
+        const matchedBefore = countBoundaryWordMatches(expectedBefore, actualBefore, true);
+        const matchedAfter = countBoundaryWordMatches(expectedAfter, actualAfter, false);
+
+        return {
+            start: start,
+            matchedBefore: matchedBefore,
+            matchedAfter: matchedAfter,
+            score: matchedBefore + matchedAfter
+        };
+    }
+
+    function resolveCorrectionOccurrence(source, original, contextBefore, contextAfter, exactMatches, exactContextMatches) {
+        if (exactContextMatches.length === 1) return exactContextMatches[0];
+        if (exactMatches.length === 1) return exactMatches[0];
+
+        const ranked = exactMatches.map(function (start) {
+            return scoreContextOccurrence(source, start, original, contextBefore, contextAfter);
+        }).sort(function (a, b) {
+            return b.score - a.score ||
+                Math.max(b.matchedBefore, b.matchedAfter) - Math.max(a.matchedBefore, a.matchedAfter) ||
+                a.start - b.start;
+        });
+
+        const best = ranked[0];
+        const runnerUp = ranked[1];
+        if (!best) return -1;
+
+        const strongestSide = Math.max(best.matchedBefore, best.matchedAfter);
+        const hasReliableBoundary = strongestSide >= 3 ||
+            (best.matchedBefore >= 2 && best.matchedAfter >= 2);
+        const hasClearLead = !runnerUp || best.score - runnerUp.score >= 2;
+
+        return hasReliableBoundary && hasClearLead ? best.start : -1;
+    }
+
     function parseResponse(value, originalValue) {
         const sourceText = String(originalValue || "");
         const maskState = pendingTarget && pendingTarget.lastMaskedChunk &&
@@ -264,7 +334,7 @@
                     throw new Error("تتضمن قائمة التصحيحات عنصرًا ناقصًا أو يمتد عبر فاصل فقرة.");
                 }
 
-                const candidates = [];
+                const exactContextMatches = [];
                 const exactMatches = [];
                 let cursor = 0;
                 while ((cursor = matchingSource.indexOf(original, cursor)) !== -1) {
@@ -272,18 +342,28 @@
                     const before = matchingSource.slice(Math.max(0, cursor - contextBefore.length), cursor);
                     const after = matchingSource.slice(cursor + original.length, cursor + original.length + contextAfter.length);
                     if ((!contextBefore || before === contextBefore) && (!contextAfter || after === contextAfter)) {
-                        candidates.push(cursor);
+                        exactContextMatches.push(cursor);
                     }
                     cursor += original.length;
                 }
 
-                // Context matching occurs in the exact model-visible text. Convert
-                // the unique target back to original Word coordinates after resolution.
-                const resolvedMaskedStart = candidates.length === 1
-                    ? candidates[0]
-                    : (exactMatches.length === 1 ? exactMatches[0] : -1);
+                // Prefer verbatim adjacent context. If the model's longer context
+                // contains a harmless discrepancy, use the contiguous boundary
+                // words to identify a unique occurrence; never guess on a tie.
+                const resolvedMaskedStart = resolveCorrectionOccurrence(
+                    matchingSource,
+                    original,
+                    contextBefore,
+                    contextAfter,
+                    exactMatches,
+                    exactContextMatches
+                );
                 if (resolvedMaskedStart < 0) {
-                    throw new Error("تعذر تحديد موضع التصحيح بصورة فريدة: " + original);
+                    throw new Error(
+                        "تعذر تحديد موضع التصحيح بصورة موثوقة: العبارة «" + original +
+                        "» وردت " + exactMatches.length +
+                        " مرات، ولم يكفِ السياق المحيط لتعيين موضع واحد؛ لم تُطبق أي تغييرات."
+                    );
                 }
 
                 const mapped = DocumentRevisionPreflight.mapMaskedRangeToSource(
