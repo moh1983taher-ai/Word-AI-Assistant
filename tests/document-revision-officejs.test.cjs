@@ -203,6 +203,16 @@ global.Word = {
         false,
         "selected-text corrections must retain the established legacy parsing path"
     );
+    assert.doesNotMatch(
+        selectedRequest.systemPrompt,
+        /paragraphId/,
+        "selected-text correction prompts must not require paragraph identifiers"
+    );
+    assert.doesNotMatch(
+        selectedRequest.userPrompt,
+        /paragraphId/,
+        "selected-text user prompts must not contain a paragraph-identifier contract"
+    );
 
     const parsed = revision.parseResponse(JSON.stringify({
         status: "ready",
@@ -284,6 +294,11 @@ global.Word = {
         }
     );
     const ids = multiParagraphRequest.revision.paragraphRecords.map(item => item.paragraphId);
+    assert.match(
+        multiParagraphRequest.systemPrompt,
+        /paragraphId/,
+        "full-document correction prompts must retain the paragraph-identifier contract"
+    );
     const multiParagraphParsed = revision.parseResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
