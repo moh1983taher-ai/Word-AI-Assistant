@@ -137,13 +137,73 @@
         return output;
     }
 
+    // JSON forbids literal U+0000–U+001F characters inside quoted strings.
+    // Models sometimes place real line breaks or tabs in Arabic text fields.
+    // Escape only those characters while inside a JSON string; preserve all
+    // content and leave legal whitespace between JSON tokens untouched.
+    function escapeJSONControlChars(rawValue) {
+        const raw = String(rawValue || "");
+        let output = "";
+        let inString = false;
+        let escaped = false;
+
+        for (let i = 0; i < raw.length; i++) {
+            const ch = raw[i];
+            const code = raw.charCodeAt(i);
+
+            if (inString) {
+                if (escaped) {
+                    output += ch;
+                    escaped = false;
+                    continue;
+                }
+                if (ch === "\\") {
+                    output += ch;
+                    escaped = true;
+                    continue;
+                }
+                if (ch === '"') {
+                    output += ch;
+                    inString = false;
+                    continue;
+                }
+                if (code <= 0x1f) {
+                    const escapes = {
+                        0x08: "\\b",
+                        0x09: "\\t",
+                        0x0a: "\\n",
+                        0x0c: "\\f",
+                        0x0d: "\\r"
+                    };
+                    output += escapes[code] || ("\\u00" + code.toString(16).padStart(2, "0"));
+                    continue;
+                }
+                output += ch;
+                continue;
+            }
+
+            output += ch;
+            if (ch === '"') inString = true;
+        }
+
+        return output;
+    }
+
     function parseStructuredRevisionJSON(rawValue) {
         const candidate = extractRevisionJSON(rawValue);
         try {
             return JSON.parse(candidate);
         } catch (firstError) {
-            const recovered = removeJSONTrailingCommas(candidate);
-            if (recovered !== candidate) {
+            // Recover syntax-only defects independently and in combination.
+            // No fields, delimiters, or missing content are ever fabricated.
+            const withoutTrailingCommas = removeJSONTrailingCommas(candidate);
+            const candidates = [
+                escapeJSONControlChars(candidate),
+                escapeJSONControlChars(withoutTrailingCommas),
+                removeJSONTrailingCommas(escapeJSONControlChars(candidate))
+            ];
+            for (const recovered of candidates) {
+                if (recovered === candidate) continue;
                 try {
                     return JSON.parse(recovered);
                 } catch (_) {}
