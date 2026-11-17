@@ -9,8 +9,10 @@ let itemLoads = 0;
 
 function makeRange(textGetter) {
     return {
-        get text() { return String(textGetter()); },
-        load() {},
+        text: "",
+        load(property) {
+            if (property === "text") this.text = String(textGetter());
+        },
         track() {},
         untrack() {},
         getOoxml() { return { value: "<w:document/>" }; },
@@ -88,7 +90,9 @@ global.Word = {
 };
 
 (async function () {
+    assert.equal(selectedRange.text, "", "mock range text starts unloaded");
     const captured = await revision.capture();
+    assert.equal(selectedRange.text, documentText, "capture must load selection text before reading it");
     assert.equal(captured.targetType, "selection");
     assert.equal(captured.originalText, "هذا خطا واضح");
 
