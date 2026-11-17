@@ -233,11 +233,21 @@ global.Word = {
     assert.equal(documentCapture.targetType, "document");
     assert.equal(documentCapture.originalText, documentText);
     const documentContext = bodyRange.context;
+    const documentRequest = revision.buildRequest(
+        "صحح المستند لغويًا ونحويًا فقط",
+        documentCapture.originalText,
+        {
+            sourceOffset: 0,
+            paragraphBaseIndex: 0
+        }
+    );
+    const documentParagraphId = documentRequest.revision.paragraphRecords[0].paragraphId;
 
     const documentParsed = revision.parseResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
         edits: [{
+            paragraphId: documentParagraphId,
             original: "واضح",
             replacement: "بيّن",
             contextBefore: "هذا خطأ ",
@@ -251,17 +261,27 @@ global.Word = {
     assert.equal(documentResult.applied, true);
     assert.equal(documentText, "هذا خطأ بيّن");
 
-    // Paragraph-aware document correction must target each identical phrase
-    // within its own Word paragraph, not the first occurrence in the entire body.
+    // Explicit whole-document intent overrides a non-empty lingering selection.
     documentText = "هذا الأطراد الأول.\r\nوتكرر الأطراد في الفقرة الثانية.";
-    selectionText = "";
-    const multiParagraphCapture = await revision.capture();
+    selectionText = "تحديد سابق لا ينبغي أن يقيّد مراجعة المستند كاملًا.";
+    assert.equal(revision.getRequestedScope("صحح المستند لغويًا ونحويًا فقط"), "document");
+    const multiParagraphCapture = await revision.capture({
+        scope: revision.getRequestedScope("صحح المستند لغويًا ونحويًا فقط")
+    });
     assert.equal(multiParagraphCapture.targetType, "document");
+    assert.equal(multiParagraphCapture.originalText, documentText);
+    assert.equal(selectionText, "تحديد سابق لا ينبغي أن يقيّد مراجعة المستند كاملًا.");
 
     const multiParagraphRequest = revision.buildRequest(
         "صحح المستند لغويًا ونحويًا فقط",
         multiParagraphCapture.originalText,
-        { sourceOffset: 0 }
+        {
+            sourceOffset: 0,
+            paragraphBaseIndex: revision.countParagraphsBefore(
+                multiParagraphCapture.originalText,
+                0
+            )
+        }
     );
     const ids = multiParagraphRequest.revision.paragraphRecords.map(item => item.paragraphId);
     const multiParagraphParsed = revision.parseResponse(JSON.stringify({
@@ -285,7 +305,7 @@ global.Word = {
                 reason: "تصويب إملائي"
             }
         ]
-    }), multiParagraphCapture.originalText, multiParagraphRequest.revision);
+    }), multiParagraphCapture.originalText);
 
     assert.equal(multiParagraphParsed.edits.length, 2);
     assert.equal(multiParagraphParsed.rejected.length, 0);
