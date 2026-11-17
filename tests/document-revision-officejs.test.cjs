@@ -8,7 +8,54 @@ let selectionText = documentText;
 let collectionLoads = 0;
 let itemLoads = 0;
 
-function makeRange(textGetter) {
+function makeParagraphCollection(textGetter, baseOffsetGetter, context) {
+    const source = String(textGetter());
+    const items = [];
+    let start = 0;
+
+    while (start < source.length) {
+        let end = start;
+        while (end < source.length && source[end] !== "\\r" && source[end] !== "\\n") end++;
+
+        const localStart = start;
+        const localEnd = end;
+        const paragraph = makeRange(
+            () => String(textGetter()).slice(localStart, localEnd),
+            () => Number(baseOffsetGetter ? baseOffsetGetter() : 0) + localStart
+        );
+        paragraph.context = context;
+        paragraph.getOoxml = () => ({
+            value: "<w:p><w:r><w:t>" + String(textGetter()).slice(localStart, localEnd) + "</w:t></w:r></w:p>"
+        });
+        items.push(paragraph);
+
+        if (end >= source.length) break;
+        const separatorLength = source[end] === "\\r" && source[end + 1] === "\\n" ? 2 : 1;
+        start = end + separatorLength;
+    }
+
+    if (!items.length) {
+        const empty = makeRange(() => "", () => Number(baseOffsetGetter ? baseOffsetGetter() : 0));
+        empty.context = context;
+        empty.getOoxml = () => ({ value: "<w:p/>" });
+        items.push(empty);
+    }
+
+    let itemsLoaded = false;
+    return {
+        context: context,
+        load(property) {
+            assert.equal(property, "items");
+            itemsLoaded = true;
+        },
+        get items() {
+            assert.equal(itemsLoaded, true, "paragraph items must be loaded before access");
+            return items;
+        }
+    };
+}
+
+function makeRange(textGetter, absoluteStartGetter) {
     return {
         context: null,
         text: "",
@@ -21,8 +68,13 @@ function makeRange(textGetter) {
         getRange() { return this; },
         search(query) {
             const source = String(textGetter());
-            const index = source.indexOf(query);
-            const matches = index < 0 ? [] : [makeMatch(query)];
+            const baseOffset = Number(absoluteStartGetter ? absoluteStartGetter() : 0);
+            const matches = [];
+            let cursor = 0;
+            while ((cursor = source.indexOf(query, cursor)) !== -1) {
+                matches.push(makeMatch(query, baseOffset + cursor));
+                cursor += query.length;
+            }
             let itemsLoaded = false;
             return {
                 context: this.context,
@@ -38,25 +90,12 @@ function makeRange(textGetter) {
             };
         },
         get paragraphs() {
-            const paragraph = makeRange(textGetter);
-            paragraph.context = this.context;
-            let itemsLoaded = false;
-            return {
-                context: this.context,
-                load(property) {
-                    assert.equal(property, "items");
-                    itemsLoaded = true;
-                },
-                get items() {
-                    assert.equal(itemsLoaded, true, "paragraph items must be loaded before access");
-                    return [paragraph];
-                }
-            };
+            return makeParagraphCollection(textGetter, absoluteStartGetter, this.context);
         }
     };
 }
 
-function makeMatch(initialText) {
+function makeMatch(initialText, absoluteStart) {
     let text = initialText;
     let textLoaded = false;
     return {
@@ -70,7 +109,12 @@ function makeMatch(initialText) {
             return text;
         },
         insertText(replacement) {
-            documentText = documentText.replace(text, replacement);
+            const current = String(documentText);
+            if (current.slice(absoluteStart, absoluteStart + text.length) !== text) {
+                throw new Error("mock Word range no longer matches its source text");
+            }
+            documentText = current.slice(0, absoluteStart) + replacement +
+                current.slice(absoluteStart + text.length);
             text = replacement;
             return {
                 load() {},
@@ -81,8 +125,8 @@ function makeMatch(initialText) {
     };
 }
 
-const selectedRange = makeRange(() => selectionText);
-const bodyRange = makeRange(() => documentText);
+const selectedRange = makeRange(() => selectionText, () => 0);
+const bodyRange = makeRange(() => documentText, () => 0);
 
 global.Office = {
     context: {
@@ -111,30 +155,7 @@ global.Word = {
                             return bodyRange;
                         },
                         get paragraphs() {
-                            const paragraph = {
-                                text: "",
-                                load(property) {
-                                    assert.equal(property, "text");
-                                    this.text = documentText;
-                                },
-                                getOoxml() {
-                                    return {
-                                        value: "<w:p><w:r><w:t>" + documentText + "</w:t></w:r></w:p>"
-                                    };
-                                }
-                            };
-                            let itemsLoaded = false;
-                            return {
-                                context,
-                                load(property) {
-                                    assert.equal(property, "items");
-                                    itemsLoaded = true;
-                                },
-                                get items() {
-                                    assert.equal(itemsLoaded, true, "paragraph items must be loaded before access");
-                                    return [paragraph];
-                                }
-                            };
+                            return makeParagraphCollection(() => documentText, () => 0, context);
                         }
                     }
                 },
@@ -218,6 +239,56 @@ global.Word = {
     assert.equal(bodyRange.context, documentContext);
     assert.equal(documentResult.applied, true);
     assert.equal(documentText, "هذا خطأ بيّن");
+
+    // Paragraph-aware document correction must target each identical phrase
+    // within its own Word paragraph, not the first occurrence in the entire body.
+    documentText = "هذا الأطراد الأول.\\r\\nوتكرر الأطراد في الفقرة الثانية.";
+    selectionText = "";
+    const multiParagraphCapture = await revision.capture();
+    assert.equal(multiParagraphCapture.targetType, "document");
+
+    const multiParagraphRequest = revision.buildRequest(
+        "صحح المستند لغويًا ونحويًا فقط",
+        multiParagraphCapture.originalText,
+        { sourceOffset: 0 }
+    );
+    const ids = multiParagraphRequest.revision.paragraphRecords.map(item => item.paragraphId);
+    const multiParagraphParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "correction",
+        edits: [
+            {
+                paragraphId: ids[0],
+                original: "الأطراد",
+                replacement: "الاطراد",
+                contextBefore: "هذا ",
+                contextAfter: " الأول",
+                reason: "تصويب إملائي"
+            },
+            {
+                paragraphId: ids[1],
+                original: "الأطراد",
+                replacement: "الاطراد",
+                contextBefore: "وتكرر ",
+                contextAfter: " في الفقرة",
+                reason: "تصويب إملائي"
+            }
+        ]
+    }), multiParagraphCapture.originalText, multiParagraphRequest.revision);
+
+    assert.equal(multiParagraphParsed.edits.length, 2);
+    assert.equal(multiParagraphParsed.rejected.length, 0);
+    const multiParagraphResult = await revision.apply(Object.assign(
+        {},
+        multiParagraphCapture,
+        multiParagraphParsed
+    ));
+    assert.equal(multiParagraphResult.applied, true);
+    assert.equal(
+        documentText,
+        "هذا الاطراد الأول.\\r\\nوتكرر الاطراد في الفقرة الثانية."
+    );
+    assert.equal(documentText.match(/الاطراد/g).length, 2);
 
     const beforeUnsafeApply = documentText;
     await assert.rejects(

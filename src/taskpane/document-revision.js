@@ -621,7 +621,7 @@
                     revised.slice(edit.start + edit.original.length);
             });
             if (pendingTarget) pendingTarget.lastMaskedChunk = null;
-            return { status: "ready", mode: mode, text: revised, edits: edits, rejected: [] };
+            return { status: "ready", mode: mode, text: revised, edits: edits };
         }
 
         let text = String(parsed && parsed.text || "");
