@@ -318,4 +318,28 @@ assert.throws(
     /تفاصيل: الاستجابة مبتورة/
 );
 assert.throws(() => revision.parseResponse("not json"), /تعذر قراءة استجابة/);
+
+// Regression: model output may contain literal newlines, tabs, CRLF, or other
+// U+0000–U+001F controls inside a quoted JSON value. Preserve them as text.
+const rawControlCharResponse =
+    "{\\"status\\":\\"ready\\",\\"mode\\":\\"rewrite\\",\\"text\\":\\"السطر الأول\nالسطر الثاني\tمع اقتباس \\\\"داخلي\\\\" وعودة\\r\\nسطر ثالث\\"}";
+assert.equal(
+    revision.parseResponse(rawControlCharResponse).text,
+    "السطر الأول\nالسطر الثاني\tمع اقتباس \\"داخلي\\" وعودة\r\nسطر ثالث"
+);
+
+const rawReasonLineBreakResponse =
+    "{\\"status\\":\\"ready\\",\\"mode\\":\\"correction\\",\\"edits\\":[{\\"original\\":\\"خطا\\",\\"replacement\\":\\"خطأ\\",\\"reason\\":\\"سبب أول\nسبب ثانٍ\\"}]}";
+const rawReasonResult = revision.parseResponse(
+    rawReasonLineBreakResponse,
+    "هذا خطا واضح."
+);
+assert.equal(rawReasonResult.edits[0].reason, "سبب أول\nسبب ثانٍ");
+
+const rawLowControlResponse =
+    "{\\"status\\":\\"ready\\",\\"mode\\":\\"rewrite\\",\\"text\\":\\"قبل\u0001بعد\\"}";
+assert.equal(
+    revision.parseResponse(rawLowControlResponse).text,
+    "قبل\u0001بعد"
+);
 console.log("Document revision tests passed.");
