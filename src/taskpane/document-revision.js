@@ -222,7 +222,8 @@
             pendingTarget.requestCursor = chunkOffset + sourceText.length;
         }
 
-        const structuredCorrection = isCorrectionOnlyRequest(userInstruction);
+        const structuredCorrection = isCorrectionOnlyRequest(userInstruction) &&
+            (!pendingTarget || pendingTarget.targetType === "document");
         const paragraphRecords = structuredCorrection ? buildParagraphRecords(requestText) : [];
         const structuredParagraphText = structuredCorrection
             ? JSON.stringify({
@@ -1112,6 +1113,7 @@
             };
             pendingTarget = {
                 id: result.id,
+                targetType: result.targetType,
                 range: range,
                 protectedRanges: protectedRanges,
                 requestCursor: 0,
