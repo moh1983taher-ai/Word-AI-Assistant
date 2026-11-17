@@ -590,6 +590,7 @@
     }
 
     function parseResponse(value, originalValue, requestMetadata) {
+        const hasOriginalSource = originalValue !== undefined && originalValue !== null;
         const sourceText = String(originalValue || "");
         const maskState = pendingTarget && pendingTarget.lastMaskedChunk &&
             pendingTarget.lastMaskedChunk.source === sourceText
@@ -765,11 +766,11 @@
             Array.isArray(activeRequestMetadata.paragraphMarkers)
             ? activeRequestMetadata.paragraphMarkers
             : [];
-        if (paragraphMarkers.length) {
+        if (hasOriginalSource && paragraphMarkers.length) {
             text = normalizeBatchLineBreaks(sourceText, text, paragraphMarkers);
-        } else if (!/[\r\n]/.test(sourceText)) {
+        } else if (hasOriginalSource && !/[\r\n]/.test(sourceText)) {
             text = normalizeChunkLineBreaks(sourceText, text);
-        } else if (hasSameLineBreakCount(sourceText, text)) {
+        } else if (hasOriginalSource && hasSameLineBreakCount(sourceText, text)) {
             text = normalizeLineBreaks(sourceText, text);
         }
         if (pendingTarget) pendingTarget.lastMaskedChunk = null;
