@@ -96,6 +96,10 @@
                 reject(item, "invalid_edit", "بيانات التصحيح ناقصة أو تمتد عبر فاصل فقرة.");
                 return;
             }
+            if (original === replacement) {
+                reject(item, "no_op", "النص البديل مطابق للنص الأصلي ولا ينتج عنه تصحيح فعلي.");
+                return;
+            }
 
             const paragraphText = String(paragraph.text || "");
             const exactMatches = [];
@@ -780,11 +784,11 @@
         const asksRewrite = /(?:أعد\s*صياغ|إعادة\s*صياغ|حسّن|حسن\s+(?:الأسلوب|الصياغة)|تحسين\s+(?:الصياغة|الأسلوب)|اجعل\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
         const asksCorrection = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|التصحيح\s+اللغوي|المراجعة\s+اللغوية|راجع\s+(?:لغوي|النص|الفقرة|المستند))/i.test(instruction);
 
-        // Correction responses contain only localized edits, so they can safely
-        // inspect larger batches. Rewriting returns the full text and needs a
-        // smaller batch to stay within provider output limits.
+        // Keep all revision requests within bounded batches. Paragraph-scoped
+        // correction output is compact, but smaller groups improve attention to
+        // local context and reduce provider output truncation on long documents.
         if (asksRewrite) return 8000;
-        if (asksCorrection) return 16000;
+        if (asksCorrection) return 6000;
         return 12000;
     }
 

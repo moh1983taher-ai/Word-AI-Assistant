@@ -104,8 +104,8 @@ assert.ok(paragraphBatchChunks.length < 20);
 assert.equal(paragraphBatchChunks.join(""), paragraphBatchSource);
 assert.ok(paragraphBatchChunks.every(chunk => chunk.length <= 1200));
 
-// Select larger batches for localized proofreading and smaller batches for full rewrites.
-assert.equal(revision.getRecommendedChunkSize("صحح الأخطاء النحوية والإملائية"), 16000);
+// Bound full-document correction batches to improve local attention and response reliability.
+assert.equal(revision.getRecommendedChunkSize("صحح الأخطاء النحوية والإملائية"), 6000);
 assert.equal(revision.getRecommendedChunkSize("أعد صياغة النص بأسلوب أكاديمي"), 8000);
 assert.equal(revision.getRecommendedChunkSize("صحح النص وأعد صياغته"), 8000);
 assert.equal(revision.getRecommendedChunkSize("راجع هذا المستند"), 12000);
@@ -511,6 +511,22 @@ const missingScopedIdResult = revision.parseResponse(JSON.stringify({
 assert.equal(missingScopedIdResult.edits.length, 1);
 assert.equal(missingScopedIdResult.rejected.length, 1);
 assert.equal(missingScopedIdResult.rejected[0].rejectionCode, "missing_paragraph_id");
+
+const noOpResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        paragraphId: scopedParagraphIds[0],
+        original: "الأطراد",
+        replacement: "الأطراد",
+        contextBefore: "ويظهر ",
+        contextAfter: " في هذا",
+        reason: "لا تغيير"
+    }]
+}), scopedParagraphSource, scopedParagraphRequest.revision);
+assert.equal(noOpResult.edits.length, 0);
+assert.equal(noOpResult.rejected.length, 1);
+assert.equal(noOpResult.rejected[0].rejectionCode, "no_op");
 
 // CRLF and blank paragraph boundaries preserve their IDs and local offsets.
 const scopedBoundaryRecords = revision.buildParagraphRecords("أولى\r\n\r\nثالثة");
