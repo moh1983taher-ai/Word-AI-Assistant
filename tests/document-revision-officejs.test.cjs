@@ -36,6 +36,22 @@ function makeRange(textGetter) {
                     return matches;
                 }
             };
+        },
+        get paragraphs() {
+            const paragraph = makeRange(textGetter);
+            paragraph.context = this.context;
+            let itemsLoaded = false;
+            return {
+                context: this.context,
+                load(property) {
+                    assert.equal(property, "items");
+                    itemsLoaded = true;
+                },
+                get items() {
+                    assert.equal(itemsLoaded, true, "paragraph items must be loaded before access");
+                    return [paragraph];
+                }
+            };
         }
     };
 }
@@ -203,7 +219,23 @@ global.Word = {
     assert.equal(documentResult.applied, true);
     assert.equal(documentText, "هذا خطأ بيّن");
 
-    process.stdout.write("document-revision-officejs: collection loading, selection and document context tests passed\n");
+    const beforeUnsafeApply = documentText;
+    await assert.rejects(
+        revision.apply(Object.assign({}, documentCapture, {
+            status: "ready",
+            mode: "correction",
+            text: "هذا نص مختلف",
+            edits: [{
+                start: 0,
+                original: "هذا",
+                replacement: "ذلك"
+            }]
+        })),
+        /لا تفسر النص الناتج بالكامل/
+    );
+    assert.equal(documentText, beforeUnsafeApply, "invalid direct edits must not mutate the Word document");
+
+    process.stdout.write("document-revision-officejs: collection loading, selection, paragraph targeting, and direct-edit integrity tests passed\n");
 })().catch(error => {
     process.stderr.write(String(error && error.stack || error) + "\n");
     process.exitCode = 1;
