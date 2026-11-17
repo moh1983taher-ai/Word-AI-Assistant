@@ -65,7 +65,27 @@ function makeRange(textGetter, absoluteStartGetter) {
         track() {},
         untrack() {},
         getOoxml() { return { value: "<w:document/>" }; },
-        getRange() { return this; },
+        getRange(location) {
+            const baseOffset = Number(absoluteStartGetter ? absoluteStartGetter() : 0);
+            const rangeText = String(textGetter());
+            const absolutePosition = location === "End"
+                ? baseOffset + rangeText.length
+                : baseOffset;
+            return {
+                context: this.context,
+                insertText(value) {
+                    const insertedText = String(value || "");
+                    const current = String(documentText);
+                    documentText = current.slice(0, absolutePosition) + insertedText +
+                        current.slice(absolutePosition);
+                    return {
+                        load() {},
+                        get text() { return insertedText; },
+                        font: {}
+                    };
+                }
+            };
+        },
         search(query) {
             const source = String(textGetter());
             const baseOffset = Number(absoluteStartGetter ? absoluteStartGetter() : 0);
@@ -108,17 +128,27 @@ function makeMatch(initialText, absoluteStart) {
             assert.equal(textLoaded, true, "must load each match's text before reading it");
             return text;
         },
-        insertText(replacement) {
+        insertText(replacement, location) {
             const current = String(documentText);
             if (current.slice(absoluteStart, absoluteStart + text.length) !== text) {
                 throw new Error("mock Word range no longer matches its source text");
             }
-            documentText = current.slice(0, absoluteStart) + replacement +
-                current.slice(absoluteStart + text.length);
-            text = replacement;
+            const insertedText = String(replacement || "");
+            let insertedStart = absoluteStart;
+            if (location === "Before") {
+                documentText = current.slice(0, absoluteStart) + insertedText +
+                    current.slice(absoluteStart);
+            } else if (location === "After") {
+                insertedStart = absoluteStart + text.length;
+                documentText = current.slice(0, insertedStart) + insertedText +
+                    current.slice(insertedStart);
+            } else {
+                documentText = current.slice(0, absoluteStart) + insertedText +
+                    current.slice(absoluteStart + text.length);
+            }
             return {
                 load() {},
-                get text() { return text; },
+                get text() { return insertedText; },
                 font: {}
             };
         }
