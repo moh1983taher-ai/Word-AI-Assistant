@@ -47,7 +47,7 @@
     function normalizeGeneratedParagraphSegment(value) {
         return String(value || "")
             .replace(/\r\n|\r|\n/g, " ")
-            .replace(/^[\\t \\u00a0]+|[\\t \\u00a0]+$/g, "");
+            .replace(/^[\t \u00a0]+|[\t \u00a0]+$/g, "");
     }
 
     function getRequestedScope(value) {
