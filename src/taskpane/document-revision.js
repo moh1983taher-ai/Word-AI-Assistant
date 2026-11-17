@@ -15,15 +15,33 @@
 
     function isCorrectionOnlyRequest(value) {
         const instruction = String(value || "").trim();
-        const correction = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|التصحيح\s+اللغوي|المراجعة\s+اللغوية|التدقيق\s+اللغوي|مراجعة\s+لغوية|راجع\s+(?:لغوي|(?:المستند|النص|الفقرة)\s+لغوي))/i.test(instruction);
+        const correction = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|التصحيح\s+اللغوي|المراجعة\s+اللغوية|التدقيق\s+اللغوي|مراجعة\s+(?:لغوية|نحوية|إملائية)|راجع\s+(?:لغوي|نحوي|إملائي|(?:المستند|النص|الفقرة)\s+(?:لغوي|نحوي|إملائي)))/i.test(instruction);
         const negatedRewrite = /(?:لا\s*(?:تعد|تعيد|تعِد|تقوم\s+بإعادة)|(?:دون|بدون|من\s+غير)\s*(?:أن\s*)?(?:تعيد\s*)?(?:إعادة\s*)?صياغ|لا\s+(?:أريد|أرغب)\s+(?:في\s+)?إعادة\s*صياغ)/i.test(instruction);
         const rewrite = !negatedRewrite && /(?:أعد\s*صياغ|إعادة\s*صياغ|إعادة\s+كتابة|حسّن|حسن\s+(?:الأسلوب|الصياغة)|تحسين\s+(?:الصياغة|الأسلوب)|اجعل\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
         return correction && !rewrite;
     }
 
-    function buildParagraphRecords(value) {
+    function getRequestedScope(value) {
+        const instruction = String(value || "").trim();
+        if (/(?:المستند|الوثيقة|الملف)(?:\s+(?:كامل(?:ا|ًا)?|كله|بأكمله|بالكامل))?|(?:كامل(?:ا|ًا)?|كامل\s+)?(?:المستند|الوثيقة|الملف)/i.test(instruction)) {
+            return "document";
+        }
+        if (/(?:النص\s+المحدد|المقطع\s+المحدد|الفقرة\s+المحددة|التحديد\s+الحالي|هذا\s+التحديد)/i.test(instruction)) {
+            return "selection";
+        }
+        return "auto";
+    }
+
+    function countParagraphsBefore(value, offset) {
+        const source = String(value || "");
+        const end = Math.max(0, Math.min(source.length, Number(offset) || 0));
+        return (source.slice(0, end).match(/\r\n|\r|\n/g) || []).length;
+    }
+
+    function buildParagraphRecords(value, baseParagraphIndex) {
         const source = String(value || "");
         const records = [];
+        const paragraphBase = Math.max(0, Math.floor(Number(baseParagraphIndex) || 0));
         let cursor = 0;
         let paragraphIndex = 0;
 
@@ -34,8 +52,8 @@
             const text = source.slice(cursor, end);
             if (text.length) {
                 records.push({
-                    paragraphId: "p" + String(paragraphIndex + 1).padStart(4, "0"),
-                    paragraphIndex: paragraphIndex,
+                    paragraphId: "p" + String(paragraphBase + paragraphIndex + 1).padStart(4, "0"),
+                    paragraphIndex: paragraphBase + paragraphIndex,
                     start: cursor,
                     end: end,
                     text: text,
@@ -222,9 +240,14 @@
             pendingTarget.requestCursor = chunkOffset + sourceText.length;
         }
 
-        const structuredCorrection = isCorrectionOnlyRequest(userInstruction) &&
-            (!pendingTarget || pendingTarget.targetType === "document");
-        const paragraphRecords = structuredCorrection ? buildParagraphRecords(requestText) : [];
+        const scopeAllowsStructuredCorrection = !pendingTarget || pendingTarget.targetType === "document";
+        const structuredCorrection = scopeAllowsStructuredCorrection && isCorrectionOnlyRequest(userInstruction);
+        const paragraphBaseIndex = requestOptions && Number.isInteger(Number(requestOptions.paragraphBaseIndex))
+            ? Math.max(0, Number(requestOptions.paragraphBaseIndex))
+            : 0;
+        const paragraphRecords = structuredCorrection
+            ? buildParagraphRecords(requestText, paragraphBaseIndex)
+            : [];
         const structuredParagraphText = structuredCorrection
             ? JSON.stringify({
                 paragraphs: paragraphRecords.map(function (record) {
@@ -273,7 +296,10 @@
             ].join("\n"),
             revision: {
                 structuredCorrection: structuredCorrection,
+                targetType: pendingTarget ? pendingTarget.targetType : "unknown",
                 sourceOffset: chunkOffset,
+                paragraphBaseIndex: paragraphBaseIndex,
+                chunkLength: sourceText.length,
                 paragraphRecords: paragraphRecords
             }
         };
@@ -539,12 +565,31 @@
             const source = sourceText;
             const matchingSource = maskState ? maskState.text : source;
 
-            if (requestMetadata && requestMetadata.structuredCorrection === true) {
+            const documentTarget = Boolean(pendingTarget && pendingTarget.targetType === "document");
+            const useParagraphScopedParsing = documentTarget ||
+                Boolean(requestMetadata && requestMetadata.structuredCorrection === true);
+            if (useParagraphScopedParsing) {
+                const fallbackOffset = requestMetadata && Number.isFinite(Number(requestMetadata.sourceOffset))
+                    ? Number(requestMetadata.sourceOffset)
+                    : (pendingTarget
+                        ? Math.max(0, (Number(pendingTarget.requestCursor) || source.length) - source.length)
+                        : 0);
+                const fallbackParagraphBase = requestMetadata &&
+                    Number.isInteger(Number(requestMetadata.paragraphBaseIndex))
+                    ? Number(requestMetadata.paragraphBaseIndex)
+                    : (pendingTarget && pendingTarget.originalText
+                        ? countParagraphsBefore(pendingTarget.originalText, fallbackOffset)
+                        : 0);
+                const paragraphRecords = requestMetadata &&
+                    Array.isArray(requestMetadata.paragraphRecords) &&
+                    requestMetadata.paragraphRecords.length
+                    ? requestMetadata.paragraphRecords
+                    : buildParagraphRecords(matchingSource, fallbackParagraphBase);
                 const structuredResult = parseParagraphScopedEdits(
                     parsed.edits,
                     source,
                     maskState,
-                    requestMetadata.paragraphRecords
+                    paragraphRecords
                 );
                 if (pendingTarget) pendingTarget.lastMaskedChunk = null;
                 return structuredResult;
@@ -984,7 +1029,7 @@
         } catch (_) {}
     }
 
-    async function capture() {
+    async function capture(options) {
         if (typeof Word === "undefined" || !Word.run) {
             throw new Error("اتصال Word غير متاح؛ افتح مستند Word ثم أعد المحاولة.");
         }
@@ -999,7 +1044,15 @@
             await context.sync();
 
             const selectedText = String(selection.text || "");
-            const targetType = selectedText.trim() ? "selection" : "document";
+            const requestedScope = String(options && options.scope || "auto");
+            const targetType = requestedScope === "document"
+                ? "document"
+                : requestedScope === "selection"
+                    ? "selection"
+                    : (selectedText.trim() ? "selection" : "document");
+            if (targetType === "selection" && !selectedText.trim()) {
+                throw new Error("طلبت معالجة النص المحدد، لكن لا يوجد تحديد نصي نشط في Word.");
+            }
             const range = targetType === "selection" ? selection : bodyRange;
             const originalText = String(range.text || "");
 
@@ -1115,6 +1168,7 @@
                 id: result.id,
                 targetType: result.targetType,
                 range: range,
+                originalText: originalText,
                 protectedRanges: protectedRanges,
                 requestCursor: 0,
                 lastMaskedChunk: null
@@ -1463,6 +1517,8 @@
         parseResponse: parseResponse,
         buildParagraphRecords: buildParagraphRecords,
         isCorrectionOnlyRequest: isCorrectionOnlyRequest,
+        getRequestedScope: getRequestedScope,
+        countParagraphsBefore: countParagraphsBefore,
         tokenize: tokenize,
         resolveSearchMatchByOccurrence: resolveSearchMatchByOccurrence,
         diffText: diffText,
