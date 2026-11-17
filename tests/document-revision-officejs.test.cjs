@@ -9,6 +9,7 @@ let itemLoads = 0;
 
 function makeRange(textGetter) {
     return {
+        get text() { return String(textGetter()); },
         load() {},
         track() {},
         untrack() {},
