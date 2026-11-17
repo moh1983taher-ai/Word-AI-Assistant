@@ -905,8 +905,7 @@
 
         let appliedCount = 0;
 
-        const trackedSelection = revision.targetType === "selection" &&
-            pendingTarget && pendingTarget.id === revision.id && pendingTarget.range
+        const trackedTarget = pendingTarget && pendingTarget.id === revision.id && pendingTarget.range
             ? pendingTarget.range
             : null;
 
@@ -1088,10 +1087,11 @@
             }
         };
 
-        // Reuse the tracked selection's owning RequestContext. For document
-        // scope, create a fresh context because the body range is reacquired.
-        if (trackedSelection) {
-            await Word.run(trackedSelection, applyBatch);
+        // Reuse the captured target's owning RequestContext for both
+        // selection and document scopes. The target proxy was tracked during
+        // capture; all ranges and collections in this batch now share its context.
+        if (trackedTarget) {
+            await Word.run(trackedTarget, applyBatch);
         } else {
             await Word.run(applyBatch);
         }
