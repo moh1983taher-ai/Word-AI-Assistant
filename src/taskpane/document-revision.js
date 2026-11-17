@@ -816,10 +816,11 @@
                 return revised.indexOf(marker);
             });
             const allMissing = markerPositions.every(function (position) { return position < 0; });
-            if (allMissing && hasSameLineBreakCount(original, revised)) {
-                // Backward compatibility for providers that preserve the exact
-                // paragraph-break count but echo the old line-break format.
-                return normalizeLineBreaks(original, revised);
+            if (allMissing) {
+                throw new Error(
+                    "لم تُعِد استجابة إعادة الصياغة علامات حدود الفقرات. " +
+                    "أُوقف التطبيق لمنع دمج الفقرات أو تغيير حدودها."
+                );
             }
 
             let cursor = 0;
