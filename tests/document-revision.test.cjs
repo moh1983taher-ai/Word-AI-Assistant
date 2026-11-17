@@ -149,6 +149,81 @@ assert.throws(
     /فواصل الفقرات الأصلية/
 );
 
+// Rewriting uses explicit boundary tokens so the model cannot silently merge
+// paragraphs or turn line wrapping into new Word paragraph marks.
+const rewriteSource = "الفقرة الأولى الأصلية.\\r\\nالفقرة الثانية الأصلية.\\n\\nالفقرة الثالثة الأصلية.";
+const rewriteRequest = revision.buildRequest(
+    "أعد صياغة النص بأسلوب أكاديمي مع المحافظة على ترتيب الفقرات.",
+    rewriteSource
+);
+assert.equal(rewriteRequest.revision.structuredCorrection, false);
+assert.equal(rewriteRequest.revision.paragraphMarkers.length, 3);
+rewriteRequest.revision.paragraphMarkers.forEach(marker => {
+    assert.ok(rewriteRequest.userPrompt.includes(marker));
+});
+assert.match(
+    rewriteRequest.systemPrompt,
+    /علامات بنيوية خاصة/
+);
+
+const rewriteMarkers = rewriteRequest.revision.paragraphMarkers;
+const rewrittenWithModelWrapping = [
+    "صياغة أكاديمية للفقرة الأولى.\\n",
+    rewriteMarkers[0],
+    "\\nصياغة أكاديمية للفقرة الثانية.\\n",
+    rewriteMarkers[1],
+    rewriteMarkers[2],
+    "\\nصياغة أكاديمية للفقرة الثالثة."
+].join("");
+const rewrittenParsed = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "rewrite",
+    text: rewrittenWithModelWrapping
+}), rewriteSource, rewriteRequest.revision);
+assert.equal(
+    rewrittenParsed.text,
+    "صياغة أكاديمية للفقرة الأولى.\\r\\nصياغة أكاديمية للفقرة الثانية.\\n\\nصياغة أكاديمية للفقرة الثالثة."
+);
+assert.equal(
+    revision.hasSameLineBreakCount(rewriteSource, rewrittenParsed.text),
+    true
+);
+
+// A missing or duplicated boundary marker is rejected rather than risking
+// an accidental merge, split, or reordering of Word paragraphs.
+assert.throws(
+    () => revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "rewrite",
+        text: "صياغة واحدة دمجت الفقرات الثلاث."
+    }), rewriteSource, rewriteRequest.revision),
+    /علامات حدود الفقرات/
+);
+assert.throws(
+    () => revision.normalizeBatchLineBreaks(
+        rewriteSource,
+        "نص جديد" + rewriteMarkers[0] + rewriteMarkers[0] + rewriteMarkers[1] + rewriteMarkers[2],
+        rewriteMarkers
+    ),
+    /علامة حدود الفقرات/
+);
+
+// For a one-paragraph selection, model-generated line wraps are flattened;
+// they must not block the later Word apply step.
+const singleParagraphSource = "هذه فقرة واحدة أصلية.";
+const singleParagraphRequest = revision.buildRequest(
+    "أعد صياغة الفقرة بأسلوب أكاديمي.",
+    singleParagraphSource
+);
+assert.deepEqual(singleParagraphRequest.revision.paragraphMarkers, []);
+const singleParagraphParsed = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "rewrite",
+    text: "هذه صياغة أكاديمية جديدة.\\nوهذا سطر تابع ولّده النموذج."
+}), singleParagraphSource, singleParagraphRequest.revision);
+assert.equal(singleParagraphParsed.text, "هذه صياغة أكاديمية جديدة. وهذا سطر تابع ولّده النموذج.");
+assert.equal(/[\\r\\n]/.test(singleParagraphParsed.text), false);
+
 assert.equal(
     revision.normalizeChunkLineBreaks("فقرة أولى.\r\n", "فقرة أولى منقحة."),
     "فقرة أولى منقحة.\r\n"
