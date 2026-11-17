@@ -540,3 +540,12 @@ assert.equal(revision.isCorrectionOnlyRequest("صحح المستند ولا تع
 assert.equal(revision.isCorrectionOnlyRequest("راجع المستند لغويًا"), true);
 assert.equal(revision.isCorrectionOnlyRequest("أعد صياغة المستند بأسلوب أكاديمي"), false);
 assert.equal(revision.isCorrectionOnlyRequest("صحح المستند وأعد صياغة بعض الجمل"), false);
+assert.equal(revision.getRequestedScope("صحح المستند لغويًا ونحويًا فقط"), "document");
+assert.equal(revision.getRequestedScope("دقق الوثيقة كاملة"), "document");
+assert.equal(revision.getRequestedScope("صحح النص المحدد"), "selection");
+assert.equal(revision.getRequestedScope("صحح هذا النص"), "auto");
+assert.equal(revision.countParagraphsBefore("أولى\r\nثانية\nثالثة", 7), 1);
+
+const laterChunkRecords = revision.buildParagraphRecords("فقرة تالية", 8);
+assert.equal(laterChunkRecords[0].paragraphId, "p0009");
+assert.equal(laterChunkRecords[0].paragraphIndex, 8);
