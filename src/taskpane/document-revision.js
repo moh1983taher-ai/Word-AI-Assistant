@@ -360,8 +360,8 @@
                 );
                 if (resolvedMaskedStart < 0) {
                     throw new Error(
-                        "تعذر تحديد موضع التصحيح بصورة موثوقة: العبارة "" + original +
-                        "" وردت " + exactMatches.length +
+                        "تعذر تحديد موضع التصحيح بصورة موثوقة: العبارة «" + original +
+                        "» وردت " + exactMatches.length +
                         " مرات، ولم يكفِ السياق المحيط لتعيين موضع واحد؛ لم تُطبق أي تغييرات."
                     );
                 }
