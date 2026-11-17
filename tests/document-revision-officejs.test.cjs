@@ -236,6 +236,65 @@ global.Word = {
     assert.equal(documentText, "هذا خطأ واضح");
     assert.ok(collectionLoads > 0, "search collection items should be explicitly loaded");
     assert.ok(itemLoads > 0, "search result text should be explicitly loaded");
+    // A selected single-paragraph rewrite must parse and apply through the
+    // same captured Office.js range, without a paragraph-ID contract.
+    documentText = "كانت الفكرة قديمة وغير واضحة.";
+    selectionText = documentText;
+    const rewriteCapture = await revision.capture({ scope: "selection" });
+    const rewriteRequest = revision.buildRequest(
+        "أعد صياغة النص المحدد بأسلوب أكاديمي",
+        rewriteCapture.originalText,
+        { sourceOffset: 0 }
+    );
+    assert.equal(rewriteRequest.revision.rewriteSegments.length, 1);
+    assert.doesNotMatch(rewriteRequest.systemPrompt, /paragraphId/);
+    const rewriteParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "rewrite",
+        paragraphs: [{
+            segmentId: rewriteRequest.revision.rewriteSegments[0].segmentId,
+            text: "تتسم الفكرة بطابع تقليدي ولا تتضح دلالتها بما يكفي."
+        }]
+    }), rewriteCapture.originalText, rewriteRequest.revision);
+    const rewriteResult = await revision.apply(Object.assign({}, rewriteCapture, rewriteParsed));
+    assert.equal(rewriteResult.applied, true);
+    assert.equal(documentText, "تتسم الفكرة بطابع تقليدي ولا تتضح دلالتها بما يكفي.");
+
+    // Rewriting several paragraphs must preserve the original CRLF separators
+    // and apply every rewritten paragraph to the full-document target.
+    documentText = "الفقرة الأولى تحتاج إلى تحسين.\\r\\nالفقرة الثانية تحتاج إلى توضيح.";
+    selectionText = "";
+    const documentRewriteCapture = await revision.capture({ scope: "document" });
+    const documentRewriteRequest = revision.buildRequest(
+        "أعد صياغة المستند كاملًا بأسلوب أكاديمي",
+        documentRewriteCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    assert.equal(documentRewriteRequest.revision.rewriteSegments.length, 2);
+    const documentRewriteParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "rewrite",
+        paragraphs: documentRewriteRequest.revision.rewriteSegments.map((segment, index) => ({
+            segmentId: segment.segmentId,
+            text: index === 0
+                ? "تحتاج الفقرة الأولى إلى تحرير أدق."
+                : "تحتاج الفقرة الثانية إلى مزيد من البيان."
+        }))
+    }), documentRewriteCapture.originalText, documentRewriteRequest.revision);
+    assert.equal(
+        documentRewriteParsed.text,
+        "تحتاج الفقرة الأولى إلى تحرير أدق.\\r\\nتحتاج الفقرة الثانية إلى مزيد من البيان."
+    );
+    const documentRewriteResult = await revision.apply(Object.assign(
+        {},
+        documentRewriteCapture,
+        documentRewriteParsed
+    ));
+    assert.equal(documentRewriteResult.applied, true);
+    assert.equal(
+        documentText,
+        "تحتاج الفقرة الأولى إلى تحرير أدق.\\r\\nتحتاج الفقرة الثانية إلى مزيد من البيان."
+    );
 
     // The document-wide path must use the captured target's RequestContext too.
     selectionText = "";
