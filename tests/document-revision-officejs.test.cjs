@@ -242,7 +242,7 @@ global.Word = {
 
     // Paragraph-aware document correction must target each identical phrase
     // within its own Word paragraph, not the first occurrence in the entire body.
-    documentText = "هذا الأطراد الأول.\\r\\nوتكرر الأطراد في الفقرة الثانية.";
+    documentText = "هذا الأطراد الأول.\r\nوتكرر الأطراد في الفقرة الثانية.";
     selectionText = "";
     const multiParagraphCapture = await revision.capture();
     assert.equal(multiParagraphCapture.targetType, "document");
@@ -286,7 +286,7 @@ global.Word = {
     assert.equal(multiParagraphResult.applied, true);
     assert.equal(
         documentText,
-        "هذا الاطراد الأول.\\r\\nوتكرر الاطراد في الفقرة الثانية."
+        "هذا الاطراد الأول.\r\nوتكرر الاطراد في الفقرة الثانية."
     );
     assert.equal(documentText.match(/الاطراد/g).length, 2);
 
