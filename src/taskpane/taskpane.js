@@ -44885,47 +44885,80 @@ async function sendMessage() {
         let revisionMode = "";
         let clarification = "";
 
-        for (let index = 0; index < chunks.length; index++) {
-            window.__documentRevisionRequest = window.DocumentRevision.buildRequest(
-                text,
-                chunks[index]
-            );
+        async function processRevisionChunk(chunkText, depth, label) {
+            window.__documentRevisionRequest = window.DocumentRevision.buildRequest(text, chunkText);
+            try {
+                const answer = await streamAI(text, function () {});
+                const parsed = window.DocumentRevision.parseResponse(answer, chunkText);
+                return [{ sourceText: chunkText, parsed: parsed }];
+            } catch (error) {
+                const canSplit = error && error.shouldSplit === true &&
+                    depth < 6 && chunkText.length > 1200;
+                if (!canSplit) throw error;
 
+                const nextLimit = Math.max(600, Math.floor(chunkText.length / 2));
+                const smallerChunks = window.DocumentRevision.splitText(chunkText, nextLimit);
+                if (smallerChunks.length < 2) throw error;
+
+                console.warn("Revision response was incomplete; retrying with smaller chunks.", {
+                    part: label,
+                    depth: depth,
+                    previousLength: chunkText.length,
+                    nextChunkCount: smallerChunks.length,
+                    reason: String(error.message || error)
+                });
+                loading.textContent = "الاستجابة غير مكتملة؛ جارٍ تقسيم الجزء " + label + " وإعادة مراجعته بأجزاء أصغر...";
+
+                const results = [];
+                for (let subIndex = 0; subIndex < smallerChunks.length; subIndex++) {
+                    const nested = await processRevisionChunk(
+                        smallerChunks[subIndex],
+                        depth + 1,
+                        label + "." + (subIndex + 1)
+                    );
+                    results.push.apply(results, nested);
+                }
+                return results;
+            }
+        }
+
+        for (let index = 0; index < chunks.length; index++) {
             loading.textContent = chunks.length > 1
                 ? "جارٍ معالجة الجزء " + (index + 1) + " من " + chunks.length + "..."
                 : "جارٍ مراجعة النص...";
 
-            const chunkAnswer = await streamAI(text, function () {});
-            const parsedRevision = window.DocumentRevision.parseResponse(
-                chunkAnswer,
-                chunks[index]
-            );
+            const chunkResults = await processRevisionChunk(chunks[index], 0, String(index + 1));
+            for (const chunkResult of chunkResults) {
+                const parsedRevision = chunkResult.parsed;
+                const sourceChunk = chunkResult.sourceText;
 
-            if (parsedRevision.status === "clarify") {
-                clarification = parsedRevision.question;
-                break;
-            }
+                if (parsedRevision.status === "clarify") {
+                    clarification = parsedRevision.question;
+                    break;
+                }
 
-            revisedChunks.push(
-                window.DocumentRevision.normalizeBatchLineBreaks(chunks[index], parsedRevision.text)
-            );
-            if (Array.isArray(parsedRevision.edits)) {
-                parsedRevision.edits.forEach(function (edit) {
-                    proofreadingEdits.push({
-                        start: sourceOffset + edit.start,
-                        original: edit.original,
-                        replacement: edit.replacement,
-                        reason: edit.reason
+                revisedChunks.push(
+                    window.DocumentRevision.normalizeBatchLineBreaks(sourceChunk, parsedRevision.text)
+                );
+                if (Array.isArray(parsedRevision.edits)) {
+                    parsedRevision.edits.forEach(function (edit) {
+                        proofreadingEdits.push({
+                            start: sourceOffset + edit.start,
+                            original: edit.original,
+                            replacement: edit.replacement,
+                            reason: edit.reason
+                        });
                     });
-                });
-            }
-            sourceOffset += chunks[index].length;
+                }
+                sourceOffset += sourceChunk.length;
 
-            if (!revisionMode) {
-                revisionMode = parsedRevision.mode;
-            } else if (revisionMode !== parsedRevision.mode) {
-                revisionMode = "combined";
+                if (!revisionMode) {
+                    revisionMode = parsedRevision.mode;
+                } else if (revisionMode !== parsedRevision.mode) {
+                    revisionMode = "combined";
+                }
             }
+            if (clarification) break;
         }
 
         if (clarification) {
