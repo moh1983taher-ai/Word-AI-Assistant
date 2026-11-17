@@ -404,25 +404,25 @@ console.log("Document revision tests passed.");
 
 // Paragraph-scoped proofreading: identical wording in different paragraphs is
 // resolved by paragraph identity, not by whole-batch occurrence counts.
-const paragraphSource =
+const scopedParagraphSource =
     "ويظهر الأطراد في هذا الاستعمال القديم، ثم يتكرر وصفه في موضع آخر.\r\n" +
     "وقد وصف الباحث الأطراد بأنه سمة ظاهرة في هذا الباب.";
-const paragraphRequest = revision.buildRequest(
+const scopedParagraphRequest = revision.buildRequest(
     "صحح المستند لغويًا ونحويًا فقط",
-    paragraphSource,
+    scopedParagraphSource,
     { sourceOffset: 4200 }
 );
-assert.equal(paragraphRequest.revision.structuredCorrection, true);
-assert.equal(paragraphRequest.revision.sourceOffset, 4200);
-assert.equal(paragraphRequest.revision.paragraphRecords.length, 2);
-assert.ok(paragraphRequest.userPrompt.includes('"paragraphId":"p0001"'));
-const paragraphIds = paragraphRequest.revision.paragraphRecords.map(record => record.paragraphId);
-const paragraphScopedResult = revision.parseResponse(JSON.stringify({
+assert.equal(scopedParagraphRequest.revision.structuredCorrection, true);
+assert.equal(scopedParagraphRequest.revision.sourceOffset, 4200);
+assert.equal(scopedParagraphRequest.revision.paragraphRecords.length, 2);
+assert.ok(scopedParagraphRequest.userPrompt.includes('"paragraphId":"p0001"'));
+const scopedParagraphIds = scopedParagraphRequest.revision.paragraphRecords.map(record => record.paragraphId);
+const scopedParagraphResult = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
     edits: [
         {
-            paragraphId: paragraphIds[0],
+            paragraphId: scopedParagraphIds[0],
             original: "الأطراد",
             replacement: "الاطراد",
             contextBefore: "ويظهر ",
@@ -430,7 +430,7 @@ const paragraphScopedResult = revision.parseResponse(JSON.stringify({
             reason: "تصويب إملائي"
         },
         {
-            paragraphId: paragraphIds[1],
+            paragraphId: scopedParagraphIds[1],
             original: "الأطراد",
             replacement: "الاطراد",
             contextBefore: "وصف الباحث ",
@@ -438,31 +438,31 @@ const paragraphScopedResult = revision.parseResponse(JSON.stringify({
             reason: "تصويب إملائي"
         }
     ]
-}), paragraphSource, paragraphRequest.revision);
-assert.equal(paragraphScopedResult.edits.length, 2);
-assert.equal(paragraphScopedResult.rejected.length, 0);
-assert.equal(paragraphScopedResult.edits[0].start, paragraphSource.indexOf("الأطراد"));
-assert.equal(paragraphScopedResult.edits[1].start, paragraphSource.lastIndexOf("الأطراد"));
-assert.equal(paragraphScopedResult.text.match(/الاطراد/g).length, 2);
-assert.equal(paragraphScopedResult.text.includes("الأطراد"), false);
+}), scopedParagraphSource, scopedParagraphRequest.revision);
+assert.equal(scopedParagraphResult.edits.length, 2);
+assert.equal(scopedParagraphResult.rejected.length, 0);
+assert.equal(scopedParagraphResult.edits[0].start, scopedParagraphSource.indexOf("الأطراد"));
+assert.equal(scopedParagraphResult.edits[1].start, scopedParagraphSource.lastIndexOf("الأطراد"));
+assert.equal(scopedParagraphResult.text.match(/الاطراد/g).length, 2);
+assert.equal(scopedParagraphResult.text.includes("الأطراد"), false);
 
 // An ambiguous edit in one paragraph must not discard a valid correction in
 // another paragraph of the same batch.
-const partialSource =
+const isolatedParagraphSource =
     "تكرر الأطراد هنا ثم عاد الأطراد مرة أخرى.\n" +
     "وهذا نص فيه خطا واضح يحتاج إلى تصويب.";
-const partialRequest = revision.buildRequest(
+const isolatedParagraphRequest = revision.buildRequest(
     "صحح النص لغويًا فقط",
-    partialSource,
+    isolatedParagraphSource,
     { sourceOffset: 9000 }
 );
-const partialIds = partialRequest.revision.paragraphRecords.map(record => record.paragraphId);
-const partialResult = revision.parseResponse(JSON.stringify({
+const isolatedParagraphIds = isolatedParagraphRequest.revision.paragraphRecords.map(record => record.paragraphId);
+const isolatedParagraphResult = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
     edits: [
         {
-            paragraphId: partialIds[0],
+            paragraphId: isolatedParagraphIds[0],
             original: "الأطراد",
             replacement: "الاطراد",
             contextBefore: "",
@@ -470,7 +470,7 @@ const partialResult = revision.parseResponse(JSON.stringify({
             reason: "تصويب إملائي"
         },
         {
-            paragraphId: partialIds[1],
+            paragraphId: isolatedParagraphIds[1],
             original: "خطا",
             replacement: "خطأ",
             contextBefore: "فيه ",
@@ -478,16 +478,16 @@ const partialResult = revision.parseResponse(JSON.stringify({
             reason: "تصويب إملائي"
         }
     ]
-}), partialSource, partialRequest.revision);
-assert.equal(partialResult.edits.length, 1);
-assert.equal(partialResult.rejected.length, 1);
-assert.equal(partialResult.rejected[0].rejectionCode, "ambiguous_occurrence");
-assert.ok(partialResult.text.includes("فيه خطأ واضح"));
-assert.equal(partialResult.text.match(/الأطراد/g).length, 2);
+}), isolatedParagraphSource, isolatedParagraphRequest.revision);
+assert.equal(isolatedParagraphResult.edits.length, 1);
+assert.equal(isolatedParagraphResult.rejected.length, 1);
+assert.equal(isolatedParagraphResult.rejected[0].rejectionCode, "ambiguous_occurrence");
+assert.ok(isolatedParagraphResult.text.includes("فيه خطأ واضح"));
+assert.equal(isolatedParagraphResult.text.match(/الأطراد/g).length, 2);
 
 // Model output without a valid paragraph ID is isolated, not allowed to abort
 // other correctly attributed edits.
-const missingIdResult = revision.parseResponse(JSON.stringify({
+const missingScopedIdResult = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
     edits: [
@@ -499,7 +499,7 @@ const missingIdResult = revision.parseResponse(JSON.stringify({
             reason: "تصويب إملائي"
         },
         {
-            paragraphId: partialIds[1],
+            paragraphId: isolatedParagraphIds[1],
             original: "خطا",
             replacement: "خطأ",
             contextBefore: "فيه ",
@@ -507,16 +507,16 @@ const missingIdResult = revision.parseResponse(JSON.stringify({
             reason: "تصويب إملائي"
         }
     ]
-}), partialSource, partialRequest.revision);
-assert.equal(missingIdResult.edits.length, 1);
-assert.equal(missingIdResult.rejected.length, 1);
-assert.equal(missingIdResult.rejected[0].rejectionCode, "missing_paragraph_id");
+}), isolatedParagraphSource, isolatedParagraphRequest.revision);
+assert.equal(missingScopedIdResult.edits.length, 1);
+assert.equal(missingScopedIdResult.rejected.length, 1);
+assert.equal(missingScopedIdResult.rejected[0].rejectionCode, "missing_paragraph_id");
 
 // CRLF and blank paragraph boundaries preserve their IDs and local offsets.
-const paragraphBoundaryRecords = revision.buildParagraphRecords("أولى\r\n\r\nثالثة");
-assert.equal(paragraphBoundaryRecords.length, 2);
-assert.equal(paragraphBoundaryRecords[0].paragraphId, "p0001");
-assert.equal(paragraphBoundaryRecords[1].paragraphId, "p0003");
-assert.equal(paragraphBoundaryRecords[1].start, "أولى\r\n\r\n".length);
+const scopedBoundaryRecords = revision.buildParagraphRecords("أولى\r\n\r\nثالثة");
+assert.equal(scopedBoundaryRecords.length, 2);
+assert.equal(scopedBoundaryRecords[0].paragraphId, "p0001");
+assert.equal(scopedBoundaryRecords[1].paragraphId, "p0003");
+assert.equal(scopedBoundaryRecords[1].start, "أولى\r\n\r\n".length);
 assert.equal(revision.isCorrectionOnlyRequest("صحح المستند لغويًا ونحويًا فقط"), true);
 assert.equal(revision.isCorrectionOnlyRequest("أعد صياغة المستند بأسلوب أكاديمي"), false);
