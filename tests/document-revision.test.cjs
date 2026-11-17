@@ -157,7 +157,11 @@ const rewriteRequest = revision.buildRequest(
     rewriteSource
 );
 assert.equal(rewriteRequest.revision.structuredCorrection, false);
+assert.equal(rewriteRequest.revision.selectedCorrection, false);
 assert.equal(rewriteRequest.revision.paragraphMarkers.length, 3);
+assert.doesNotMatch(rewriteRequest.systemPrompt, /paragraphId|استجابة تصحيح النص المحدد/);
+assert.doesNotMatch(rewriteRequest.userPrompt, /قائمة edits موضعية فقط/);
+assert.match(rewriteRequest.userPrompt, /النص المعالج كاملًا في الحقل text/);
 rewriteRequest.revision.paragraphMarkers.forEach(marker => {
     assert.ok(rewriteRequest.userPrompt.includes(marker));
 });
