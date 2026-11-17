@@ -193,6 +193,17 @@ global.Word = {
     const captureContext = selectedRange.context;
     assert.ok(captureContext, "capture should attach the selected Range to its RequestContext");
 
+    const selectedRequest = revision.buildRequest(
+        "صحح النص لغويًا فقط",
+        captured.originalText,
+        { sourceOffset: 0 }
+    );
+    assert.equal(
+        selectedRequest.revision.structuredCorrection,
+        false,
+        "selected-text corrections must retain the established legacy parsing path"
+    );
+
     const parsed = revision.parseResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
@@ -203,7 +214,7 @@ global.Word = {
             contextAfter: " واضح",
             reason: "تصويب إملائي"
         }]
-    }), captured.originalText);
+    }), captured.originalText, selectedRequest.revision);
 
     const result = await revision.apply(Object.assign({}, captured, parsed));
     assert.equal(
