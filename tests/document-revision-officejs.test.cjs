@@ -233,11 +233,21 @@ global.Word = {
     assert.equal(documentCapture.targetType, "document");
     assert.equal(documentCapture.originalText, documentText);
     const documentContext = bodyRange.context;
+    const documentRequest = revision.buildRequest(
+        "صحح المستند لغويًا ونحويًا فقط",
+        documentCapture.originalText,
+        {
+            sourceOffset: 0,
+            paragraphBaseIndex: 0
+        }
+    );
+    const documentParagraphId = documentRequest.revision.paragraphRecords[0].paragraphId;
 
     const documentParsed = revision.parseResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
         edits: [{
+            paragraphId: documentParagraphId,
             original: "واضح",
             replacement: "بيّن",
             contextBefore: "هذا خطأ ",
