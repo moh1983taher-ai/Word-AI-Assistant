@@ -137,7 +137,7 @@
         return output;
     }
 
-    // JSON forbids literal U+0000–U+001F characters inside quoted strings.
+        // JSON forbids literal U+0000–U+001F characters inside quoted strings.
     // Models sometimes place real line breaks or tabs in Arabic text fields.
     // Escape only those characters while inside a JSON string; preserve all
     // content and leave legal whitespace between JSON tokens untouched.
@@ -157,7 +157,7 @@
                     escaped = false;
                     continue;
                 }
-                if (ch === "\\\\") {
+                if (ch === "\\") {
                     output += ch;
                     escaped = true;
                     continue;
@@ -169,13 +169,13 @@
                 }
                 if (code <= 0x1f) {
                     const escapes = {
-                        0x08: "\\\\b",
-                        0x09: "\\\\t",
-                        0x0a: "\\\\n",
-                        0x0c: "\\\\f",
-                        0x0d: "\\\\r"
+                        0x08: "\\b",
+                        0x09: "\\t",
+                        0x0a: "\\n",
+                        0x0c: "\\f",
+                        0x0d: "\\r"
                     };
-                    output += escapes[code] || ("\\\\u00" + code.toString(16).padStart(2, "0"));
+                    output += escapes[code] || ("\\u00" + code.toString(16).padStart(2, "0"));
                     continue;
                 }
                 output += ch;
