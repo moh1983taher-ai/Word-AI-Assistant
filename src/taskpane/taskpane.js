@@ -44834,7 +44834,10 @@ async function sendMessage() {
     );
 
     if (isDocumentRevision) {
-        documentRevisionCapture = await window.DocumentRevision.capture();
+        const requestedRevisionScope = window.DocumentRevision.getRequestedScope(text);
+        documentRevisionCapture = await window.DocumentRevision.capture({
+            scope: requestedRevisionScope
+        });
         // تُجهّز تعليمات كل جزء عند إرساله؛ لتفادي تجاوز حدود مزود الذكاء الاصطناعي.
     }
 
@@ -44889,8 +44892,19 @@ async function sendMessage() {
 
         async function processRevisionChunk(chunkText, depth, label, chunkOffset) {
             const revisionRequest = window.DocumentRevision.buildRequest(text, chunkText, {
-                sourceOffset: chunkOffset
+                sourceOffset: chunkOffset,
+                paragraphBaseIndex: window.DocumentRevision.countParagraphsBefore(
+                    documentRevisionCapture.originalText,
+                    chunkOffset
+                )
             });
+            if (documentRevisionCapture.targetType === "document" &&
+                window.DocumentRevision.isCorrectionOnlyRequest(text) &&
+                !revisionRequest.revision.structuredCorrection) {
+                throw new Error(
+                    "لم يُفعّل مسار التصحيح المرتبط بفقرات المستند؛ أُوقف التدقيق بدل الرجوع إلى المطابقة النصية العامة."
+                );
+            }
             window.__documentRevisionRequest = revisionRequest;
             try {
                 const answer = await streamAI(text, function () {});
