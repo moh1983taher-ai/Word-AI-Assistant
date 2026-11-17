@@ -1501,6 +1501,143 @@
                 return mapping || null;
             }
 
+            // Word search is not a dependable locator for every edit span:
+            // long spans can exceed search limits, and whitespace-only spans
+            // may return no ranges. Fall back to short, verifiable anchors
+            // around the edit, then expand only between their boundary points.
+            function prepareContextFallback(item, expectedText, expectedStart) {
+                const source = String(item.searchSourceText || originalText);
+                const expectedEnd = expectedStart + expectedText.length;
+                const searchRange = item.searchRange;
+                if (!searchRange || expectedStart < 0 || expectedEnd > source.length) {
+                    throw new Error("نطاق البحث السياقي غير صالح.");
+                }
+
+                const previousBreak = Math.max(
+                    source.lastIndexOf("\\r", Math.max(0, expectedStart - 1)),
+                    source.lastIndexOf("\\n", Math.max(0, expectedStart - 1))
+                );
+                const lineStart = previousBreak + 1;
+                const nextCr = source.indexOf("\\r", expectedEnd);
+                const nextLf = source.indexOf("\\n", expectedEnd);
+                let lineEnd = source.length;
+                if (nextCr >= 0) lineEnd = Math.min(lineEnd, nextCr);
+                if (nextLf >= 0) lineEnd = Math.min(lineEnd, nextLf);
+                if (expectedStart < lineStart || expectedEnd > lineEnd) {
+                    throw new Error("يمتد موضع التعديل خارج فقرة واحدة.");
+                }
+
+                const lineTokens = tokenize(source.slice(lineStart, lineEnd)).map(function (token) {
+                    return {
+                        value: token.value,
+                        start: lineStart + token.start,
+                        end: lineStart + token.end
+                    };
+                });
+                const nonWhitespace = lineTokens.filter(function (token) {
+                    return !/^\\s+$/.test(token.value);
+                });
+                const wordTokens = nonWhitespace.filter(function (token) {
+                    return /[\\p{L}\\p{N}_]/u.test(token.value);
+                });
+                const anchors = wordTokens.length ? wordTokens : nonWhitespace;
+                const before = anchors.filter(function (token) {
+                    return token.end <= expectedStart;
+                }).pop() || null;
+                const after = anchors.find(function (token) {
+                    return token.start >= expectedEnd;
+                }) || null;
+                const inside = anchors.filter(function (token) {
+                    return token.start >= expectedStart && token.end <= expectedEnd;
+                });
+                const firstInside = inside[0] || null;
+                const lastInside = inside.length ? inside[inside.length - 1] : null;
+                const anchorSpecs = [];
+
+                function addAnchor(token, side) {
+                    if (!token) return null;
+                    const characters = Array.from(token.value);
+                    const query = characters.length > 100
+                        ? (side === "end" ? characters.slice(-100).join("") : characters.slice(0, 100).join(""))
+                        : token.value;
+                    const queryStart = token.start + (side === "end" ? token.value.length - query.length : 0);
+                    const existing = anchorSpecs.find(function (spec) {
+                        return spec.query === query && spec.expectedStart === queryStart;
+                    });
+                    if (existing) return existing;
+
+                    const collection = searchRange.search(query, {
+                        matchCase: true,
+                        matchWholeWord: false
+                    });
+                    collection.load("items");
+                    const spec = {
+                        query: query,
+                        expectedStart: queryStart,
+                        collection: collection
+                    };
+                    anchorSpecs.push(spec);
+                    return spec;
+                }
+
+                const beforeSpec = addAnchor(before, "end");
+                const afterSpec = addAnchor(after, "start");
+                const firstInsideSpec = !before && firstInside
+                    ? addAnchor(firstInside, "start")
+                    : null;
+                const lastInsideSpec = !after && lastInside
+                    ? addAnchor(lastInside, "end")
+                    : null;
+
+                let startBoundary;
+                let sourceStart;
+                if (beforeSpec) {
+                    startBoundary = { type: "match-end", spec: beforeSpec };
+                    sourceStart = before.end;
+                } else if (expectedStart === 0 && lineStart === 0) {
+                    startBoundary = { type: "range-start" };
+                    sourceStart = 0;
+                } else if (firstInsideSpec && firstInside.start === expectedStart) {
+                    startBoundary = { type: "match-start", spec: firstInsideSpec };
+                    sourceStart = expectedStart;
+                } else {
+                    throw new Error("تعذر تثبيت بداية مقطع التعديل بسياق فريد.");
+                }
+
+                let endBoundary;
+                let sourceEnd;
+                if (afterSpec) {
+                    endBoundary = { type: "match-start", spec: afterSpec };
+                    sourceEnd = after.start;
+                } else if (expectedEnd === lineEnd && lineEnd === source.length) {
+                    endBoundary = { type: "range-end" };
+                    sourceEnd = source.length;
+                } else if (lastInsideSpec && lastInside.end === expectedEnd) {
+                    endBoundary = { type: "match-end", spec: lastInsideSpec };
+                    sourceEnd = expectedEnd;
+                } else {
+                    throw new Error("تعذر تثبيت نهاية مقطع التعديل بسياق فريد.");
+                }
+
+                if (sourceStart > expectedStart || sourceEnd < expectedEnd || sourceEnd < sourceStart) {
+                    throw new Error("لا يحيط السياق بموضع التعديل المتوقع.");
+                }
+
+                return {
+                    item: item,
+                    source: source,
+                    expectedText: expectedText,
+                    expectedStart: expectedStart,
+                    expectedEnd: expectedEnd,
+                    sourceStart: sourceStart,
+                    sourceEnd: sourceEnd,
+                    searchRange: searchRange,
+                    startBoundary: startBoundary,
+                    endBoundary: endBoundary,
+                    anchorSpecs: anchorSpecs
+                };
+            }
+
             const prepared = [];
             for (const operation of operations) {
                 if (operation.length > 0) {
@@ -1513,11 +1650,17 @@
                         throw new Error("تعذر تعيين التصحيح إلى فقرة واحدة في المستند؛ أُلغي التطبيق دون إجراء تغيير.");
                     }
                     const searchRange = paragraphTarget ? paragraphTarget.paragraph : range;
-                    const search = searchRange.search(oldText, { matchCase: true, matchWholeWord: false });
-                    search.load("items");
+                    // Keep direct Word searches well below the documented
+                    // 255-character Body.search ceiling. Longer spans use
+                    // short anchors and are verified after range expansion.
+                    const search = oldText.length <= 200
+                        ? searchRange.search(oldText, { matchCase: true, matchWholeWord: false })
+                        : null;
+                    if (search) search.load("items");
                     prepared.push({
                         operation: operation,
                         search: search,
+                        searchRange: searchRange,
                         kind: "replace",
                         searchSourceText: paragraphTarget ? paragraphTarget.text : originalText,
                         searchExpectedStart: paragraphTarget ? operation.start - paragraphTarget.start : operation.start
@@ -1547,6 +1690,7 @@
                         prepared.push({
                             operation: operation,
                             search: search,
+                            searchRange: searchRange,
                             kind: "insert",
                             anchor: anchor,
                             searchSourceText: paragraphTarget ? paragraphTarget.text : originalText,
@@ -1574,13 +1718,14 @@
             await context.sync();
 
             const resolved = [];
+            const fallbackPlans = [];
             for (const item of prepared) {
                 if (item.kind === "boundary-start") {
-                    resolved.push({ ...item, target: range.getRange("Start") });
+                    resolved.push({ ...item, target: range.getRange("Start"), replacement: item.operation.replacement });
                     continue;
                 }
                 if (item.kind === "boundary-end") {
-                    resolved.push({ ...item, target: range.getRange("End") });
+                    resolved.push({ ...item, target: range.getRange("End"), replacement: item.operation.replacement });
                     continue;
                 }
 
@@ -1592,23 +1737,96 @@
                     : (item.kind === "insert" && item.anchor.location === "After"
                         ? item.anchor.token.start
                         : item.operation.start);
+
+                if (item.kind === "replace") {
+                    try {
+                        if (!item.search) throw new Error("تجاوز مقطع التعديل حد البحث المباشر.");
+                        const target = resolveSearchMatchByOccurrence(
+                            item.search.items,
+                            item.searchSourceText || originalText,
+                            expectedText,
+                            expectedStart
+                        );
+                        resolved.push({ ...item, target: target, replacement: item.operation.replacement });
+                    } catch (_) {
+                        fallbackPlans.push(prepareContextFallback(item, expectedText, expectedStart));
+                    }
+                    continue;
+                }
+
                 const target = resolveSearchMatchByOccurrence(
                     item.search.items,
                     item.searchSourceText || originalText,
                     expectedText,
                     expectedStart
                 );
-                resolved.push({ ...item, target: target });
+                resolved.push({ ...item, target: target, replacement: item.operation.replacement });
+            }
+
+            if (fallbackPlans.length) {
+                // Load all short context anchors together, then resolve their
+                // document positions before constructing any mutation.
+                await context.sync();
+                fallbackPlans.forEach(function (plan) {
+                    plan.anchorSpecs.forEach(function (spec) {
+                        spec.collection.items.forEach(function (match) {
+                            match.load("text");
+                        });
+                    });
+                });
+                await context.sync();
+
+                fallbackPlans.forEach(function (plan) {
+                    function resolveBoundary(boundary) {
+                        if (boundary.type === "range-start") return plan.searchRange.getRange("Start");
+                        if (boundary.type === "range-end") return plan.searchRange.getRange("End");
+                        const match = resolveSearchMatchByOccurrence(
+                            boundary.spec.collection.items,
+                            plan.source,
+                            boundary.spec.query,
+                            boundary.spec.expectedStart
+                        );
+                        return match.getRange(boundary.type === "match-end" ? "End" : "Start");
+                    }
+
+                    const startRange = resolveBoundary(plan.startBoundary);
+                    const endRange = resolveBoundary(plan.endBoundary);
+                    plan.target = startRange.expandTo(endRange);
+                    plan.target.load("text");
+                });
+                await context.sync();
+
+                fallbackPlans.forEach(function (plan) {
+                    const expectedExpandedText = plan.source.slice(plan.sourceStart, plan.sourceEnd);
+                    const actualExpandedText = String(plan.target.text || "");
+                    if (actualExpandedText !== expectedExpandedText) {
+                        throw new Error(
+                            "لم يتطابق النطاق السياقي في Word مع النص الأصلي حرفيًا؛ أُلغي التطبيق دون تعديل."
+                        );
+                    }
+
+                    const replacement = expectedExpandedText.slice(0, plan.expectedStart - plan.sourceStart) +
+                        plan.item.operation.replacement +
+                        expectedExpandedText.slice(plan.expectedEnd - plan.sourceStart);
+                    resolved.push({
+                        ...plan.item,
+                        target: plan.target,
+                        replacement: replacement
+                    });
+                });
             }
 
             resolved.sort(function (a, b) { return b.operation.start - a.operation.start; });
             const insertedRanges = [];
             resolved.forEach(function (item) {
                 const location = item.kind === "insert" ? item.anchor.location : "Replace";
-                const inserted = item.target.insertText(item.operation.replacement, location);
-                if (item.operation.replacement) {
+                const replacement = item.replacement !== undefined
+                    ? item.replacement
+                    : item.operation.replacement;
+                const inserted = item.target.insertText(replacement, location);
+                if (replacement) {
                     inserted.font.color = "#FF0000";
-                    insertedRanges.push({ range: inserted, expectedText: item.operation.replacement });
+                    insertedRanges.push({ range: inserted, expectedText: replacement });
                 }
             });
 
