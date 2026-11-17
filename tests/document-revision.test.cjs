@@ -289,21 +289,21 @@ assert.deepEqual(revision.parseResponse(JSON.stringify({
 
 // Response parser regressions: tolerate harmless wrappers and trailing commas,
 // but never fabricate a closing brace for a truncated model response.
-const fencedResponse = "```json\\n" + JSON.stringify({
+const fencedResponse = "```json\n" + JSON.stringify({
     status: "ready",
     mode: "rewrite",
     text: "صياغة تتضمن قوسًا } داخل النص."
-}) + "\\n```";
+}) + "\n```";
 assert.equal(
     revision.parseResponse(fencedResponse).text,
     "صياغة تتضمن قوسًا } داخل النص."
 );
 
-const wrappedResponse = "إليك النتيجة المطلوبة:\\n" + JSON.stringify({
+const wrappedResponse = "إليك النتيجة المطلوبة:\n" + JSON.stringify({
     status: "ready",
     mode: "rewrite",
     text: "نص منقح"
-}) + "\\nانتهى.";
+}) + "\nانتهى.";
 assert.equal(revision.parseResponse(wrappedResponse).text, "نص منقح");
 
 const trailingCommaResponse =
