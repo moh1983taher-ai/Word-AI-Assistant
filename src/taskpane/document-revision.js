@@ -164,7 +164,7 @@
             parsed = parseStructuredRevisionJSON(raw);
         } catch (error) {
             const diagnostic = String(error && error.message || "صيغة غير معروفة")
-                .replace(/[\\r\\n\\t]+/g, " ")
+                .replace(/[\r\n\t]+/g, " ")
                 .slice(0, 180);
             const failure = new Error(
                 "تعذر قراءة استجابة المراجع اللغوي بصيغة منظمة. " +
