@@ -137,7 +137,7 @@
         return output;
     }
 
-        // JSON forbids literal U+0000–U+001F characters inside quoted strings.
+    // JSON forbids literal U+0000–U+001F characters inside quoted strings.
     // Models sometimes place real line breaks or tabs in Arabic text fields.
     // Escape only those characters while inside a JSON string; preserve all
     // content and leave legal whitespace between JSON tokens untouched.
