@@ -104,8 +104,8 @@ assert.ok(paragraphBatchChunks.length < 20);
 assert.equal(paragraphBatchChunks.join(""), paragraphBatchSource);
 assert.ok(paragraphBatchChunks.every(chunk => chunk.length <= 1200));
 
-// Select larger batches for localized proofreading and smaller batches for full rewrites.
-assert.equal(revision.getRecommendedChunkSize("صحح الأخطاء النحوية والإملائية"), 16000);
+// Bound full-document correction batches to improve local attention and response reliability.
+assert.equal(revision.getRecommendedChunkSize("صحح الأخطاء النحوية والإملائية"), 6000);
 assert.equal(revision.getRecommendedChunkSize("أعد صياغة النص بأسلوب أكاديمي"), 8000);
 assert.equal(revision.getRecommendedChunkSize("صحح النص وأعد صياغته"), 8000);
 assert.equal(revision.getRecommendedChunkSize("راجع هذا المستند"), 12000);
@@ -400,3 +400,143 @@ assert.equal(
     "قبل\u0001بعد"
 );
 console.log("Document revision tests passed.");
+
+
+// Paragraph-scoped proofreading: identical wording in different paragraphs is
+// resolved by paragraph identity, not by whole-batch occurrence counts.
+const scopedParagraphSource =
+    "ويظهر الأطراد في هذا الاستعمال القديم، ثم يتكرر وصفه في موضع آخر.\r\n" +
+    "وقد وصف الباحث الأطراد بأنه سمة ظاهرة في هذا الباب.";
+const scopedParagraphRequest = revision.buildRequest(
+    "صحح المستند لغويًا ونحويًا فقط",
+    scopedParagraphSource,
+    { sourceOffset: 4200 }
+);
+assert.equal(scopedParagraphRequest.revision.structuredCorrection, true);
+assert.equal(scopedParagraphRequest.revision.sourceOffset, 4200);
+assert.equal(scopedParagraphRequest.revision.paragraphRecords.length, 2);
+assert.ok(scopedParagraphRequest.userPrompt.includes('"paragraphId":"p0001"'));
+const scopedParagraphIds = scopedParagraphRequest.revision.paragraphRecords.map(record => record.paragraphId);
+const scopedParagraphResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [
+        {
+            paragraphId: scopedParagraphIds[0],
+            original: "الأطراد",
+            replacement: "الاطراد",
+            contextBefore: "ويظهر ",
+            contextAfter: " في هذا",
+            reason: "تصويب إملائي"
+        },
+        {
+            paragraphId: scopedParagraphIds[1],
+            original: "الأطراد",
+            replacement: "الاطراد",
+            contextBefore: "وصف الباحث ",
+            contextAfter: " بأنه سمة",
+            reason: "تصويب إملائي"
+        }
+    ]
+}), scopedParagraphSource, scopedParagraphRequest.revision);
+assert.equal(scopedParagraphResult.edits.length, 2);
+assert.equal(scopedParagraphResult.rejected.length, 0);
+assert.equal(scopedParagraphResult.edits[0].start, scopedParagraphSource.indexOf("الأطراد"));
+assert.equal(scopedParagraphResult.edits[1].start, scopedParagraphSource.lastIndexOf("الأطراد"));
+assert.equal(scopedParagraphResult.text.match(/الاطراد/g).length, 2);
+assert.equal(scopedParagraphResult.text.includes("الأطراد"), false);
+
+// An ambiguous edit in one paragraph must not discard a valid correction in
+// another paragraph of the same batch.
+const isolatedParagraphSource =
+    "تكرر الأطراد هنا ثم عاد الأطراد مرة أخرى.\n" +
+    "وهذا نص فيه خطا واضح يحتاج إلى تصويب.";
+const isolatedParagraphRequest = revision.buildRequest(
+    "صحح النص لغويًا فقط",
+    isolatedParagraphSource,
+    { sourceOffset: 9000 }
+);
+const isolatedParagraphIds = isolatedParagraphRequest.revision.paragraphRecords.map(record => record.paragraphId);
+const isolatedParagraphResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [
+        {
+            paragraphId: isolatedParagraphIds[0],
+            original: "الأطراد",
+            replacement: "الاطراد",
+            contextBefore: "",
+            contextAfter: "",
+            reason: "تصويب إملائي"
+        },
+        {
+            paragraphId: isolatedParagraphIds[1],
+            original: "خطا",
+            replacement: "خطأ",
+            contextBefore: "فيه ",
+            contextAfter: " واضح",
+            reason: "تصويب إملائي"
+        }
+    ]
+}), isolatedParagraphSource, isolatedParagraphRequest.revision);
+assert.equal(isolatedParagraphResult.edits.length, 1);
+assert.equal(isolatedParagraphResult.rejected.length, 1);
+assert.equal(isolatedParagraphResult.rejected[0].rejectionCode, "ambiguous_occurrence");
+assert.ok(isolatedParagraphResult.text.includes("فيه خطأ واضح"));
+assert.equal(isolatedParagraphResult.text.match(/الأطراد/g).length, 2);
+
+// Model output without a valid paragraph ID is isolated, not allowed to abort
+// other correctly attributed edits.
+const missingScopedIdResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [
+        {
+            original: "خطا",
+            replacement: "خطأ",
+            contextBefore: "هذا ",
+            contextAfter: " واضح",
+            reason: "تصويب إملائي"
+        },
+        {
+            paragraphId: isolatedParagraphIds[1],
+            original: "خطا",
+            replacement: "خطأ",
+            contextBefore: "فيه ",
+            contextAfter: " واضح",
+            reason: "تصويب إملائي"
+        }
+    ]
+}), isolatedParagraphSource, isolatedParagraphRequest.revision);
+assert.equal(missingScopedIdResult.edits.length, 1);
+assert.equal(missingScopedIdResult.rejected.length, 1);
+assert.equal(missingScopedIdResult.rejected[0].rejectionCode, "missing_paragraph_id");
+
+const noOpResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        paragraphId: scopedParagraphIds[0],
+        original: "الأطراد",
+        replacement: "الأطراد",
+        contextBefore: "ويظهر ",
+        contextAfter: " في هذا",
+        reason: "لا تغيير"
+    }]
+}), scopedParagraphSource, scopedParagraphRequest.revision);
+assert.equal(noOpResult.edits.length, 0);
+assert.equal(noOpResult.rejected.length, 1);
+assert.equal(noOpResult.rejected[0].rejectionCode, "no_op");
+
+// CRLF and blank paragraph boundaries preserve their IDs and local offsets.
+const scopedBoundaryRecords = revision.buildParagraphRecords("أولى\r\n\r\nثالثة");
+assert.equal(scopedBoundaryRecords.length, 2);
+assert.equal(scopedBoundaryRecords[0].paragraphId, "p0001");
+assert.equal(scopedBoundaryRecords[1].paragraphId, "p0003");
+assert.equal(scopedBoundaryRecords[1].start, "أولى\r\n\r\n".length);
+assert.equal(revision.isCorrectionOnlyRequest("صحح المستند لغويًا ونحويًا فقط"), true);
+assert.equal(revision.isCorrectionOnlyRequest("صحح المستند لغويًا دون إعادة صياغة"), true);
+assert.equal(revision.isCorrectionOnlyRequest("صحح المستند ولا تعِد صياغته"), true);
+assert.equal(revision.isCorrectionOnlyRequest("راجع المستند لغويًا"), true);
+assert.equal(revision.isCorrectionOnlyRequest("أعد صياغة المستند بأسلوب أكاديمي"), false);
+assert.equal(revision.isCorrectionOnlyRequest("صحح المستند وأعد صياغة بعض الجمل"), false);
