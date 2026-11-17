@@ -1514,12 +1514,12 @@
                 }
 
                 const previousBreak = Math.max(
-                    source.lastIndexOf("\\r", Math.max(0, expectedStart - 1)),
-                    source.lastIndexOf("\\n", Math.max(0, expectedStart - 1))
+                    source.lastIndexOf("\r", Math.max(0, expectedStart - 1)),
+                    source.lastIndexOf("\n", Math.max(0, expectedStart - 1))
                 );
                 const lineStart = previousBreak + 1;
-                const nextCr = source.indexOf("\\r", expectedEnd);
-                const nextLf = source.indexOf("\\n", expectedEnd);
+                const nextCr = source.indexOf("\r", expectedEnd);
+                const nextLf = source.indexOf("\n", expectedEnd);
                 let lineEnd = source.length;
                 if (nextCr >= 0) lineEnd = Math.min(lineEnd, nextCr);
                 if (nextLf >= 0) lineEnd = Math.min(lineEnd, nextLf);
@@ -1535,10 +1535,10 @@
                     };
                 });
                 const nonWhitespace = lineTokens.filter(function (token) {
-                    return !/^\\s+$/.test(token.value);
+                    return !/^\s+$/.test(token.value);
                 });
                 const wordTokens = nonWhitespace.filter(function (token) {
-                    return /[\\p{L}\\p{N}_]/u.test(token.value);
+                    return /[\p{L}\p{N}_]/u.test(token.value);
                 });
                 const anchors = wordTokens.length ? wordTokens : nonWhitespace;
                 const before = anchors.filter(function (token) {
