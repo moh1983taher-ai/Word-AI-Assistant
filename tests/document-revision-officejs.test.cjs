@@ -216,7 +216,12 @@ global.Word = {
         }]
     }), captured.originalText, selectedRequest.revision);
 
-    const result = await revision.apply(Object.assign({}, captured, parsed));
+    const selectedLegacyRevision = Object.assign({}, captured, parsed, {
+        // The selected-text path must continue to derive Word operations from
+        // the reviewed text, as it did before the paragraph-scoped refactor.
+        edits: [{ start: 0, original: "not-the-source", replacement: "unsafe" }]
+    });
+    const result = await revision.apply(selectedLegacyRevision);
     assert.equal(
         selectedRange.context,
         captureContext,

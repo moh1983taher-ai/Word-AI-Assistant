@@ -1210,7 +1210,11 @@
         const safeRevisedText = normalizeLineBreaks(originalText, revision.text);
         let operations;
 
-        if (revision.mode === "correction" && Array.isArray(revision.edits)) {
+        // Use direct paragraph offsets only for full-document corrections.
+        // Selected-text corrections retain their established diff-based path.
+        if (revision.targetType === "document" &&
+            revision.mode === "correction" &&
+            Array.isArray(revision.edits)) {
             const directEdits = revision.edits.map(function (edit) {
                 return {
                     start: Number(edit && edit.start),
