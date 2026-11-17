@@ -287,5 +287,35 @@ assert.deepEqual(revision.parseResponse(JSON.stringify({
     edits: []
 });
 
-assert.throws(() => revision.parseResponse("not json"), /تعذر التحقق/);
+// Response parser regressions: tolerate harmless wrappers and trailing commas,
+// but never fabricate a closing brace for a truncated model response.
+const fencedResponse = "```json\n" + JSON.stringify({
+    status: "ready",
+    mode: "rewrite",
+    text: "صياغة تتضمن قوسًا } داخل النص."
+}) + "\n```";
+assert.equal(
+    revision.parseResponse(fencedResponse).text,
+    "صياغة تتضمن قوسًا } داخل النص."
+);
+
+const wrappedResponse = "إليك النتيجة المطلوبة:\n" + JSON.stringify({
+    status: "ready",
+    mode: "rewrite",
+    text: "نص منقح"
+}) + "\nانتهى.";
+assert.equal(revision.parseResponse(wrappedResponse).text, "نص منقح");
+
+const trailingCommaResponse =
+    '{"status":"ready","mode":"correction","edits":[{"original":"خطا","replacement":"خطأ","reason":"تصويب إملائي",}]}';
+assert.equal(
+    revision.parseResponse(trailingCommaResponse, "هذا خطا واضح.").text,
+    "هذا خطأ واضح."
+);
+
+assert.throws(
+    () => revision.parseResponse('{"status":"ready","mode":"rewrite","text":"استجابة مبتورة'),
+    /تفاصيل: الاستجابة مبتورة/
+);
+assert.throws(() => revision.parseResponse("not json"), /تعذر قراءة استجابة/);
 console.log("Document revision tests passed.");

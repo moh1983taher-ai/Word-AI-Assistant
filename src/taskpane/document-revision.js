@@ -64,27 +64,116 @@
         };
     }
 
+    // Extract one complete JSON object from a model response without
+    // truncating nested objects or braces embedded in quoted strings.
+    function extractRevisionJSON(rawValue) {
+        let raw = String(rawValue || "").replace(/^\uFEFF/, "").trim();
+        if (!raw) throw new Error("الاستجابة فارغة");
+
+        raw = raw.replace(/^\x60{3}(?:json)?\s*/i, "")
+            .replace(/\s*\x60{3}\s*$/i, "")
+            .trim();
+
+        const start = raw.indexOf("{");
+        if (start < 0) throw new Error("لم يبدأ الرد بكائن JSON");
+
+        let depth = 0;
+        let inString = false;
+        let escaped = false;
+        let end = -1;
+        for (let i = start; i < raw.length; i++) {
+            const ch = raw[i];
+            if (inString) {
+                if (escaped) escaped = false;
+                else if (ch === "\\") escaped = true;
+                else if (ch === '"') inString = false;
+                continue;
+            }
+            if (ch === '"') inString = true;
+            else if (ch === "{") depth++;
+            else if (ch === "}") {
+                depth--;
+                if (depth === 0) {
+                    end = i + 1;
+                    break;
+                }
+                if (depth < 0) throw new Error("توازن الأقواس غير صحيح");
+            }
+        }
+        if (end < 0 || inString || depth !== 0) {
+            throw new Error("الاستجابة مبتورة: لم يكتمل كائن JSON");
+        }
+        return raw.slice(start, end);
+    }
+
+    // Conservative recovery for a common model-formatting defect: trailing
+    // commas before a closing object/array. Never invent missing fields or braces.
+    function removeJSONTrailingCommas(rawValue) {
+        const raw = String(rawValue || "");
+        let output = "";
+        let inString = false;
+        let escaped = false;
+        for (let i = 0; i < raw.length; i++) {
+            const ch = raw[i];
+            if (inString) {
+                output += ch;
+                if (escaped) escaped = false;
+                else if (ch === "\\") escaped = true;
+                else if (ch === '"') inString = false;
+                continue;
+            }
+            if (ch === '"') {
+                inString = true;
+                output += ch;
+                continue;
+            }
+            if (ch === ",") {
+                let next = i + 1;
+                while (next < raw.length && /\s/.test(raw[next])) next++;
+                if (raw[next] === "}" || raw[next] === "]") continue;
+            }
+            output += ch;
+        }
+        return output;
+    }
+
+    function parseStructuredRevisionJSON(rawValue) {
+        const candidate = extractRevisionJSON(rawValue);
+        try {
+            return JSON.parse(candidate);
+        } catch (firstError) {
+            const recovered = removeJSONTrailingCommas(candidate);
+            if (recovered !== candidate) {
+                try {
+                    return JSON.parse(recovered);
+                } catch (_) {}
+            }
+            throw firstError;
+        }
+    }
+
     function parseResponse(value, originalValue) {
         const sourceText = String(originalValue || "");
         const maskState = pendingTarget && pendingTarget.lastMaskedChunk &&
             pendingTarget.lastMaskedChunk.source === sourceText
             ? pendingTarget.lastMaskedChunk
             : null;
-        let raw = String(value || "").trim();
-        raw = raw.replace(new RegExp("^" + String.fromCharCode(65279)), "");
-        const tick = String.fromCharCode(96);
-        raw = raw.replace(new RegExp("^" + tick + "{3}(?:json)?\\s*", "i"), "")
-            .replace(new RegExp("\\s*" + tick + "{3}$"), "");
-
-        const first = raw.indexOf("{");
-        const last = raw.lastIndexOf("}");
-        if (first >= 0 && last > first) raw = raw.slice(first, last + 1);
-
+        const raw = String(value || "");
         let parsed;
         try {
-            parsed = JSON.parse(raw);
-        } catch (_) {
-            throw new Error("تعذر التحقق من نتيجة المعالجة؛ لم تُطبق أي تغييرات في المستند.");
+            parsed = parseStructuredRevisionJSON(raw);
+        } catch (error) {
+            const diagnostic = String(error && error.message || "صيغة غير معروفة")
+                .replace(/[\r\n\t]+/g, " ")
+                .slice(0, 180);
+            const failure = new Error(
+                "تعذر قراءة استجابة المراجع اللغوي بصيغة منظمة. " +
+                "لم تُطبق أي تغييرات. التفاصيل: " + diagnostic
+            );
+            failure.code = "REVISION_INVALID_RESPONSE";
+            failure.shouldSplit = /الاستجابة مبتورة/.test(diagnostic);
+            failure.cause = error;
+            throw failure;
         }
 
         if (parsed && parsed.status === "clarify" && String(parsed.question || "").trim()) {
