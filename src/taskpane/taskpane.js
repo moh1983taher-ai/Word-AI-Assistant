@@ -44881,16 +44881,25 @@ async function sendMessage() {
         );
         const revisedChunks = [];
         const proofreadingEdits = [];
+        const proofreadingRejected = [];
         let sourceOffset = 0;
+        let requestOffset = 0;
         let revisionMode = "";
         let clarification = "";
 
-        async function processRevisionChunk(chunkText, depth, label) {
-            window.__documentRevisionRequest = window.DocumentRevision.buildRequest(text, chunkText);
+        async function processRevisionChunk(chunkText, depth, label, chunkOffset) {
+            const revisionRequest = window.DocumentRevision.buildRequest(text, chunkText, {
+                sourceOffset: chunkOffset
+            });
+            window.__documentRevisionRequest = revisionRequest;
             try {
                 const answer = await streamAI(text, function () {});
-                const parsed = window.DocumentRevision.parseResponse(answer, chunkText);
-                return [{ sourceText: chunkText, parsed: parsed }];
+                const parsed = window.DocumentRevision.parseResponse(
+                    answer,
+                    chunkText,
+                    revisionRequest.revision
+                );
+                return [{ sourceText: chunkText, parsed: parsed, label: label }];
             } catch (error) {
                 const canSplit = error && error.shouldSplit === true &&
                     depth < 6 && chunkText.length > 1200;
@@ -44905,18 +44914,23 @@ async function sendMessage() {
                     depth: depth,
                     previousLength: chunkText.length,
                     nextChunkCount: smallerChunks.length,
+                    sourceOffset: chunkOffset,
                     reason: String(error.message || error)
                 });
                 loading.textContent = "الاستجابة غير مكتملة؛ جارٍ تقسيم الجزء " + label + " وإعادة مراجعته بأجزاء أصغر...";
 
                 const results = [];
+                let nestedOffset = chunkOffset;
                 for (let subIndex = 0; subIndex < smallerChunks.length; subIndex++) {
+                    const nestedChunk = smallerChunks[subIndex];
                     const nested = await processRevisionChunk(
-                        smallerChunks[subIndex],
+                        nestedChunk,
                         depth + 1,
-                        label + "." + (subIndex + 1)
+                        label + "." + (subIndex + 1),
+                        nestedOffset
                     );
                     results.push.apply(results, nested);
+                    nestedOffset += nestedChunk.length;
                 }
                 return results;
             }
@@ -44927,7 +44941,14 @@ async function sendMessage() {
                 ? "جارٍ معالجة الجزء " + (index + 1) + " من " + chunks.length + "..."
                 : "جارٍ مراجعة النص...";
 
-            const chunkResults = await processRevisionChunk(chunks[index], 0, String(index + 1));
+            const currentChunk = chunks[index];
+            const chunkResults = await processRevisionChunk(
+                currentChunk,
+                0,
+                String(index + 1),
+                requestOffset
+            );
+            requestOffset += currentChunk.length;
             for (const chunkResult of chunkResults) {
                 const parsedRevision = chunkResult.parsed;
                 const sourceChunk = chunkResult.sourceText;
@@ -44935,6 +44956,15 @@ async function sendMessage() {
                 if (parsedRevision.status === "clarify") {
                     clarification = parsedRevision.question;
                     break;
+                }
+
+                if (Array.isArray(parsedRevision.rejected) && parsedRevision.rejected.length) {
+                    proofreadingRejected.push.apply(
+                        proofreadingRejected,
+                        parsedRevision.rejected.map(function (item) {
+                            return Object.assign({ batch: chunkResult.label || "" }, item);
+                        })
+                    );
                 }
 
                 revisedChunks.push(
@@ -44946,7 +44976,9 @@ async function sendMessage() {
                             start: sourceOffset + edit.start,
                             original: edit.original,
                             replacement: edit.replacement,
-                            reason: edit.reason
+                            reason: edit.reason,
+                            paragraphId: edit.paragraphId,
+                            paragraphIndex: edit.paragraphIndex
                         });
                     });
                 }
@@ -44973,7 +45005,11 @@ async function sendMessage() {
                                 "الصواب: «" + edit.replacement + "»\n" +
                                 "السبب: " + edit.reason;
                         }).join("\n\n") +
-                        "\n\nراجع المقترحات، ثم طبّقها على مواضعها في المستند.";
+                        "\n\nراجع المقترحات، ثم طبّقها على مواضعها في المستند." +
+                        (proofreadingRejected.length
+                            ? "\n\nلم يعتمد النظام " + proofreadingRejected.length +
+                                " تصحيحًا لعدم إمكان التحقق من موضعه بأمان. لم تُطبق هذه المقترحات."
+                            : "");
                 } else {
                     finalAnswer = revisedText;
                 }
@@ -44983,11 +45019,16 @@ async function sendMessage() {
                     originalText: documentRevisionCapture.originalText,
                     text: revisedText,
                     edits: proofreadingEdits,
+                    rejectedEdits: proofreadingRejected,
                     protectedParagraphCount: Number(documentRevisionCapture.protectedParagraphCount) || 0,
                     mode: revisionMode || "combined",
                     status: "ready",
                     applied: false
                 };
+            } else if (proofreadingRejected.length) {
+                finalAnswer = "اكتملت المراجعة، لكن تعذر اعتماد " + proofreadingRejected.length +
+                    " تصحيحًا لعدم كفاية بيانات موضعها. لم تُطبق أي تغييرات على هذه المواضع. " +
+                    "يمكن مراجعة تفاصيلها في سجل التشخيص.";
             } else {
                 finalAnswer = "راجعت النص، ولا توجد تغييرات تستلزم التطبيق.";
             }
