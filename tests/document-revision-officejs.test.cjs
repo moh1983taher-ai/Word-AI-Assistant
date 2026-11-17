@@ -374,14 +374,14 @@ global.Word = {
         mode: "rewrite",
         paragraphs: whitespaceRequest.revision.rewriteSegments.map(segment => ({
             segmentId: segment.segmentId,
-            text: "كلمة\\tكلمة"
+            text: "كلمة\tكلمة"
         }))
     }), whitespaceCapture.originalText, whitespaceRequest.revision);
     const whitespaceResult = await revision.apply(Object.assign(
         {}, whitespaceCapture, whitespaceParsed
     ));
     assert.equal(whitespaceResult.applied, true);
-    assert.equal(documentText, "كلمة\\tكلمة");
+    assert.equal(documentText, "كلمة\tكلمة");
 
     // Multi-paragraph rewrites can produce changed spans beyond Word's
     // direct-search limit. They must be applied through verified paragraph
@@ -393,7 +393,7 @@ global.Word = {
     const longOriginalTwo = makeLongToken(500);
     const longRevisedOne = makeLongToken(900);
     const longRevisedTwo = makeLongToken(1300);
-    documentText = longOriginalOne + "\\r\\n" + longOriginalTwo;
+    documentText = longOriginalOne + "\r\n" + longOriginalTwo;
     selectionText = "";
     const longRewriteCapture = await revision.capture({ scope: "document" });
     const longRewriteRequest = revision.buildRequest(
@@ -418,7 +418,7 @@ global.Word = {
         {}, longRewriteCapture, longRewriteParsed
     ));
     assert.equal(longRewriteResult.applied, true);
-    assert.equal(documentText, longRevisedOne + "\\r\\n" + longRevisedTwo);
+    assert.equal(documentText, longRevisedOne + "\r\n" + longRevisedTwo);
 
     // Restore the base fixture for the existing document-correction tests.
     documentText = "هذا خطأ واضح";
