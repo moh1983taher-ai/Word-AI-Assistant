@@ -317,5 +317,5 @@ assert.throws(
     () => revision.parseResponse('{"status":"ready","mode":"rewrite","text":"استجابة مبتورة'),
     /تفاصيل: الاستجابة مبتورة/
 );
-assert.throws(() => revision.parseResponse("not json"), /تعذر التحقق/);
+assert.throws(() => revision.parseResponse("not json"), /تعذر قراءة استجابة/);
 console.log("Document revision tests passed.");
