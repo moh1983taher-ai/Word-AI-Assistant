@@ -319,7 +319,7 @@ assert.throws(() => revision.parseResponse(JSON.stringify({
         contextAfter: "",
         reason: "تصحيح"
     }]
-}), repeatedSource), /بصورة فريدة/);
+}), repeatedSource), /وردت 2 مرات، ولم يكفِ السياق المحيط/);
 
 assert.throws(() => revision.parseResponse(JSON.stringify({
     status: "ready",
