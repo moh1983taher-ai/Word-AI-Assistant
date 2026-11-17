@@ -261,6 +261,19 @@
             })
             : requestText;
 
+        const revisionMetadata = {
+            structuredCorrection: structuredCorrection,
+            targetType: pendingTarget ? pendingTarget.targetType : "unknown",
+            sourceOffset: chunkOffset,
+            paragraphBaseIndex: paragraphBaseIndex,
+            chunkLength: sourceText.length,
+            userInstruction: String(userInstruction || ""),
+            paragraphRecords: paragraphRecords
+        };
+        if (pendingTarget) {
+            pendingTarget.lastRevisionMetadata = revisionMetadata;
+        }
+
         return {
             systemPrompt: [
                 "أنت محرر لغوي وأكاديمي متخصص في تحرير النصوص العربية والبحوث العلمية.",
@@ -294,14 +307,7 @@
                     ? "نفذ التصحيح اللغوي على الفقرات المسجلة في JSON. أخرج edits فقط، ويجب أن يحمل كل عنصر paragraphId صحيحًا من المدخلات. اجعل السياق من الفقرة نفسها."
                     : "نفذ طلب الباحث على النص المحصور بين العلامتين. في التصحيح اللغوي أخرج قائمة edits فقط، وفي إعادة الصياغة أو الجمع أخرج النص الكامل. حافظ على علامات الحماية كما هي تمامًا."
             ].join("\n"),
-            revision: {
-                structuredCorrection: structuredCorrection,
-                targetType: pendingTarget ? pendingTarget.targetType : "unknown",
-                sourceOffset: chunkOffset,
-                paragraphBaseIndex: paragraphBaseIndex,
-                chunkLength: sourceText.length,
-                paragraphRecords: paragraphRecords
-            }
+            revision: revisionMetadata
         };
     }
 
@@ -558,6 +564,10 @@
             throw new Error("نتيجة المعالجة غير مكتملة أو غير صالحة؛ لم يُمس المستند.");
         }
 
+        const activeRequestMetadata = requestMetadata ||
+            (pendingTarget && pendingTarget.lastRevisionMetadata) ||
+            null;
+
         if (mode === "correction") {
             if (!Array.isArray(parsed.edits)) {
                 throw new Error("لم تُرجع المراجعة قائمة تصحيحات موضعية صالحة.");
@@ -566,24 +576,28 @@
             const matchingSource = maskState ? maskState.text : source;
 
             const documentTarget = Boolean(pendingTarget && pendingTarget.targetType === "document");
-            const useParagraphScopedParsing = documentTarget ||
-                Boolean(requestMetadata && requestMetadata.structuredCorrection === true);
+            if (documentTarget && !activeRequestMetadata) {
+                throw new Error(
+                    "بيانات دفعة المستند غير متاحة لتحديد الفقرات؛ أُوقف التصحيح بدل البحث العام عن عبارات قد تتكرر."
+                );
+            }
+            const useParagraphScopedParsing = Boolean(
+                activeRequestMetadata && activeRequestMetadata.structuredCorrection === true
+            );
             if (useParagraphScopedParsing) {
-                const fallbackOffset = requestMetadata && Number.isFinite(Number(requestMetadata.sourceOffset))
-                    ? Number(requestMetadata.sourceOffset)
+                const fallbackOffset = Number.isFinite(Number(activeRequestMetadata.sourceOffset))
+                    ? Number(activeRequestMetadata.sourceOffset)
                     : (pendingTarget
                         ? Math.max(0, (Number(pendingTarget.requestCursor) || source.length) - source.length)
                         : 0);
-                const fallbackParagraphBase = requestMetadata &&
-                    Number.isInteger(Number(requestMetadata.paragraphBaseIndex))
-                    ? Number(requestMetadata.paragraphBaseIndex)
+                const fallbackParagraphBase = Number.isInteger(Number(activeRequestMetadata.paragraphBaseIndex))
+                    ? Number(activeRequestMetadata.paragraphBaseIndex)
                     : (pendingTarget && pendingTarget.originalText
                         ? countParagraphsBefore(pendingTarget.originalText, fallbackOffset)
                         : 0);
-                const paragraphRecords = requestMetadata &&
-                    Array.isArray(requestMetadata.paragraphRecords) &&
-                    requestMetadata.paragraphRecords.length
-                    ? requestMetadata.paragraphRecords
+                const paragraphRecords = Array.isArray(activeRequestMetadata.paragraphRecords) &&
+                    activeRequestMetadata.paragraphRecords.length
+                    ? activeRequestMetadata.paragraphRecords
                     : buildParagraphRecords(matchingSource, fallbackParagraphBase);
                 const structuredResult = parseParagraphScopedEdits(
                     parsed.edits,
@@ -591,7 +605,10 @@
                     maskState,
                     paragraphRecords
                 );
-                if (pendingTarget) pendingTarget.lastMaskedChunk = null;
+                if (pendingTarget) {
+                    pendingTarget.lastMaskedChunk = null;
+                    pendingTarget.lastRevisionMetadata = null;
+                }
                 return structuredResult;
             }
 
@@ -670,7 +687,10 @@
                 revised = revised.slice(0, edit.start) + edit.replacement +
                     revised.slice(edit.start + edit.original.length);
             });
-            if (pendingTarget) pendingTarget.lastMaskedChunk = null;
+            if (pendingTarget) {
+                pendingTarget.lastMaskedChunk = null;
+                pendingTarget.lastRevisionMetadata = null;
+            }
             return { status: "ready", mode: mode, text: revised, edits: edits };
         }
 
