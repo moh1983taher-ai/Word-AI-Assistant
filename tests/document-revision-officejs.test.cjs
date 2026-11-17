@@ -295,7 +295,7 @@ global.Word = {
                 reason: "تصويب إملائي"
             }
         ]
-    }), multiParagraphCapture.originalText, multiParagraphRequest.revision);
+    }), multiParagraphCapture.originalText);
 
     assert.equal(multiParagraphParsed.edits.length, 2);
     assert.equal(multiParagraphParsed.rejected.length, 0);
