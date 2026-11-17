@@ -55,6 +55,45 @@ function makeParagraphCollection(textGetter, baseOffsetGetter, context) {
     };
 }
 
+function makeRangeSegment(startOffset, endOffset, context) {
+    let textLoaded = false;
+    return {
+        context: context,
+        startOffset: startOffset,
+        endOffset: endOffset,
+        load(property) {
+            assert.equal(property, "text");
+            textLoaded = true;
+        },
+        get text() {
+            assert.equal(textLoaded, true, "range text must be loaded before access");
+            return String(documentText).slice(startOffset, endOffset);
+        },
+        getRange(location) {
+            const point = location === "End" ? endOffset : startOffset;
+            return makeRangeSegment(point, point, context);
+        },
+        expandTo(other) {
+            return makeRangeSegment(
+                Math.min(startOffset, other.startOffset),
+                Math.max(endOffset, other.endOffset),
+                context
+            );
+        },
+        insertText(value) {
+            const insertedText = String(value || "");
+            const current = String(documentText);
+            documentText = current.slice(0, startOffset) + insertedText +
+                current.slice(endOffset);
+            return {
+                load() {},
+                get text() { return insertedText; },
+                font: {}
+            };
+        }
+    };
+}
+
 function makeRange(textGetter, absoluteStartGetter) {
     return {
         context: null,
@@ -71,29 +110,18 @@ function makeRange(textGetter, absoluteStartGetter) {
             const absolutePosition = location === "End"
                 ? baseOffset + rangeText.length
                 : baseOffset;
-            return {
-                context: this.context,
-                insertText(value) {
-                    const insertedText = String(value || "");
-                    const current = String(documentText);
-                    documentText = current.slice(0, absolutePosition) + insertedText +
-                        current.slice(absolutePosition);
-                    return {
-                        load() {},
-                        get text() { return insertedText; },
-                        font: {}
-                    };
-                }
-            };
+            return makeRangeSegment(absolutePosition, absolutePosition, this.context);
         },
         search(query) {
             const source = String(textGetter());
             const baseOffset = Number(absoluteStartGetter ? absoluteStartGetter() : 0);
             const matches = [];
             let cursor = 0;
-            while ((cursor = source.indexOf(query, cursor)) !== -1) {
-                matches.push(makeMatch(query, baseOffset + cursor));
-                cursor += query.length;
+            if (String(query).trim() && String(query).length <= 255) {
+                while ((cursor = source.indexOf(query, cursor)) !== -1) {
+                    matches.push(makeMatch(query, baseOffset + cursor, this.context));
+                    cursor += query.length;
+                }
             }
             let itemsLoaded = false;
             return {
@@ -115,10 +143,11 @@ function makeRange(textGetter, absoluteStartGetter) {
     };
 }
 
-function makeMatch(initialText, absoluteStart) {
+function makeMatch(initialText, absoluteStart, context) {
     let text = initialText;
     let textLoaded = false;
     return {
+        context: context,
         load(property) {
             assert.equal(property, "text");
             textLoaded = true;
@@ -127,6 +156,10 @@ function makeMatch(initialText, absoluteStart) {
         get text() {
             assert.equal(textLoaded, true, "must load each match's text before reading it");
             return text;
+        },
+        getRange(location) {
+            const point = location === "End" ? absoluteStart + text.length : absoluteStart;
+            return makeRangeSegment(point, point, context);
         },
         insertText(replacement, location) {
             const current = String(documentText);
@@ -325,6 +358,67 @@ global.Word = {
         documentText,
         "تحتاج الفقرة الأولى إلى تحرير أدق.\r\nتحتاج الفقرة الثانية إلى مزيد من البيان."
     );
+
+    // A whitespace-only diff operation is not reliably returned by Word.search.
+    // The contextual fallback must resolve it between the adjacent word ranges.
+    documentText = "كلمة كلمة";
+    selectionText = "";
+    const whitespaceCapture = await revision.capture({ scope: "document" });
+    const whitespaceRequest = revision.buildRequest(
+        "أعد صياغة المستند بأسلوب أكاديمي",
+        whitespaceCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    const whitespaceParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "rewrite",
+        paragraphs: whitespaceRequest.revision.rewriteSegments.map(segment => ({
+            segmentId: segment.segmentId,
+            text: "كلمة\\tكلمة"
+        }))
+    }), whitespaceCapture.originalText, whitespaceRequest.revision);
+    const whitespaceResult = await revision.apply(Object.assign(
+        {}, whitespaceCapture, whitespaceParsed
+    ));
+    assert.equal(whitespaceResult.applied, true);
+    assert.equal(documentText, "كلمة\\tكلمة");
+
+    // Multi-paragraph rewrites can produce changed spans beyond Word's
+    // direct-search limit. They must be applied through verified paragraph
+    // boundaries without searching for the entire long phrase.
+    const makeLongToken = seed => Array.from({ length: 320 }, (_, index) =>
+        (index + seed).toString(36).padStart(3, "0")
+    ).join("");
+    const longOriginalOne = makeLongToken(1);
+    const longOriginalTwo = makeLongToken(500);
+    const longRevisedOne = makeLongToken(900);
+    const longRevisedTwo = makeLongToken(1300);
+    documentText = longOriginalOne + "\\r\\n" + longOriginalTwo;
+    selectionText = "";
+    const longRewriteCapture = await revision.capture({ scope: "document" });
+    const longRewriteRequest = revision.buildRequest(
+        "أعد صياغة المستند كاملًا بأسلوب أكاديمي",
+        longRewriteCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    const longRewriteParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "rewrite",
+        paragraphs: longRewriteRequest.revision.rewriteSegments.map((segment, index) => ({
+            segmentId: segment.segmentId,
+            text: index === 0 ? longRevisedOne : longRevisedTwo
+        }))
+    }), longRewriteCapture.originalText, longRewriteRequest.revision);
+    assert.ok(
+        revision.diffTextPreservingParagraphs(longRewriteCapture.originalText, longRewriteParsed.text)
+            .some(operation => operation.length > 255),
+        "the regression fixture must include a long Word search span"
+    );
+    const longRewriteResult = await revision.apply(Object.assign(
+        {}, longRewriteCapture, longRewriteParsed
+    ));
+    assert.equal(longRewriteResult.applied, true);
+    assert.equal(documentText, longRevisedOne + "\\r\\n" + longRevisedTwo);
 
     // Restore the base fixture for the existing document-correction tests.
     documentText = "هذا خطأ واضح";
