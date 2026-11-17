@@ -45007,8 +45007,13 @@ async function sendMessage() {
                         }).join("\n\n") +
                         "\n\nراجع المقترحات، ثم طبّقها على مواضعها في المستند." +
                         (proofreadingRejected.length
-                            ? "\n\nلم يعتمد النظام " + proofreadingRejected.length +
-                                " تصحيحًا لعدم إمكان التحقق من موضعه بأمان. لم تُطبق هذه المقترحات."
+                            ? "\n\nعُزل " + proofreadingRejected.length +
+                                " تصحيحًا لعدم إمكان التحقق من موضعه بأمان.\n" +
+                                proofreadingRejected.slice(0, 3).map(function (item) {
+                                    return "• «" + (item.original || "عبارة غير محددة") + "»: " +
+                                        (item.rejectionReason || "تعذر التحقق من الموضع");
+                                }).join("\n") +
+                                (proofreadingRejected.length > 3 ? "\nوتوجد حالات أخرى لم تُعرض." : "")
                             : "");
                 } else {
                     finalAnswer = revisedText;
@@ -45027,8 +45032,12 @@ async function sendMessage() {
                 };
             } else if (proofreadingRejected.length) {
                 finalAnswer = "اكتملت المراجعة، لكن تعذر اعتماد " + proofreadingRejected.length +
-                    " تصحيحًا لعدم كفاية بيانات موضعها. لم تُطبق أي تغييرات على هذه المواضع. " +
-                    "يمكن مراجعة تفاصيلها في سجل التشخيص.";
+                    " تصحيحًا لعدم كفاية بيانات موضعها. لم تُطبق أي تغييرات على هذه المواضع.\n" +
+                    proofreadingRejected.slice(0, 5).map(function (item) {
+                        return "• «" + (item.original || "عبارة غير محددة") + "»: " +
+                            (item.rejectionReason || "تعذر التحقق من الموضع");
+                    }).join("\n") +
+                    (proofreadingRejected.length > 5 ? "\nوتوجد حالات أخرى لم تُعرض." : "");
             } else {
                 finalAnswer = "راجعت النص، ولا توجد تغييرات تستلزم التطبيق.";
             }

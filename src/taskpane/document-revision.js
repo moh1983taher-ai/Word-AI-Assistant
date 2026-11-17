@@ -15,8 +15,8 @@
 
     function isCorrectionOnlyRequest(value) {
         const instruction = String(value || "").trim();
-        const correction = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|المراجعة\\s+اللغوية|التصحيح\\s+اللغوي|راجع\\s+لغوي)/i.test(instruction);
-        const rewrite = /(?:أعد\\s*صياغ|إعادة\\s*صياغ|صياغة|حسّن|حسن\\s+(?:الأسلوب|الصياغة)|تحسين\\s+(?:الصياغة|الأسلوب)|اجعل\\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
+        const correction = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|المراجعة\s+اللغوية|التصحيح\s+اللغوي|راجع\s+لغوي)/i.test(instruction);
+        const rewrite = /(?:أعد\s*صياغ|إعادة\s*صياغ|صياغة|حسّن|حسن\s+(?:الأسلوب|الصياغة)|تحسين\s+(?:الصياغة|الأسلوب)|اجعل\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
         return correction && !rewrite;
     }
 
@@ -28,7 +28,7 @@
 
         while (cursor < source.length) {
             let end = cursor;
-            while (end < source.length && source[end] !== "\\r" && source[end] !== "\\n") end++;
+            while (end < source.length && source[end] !== "\r" && source[end] !== "\n") end++;
 
             const text = source.slice(cursor, end);
             if (text.length) {
@@ -38,12 +38,12 @@
                     start: cursor,
                     end: end,
                     text: text,
-                    locked: /\\[\\[WB_KEEP_[^\\]]+\\]\\]/.test(text)
+                    locked: /\[\[WB_KEEP_[^\]]+\]\]/.test(text)
                 });
             }
 
             if (end >= source.length) break;
-            const separatorLength = source[end] === "\\r" && source[end + 1] === "\\n" ? 2 : 1;
+            const separatorLength = source[end] === "\r" && source[end + 1] === "\n" ? 2 : 1;
             cursor = end + separatorLength;
             paragraphIndex++;
         }
@@ -91,7 +91,7 @@
                 reject(item, "protected_paragraph", "الفقرة محمية بسبب تغييرات متعقبة سابقة.");
                 return;
             }
-            if (!original || !reason || /[\\r\\n]/.test(original + replacement)) {
+            if (!original || !reason || /[\r\n]/.test(original + replacement)) {
                 reject(item, "invalid_edit", "بيانات التصحيح ناقصة أو تمتد عبر فاصل فقرة.");
                 return;
             }
@@ -1216,7 +1216,7 @@
             for (let index = 0; index < directEdits.length; index++) {
                 const edit = directEdits[index];
                 if (!Number.isInteger(edit.start) || edit.start < 0 ||
-                    !edit.original || /[\\r\\n]/.test(edit.original + edit.replacement) ||
+                    !edit.original || /[\r\n]/.test(edit.original + edit.replacement) ||
                     originalText.slice(edit.start, edit.start + edit.original.length) !== edit.original) {
                     throw new Error("تغير موضع أحد التصحيحات المعتمدة أو لم يعد يطابق النص الأصلي؛ أُلغي التطبيق حمايةً للمستند.");
                 }
