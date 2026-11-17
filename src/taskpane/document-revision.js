@@ -67,11 +67,11 @@
     // Extract one complete JSON object from a model response without
     // truncating nested objects or braces embedded in quoted strings.
     function extractRevisionJSON(rawValue) {
-        let raw = String(rawValue || "").replace(/^\\uFEFF/, "").trim();
+        let raw = String(rawValue || "").replace(/^\uFEFF/, "").trim();
         if (!raw) throw new Error("الاستجابة فارغة");
 
-        raw = raw.replace(/^\\x60{3}(?:json)?\\s*/i, "")
-            .replace(/\\s*\\x60{3}\\s*$/i, "")
+        raw = raw.replace(/^\x60{3}(?:json)?\s*/i, "")
+            .replace(/\s*\x60{3}\s*$/i, "")
             .trim();
 
         const start = raw.indexOf("{");
@@ -85,7 +85,7 @@
             const ch = raw[i];
             if (inString) {
                 if (escaped) escaped = false;
-                else if (ch === "\\\\") escaped = true;
+                else if (ch === "\\") escaped = true;
                 else if (ch === '"') inString = false;
                 continue;
             }
@@ -118,7 +118,7 @@
             if (inString) {
                 output += ch;
                 if (escaped) escaped = false;
-                else if (ch === "\\\\") escaped = true;
+                else if (ch === "\\") escaped = true;
                 else if (ch === '"') inString = false;
                 continue;
             }
@@ -129,7 +129,7 @@
             }
             if (ch === ",") {
                 let next = i + 1;
-                while (next < raw.length && /\\s/.test(raw[next])) next++;
+                while (next < raw.length && /\s/.test(raw[next])) next++;
                 if (raw[next] === "}" || raw[next] === "]") continue;
             }
             output += ch;
