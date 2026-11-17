@@ -757,7 +757,7 @@
             : [];
         if (paragraphMarkers.length) {
             text = normalizeBatchLineBreaks(sourceText, text, paragraphMarkers);
-        } else if (!/[\\r\\n]/.test(sourceText)) {
+        } else if (!/[\r\n]/.test(sourceText)) {
             text = normalizeChunkLineBreaks(sourceText, text);
         } else if (hasSameLineBreakCount(sourceText, text)) {
             text = normalizeLineBreaks(sourceText, text);
@@ -786,12 +786,9 @@
         });
     }
 
-    // Normalize a single paragraph's model output and restore its original edge separators.
-    // Each model request handles one paragraph. Restore source separators and
-    // flatten any line breaks introduced inside the revised paragraph.
-    // Batched requests may contain several original paragraphs.
-    // Unlike normalizeChunkLineBreaks (single-paragraph mode), preserve every
-    // internal line break and restore the exact original separator sequence.
+    // Restore the exact source paragraph separators after rewriting. Multi-paragraph
+    // requests use explicit boundary markers; line wraps generated inside a paragraph
+    // are flattened so they cannot create or delete Word paragraphs.
     function normalizeBatchLineBreaks(originalValue, revisedValue, paragraphMarkers) {
         const original = String(originalValue || "");
         const revised = String(revisedValue || "");
