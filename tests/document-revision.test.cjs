@@ -519,4 +519,8 @@ assert.equal(scopedBoundaryRecords[0].paragraphId, "p0001");
 assert.equal(scopedBoundaryRecords[1].paragraphId, "p0003");
 assert.equal(scopedBoundaryRecords[1].start, "أولى\r\n\r\n".length);
 assert.equal(revision.isCorrectionOnlyRequest("صحح المستند لغويًا ونحويًا فقط"), true);
+assert.equal(revision.isCorrectionOnlyRequest("صحح المستند لغويًا دون إعادة صياغة"), true);
+assert.equal(revision.isCorrectionOnlyRequest("صحح المستند ولا تعِد صياغته"), true);
+assert.equal(revision.isCorrectionOnlyRequest("راجع المستند لغويًا"), true);
 assert.equal(revision.isCorrectionOnlyRequest("أعد صياغة المستند بأسلوب أكاديمي"), false);
+assert.equal(revision.isCorrectionOnlyRequest("صحح المستند وأعد صياغة بعض الجمل"), false);

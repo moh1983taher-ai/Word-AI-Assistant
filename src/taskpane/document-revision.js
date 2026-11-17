@@ -15,8 +15,9 @@
 
     function isCorrectionOnlyRequest(value) {
         const instruction = String(value || "").trim();
-        const correction = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|المراجعة\s+اللغوية|التصحيح\s+اللغوي|راجع\s+لغوي)/i.test(instruction);
-        const rewrite = /(?:أعد\s*صياغ|إعادة\s*صياغ|صياغة|حسّن|حسن\s+(?:الأسلوب|الصياغة)|تحسين\s+(?:الصياغة|الأسلوب)|اجعل\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
+        const correction = /(?:صحح|تصحيح|دقق|تدقيق|نقح|تنقيح|التصحيح\s+اللغوي|المراجعة\s+اللغوية|التدقيق\s+اللغوي|مراجعة\s+لغوية|راجع\s+(?:لغوي|(?:المستند|النص|الفقرة)\s+لغوي))/i.test(instruction);
+        const negatedRewrite = /(?:لا\s*(?:تعد|تعيد|تعِد|تقوم\s+بإعادة)|(?:دون|بدون|من\s+غير)\s*(?:أن\s*)?(?:تعيد\s*)?(?:إعادة\s*)?صياغ|لا\s+(?:أريد|أرغب)\s+(?:في\s+)?إعادة\s*صياغ)/i.test(instruction);
+        const rewrite = !negatedRewrite && /(?:أعد\s*صياغ|إعادة\s*صياغ|إعادة\s+كتابة|حسّن|حسن\s+(?:الأسلوب|الصياغة)|تحسين\s+(?:الصياغة|الأسلوب)|اجعل\s+(?:النص|الفقرة|العبارة).{0,45}(?:أوضح|أكثر|أكاديمية|رصانة|سلاسة))/i.test(instruction);
         return correction && !rewrite;
     }
 
@@ -51,7 +52,7 @@
         return records;
     }
 
-    function parseParagraphScopedEdits(items, source, matchingSource, maskState, paragraphRecords) {
+    function parseParagraphScopedEdits(items, source, maskState, paragraphRecords) {
         const records = Array.isArray(paragraphRecords) ? paragraphRecords : [];
         const byId = new Map(records.map(function (record) {
             return [String(record.paragraphId), record];
@@ -537,7 +538,6 @@
                 const structuredResult = parseParagraphScopedEdits(
                     parsed.edits,
                     source,
-                    matchingSource,
                     maskState,
                     requestMetadata.paragraphRecords
                 );
