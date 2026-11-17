@@ -1582,10 +1582,14 @@
 
                 const beforeSpec = addAnchor(before, "end");
                 const afterSpec = addAnchor(after, "start");
-                const firstInsideSpec = !before && firstInside
+                const needsFirstInside = !before &&
+                    !(expectedStart === 0 && lineStart === 0);
+                const needsLastInside = !after &&
+                    !(expectedEnd === lineEnd && lineEnd === source.length);
+                const firstInsideSpec = needsFirstInside && firstInside
                     ? addAnchor(firstInside, "start")
                     : null;
-                const lastInsideSpec = !after && lastInside
+                const lastInsideSpec = needsLastInside && lastInside
                     ? addAnchor(lastInside, "end")
                     : null;
 
