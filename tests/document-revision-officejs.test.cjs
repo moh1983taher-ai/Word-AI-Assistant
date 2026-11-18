@@ -8,6 +8,9 @@ let selectionText = documentText;
 let collectionLoads = 0;
 let itemLoads = 0;
 let searchQueries = [];
+let footnoteText = "حاشية قديمة فيها خطا.";
+let endnoteText = "";
+
 
 function makeParagraphCollection(textGetter, baseOffsetGetter, context) {
     const source = String(textGetter());
@@ -193,14 +196,123 @@ function makeMatch(initialText, absoluteStart, context) {
     };
 }
 
+function makeNoteRange(textGetter, textSetter, context) {
+    const range = makeRange(textGetter, () => 0);
+    range.context = context;
+    range.getOoxml = () => ({ value: "<w:p><w:r><w:t>" + String(textGetter()) + "</w:t></w:r></w:p>" });
+    range.search = function (query) {
+        searchQueries.push(String(query));
+        const source = String(textGetter());
+        const matches = [];
+        let cursor = 0;
+        if (String(query).trim() && String(query).length <= 255 &&
+            !String(query).includes("\u0002") &&
+            !/^[\s\p{P}\p{S}]+$/u.test(String(query))) {
+            while ((cursor = source.indexOf(query, cursor)) !== -1) {
+                const matchStart = cursor;
+                let textLoaded = false;
+                matches.push({
+                    context: context,
+                    load(property) {
+                        assert.equal(property, "text");
+                        textLoaded = true;
+                        itemLoads++;
+                    },
+                    get text() {
+                        assert.equal(textLoaded, true);
+                        return query;
+                    },
+                    insertText(replacement) {
+                        const current = String(textGetter());
+                        if (current.slice(matchStart, matchStart + query.length) !== query) {
+                            throw new Error("note range no longer matches its source text");
+                        }
+                        const insertedText = String(replacement || "");
+                        textSetter(
+                            current.slice(0, matchStart) + insertedText +
+                            current.slice(matchStart + query.length)
+                        );
+                        return {
+                            load() {},
+                            get text() { return insertedText; },
+                            font: {}
+                        };
+                    }
+                });
+                cursor += query.length;
+            }
+        }
+        let itemsLoaded = false;
+        return {
+            context: context,
+            load(property) {
+                assert.equal(property, "items");
+                itemsLoaded = true;
+                collectionLoads++;
+            },
+            get items() {
+                assert.equal(itemsLoaded, true);
+                return matches;
+            }
+        };
+    };
+    return range;
+}
+
+function makeNoteCollection(context, type) {
+    const isFootnote = type === "footnote";
+    const noteRange = makeNoteRange(
+        () => isFootnote ? footnoteText : endnoteText,
+        value => { if (isFootnote) footnoteText = value; else endnoteText = value; },
+        context
+    );
+    const noteItem = {
+        context: context,
+        type: isFootnote ? "Footnote" : "Endnote",
+        body: {
+            getRange() { return noteRange; }
+        },
+        reference: {
+            context: context,
+            load(property) { assert.equal(property, "text"); },
+            text: isFootnote ? "1" : "1"
+        },
+        track() {},
+        untrack() {}
+    };
+    let itemsLoaded = false;
+    return {
+        context: context,
+        track() {},
+        untrack() {},
+        load(property) {
+            assert.equal(property, "items");
+            itemsLoaded = true;
+        },
+        get items() {
+            assert.equal(itemsLoaded, true, "note items must be loaded before access");
+            return isFootnote && footnoteText.trim() ? [noteItem] : [];
+        }
+    };
+}
+
 const selectedRange = makeRange(() => selectionText, () => 0);
 const bodyRange = makeRange(() => documentText, () => 0);
+Object.defineProperties(bodyRange, {
+    footnotes: { get() { return makeNoteCollection(this.context, "footnote"); } },
+    endnotes: { get() { return makeNoteCollection(this.context, "endnote"); } }
+});
+Object.defineProperties(selectedRange, {
+    footnotes: { get() { return makeNoteCollection(this.context, "footnote"); } },
+    endnotes: { get() { return makeNoteCollection(this.context, "endnote"); } }
+});
 
 global.Office = {
     context: {
         requirements: {
             isSetSupported(name, version) {
-                return name === "WordApi" && version === "1.3";
+                return name === "WordApi" &&
+                    ["1.3", "1.5"].includes(version);
             }
         }
     }
@@ -688,7 +800,79 @@ global.Word = {
     );
     assert.equal(documentText, beforeUnsafeApply, "invalid direct edits must not mutate the Word document");
 
-    process.stdout.write("document-revision-officejs: collection loading, selection, paragraph targeting, and direct-edit integrity tests passed\n");
+    // Whole-document revision now captures footnotes/endnotes as independent
+    // targets. A note correction is applied to its own Word story while the
+    // main document text and the reference itself remain unchanged.
+    documentText = "نص المتن يبقى كما هو.";
+    selectionText = "";
+    footnoteText = "حاشية قديمة فيها خطا.";
+    endnoteText = "";
+    const noteWorkspaceCapture = await revision.capture({ scope: "document" });
+    assert.equal(noteWorkspaceCapture.notesSupported, true);
+    assert.equal(noteWorkspaceCapture.notes.length, 1);
+    assert.equal(noteWorkspaceCapture.notes[0].kind, "footnote");
+    assert.equal(noteWorkspaceCapture.notes[0].label, "حاشية سفلية 1");
+    assert.equal(noteWorkspaceCapture.notes[0].originalText, footnoteText);
+
+    const capturedNote = noteWorkspaceCapture.notes[0];
+    const noteRequest = revision.buildRequest(
+        "صحح المستند لغويًا ونحويًا فقط",
+        capturedNote.originalText,
+        {
+            sourceOffset: 0,
+            paragraphBaseIndex: 0,
+            targetPartId: capturedNote.id
+        }
+    );
+    assert.equal(noteRequest.revision.targetType, "note");
+    assert.equal(noteRequest.revision.targetPartId, capturedNote.id);
+    assert.equal(noteRequest.revision.structuredCorrection, true);
+    const noteParagraphId = noteRequest.revision.paragraphRecords[0].paragraphId;
+    const noteParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "correction",
+        edits: [{
+            paragraphId: noteParagraphId,
+            original: "خطا",
+            replacement: "خطأ",
+            contextBefore: "حاشية قديمة فيها ",
+            contextAfter: ".",
+            reason: "تصويب إملائي"
+        }]
+    }), capturedNote.originalText, noteRequest.revision);
+
+    const workspaceRevision = {
+        id: noteWorkspaceCapture.id,
+        targetType: "document",
+        originalText: noteWorkspaceCapture.originalText,
+        text: noteWorkspaceCapture.originalText,
+        mode: "correction",
+        edits: [],
+        status: "ready",
+        notes: [{
+            id: capturedNote.id,
+            targetPartId: capturedNote.id,
+            targetType: "note",
+            kind: capturedNote.kind,
+            index: capturedNote.index,
+            label: capturedNote.label,
+            originalText: capturedNote.originalText,
+            text: noteParsed.text,
+            mode: noteParsed.mode,
+            edits: noteParsed.edits,
+            rejectedEdits: noteParsed.rejected,
+            protected: false
+        }]
+    };
+    const workspaceApplied = await revision.applyWorkspace(workspaceRevision);
+    assert.equal(workspaceApplied.applied, true);
+    assert.equal(workspaceApplied.noteCount, 1);
+    assert.equal(documentText, "نص المتن يبقى كما هو.");
+    assert.equal(footnoteText, "حاشية قديمة فيها خطأ.");
+    assert.equal(endnoteText, "");
+    assert.equal(searchQueries.some(query => query.includes("\u0002")), false);
+
+    process.stdout.write("document-revision-officejs: collection loading, selection, paragraph targeting, note capture, and grouped note application tests passed\n");
 })().catch(error => {
     process.stderr.write(String(error && error.stack || error) + "\n");
     process.exitCode = 1;
