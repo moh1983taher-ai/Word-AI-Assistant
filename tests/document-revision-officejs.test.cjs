@@ -119,7 +119,7 @@ function makeRange(textGetter, absoluteStartGetter) {
             let cursor = 0;
             if (String(query).trim() &&
                 String(query).length <= 255 &&
-                !/^[\\s\\p{P}\\p{S}]+$/u.test(String(query))) {
+                !/^[\s\p{P}\p{S}]+$/u.test(String(query))) {
                 while ((cursor = source.indexOf(query, cursor)) !== -1) {
                     matches.push(makeMatch(query, baseOffset + cursor, this.context));
                     cursor += query.length;
