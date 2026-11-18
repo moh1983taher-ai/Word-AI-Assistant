@@ -228,6 +228,11 @@ function makeNoteRange(textGetter, textSetter, context) {
                             throw new Error("note range no longer matches its source text");
                         }
                         const insertedText = String(replacement || "");
+                        assert.equal(
+                            documentTrackingMode,
+                            "TrackAll",
+                            "footnote replacements must be recorded as Word tracked changes"
+                        );
                         textSetter(
                             current.slice(0, matchStart) + insertedText +
                             current.slice(matchStart + query.length)
@@ -313,7 +318,7 @@ global.Office = {
         requirements: {
             isSetSupported(name, version) {
                 return name === "WordApi" &&
-                    ["1.3", "1.5"].includes(version);
+                    ["1.3", "1.4", "1.5"].includes(version);
             }
         }
     }
@@ -326,6 +331,15 @@ global.Word = {
             const context = {
                 id: ++requestContextCount,
                 document: {
+                    load(property) {
+                        assert.equal(property, "changeTrackingMode");
+                    },
+                    get changeTrackingMode() {
+                        return documentTrackingMode;
+                    },
+                    set changeTrackingMode(value) {
+                        documentTrackingMode = String(value);
+                    },
                     getSelection() {
                         selectedRange.context = context;
                         return selectedRange;
@@ -870,6 +884,7 @@ global.Word = {
     assert.equal(workspaceApplied.noteCount, 1);
     assert.equal(documentText, "نص المتن يبقى كما هو.");
     assert.equal(footnoteText, "حاشية قديمة فيها خطأ.");
+    assert.equal(documentTrackingMode, "Off", "the user's original change-tracking mode must be restored after applying notes");
     assert.equal(endnoteText, "");
     assert.equal(searchQueries.some(query => query.includes("\u0002")), false);
 
