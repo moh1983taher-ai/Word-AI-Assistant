@@ -22040,17 +22040,41 @@ function renderChat() {
                 applyButton.style.background = "transparent";
                 applyButton.style.color = "#0B5553";
                 applyButton.style.cursor = "pointer";
+                const noteHasChanges = Array.isArray(msg.documentRevision.notes) &&
+                    msg.documentRevision.notes.some(function (note) {
+                        return note && !note.protected &&
+                            String(note.originalText || "") !== String(note.text || "");
+                    });
+                const bodyHasChanges = String(msg.documentRevision.originalText || "") !==
+                    String(msg.documentRevision.text || "");
+                if (!noteHasChanges && !bodyHasChanges) {
+                    applyButton.disabled = true;
+                    applyButton.textContent = "لا توجد تعديلات للتطبيق";
+                    applyButton.title = "لم ينتج التدقيق تغييرات معتمدة في المتن أو الحواشي";
+                    applyButton.style.opacity = "0.6";
+                    applyButton.style.cursor = "default";
+                }
                 applyButton.onclick = async function (event) {
                     event.preventDefault();
                     event.stopPropagation();
+                    if (applyButton.disabled) return;
                     applyButton.disabled = true;
                     applyButton.textContent = "جارٍ تطبيق التعديلات...";
                     try {
-                        await window.DocumentRevision.applyWorkspace(msg.documentRevision);
+                        const result = await window.DocumentRevision.applyWorkspace(msg.documentRevision);
+                        if (!result || result.applied !== true || Number(result.changedParts) < 1) {
+                            applyButton.disabled = true;
+                            applyButton.textContent = "لم تُنفذ تغييرات في المستند";
+                            applyButton.title = "لم تُرجع Word أي تغييرات فعلية؛ لم تُسجل الرسالة بوصفها مطبقة.";
+                            return;
+                        }
                         msg.documentRevision.applied = true;
+                        msg.documentRevision.appliedParts = Number(result.changedParts) || 0;
+                        msg.documentRevision.appliedNotes = Number(result.noteCount) || 0;
                         saveChat(currentChat);
                         applyButton.textContent = "تم تطبيق التعديلات";
-                        applyButton.title = "طُبقت التعديلات المقترحة على مواضعها في المستند";
+                        applyButton.title = "أكد Word تطبيق " + result.changedParts +
+                            " تغييرًا مع تتبع التعديلات في الحواشي عند وجودها.";
                     } catch (error) {
                         applyButton.disabled = false;
                         applyButton.textContent = "تعذر التطبيق — أعد المحاولة";
