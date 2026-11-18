@@ -307,6 +307,41 @@ assert.equal(proofreadingResult.edits.length, 1);
 assert.equal(proofreadingResult.edits[0].start, proofreadingSource.indexOf("لايمكن"));
 assert.equal(proofreadingResult.edits[0].reason, "فصل أداة النفي عن الفعل");
 
+// Regression: the model may follow the user prompt literally and return only
+// the root "edits" array, omitting status and mode. Infer the ready correction
+// envelope only when the active request explicitly requires correction and the
+// structured edits payload is present; continue to reject explicit partial/error states.
+const missingEnvelopeSource = "هذا خطا واضح.";
+const missingEnvelopeRequest = revision.buildRequest(
+    "صحح المستند لغويًا ونحويًا فقط",
+    missingEnvelopeSource,
+    { sourceOffset: 0, paragraphBaseIndex: 0 }
+);
+assert.equal(missingEnvelopeRequest.revision.structuredCorrection, true);
+assert.match(missingEnvelopeRequest.userPrompt, /كائن JSON كاملًا يتضمن/);
+assert.match(missingEnvelopeRequest.userPrompt, /لا تخرج مصفوفة edits وحدها/);
+assert.doesNotMatch(missingEnvelopeRequest.userPrompt, /أخرج edits فقط/);
+
+const missingEnvelopeResult = revision.parseResponse(JSON.stringify({
+    edits: [{
+        paragraphId: missingEnvelopeRequest.revision.paragraphRecords[0].paragraphId,
+        original: "خطا",
+        replacement: "خطأ",
+        contextBefore: "هذا ",
+        contextAfter: " واضح.",
+        reason: "تصويب إملائي"
+    }]
+}), missingEnvelopeSource, missingEnvelopeRequest.revision);
+assert.equal(missingEnvelopeResult.status, "ready");
+assert.equal(missingEnvelopeResult.mode, "correction");
+assert.equal(missingEnvelopeResult.text, "هذا خطأ واضح.");
+assert.equal(missingEnvelopeResult.edits.length, 1);
+
+assert.throws(() => revision.parseResponse(JSON.stringify({
+    status: "partial",
+    edits: []
+}), missingEnvelopeSource, missingEnvelopeRequest.revision), /status=partial/);
+
 const repeatedSource = "هذا خطأ لايمكن قبوله، وموضع آخر لايمكن إغفاله.";
 const repeatedResult = revision.parseResponse(JSON.stringify({
     status: "ready",
