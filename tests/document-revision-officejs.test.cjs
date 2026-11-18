@@ -464,6 +464,16 @@ global.Word = {
     const originalFootnoteBody = "مرجع المصدر، بيانات النشر والصفحة.";
     const queryLogStart = searchQueries.length;
     const footnoteCapture = await revision.capture({ scope: "document" });
+    const footnoteProofreadingRequest = revision.buildRequest(
+        "صحح المستند لغويًا ونحويًا فقط",
+        footnoteCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    assert.equal(
+        footnoteProofreadingRequest.revision.paragraphRecords[0].locked,
+        false,
+        "a note reference must not lock the whole paragraph against proofreading"
+    );
     const footnoteRequest = revision.buildRequest(
         "أعد صياغة المستند كاملًا بأسلوب أكاديمي",
         footnoteCapture.originalText,
