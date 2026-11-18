@@ -10,6 +10,8 @@ let itemLoads = 0;
 let searchQueries = [];
 let footnoteText = "حاشية قديمة فيها خطا.";
 let endnoteText = "";
+let documentTrackingMode = "Off";
+let noteTrackedChanges = false;
 
 
 function makeParagraphCollection(textGetter, baseOffsetGetter, context) {
@@ -199,7 +201,11 @@ function makeMatch(initialText, absoluteStart, context) {
 function makeNoteRange(textGetter, textSetter, context) {
     const range = makeRange(textGetter, () => 0);
     range.context = context;
-    range.getOoxml = () => ({ value: "<w:p><w:r><w:t>" + String(textGetter()) + "</w:t></w:r></w:p>" });
+    range.getOoxml = () => ({
+        value: noteTrackedChanges
+            ? "<w:p><w:ins><w:r><w:t>" + String(textGetter()) + "</w:t></w:r></w:ins></w:p>"
+            : "<w:p><w:r><w:t>" + String(textGetter()) + "</w:t></w:r></w:p>"
+    });
     range.search = function (query) {
         searchQueries.push(String(query));
         const source = String(textGetter());
@@ -228,6 +234,11 @@ function makeNoteRange(textGetter, textSetter, context) {
                             throw new Error("note range no longer matches its source text");
                         }
                         const insertedText = String(replacement || "");
+                        assert.equal(
+                            documentTrackingMode,
+                            "TrackAll",
+                            "footnote replacements must be recorded as Word tracked changes"
+                        );
                         textSetter(
                             current.slice(0, matchStart) + insertedText +
                             current.slice(matchStart + query.length)
@@ -292,7 +303,8 @@ function makeNoteCollection(context, type) {
         },
         get items() {
             assert.equal(itemsLoaded, true, "note items must be loaded before access");
-            return isFootnote && footnoteText.trim() ? [noteItem] : [];
+            const noteText = isFootnote ? footnoteText : endnoteText;
+            return noteText.trim() ? [noteItem] : [];
         }
     };
 }
@@ -313,7 +325,7 @@ global.Office = {
         requirements: {
             isSetSupported(name, version) {
                 return name === "WordApi" &&
-                    ["1.3", "1.5"].includes(version);
+                    ["1.3", "1.4", "1.5"].includes(version);
             }
         }
     }
@@ -326,6 +338,15 @@ global.Word = {
             const context = {
                 id: ++requestContextCount,
                 document: {
+                    load(property) {
+                        assert.equal(property, "changeTrackingMode");
+                    },
+                    get changeTrackingMode() {
+                        return documentTrackingMode;
+                    },
+                    set changeTrackingMode(value) {
+                        documentTrackingMode = String(value);
+                    },
                     getSelection() {
                         selectedRange.context = context;
                         return selectedRange;
@@ -806,41 +827,95 @@ global.Word = {
     // main document text and the reference itself remain unchanged.
     documentText = "نص المتن يبقى كما هو.";
     selectionText = "";
-    footnoteText = "حاشية قديمة فيها خطا.";
-    endnoteText = "";
+    footnoteText = "حاشية سفلية قديمة فيها خطا.";
+    endnoteText = "حاشية ختامية قديمة فيها خطا.";
     const noteWorkspaceCapture = await revision.capture({ scope: "document" });
     assert.equal(noteWorkspaceCapture.notesSupported, true);
-    assert.equal(noteWorkspaceCapture.notes.length, 1);
+    assert.equal(noteWorkspaceCapture.notes.length, 2);
     assert.equal(noteWorkspaceCapture.notes[0].kind, "footnote");
     assert.equal(noteWorkspaceCapture.notes[0].label, "حاشية سفلية 1");
     assert.equal(noteWorkspaceCapture.notes[0].originalText, footnoteText);
+    assert.equal(noteWorkspaceCapture.notes[1].kind, "endnote");
+    assert.equal(noteWorkspaceCapture.notes[1].label, "حاشية ختامية 1");
+    assert.equal(noteWorkspaceCapture.notes[1].originalText, endnoteText);
 
-    const capturedNote = noteWorkspaceCapture.notes[0];
-    const noteRequest = revision.buildRequest(
-        "صحح المستند لغويًا ونحويًا فقط",
-        capturedNote.originalText,
+    const capturedFootnote = noteWorkspaceCapture.notes[0];
+    const capturedEndnote = noteWorkspaceCapture.notes[1];
+    const correctionInstruction = "صحح المستند لغويًا ونحويًا فقط";
+    const noteBatchRequest = revision.buildNotesBatchRequest(correctionInstruction, [
         {
-            sourceOffset: 0,
-            paragraphBaseIndex: 0,
-            targetPartId: capturedNote.id
+            noteId: capturedFootnote.id,
+            notePartId: capturedFootnote.id + "-part-1",
+            label: capturedFootnote.label,
+            sourceText: capturedFootnote.originalText,
+            sourceOffset: 0
+        },
+        {
+            noteId: capturedEndnote.id,
+            notePartId: capturedEndnote.id + "-part-1",
+            label: capturedEndnote.label,
+            sourceText: capturedEndnote.originalText,
+            sourceOffset: 0
         }
-    );
-    assert.equal(noteRequest.revision.targetType, "note");
-    assert.equal(noteRequest.revision.targetPartId, capturedNote.id);
-    assert.equal(noteRequest.revision.structuredCorrection, true);
-    const noteParagraphId = noteRequest.revision.paragraphRecords[0].paragraphId;
-    const noteParsed = revision.parseResponse(JSON.stringify({
+    ]);
+    assert.match(noteBatchRequest.systemPrompt, /جميع الحواشي الواردة في الطلب دفعة واحدة/);
+    assert.match(noteBatchRequest.userPrompt, /BEGIN_NOTES/);
+    assert.equal(noteBatchRequest.revision.noteParts.length, 2);
+
+    const footnoteParagraphId = noteBatchRequest.revision.noteParts[0].paragraphRecords[0].paragraphId;
+    const endnoteParagraphId = noteBatchRequest.revision.noteParts[1].paragraphRecords[0].paragraphId;
+    const noteBatchParsed = revision.parseNotesBatchResponse(JSON.stringify({
+        status: "ready",
+        mode: "correction",
+        edits: [
+            {
+                noteId: capturedFootnote.id,
+                notePartId: capturedFootnote.id + "-part-1",
+                paragraphId: footnoteParagraphId,
+                original: "خطا",
+                replacement: "خطأ",
+                contextBefore: "حاشية سفلية قديمة فيها ",
+                contextAfter: ".",
+                reason: "تصويب إملائي"
+            },
+            {
+                noteId: capturedEndnote.id,
+                notePartId: capturedEndnote.id + "-part-1",
+                paragraphId: endnoteParagraphId,
+                original: "خطا",
+                replacement: "خطأ",
+                contextBefore: "حاشية ختامية قديمة فيها ",
+                contextAfter: ".",
+                reason: "تصويب إملائي"
+            }
+        ]
+    }), noteBatchRequest.revision);
+    assert.equal(noteBatchParsed.parts.length, 2);
+    assert.equal(noteBatchParsed.parts[0].text, "حاشية سفلية قديمة فيها خطأ.");
+    assert.equal(noteBatchParsed.parts[1].text, "حاشية ختامية قديمة فيها خطأ.");
+    assert.equal(noteBatchParsed.parts[0].edits[0].noteId, capturedFootnote.id);
+    assert.equal(noteBatchParsed.parts[1].edits[0].noteId, capturedEndnote.id);
+
+    assert.throws(() => revision.parseNotesBatchResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
         edits: [{
-            paragraphId: noteParagraphId,
+            noteId: capturedEndnote.id,
+            notePartId: capturedFootnote.id + "-part-1",
+            paragraphId: footnoteParagraphId,
             original: "خطا",
             replacement: "خطأ",
-            contextBefore: "حاشية قديمة فيها ",
+            contextBefore: "حاشية سفلية قديمة فيها ",
             contextAfter: ".",
-            reason: "تصويب إملائي"
+            reason: "محاولة إسناد خاطئة"
         }]
-    }), capturedNote.originalText, noteRequest.revision);
+    }), noteBatchRequest.revision), /إسناد أحد تصحيحات النموذج/);
+
+    assert.throws(() => revision.parseNotesBatchResponse(JSON.stringify({
+        status: "partial",
+        mode: "correction",
+        edits: []
+    }), noteBatchRequest.revision), /status=partial/);
 
     const workspaceRevision = {
         id: noteWorkspaceCapture.id,
@@ -850,30 +925,76 @@ global.Word = {
         mode: "correction",
         edits: [],
         status: "ready",
-        notes: [{
-            id: capturedNote.id,
-            targetPartId: capturedNote.id,
-            targetType: "note",
-            kind: capturedNote.kind,
-            index: capturedNote.index,
-            label: capturedNote.label,
-            originalText: capturedNote.originalText,
-            text: noteParsed.text,
-            mode: noteParsed.mode,
-            edits: noteParsed.edits,
-            rejectedEdits: noteParsed.rejected,
-            protected: false
-        }]
+        notes: noteBatchParsed.parts.map(function (part, index) {
+            const sourceNote = noteWorkspaceCapture.notes[index];
+            return {
+                id: noteWorkspaceCapture.id,
+                targetPartId: part.noteId,
+                targetType: "note",
+                kind: sourceNote.kind,
+                index: sourceNote.index,
+                label: sourceNote.label,
+                originalText: part.originalText,
+                text: part.text,
+                mode: part.mode,
+                edits: part.edits,
+                rejectedEdits: part.rejected,
+                protected: false
+            };
+        })
     };
     const workspaceApplied = await revision.applyWorkspace(workspaceRevision);
     assert.equal(workspaceApplied.applied, true);
-    assert.equal(workspaceApplied.noteCount, 1);
+    assert.equal(workspaceApplied.noteCount, 2);
     assert.equal(documentText, "نص المتن يبقى كما هو.");
-    assert.equal(footnoteText, "حاشية قديمة فيها خطأ.");
-    assert.equal(endnoteText, "");
+    assert.equal(footnoteText, "حاشية سفلية قديمة فيها خطأ.");
+    assert.equal(endnoteText, "حاشية ختامية قديمة فيها خطأ.");
+    assert.equal(documentTrackingMode, "Off", "the user's original change-tracking mode must be restored after applying notes");
     assert.equal(searchQueries.some(query => query.includes("\u0002")), false);
 
-    process.stdout.write("document-revision-officejs: collection loading, selection, paragraph targeting, note capture, and grouped note application tests passed\n");
+    // A new tracked edit introduced after capture must invalidate the note
+    // preview, even when the visible text still matches the reviewed source.
+    noteTrackedChanges = false;
+    footnoteText = "حاشية سفلية عاد فيها خطا بعد التقاط المراجعة.";
+    endnoteText = "حاشية ختامية عاد فيها خطا بعد التقاط المراجعة.";
+    const staleNoteCapture = await revision.capture({ scope: "document" });
+    assert.equal(staleNoteCapture.notes[0].protected, false);
+    noteTrackedChanges = true;
+    const staleNoteReview = {
+        id: staleNoteCapture.id,
+        targetType: "document",
+        originalText: staleNoteCapture.originalText,
+        text: staleNoteCapture.originalText,
+        mode: "correction",
+        status: "ready",
+        notes: staleNoteCapture.notes.map(function (note) {
+            return {
+                targetPartId: note.id,
+                kind: note.kind,
+                originalText: note.originalText,
+                text: String(note.originalText).replace("خطا", "خطأ"),
+                mode: "correction",
+                status: "ready",
+                edits: [{
+                    start: note.originalText.indexOf("خطا"),
+                    original: "خطا",
+                    replacement: "خطأ"
+                }],
+                protected: false
+            };
+        })
+    };
+    const beforeStaleApplyFootnote = footnoteText;
+    const beforeStaleApplyEndnote = endnoteText;
+    await assert.rejects(
+        revision.applyWorkspace(staleNoteReview),
+        /تغييرات متعقبة جديدة في الحاشية/
+    );
+    assert.equal(footnoteText, beforeStaleApplyFootnote);
+    assert.equal(endnoteText, beforeStaleApplyEndnote);
+    assert.equal(documentTrackingMode, "Off");
+
+    process.stdout.write("document-revision-officejs: collection loading, selection, paragraph targeting, batched note capture, tracked application, and stale-note protection tests passed\n");
 })().catch(error => {
     process.stderr.write(String(error && error.stack || error) + "\n");
     process.exitCode = 1;

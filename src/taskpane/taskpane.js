@@ -21942,6 +21942,20 @@ function renderChat() {
 
             if (msg.role !== "user" && msg.documentRevision &&
                 msg.documentRevision.status === "ready" && !msg.documentRevision.applied) {
+                if (msg.documentRevision.partialApplied) {
+                    const partialNotice = document.createElement("div");
+                    partialNotice.className = "document-revision-partial-apply";
+                    partialNotice.textContent = String(msg.documentRevision.partialApplyMessage ||
+                        "توقف التطبيق بعد تنفيذ جزء من التعديلات. أعد التقاط المستند قبل المتابعة.");
+                    partialNotice.style.marginTop = "8px";
+                    partialNotice.style.padding = "8px";
+                    partialNotice.style.borderRadius = "7px";
+                    partialNotice.style.background = "rgba(181, 71, 8, 0.06)";
+                    partialNotice.style.color = "#B54708";
+                    partialNotice.style.fontSize = "12px";
+                    partialNotice.style.whiteSpace = "pre-wrap";
+                    div.appendChild(partialNotice);
+                }
                 const protectedParagraphCount = Number(msg.documentRevision.protectedParagraphCount) || 0;
                 if (protectedParagraphCount > 0) {
                     const revisionNotice = document.createElement("div");
@@ -21965,7 +21979,11 @@ function renderChat() {
                     notesPanel.style.background = "rgba(11, 85, 83, 0.035)";
 
                     const notesHeading = document.createElement("div");
-                    notesHeading.textContent = "مراجعة الحواشي";
+                    const noteBatchLabel = Number(msg.documentRevision.notesBatchCount) > 0
+                        ? " — " + msg.documentRevision.noteCount + " حاشية في " +
+                            msg.documentRevision.notesBatchCount + " دفعة"
+                        : " — " + msg.documentRevision.noteCount + " حاشية";
+                    notesHeading.textContent = "مراجعة الحواشي" + noteBatchLabel;
                     notesHeading.style.fontWeight = "600";
                     notesHeading.style.marginBottom = "8px";
                     notesPanel.appendChild(notesHeading);
@@ -21976,14 +21994,24 @@ function renderChat() {
                         details.style.borderTop = "1px solid #E4E9ED";
 
                         const summary = document.createElement("summary");
+                        const noteEditCount = Array.isArray(note.edits) ? note.edits.length : 0;
                         summary.textContent = note.label +
                             (note.protected ? " — مستثناة للحماية" :
                                 (String(note.originalText || "") === String(note.text || "")
                                     ? " — لا تغييرات"
-                                    : " — توجد تعديلات مقترحة"));
+                                    : " — " + noteEditCount + " تصحيحًا مقترحًا"));
                         summary.style.cursor = "pointer";
                         summary.style.fontWeight = "500";
                         details.appendChild(summary);
+
+                        if (note.referenceText) {
+                            const referenceLocation = document.createElement("div");
+                            referenceLocation.textContent = "علامة الإحالة في المتن: " + String(note.referenceText);
+                            referenceLocation.style.fontSize = "11px";
+                            referenceLocation.style.color = "#667085";
+                            referenceLocation.style.marginTop = "5px";
+                            details.appendChild(referenceLocation);
+                        }
 
                         if (!note.protected && String(note.originalText || "") !== String(note.text || "")) {
                             const beforeLabel = document.createElement("div");
@@ -22015,9 +22043,97 @@ function renderChat() {
                             afterText.style.borderRadius = "6px";
                             afterText.style.background = "rgba(11, 85, 83, 0.06)";
                             details.appendChild(afterText);
+
+                            if (Array.isArray(note.edits) && note.edits.length) {
+                                const editsHeading = document.createElement("div");
+                                editsHeading.textContent = "التصحيحات المحددة (" + note.edits.length + ")";
+                                editsHeading.style.marginTop = "10px";
+                                editsHeading.style.fontSize = "12px";
+                                editsHeading.style.fontWeight = "600";
+                                details.appendChild(editsHeading);
+
+                                note.edits.forEach(function (edit, editIndex) {
+                                    const editCard = document.createElement("div");
+                                    editCard.style.marginTop = "7px";
+                                    editCard.style.padding = "8px";
+                                    editCard.style.border = "1px solid #E4E9ED";
+                                    editCard.style.borderRadius = "7px";
+                                    editCard.style.background = "#FFFFFF";
+
+                                    const editTitle = document.createElement("div");
+                                    editTitle.textContent = "التصحيح " + (editIndex + 1);
+                                    editTitle.style.fontSize = "11px";
+                                    editTitle.style.color = "#667085";
+                                    editCard.appendChild(editTitle);
+
+                                    const originalLine = document.createElement("div");
+                                    originalLine.style.marginTop = "4px";
+                                    originalLine.textContent = "الأصل: " + String(edit.original || "");
+                                    originalLine.style.color = "#B42318";
+                                    originalLine.style.whiteSpace = "pre-wrap";
+                                    editCard.appendChild(originalLine);
+
+                                    const replacementLine = document.createElement("div");
+                                    replacementLine.style.marginTop = "3px";
+                                    replacementLine.textContent = "الصواب: " + String(edit.replacement || "");
+                                    replacementLine.style.color = "#067647";
+                                    replacementLine.style.whiteSpace = "pre-wrap";
+                                    editCard.appendChild(replacementLine);
+
+                                    if (edit.reason) {
+                                        const reasonLine = document.createElement("div");
+                                        reasonLine.style.marginTop = "4px";
+                                        reasonLine.textContent = "السبب: " + String(edit.reason);
+                                        reasonLine.style.fontSize = "12px";
+                                        reasonLine.style.color = "#475467";
+                                        reasonLine.style.whiteSpace = "pre-wrap";
+                                        editCard.appendChild(reasonLine);
+                                    }
+                                    details.appendChild(editCard);
+                                });
+                            }
+
+                            if (Array.isArray(note.rejectedEdits) && note.rejectedEdits.length) {
+                                const rejectedHeading = document.createElement("div");
+                                rejectedHeading.textContent = "مواضع معزولة — لم تُطبّق (" +
+                                    note.rejectedEdits.length + ")";
+                                rejectedHeading.style.marginTop = "10px";
+                                rejectedHeading.style.fontSize = "12px";
+                                rejectedHeading.style.fontWeight = "600";
+                                rejectedHeading.style.color = "#B54708";
+                                details.appendChild(rejectedHeading);
+
+                                note.rejectedEdits.forEach(function (rejected, rejectedIndex) {
+                                    const rejectedCard = document.createElement("div");
+                                    rejectedCard.style.marginTop = "6px";
+                                    rejectedCard.style.padding = "7px";
+                                    rejectedCard.style.border = "1px solid #FECBA1";
+                                    rejectedCard.style.borderRadius = "7px";
+                                    rejectedCard.style.background = "rgba(181, 71, 8, 0.035)";
+
+                                    const rejectedText = document.createElement("div");
+                                    rejectedText.textContent = (rejectedIndex + 1) + ". " +
+                                        String(rejected.original || "موضع غير محدد");
+                                    rejectedText.style.fontSize = "12px";
+                                    rejectedText.style.whiteSpace = "pre-wrap";
+                                    rejectedCard.appendChild(rejectedText);
+
+                                    const rejectedReason = document.createElement("div");
+                                    rejectedReason.textContent = String(
+                                        rejected.rejectionReason || rejected.reason ||
+                                        "لم يجتز الموضع التحقق الدقيق."
+                                    );
+                                    rejectedReason.style.marginTop = "4px";
+                                    rejectedReason.style.fontSize = "11px";
+                                    rejectedReason.style.color = "#B54708";
+                                    rejectedCard.appendChild(rejectedReason);
+                                    details.appendChild(rejectedCard);
+                                });
+                            }
                         } else if (note.protected) {
                             const protectedText = document.createElement("div");
-                            protectedText.textContent = "لم تُعدّل هذه الحاشية لوجود تغييرات متعقبة سابقة.";
+                            protectedText.textContent = String(note.protectionReason ||
+                                "لم تُعدّل هذه الحاشية لوجود تغييرات متعقبة سابقة.");
                             protectedText.style.fontSize = "12px";
                             protectedText.style.color = "#667085";
                             protectedText.style.marginTop = "6px";
@@ -22040,21 +22156,62 @@ function renderChat() {
                 applyButton.style.background = "transparent";
                 applyButton.style.color = "#0B5553";
                 applyButton.style.cursor = "pointer";
+                const noteHasChanges = Array.isArray(msg.documentRevision.notes) &&
+                    msg.documentRevision.notes.some(function (note) {
+                        return note && !note.protected &&
+                            String(note.originalText || "") !== String(note.text || "");
+                    });
+                const bodyHasChanges = String(msg.documentRevision.originalText || "") !==
+                    String(msg.documentRevision.text || "");
+                if (msg.documentRevision.partialApplied) {
+                    applyButton.disabled = true;
+                    applyButton.textContent = "توقف التطبيق بعد تنفيذ جزء من التعديلات";
+                    applyButton.title = String(msg.documentRevision.partialApplyMessage || "أعد التقاط المستند ومراجعته قبل أي تطبيق جديد.");
+                    applyButton.style.opacity = "0.7";
+                    applyButton.style.cursor = "default";
+                } else if (!noteHasChanges && !bodyHasChanges) {
+                    applyButton.disabled = true;
+                    applyButton.textContent = "لا توجد تعديلات للتطبيق";
+                    applyButton.title = "لم ينتج التدقيق تغييرات معتمدة في المتن أو الحواشي";
+                    applyButton.style.opacity = "0.6";
+                    applyButton.style.cursor = "default";
+                }
                 applyButton.onclick = async function (event) {
                     event.preventDefault();
                     event.stopPropagation();
+                    if (applyButton.disabled) return;
                     applyButton.disabled = true;
                     applyButton.textContent = "جارٍ تطبيق التعديلات...";
                     try {
-                        await window.DocumentRevision.applyWorkspace(msg.documentRevision);
+                        const result = await window.DocumentRevision.applyWorkspace(msg.documentRevision);
+                        if (!result || result.applied !== true || Number(result.changedParts) < 1) {
+                            applyButton.disabled = true;
+                            applyButton.textContent = "لم تُنفذ تغييرات في المستند";
+                            applyButton.title = "لم تُرجع Word أي تغييرات فعلية؛ لم تُسجل الرسالة بوصفها مطبقة.";
+                            return;
+                        }
                         msg.documentRevision.applied = true;
+                        msg.documentRevision.appliedParts = Number(result.changedParts) || 0;
+                        msg.documentRevision.appliedNotes = Number(result.appliedNotes) || 0;
                         saveChat(currentChat);
                         applyButton.textContent = "تم تطبيق التعديلات";
-                        applyButton.title = "طُبقت التعديلات المقترحة على مواضعها في المستند";
+                        applyButton.title = "أكد Word تطبيق " + result.changedParts +
+                            " تغييرًا مع تتبع التعديلات في الحواشي عند وجودها.";
                     } catch (error) {
-                        applyButton.disabled = false;
-                        applyButton.textContent = "تعذر التطبيق — أعد المحاولة";
-                        applyButton.title = error && error.message ? error.message : "تعذر تطبيق التعديلات";
+                        if (error && error.partialApply === true) {
+                            msg.documentRevision.partialApplied = true;
+                            msg.documentRevision.appliedParts = Number(error.changedParts) || 0;
+                            msg.documentRevision.appliedNotes = Number(error.appliedNotes) || 0;
+                            msg.documentRevision.partialApplyMessage = String(error.message || "");
+                            saveChat(currentChat);
+                            applyButton.disabled = true;
+                            applyButton.textContent = "توقف التطبيق بعد تنفيذ جزء من التعديلات";
+                            applyButton.title = msg.documentRevision.partialApplyMessage;
+                        } else {
+                            applyButton.disabled = false;
+                            applyButton.textContent = "تعذر التطبيق — أعد المحاولة";
+                            applyButton.title = error && error.message ? error.message : "تعذر تطبيق التعديلات";
+                        }
                     }
                 };
                 div.appendChild(applyButton);
@@ -45122,23 +45279,121 @@ async function sendMessage() {
             };
         }
 
-        const mainReview = await reviewRevisionTarget(
-            documentRevisionCapture,
-            "",
-            "المتن"
-        );
-        if (mainReview.status === "clarify") {
-            finalAnswer = mainReview.question;
-        } else {
-            const noteReviews = [];
-            const capturedNotes = Array.isArray(documentRevisionCapture.notes)
-                ? documentRevisionCapture.notes
-                : [];
+        async function reviewNotesInBatches(notes) {
+            const noteParts = [];
+            const maxPartCharacters = 3000;
+            const batchCharacterBudget = 5200;
+            const maxPartsPerBatch = 8;
 
-            for (const note of capturedNotes) {
+            (Array.isArray(notes) ? notes : []).forEach(function (note) {
+                const noteText = String(note && note.originalText || "");
+                if (!noteText.trim() || note.protected) return;
+                const chunks = window.DocumentRevision.splitText(noteText, maxPartCharacters);
+                let sourceOffset = 0;
+                chunks.forEach(function (chunk, index) {
+                    noteParts.push({
+                        noteId: note.id,
+                        notePartId: String(note.id) + "-part-" + String(index + 1),
+                        label: note.label || (note.kind === "endnote" ? "حاشية ختامية" : "حاشية سفلية"),
+                        sourceText: chunk,
+                        sourceOffset: sourceOffset
+                    });
+                    sourceOffset += chunk.length;
+                });
+            });
+
+            if (!noteParts.length) return { status: "ready", notes: [] };
+
+            const batches = [];
+            let currentBatch = [];
+            let currentCharacters = 0;
+            noteParts.forEach(function (part) {
+                const paragraphCount = Math.max(
+                    1,
+                    (String(part.sourceText).match(/\r\n|\r|\n/g) || []).length + 1
+                );
+                const estimatedSize = part.sourceText.length + part.label.length +
+                    140 + paragraphCount * 110;
+                if (currentBatch.length &&
+                    (currentCharacters + estimatedSize > batchCharacterBudget ||
+                        currentBatch.length >= maxPartsPerBatch)) {
+                    batches.push(currentBatch);
+                    currentBatch = [];
+                    currentCharacters = 0;
+                }
+                currentBatch.push(part);
+                currentCharacters += estimatedSize;
+            });
+            if (currentBatch.length) batches.push(currentBatch);
+
+            async function processNoteBatch(parts, depth, batchLabel) {
+                const request = window.DocumentRevision.buildNotesBatchRequest(text, parts);
+                window.__documentRevisionRequest = request;
+                try {
+                    const answer = await streamAI(text, function () {});
+                    return window.DocumentRevision.parseNotesBatchResponse(answer, request.revision);
+                } catch (error) {
+                    if (!error || error.shouldSplit !== true || depth >= 6) throw error;
+
+                    if (parts.length > 1) {
+                        const midpoint = Math.ceil(parts.length / 2);
+                        loading.textContent = "الاستجابة غير مكتملة؛ يُعاد تقسيم دفعة الحواشي " + batchLabel + "...";
+                        const left = await processNoteBatch(parts.slice(0, midpoint), depth + 1, batchLabel + ".1");
+                        if (left.status === "clarify") return left;
+                        const right = await processNoteBatch(parts.slice(midpoint), depth + 1, batchLabel + ".2");
+                        if (right.status === "clarify") return right;
+                        return {
+                            status: "ready",
+                            mode: "correction",
+                            parts: left.parts.concat(right.parts)
+                        };
+                    }
+
+                    const part = parts[0];
+                    if (!part || part.sourceText.length <= 600) throw error;
+                    const nextLimit = Math.max(400, Math.floor(part.sourceText.length / 2));
+                    const smallerChunks = window.DocumentRevision.splitText(part.sourceText, nextLimit);
+                    if (smallerChunks.length < 2) throw error;
+                    const nestedParts = [];
+                    let offset = part.sourceOffset;
+                    smallerChunks.forEach(function (chunk, index) {
+                        nestedParts.push(Object.assign({}, part, {
+                            notePartId: part.notePartId + "-r" + String(depth + 1) + "-" + String(index + 1),
+                            sourceText: chunk,
+                            sourceOffset: offset
+                        }));
+                        offset += chunk.length;
+                    });
+                    return processNoteBatch(nestedParts, depth + 1, batchLabel + ".r");
+                }
+            }
+
+            const reviewedParts = [];
+            for (let index = 0; index < batches.length; index++) {
+                loading.textContent = "جارٍ تدقيق الحواشي في دفعة " +
+                    (index + 1) + " من " + batches.length + "...";
+                const result = await processNoteBatch(batches[index], 0, String(index + 1));
+                if (result.status === "clarify") return result;
+                reviewedParts.push.apply(reviewedParts, result.parts);
+            }
+
+            const resultByNote = new Map();
+            (Array.isArray(notes) ? notes : []).forEach(function (note) {
+                if (!note || note.protected) return;
+                resultByNote.set(note.id, []);
+            });
+            reviewedParts.forEach(function (part) {
+                if (!resultByNote.has(part.noteId)) {
+                    throw new Error("أعاد النموذج نتيجة لحاشية غير موجودة في قائمة المراجعة؛ أُلغيت النتائج.");
+                }
+                resultByNote.get(part.noteId).push(part);
+            });
+
+            const noteReviews = [];
+            for (const note of notes) {
                 if (note.protected) {
                     noteReviews.push({
-                        id: note.id,
+                        id: documentRevisionCapture.id,
                         targetPartId: note.id,
                         targetType: "note",
                         kind: note.kind,
@@ -45152,25 +45407,125 @@ async function sendMessage() {
                         mode: "correction",
                         status: "ready",
                         protected: true,
+                        protectionReason: note.protectionReason || "",
                         applied: false
                     });
                     continue;
                 }
 
-                const noteReview = await reviewRevisionTarget(
-                    note,
-                    note.id,
-                    note.label || (note.kind === "endnote" ? "حاشية ختامية" : "حاشية سفلية")
-                );
-                if (noteReview.status === "clarify") {
-                    finalAnswer = noteReview.question;
-                    break;
+                const chunks = (resultByNote.get(note.id) || []).slice().sort(function (a, b) {
+                    return a.sourceOffset - b.sourceOffset;
+                });
+                let expectedOffset = 0;
+                let revisedText = "";
+                const noteEdits = [];
+                const noteRejected = [];
+                chunks.forEach(function (part) {
+                    if (part.sourceOffset !== expectedOffset ||
+                        String(note.originalText).slice(part.sourceOffset, part.sourceOffset + part.originalText.length) !== part.originalText) {
+                        throw new Error("اختل تسلسل أجزاء " + note.label + " أو لم تطابق النص الأصلي؛ أُلغيت مراجعة الحواشي حمايةً لها.");
+                    }
+                    revisedText += part.text;
+                    expectedOffset += part.originalText.length;
+                    (part.edits || []).forEach(function (edit) {
+                        noteEdits.push(Object.assign({}, edit, {
+                            start: part.sourceOffset + edit.start,
+                            noteId: note.id
+                        }));
+                    });
+                    (part.rejected || []).forEach(function (edit) {
+                        noteRejected.push(Object.assign({}, edit, {
+                            batch: part.notePartId,
+                            noteId: note.id
+                        }));
+                    });
+                });
+                if (expectedOffset !== String(note.originalText).length) {
+                    throw new Error("لم تكتمل تغطية نص " + note.label + " في دفعات المراجعة؛ لم تُجهز أي تعديلات للتطبيق.");
                 }
-                noteReviews.push(Object.assign({}, noteReview, {
-                    id: note.id,
+
+                noteReviews.push({
+                    id: documentRevisionCapture.id,
                     targetPartId: note.id,
-                    referenceText: note.referenceText || ""
-                }));
+                    targetType: "note",
+                    kind: note.kind,
+                    index: note.index,
+                    label: note.label,
+                    referenceText: note.referenceText || "",
+                    originalText: note.originalText,
+                    text: revisedText,
+                    edits: noteEdits,
+                    rejectedEdits: noteRejected,
+                    mode: "correction",
+                    status: "ready",
+                    protected: false,
+                    applied: false
+                });
+            }
+
+            return { status: "ready", notes: noteReviews, batchCount: batches.length };
+        }
+
+        const mainReview = await reviewRevisionTarget(
+            documentRevisionCapture,
+            "",
+            "المتن"
+        );
+        if (mainReview.status === "clarify") {
+            finalAnswer = mainReview.question;
+        } else {
+            const noteReviews = [];
+            const capturedNotes = Array.isArray(documentRevisionCapture.notes)
+                ? documentRevisionCapture.notes
+                : [];
+            let notesBatchCount = 0;
+
+            if (window.DocumentRevision.isCorrectionOnlyRequest(text)) {
+                const batchedReview = await reviewNotesInBatches(capturedNotes);
+                if (batchedReview.status === "clarify") {
+                    finalAnswer = batchedReview.question;
+                } else {
+                    notesBatchCount = Number(batchedReview.batchCount) || 0;
+                    noteReviews.push.apply(noteReviews, batchedReview.notes);
+                }
+            } else {
+                for (const note of capturedNotes) {
+                    if (note.protected) {
+                        noteReviews.push({
+                            id: documentRevisionCapture.id,
+                            targetPartId: note.id,
+                            targetType: "note",
+                            kind: note.kind,
+                            index: note.index,
+                            label: note.label,
+                            referenceText: note.referenceText,
+                            originalText: note.originalText,
+                            text: note.originalText,
+                            edits: [],
+                            rejectedEdits: [],
+                            mode: "correction",
+                            status: "ready",
+                            protected: true,
+                            applied: false
+                        });
+                        continue;
+                    }
+
+                    const noteReview = await reviewRevisionTarget(
+                        note,
+                        note.id,
+                        note.label || (note.kind === "endnote" ? "حاشية ختامية" : "حاشية سفلية")
+                    );
+                    if (noteReview.status === "clarify") {
+                        finalAnswer = noteReview.question;
+                        break;
+                    }
+                    noteReviews.push(Object.assign({}, noteReview, {
+                        id: documentRevisionCapture.id,
+                        targetPartId: note.id,
+                        referenceText: note.referenceText || ""
+                    }));
+                }
             }
 
             if (!finalAnswer) {
@@ -45206,14 +45561,19 @@ async function sendMessage() {
                 }
 
                 if (changedNotes.length) {
-                    finalAnswer += "\n\nنتائج مراجعة الحواشي (" + changedNotes.length + "):\n" +
+                    const noteEditCount = changedNotes.reduce(function (sum, note) {
+                        return sum + (Array.isArray(note.edits) ? note.edits.length : 0);
+                    }, 0);
+                    finalAnswer += "\n\nنتائج مراجعة الحواشي (" + changedNotes.length + " حاشية):\n" +
                         changedNotes.map(function (note) {
                             const count = Array.isArray(note.edits) ? note.edits.length : 0;
                             return "• " + note.label + ": " +
                                 (note.mode === "correction" && count
                                     ? count + " موضعًا مقترحًا للتصحيح"
                                     : "صياغة مقترحة جاهزة للمعاينة");
-                        }).join("\n");
+                        }).join("\n") +
+                        "\nإجمالي التصحيحات المقترحة في الحواشي: " + noteEditCount +
+                        (notesBatchCount ? " (راجعت في " + notesBatchCount + " دفعة)." : ".");
                 } else if (noteReviews.length) {
                     finalAnswer += "\n\nتم فحص " + noteReviews.length +
                         " حاشية؛ لم تظهر تعديلات لغوية تستلزم التطبيق.";
@@ -45242,6 +45602,7 @@ async function sendMessage() {
                     notes: noteReviews,
                     notesSupported: documentRevisionCapture.notesSupported !== false,
                     noteCount: noteReviews.length,
+                    notesBatchCount: notesBatchCount,
                     status: "ready",
                     applied: false
                 });
