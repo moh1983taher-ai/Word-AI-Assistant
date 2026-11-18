@@ -269,6 +269,7 @@ function makeNoteCollection(context, type) {
     const noteItem = {
         context: context,
         type: isFootnote ? "Footnote" : "Endnote",
+        load(property) { assert.equal(property, "type"); },
         body: {
             getRange() { return noteRange; }
         },
