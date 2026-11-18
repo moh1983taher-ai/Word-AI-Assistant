@@ -442,9 +442,9 @@
                 "<<<END_TEXT>>>",
                 "",
                 structuredCorrection
-                    ? "نفذ التصحيح اللغوي على الفقرات المسجلة في JSON. أخرج edits فقط، ويجب أن يحمل كل عنصر paragraphId صحيحًا من المدخلات. اجعل السياق من الفقرة نفسها."
+                    ? "نفذ التصحيح اللغوي على الفقرات المسجلة في JSON. أخرج كائن JSON كاملًا يتضمن الحقول العليا status وmode وedits وفق المخطط المحدد في تعليمات النظام، ولا تخرج مصفوفة edits وحدها. يجب أن يحمل كل عنصر paragraphId صحيحًا من المدخلات، واجعل السياق من الفقرة نفسها."
                     : correctionOnly
-                        ? "نفذ طلب الباحث على النص المحصور بين العلامتين. أخرج edits فقط، ولا تطلب أي معرف فقرة أو رقم خارجي."
+                        ? "نفذ طلب الباحث على النص المحصور بين العلامتين. أخرج كائن JSON كاملًا يتضمن status وmode وedits وفق المخطط المحدد في تعليمات النظام، ولا تخرج مصفوفة edits وحدها أو أي معرف فقرة أو رقم خارجي."
                         : "أعد جميع عناصر paragraphs في JSON مع segmentId كما وردت تمامًا. أخرج النص المعاد صياغته لكل عنصر في text، بعدد العناصر نفسه وبالترتيب نفسه، ولا تضع فواصل أسطر داخل قيمة text. لا تخرج الحقل text على مستوى الجذر."
             ].join("\n"),
             revision: revisionMetadata
@@ -758,13 +758,23 @@
             return { status: "clarify", question: String(parsed.question).trim() };
         }
 
-        const responseStatus = String(parsed && parsed.status || "").trim().toLowerCase();
+        let responseStatus = String(parsed && parsed.status || "").trim().toLowerCase();
         let mode = String(parsed && parsed.mode || "").trim().toLowerCase();
         const expectedCorrection = Boolean(
             activeRequestMetadata &&
             (activeRequestMetadata.structuredCorrection === true ||
                 isCorrectionOnlyRequest(activeRequestMetadata.userInstruction))
         );
+        const hasCorrectionPayload = expectedCorrection && Array.isArray(parsed && parsed.edits);
+
+        // Some models interpret "return edits only" as a root object containing
+        // just the edits array. The request contract lets us safely infer the
+        // correction mode and the ready envelope in that narrow case: the caller
+        // explicitly requested correction and the complete edits array exists.
+        // This does not invent or repair edit data; every edit is validated below.
+        if (hasCorrectionPayload && !responseStatus) {
+            responseStatus = "ready";
+        }
 
         // A few providers/models label a proofreading result as "review" or
         // "proofreading" even though the request explicitly required the
