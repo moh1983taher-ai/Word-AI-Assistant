@@ -117,7 +117,9 @@ function makeRange(textGetter, absoluteStartGetter) {
             const baseOffset = Number(absoluteStartGetter ? absoluteStartGetter() : 0);
             const matches = [];
             let cursor = 0;
-            if (String(query).trim() && String(query).length <= 255) {
+            if (String(query).trim() &&
+                String(query).length <= 255 &&
+                !/^[\s\p{P}\p{S}]+$/u.test(String(query))) {
                 while ((cursor = source.indexOf(query, cursor)) !== -1) {
                     matches.push(makeMatch(query, baseOffset + cursor, this.context));
                     cursor += query.length;
@@ -419,6 +421,37 @@ global.Word = {
     ));
     assert.equal(longRewriteResult.applied, true);
     assert.equal(documentText, longRevisedOne + "\r\n" + longRevisedTwo);
+
+    // Pure punctuation insertions must not depend on Word.search finding
+    // the punctuation mark itself. The neighboring exact text is the anchor.
+    documentText = "كلمة.";
+    selectionText = "";
+    const punctuationCapture = await revision.capture({ scope: "document" });
+    const punctuationRequest = revision.buildRequest(
+        "أعد صياغة المستند بأسلوب أكاديمي",
+        punctuationCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    const punctuationParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "rewrite",
+        paragraphs: punctuationRequest.revision.rewriteSegments.map(segment => ({
+            segmentId: segment.segmentId,
+            text: "كلمة،."
+        }))
+    }), punctuationCapture.originalText, punctuationRequest.revision);
+    assert.ok(
+        revision.diffTextPreservingParagraphs(
+            punctuationCapture.originalText,
+            punctuationParsed.text
+        ).some(operation => operation.length === 0),
+        "the regression fixture must include a pure insertion"
+    );
+    const punctuationResult = await revision.apply(Object.assign(
+        {}, punctuationCapture, punctuationParsed
+    ));
+    assert.equal(punctuationResult.applied, true);
+    assert.equal(documentText, "كلمة،.");
 
     // Restore the base fixture for the existing document-correction tests.
     documentText = "هذا خطأ واضح";
