@@ -1989,17 +1989,23 @@
             await context.sync();
 
             if (String(range.text || "") !== originalText) {
-                throw new Error("تغير النص الأصلي في Word بعد إرساله للمعالجة؛ أُلغي التطبيق حمايةً للمستند. أعد المعالجة على النص الحالي.");
+                const changedTarget = new Error("تغير النص الأصلي في Word بعد إرساله للمعالجة؛ أُلغي التطبيق حمايةً للمستند. أعد المعالجة على النص الحالي.");
+                if (revision.targetPartId) changedTarget.staleTarget = true;
+                throw changedTarget;
             }
 
             if (revision.targetPartId) {
                 if (typeof range.getOoxml !== "function") {
-                    throw new Error("تعذر إعادة فحص التغييرات المتعقبة في الحاشية قبل التطبيق؛ أُلغي التعديل حمايةً لمراجعات Word.");
+                    const unverifiableNote = new Error("تعذر إعادة فحص التغييرات المتعقبة في الحاشية قبل التطبيق؛ أُلغي التعديل حمايةً لمراجعات Word.");
+                    unverifiableNote.staleTarget = true;
+                    throw unverifiableNote;
                 }
                 const currentNoteOoxml = range.getOoxml();
                 await context.sync();
                 if (DocumentRevisionPreflight.hasTrackedChanges(currentNoteOoxml.value)) {
-                    throw new Error("ظهرت تغييرات متعقبة جديدة في الحاشية بعد التقاطها؛ أُلغي التطبيق حتى تُحسم تلك التغييرات في Word.");
+                    const staleNote = new Error("ظهرت تغييرات متعقبة جديدة في الحاشية بعد التقاطها؛ أُلغي التطبيق حتى تُحسم تلك التغييرات في Word.");
+                    staleNote.staleTarget = true;
+                    throw staleNote;
                 }
             }
 
