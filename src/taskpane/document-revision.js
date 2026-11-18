@@ -2619,6 +2619,8 @@
 
         let previousTrackingMode = "";
         let restoreTrackingMode = false;
+        let changedParts = 0;
+        let appliedNotes = 0;
         try {
             // Resolve every body/note operation before the first mutation. This
             // prevents a stale or ambiguous note target from leaving a partly
@@ -2638,7 +2640,6 @@
                 }
             }
 
-            let changedParts = 0;
             // Notes are independent Word stories. Apply them first and the body
             // last; the note references in the main story remain untouched.
             for (const part of parts) {
@@ -2646,14 +2647,33 @@
                     preflightOnly: false,
                     retainCapture: true
                 }));
-                changedParts += Number(result && result.changedParts) || 0;
+                const partChanges = Number(result && result.changedParts) || 0;
+                changedParts += partChanges;
+                if (partChanges > 0 && part.targetPartId) appliedNotes++;
             }
             return {
                 applied: changedParts > 0,
                 unchanged: changedParts === 0,
                 changedParts: changedParts,
+                appliedNotes: appliedNotes,
                 noteCount: noteRevisions.length
             };
+        } catch (error) {
+            if (changedParts > 0) {
+                const partial = new Error(
+                    "توقف التطبيق بعد تنفيذ " + changedParts + " تغييرًا في " +
+                    appliedNotes + " حاشية. لم تُنفذ بقية الأجزاء؛ لا تعاود التطبيق من هذه المعاينة. " +
+                    "أعد التقاط المستند ومراجعته لمعرفة الحالة الحالية. السبب: " +
+                    String(error && error.message || error)
+                );
+                partial.code = "REVISION_PARTIAL_APPLY";
+                partial.partialApply = true;
+                partial.changedParts = changedParts;
+                partial.appliedNotes = appliedNotes;
+                partial.cause = error;
+                throw partial;
+            }
+            throw error;
         } finally {
             try {
                 if (restoreTrackingMode && previousTrackingMode) {
