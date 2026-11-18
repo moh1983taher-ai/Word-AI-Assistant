@@ -45308,7 +45308,12 @@ async function sendMessage() {
             let currentBatch = [];
             let currentCharacters = 0;
             noteParts.forEach(function (part) {
-                const estimatedSize = part.sourceText.length + part.label.length + 100;
+                const paragraphCount = Math.max(
+                    1,
+                    (String(part.sourceText).match(/\\r\\n|\\r|\\n/g) || []).length + 1
+                );
+                const estimatedSize = part.sourceText.length + part.label.length +
+                    140 + paragraphCount * 110;
                 if (currentBatch.length &&
                     (currentCharacters + estimatedSize > batchCharacterBudget ||
                         currentBatch.length >= maxPartsPerBatch)) {
