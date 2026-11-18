@@ -10,6 +10,7 @@ let itemLoads = 0;
 let searchQueries = [];
 let footnoteText = "حاشية قديمة فيها خطا.";
 let endnoteText = "";
+let documentTrackingMode = "Off";
 
 
 function makeParagraphCollection(textGetter, baseOffsetGetter, context) {
