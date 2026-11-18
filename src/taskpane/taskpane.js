@@ -22015,6 +22015,65 @@ function renderChat() {
                             afterText.style.borderRadius = "6px";
                             afterText.style.background = "rgba(11, 85, 83, 0.06)";
                             details.appendChild(afterText);
+
+                            if (Array.isArray(note.edits) && note.edits.length) {
+                                const editsHeading = document.createElement("div");
+                                editsHeading.textContent = "التصحيحات المحددة (" + note.edits.length + ")";
+                                editsHeading.style.marginTop = "10px";
+                                editsHeading.style.fontSize = "12px";
+                                editsHeading.style.fontWeight = "600";
+                                details.appendChild(editsHeading);
+
+                                note.edits.forEach(function (edit, editIndex) {
+                                    const editCard = document.createElement("div");
+                                    editCard.style.marginTop = "7px";
+                                    editCard.style.padding = "8px";
+                                    editCard.style.border = "1px solid #E4E9ED";
+                                    editCard.style.borderRadius = "7px";
+                                    editCard.style.background = "#FFFFFF";
+
+                                    const editTitle = document.createElement("div");
+                                    editTitle.textContent = "التصحيح " + (editIndex + 1);
+                                    editTitle.style.fontSize = "11px";
+                                    editTitle.style.color = "#667085";
+                                    editCard.appendChild(editTitle);
+
+                                    const originalLine = document.createElement("div");
+                                    originalLine.style.marginTop = "4px";
+                                    originalLine.textContent = "الأصل: " + String(edit.original || "");
+                                    originalLine.style.color = "#B42318";
+                                    originalLine.style.whiteSpace = "pre-wrap";
+                                    editCard.appendChild(originalLine);
+
+                                    const replacementLine = document.createElement("div");
+                                    replacementLine.style.marginTop = "3px";
+                                    replacementLine.textContent = "الصواب: " + String(edit.replacement || "");
+                                    replacementLine.style.color = "#067647";
+                                    replacementLine.style.whiteSpace = "pre-wrap";
+                                    editCard.appendChild(replacementLine);
+
+                                    if (edit.reason) {
+                                        const reasonLine = document.createElement("div");
+                                        reasonLine.style.marginTop = "4px";
+                                        reasonLine.textContent = "السبب: " + String(edit.reason);
+                                        reasonLine.style.fontSize = "12px";
+                                        reasonLine.style.color = "#475467";
+                                        reasonLine.style.whiteSpace = "pre-wrap";
+                                        editCard.appendChild(reasonLine);
+                                    }
+                                    details.appendChild(editCard);
+                                });
+                            }
+
+                            if (Array.isArray(note.rejectedEdits) && note.rejectedEdits.length) {
+                                const rejectedNotice = document.createElement("div");
+                                rejectedNotice.textContent = "عُزل " + note.rejectedEdits.length +
+                                    " اقتراحًا لم يجتز التحقق من موضعه؛ لم تُدرج في التعديلات.";
+                                rejectedNotice.style.marginTop = "8px";
+                                rejectedNotice.style.fontSize = "12px";
+                                rejectedNotice.style.color = "#B54708";
+                                details.appendChild(rejectedNotice);
+                            }
                         } else if (note.protected) {
                             const protectedText = document.createElement("div");
                             protectedText.textContent = "لم تُعدّل هذه الحاشية لوجود تغييرات متعقبة سابقة.";
