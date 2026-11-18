@@ -21995,11 +21995,13 @@ function renderChat() {
 
                         const summary = document.createElement("summary");
                         const noteEditCount = Array.isArray(note.edits) ? note.edits.length : 0;
+                        const noteFlagCount = Array.isArray(note.flags) ? note.flags.length : 0;
                         summary.textContent = note.label +
                             (note.protected ? " — مستثناة للحماية" :
                                 (String(note.originalText || "") === String(note.text || "")
-                                    ? " — لا تغييرات"
-                                    : " — " + noteEditCount + " تصحيحًا مقترحًا"));
+                                    ? " — لا تصحيحات قابلة للتطبيق"
+                                    : " — " + noteEditCount + " تصحيحًا مقترحًا") +
+                                (noteFlagCount ? "، و" + noteFlagCount + " موضع تحقق" : ""));
                         summary.style.cursor = "pointer";
                         summary.style.fontWeight = "500";
                         details.appendChild(summary);
@@ -22080,6 +22082,27 @@ function renderChat() {
                                     replacementLine.style.whiteSpace = "pre-wrap";
                                     editCard.appendChild(replacementLine);
 
+                                    const categoryLabels = {
+                                        spelling: "إملاء",
+                                        grammar: "نحو",
+                                        punctuation: "ترقيم",
+                                        citation_format: "تنسيق إحالة",
+                                        bibliographic_name: "اسم ببليوغرافي",
+                                        other: "أخرى"
+                                    };
+                                    const confidenceValue = Number(edit.confidence);
+                                    const hasConfidence = edit.confidence !== null &&
+                                        edit.confidence !== undefined && edit.confidence !== "" &&
+                                        Number.isFinite(confidenceValue);
+                                    const editMeta = document.createElement("div");
+                                    editMeta.style.marginTop = "4px";
+                                    editMeta.style.fontSize = "11px";
+                                    editMeta.style.color = "#667085";
+                                    editMeta.textContent = "التصنيف: " +
+                                        (categoryLabels[String(edit.category || "other")] || "أخرى") +
+                                        (hasConfidence ? " — الثقة التقديرية: " + Math.round(confidenceValue * 100) + "%" : "");
+                                    editCard.appendChild(editMeta);
+
                                     if (edit.reason) {
                                         const reasonLine = document.createElement("div");
                                         reasonLine.style.marginTop = "4px";
@@ -22138,6 +22161,60 @@ function renderChat() {
                             protectedText.style.color = "#667085";
                             protectedText.style.marginTop = "6px";
                             details.appendChild(protectedText);
+                        }
+
+                        if (Array.isArray(note.flags) && note.flags.length) {
+                            const flagsHeading = document.createElement("div");
+                            flagsHeading.textContent = "مواضع تحتاج إلى تحقق — لا تُطبّق (" + note.flags.length + ")";
+                            flagsHeading.style.marginTop = "10px";
+                            flagsHeading.style.fontSize = "12px";
+                            flagsHeading.style.fontWeight = "600";
+                            flagsHeading.style.color = "#B54708";
+                            details.appendChild(flagsHeading);
+
+                            note.flags.forEach(function (flag, flagIndex) {
+                                const flagCard = document.createElement("div");
+                                flagCard.style.marginTop = "6px";
+                                flagCard.style.padding = "7px";
+                                flagCard.style.border = "1px solid #FECBA1";
+                                flagCard.style.borderRadius = "7px";
+                                flagCard.style.background = "rgba(181, 71, 8, 0.035)";
+
+                                const flagText = document.createElement("div");
+                                flagText.textContent = (flagIndex + 1) + ". «" +
+                                    String(flag.text || "موضع غير محدد") + "»";
+                                flagText.style.fontSize = "12px";
+                                flagText.style.fontWeight = "600";
+                                flagText.style.whiteSpace = "pre-wrap";
+                                flagCard.appendChild(flagText);
+
+                                const flagReason = document.createElement("div");
+                                flagReason.textContent = String(flag.reason || "يتطلب مراجعة بشرية.");
+                                flagReason.style.marginTop = "4px";
+                                flagReason.style.fontSize = "11px";
+                                flagReason.style.color = "#B54708";
+                                flagCard.appendChild(flagReason);
+
+                                const flagConfidence = Number(flag.confidence);
+                                const hasFlagConfidence = flag.confidence !== null &&
+                                    flag.confidence !== undefined && flag.confidence !== "" &&
+                                    Number.isFinite(flagConfidence);
+                                const flagMeta = document.createElement("div");
+                                flagMeta.textContent = "التصنيف: " + (
+                                    flag.category === "bibliographic_verification"
+                                        ? "تحقق ببليوغرافي"
+                                        : flag.category === "low_confidence_review"
+                                            ? "ثقة منخفضة — مراجعة بشرية"
+                                            : String(flag.category || "مراجعة بشرية")
+                                ) + (hasFlagConfidence
+                                    ? " — الثقة التقديرية: " + Math.round(flagConfidence * 100) + "%"
+                                    : "");
+                                flagMeta.style.marginTop = "4px";
+                                flagMeta.style.fontSize = "11px";
+                                flagMeta.style.color = "#667085";
+                                flagCard.appendChild(flagMeta);
+                                details.appendChild(flagCard);
+                            });
                         }
                         notesPanel.appendChild(details);
                     });
