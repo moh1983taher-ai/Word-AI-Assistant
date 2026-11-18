@@ -21980,11 +21980,12 @@ function renderChat() {
                         details.style.borderTop = "1px solid #E4E9ED";
 
                         const summary = document.createElement("summary");
+                        const noteEditCount = Array.isArray(note.edits) ? note.edits.length : 0;
                         summary.textContent = note.label +
                             (note.protected ? " — مستثناة للحماية" :
                                 (String(note.originalText || "") === String(note.text || "")
                                     ? " — لا تغييرات"
-                                    : " — توجد تعديلات مقترحة"));
+                                    : " — " + noteEditCount + " تصحيحًا مقترحًا"));
                         summary.style.cursor = "pointer";
                         summary.style.fontWeight = "500";
                         details.appendChild(summary);
@@ -22079,13 +22080,41 @@ function renderChat() {
                             }
 
                             if (Array.isArray(note.rejectedEdits) && note.rejectedEdits.length) {
-                                const rejectedNotice = document.createElement("div");
-                                rejectedNotice.textContent = "عُزل " + note.rejectedEdits.length +
-                                    " اقتراحًا لم يجتز التحقق من موضعه؛ لم تُدرج في التعديلات.";
-                                rejectedNotice.style.marginTop = "8px";
-                                rejectedNotice.style.fontSize = "12px";
-                                rejectedNotice.style.color = "#B54708";
-                                details.appendChild(rejectedNotice);
+                                const rejectedHeading = document.createElement("div");
+                                rejectedHeading.textContent = "مواضع معزولة — لم تُطبّق (" +
+                                    note.rejectedEdits.length + ")";
+                                rejectedHeading.style.marginTop = "10px";
+                                rejectedHeading.style.fontSize = "12px";
+                                rejectedHeading.style.fontWeight = "600";
+                                rejectedHeading.style.color = "#B54708";
+                                details.appendChild(rejectedHeading);
+
+                                note.rejectedEdits.forEach(function (rejected, rejectedIndex) {
+                                    const rejectedCard = document.createElement("div");
+                                    rejectedCard.style.marginTop = "6px";
+                                    rejectedCard.style.padding = "7px";
+                                    rejectedCard.style.border = "1px solid #FECBA1";
+                                    rejectedCard.style.borderRadius = "7px";
+                                    rejectedCard.style.background = "rgba(181, 71, 8, 0.035)";
+
+                                    const rejectedText = document.createElement("div");
+                                    rejectedText.textContent = (rejectedIndex + 1) + ". " +
+                                        String(rejected.original || "موضع غير محدد");
+                                    rejectedText.style.fontSize = "12px";
+                                    rejectedText.style.whiteSpace = "pre-wrap";
+                                    rejectedCard.appendChild(rejectedText);
+
+                                    const rejectedReason = document.createElement("div");
+                                    rejectedReason.textContent = String(
+                                        rejected.rejectionReason || rejected.reason ||
+                                        "لم يجتز الموضع التحقق الدقيق."
+                                    );
+                                    rejectedReason.style.marginTop = "4px";
+                                    rejectedReason.style.fontSize = "11px";
+                                    rejectedReason.style.color = "#B54708";
+                                    rejectedCard.appendChild(rejectedReason);
+                                    details.appendChild(rejectedCard);
+                                });
                             }
                         } else if (note.protected) {
                             const protectedText = document.createElement("div");
