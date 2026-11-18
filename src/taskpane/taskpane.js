@@ -22089,7 +22089,8 @@ function renderChat() {
                             }
                         } else if (note.protected) {
                             const protectedText = document.createElement("div");
-                            protectedText.textContent = "لم تُعدّل هذه الحاشية لوجود تغييرات متعقبة سابقة.";
+                            protectedText.textContent = String(note.protectionReason ||
+                                "لم تُعدّل هذه الحاشية لوجود تغييرات متعقبة سابقة.");
                             protectedText.style.fontSize = "12px";
                             protectedText.style.color = "#667085";
                             protectedText.style.marginTop = "6px";
