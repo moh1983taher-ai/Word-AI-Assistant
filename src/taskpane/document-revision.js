@@ -1528,7 +1528,6 @@
 
                 const candidates = [];
                 const seen = new Set();
-                const lengths = [80, 48, 24, 12, 6];
 
                 function add(text, start, location) {
                     if (!text || !text.trim()) return;
@@ -1548,6 +1547,30 @@
                     });
                 }
 
+                // Prefer a single adjacent word range. It is less likely to
+                // overlap a second edit later in the same paragraph than a
+                // long context range, and it pins the insertion at its exact
+                // boundary.
+                const tokens = tokenize(source);
+                const previous = tokens.slice().reverse().find(function (token) {
+                    return token.end === position && !/^\s+$/.test(token.value);
+                });
+                const next = tokens.find(function (token) {
+                    return token.start === position && !/^\s+$/.test(token.value);
+                });
+                const isWord = function (token) {
+                    return !!token && /[\p{L}\p{N}_]/u.test(token.value);
+                };
+
+                if (isWord(previous)) add(previous.value, previous.start, "After");
+                if (isWord(next)) add(next.value, next.start, "Before");
+                if (previous && !isWord(previous)) add(previous.value, previous.start, "After");
+                if (next && !isWord(next)) add(next.value, next.start, "Before");
+
+                // If the immediate word is not searchable or is ambiguous,
+                // progressively widen the exact context. Keep these after
+                // edge-token candidates to minimize overlap with other edits.
+                const lengths = [12, 24, 48, 80];
                 lengths.forEach(function (length) {
                     const prefixStart = Math.max(lineStart, position - length);
                     if (prefixStart < position) {
