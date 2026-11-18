@@ -21965,7 +21965,11 @@ function renderChat() {
                     notesPanel.style.background = "rgba(11, 85, 83, 0.035)";
 
                     const notesHeading = document.createElement("div");
-                    notesHeading.textContent = "مراجعة الحواشي";
+                    const noteBatchLabel = Number(msg.documentRevision.notesBatchCount) > 0
+                        ? " — " + msg.documentRevision.noteCount + " حاشية في " +
+                            msg.documentRevision.notesBatchCount + " دفعة"
+                        : " — " + msg.documentRevision.noteCount + " حاشية";
+                    notesHeading.textContent = "مراجعة الحواشي" + noteBatchLabel;
                     notesHeading.style.fontWeight = "600";
                     notesHeading.style.marginBottom = "8px";
                     notesPanel.appendChild(notesHeading);
@@ -45398,12 +45402,14 @@ async function sendMessage() {
             const capturedNotes = Array.isArray(documentRevisionCapture.notes)
                 ? documentRevisionCapture.notes
                 : [];
+            let notesBatchCount = 0;
 
             if (window.DocumentRevision.isCorrectionOnlyRequest(text)) {
                 const batchedReview = await reviewNotesInBatches(capturedNotes);
                 if (batchedReview.status === "clarify") {
                     finalAnswer = batchedReview.question;
                 } else {
+                    notesBatchCount = Number(batchedReview.batchCount) || 0;
                     noteReviews.push.apply(noteReviews, batchedReview.notes);
                 }
             } else {
@@ -45515,6 +45521,7 @@ async function sendMessage() {
                     notes: noteReviews,
                     notesSupported: documentRevisionCapture.notesSupported !== false,
                     noteCount: noteReviews.length,
+                    notesBatchCount: notesBatchCount,
                     status: "ready",
                     applied: false
                 });
