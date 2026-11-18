@@ -45342,6 +45342,7 @@ async function sendMessage() {
                         mode: "correction",
                         status: "ready",
                         protected: true,
+                        protectionReason: note.protectionReason || "",
                         applied: false
                     });
                     continue;
