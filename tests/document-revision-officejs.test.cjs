@@ -12,6 +12,7 @@ let footnoteText = "حاشية قديمة فيها خطا.";
 let endnoteText = "";
 let documentTrackingMode = "Off";
 let noteTrackedChanges = false;
+let bodyApplyMustBeUntracked = false;
 
 
 function makeParagraphCollection(textGetter, baseOffsetGetter, context) {
@@ -172,6 +173,13 @@ function makeMatch(initialText, absoluteStart, context) {
             return makeRangeSegment(point, point, context);
         },
         insertText(replacement, location) {
+            if (bodyApplyMustBeUntracked) {
+                assert.equal(
+                    documentTrackingMode,
+                    "Off",
+                    "main-body changes must retain the original Word tracking mode"
+                );
+            }
             const current = String(documentText);
             if (current.slice(absoluteStart, absoluteStart + text.length) !== text) {
                 throw new Error("mock Word range no longer matches its source text");
@@ -921,9 +929,13 @@ global.Word = {
         id: noteWorkspaceCapture.id,
         targetType: "document",
         originalText: noteWorkspaceCapture.originalText,
-        text: noteWorkspaceCapture.originalText,
+        text: "نص المتن يبقى ثابتًا.",
         mode: "correction",
-        edits: [],
+        edits: [{
+            start: "نص المتن يبقى كما هو.".indexOf("كما هو"),
+            original: "كما هو",
+            replacement: "ثابتًا"
+        }],
         status: "ready",
         notes: noteBatchParsed.parts.map(function (part, index) {
             const sourceNote = noteWorkspaceCapture.notes[index];
@@ -943,10 +955,12 @@ global.Word = {
             };
         })
     };
+    bodyApplyMustBeUntracked = true;
     const workspaceApplied = await revision.applyWorkspace(workspaceRevision);
+    bodyApplyMustBeUntracked = false;
     assert.equal(workspaceApplied.applied, true);
     assert.equal(workspaceApplied.noteCount, 2);
-    assert.equal(documentText, "نص المتن يبقى كما هو.");
+    assert.equal(documentText, "نص المتن يبقى ثابتًا.");
     assert.equal(footnoteText, "حاشية سفلية قديمة فيها خطأ.");
     assert.equal(endnoteText, "حاشية ختامية قديمة فيها خطأ.");
     assert.equal(documentTrackingMode, "Off", "the user's original change-tracking mode must be restored after applying notes");
