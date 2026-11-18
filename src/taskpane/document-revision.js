@@ -1734,14 +1734,20 @@
                         : "";
                     if (!note.originalText.trim()) {
                         note.protected = true;
+                        note.protectionReason = "الحاشية فارغة أو لم يُرجع Word نصها.";
                         note.protectedRanges = [];
                         return;
                     }
 
-                    const hasChanges = noteOoxmlResults[index] &&
-                        DocumentRevisionPreflight.hasTrackedChanges(noteOoxmlResults[index].value);
-                    if (hasChanges) {
+                    if (!noteOoxmlResults[index]) {
                         note.protected = true;
+                        note.protectionReason = "تعذر فحص بنية الحاشية للتحقق من التغييرات المتعقبة.";
+                    } else if (DocumentRevisionPreflight.hasTrackedChanges(noteOoxmlResults[index].value)) {
+                        note.protected = true;
+                        note.protectionReason = "تتضمن الحاشية تغييرات متعقبة سابقة لم تُحسم بعد.";
+                    }
+
+                    if (note.protected) {
                         note.protectedRanges = [{
                             paragraphIndex: 0,
                             start: 0,
@@ -1772,7 +1778,8 @@
                         label: note.label,
                         referenceText: note.referenceText,
                         originalText: note.originalText,
-                        protected: note.protected
+                        protected: note.protected,
+                        protectionReason: note.protectionReason || ""
                     };
                 })
             };
@@ -1966,6 +1973,17 @@
 
             if (String(range.text || "") !== originalText) {
                 throw new Error("تغير النص الأصلي في Word بعد إرساله للمعالجة؛ أُلغي التطبيق حمايةً للمستند. أعد المعالجة على النص الحالي.");
+            }
+
+            if (revision.targetPartId) {
+                if (typeof range.getOoxml !== "function") {
+                    throw new Error("تعذر إعادة فحص التغييرات المتعقبة في الحاشية قبل التطبيق؛ أُلغي التعديل حمايةً لمراجعات Word.");
+                }
+                const currentNoteOoxml = range.getOoxml();
+                await context.sync();
+                if (DocumentRevisionPreflight.hasTrackedChanges(currentNoteOoxml.value)) {
+                    throw new Error("ظهرت تغييرات متعقبة جديدة في الحاشية بعد التقاطها؛ أُلغي التطبيق حتى تُحسم تلك التغييرات في Word.");
+                }
             }
 
             let paragraphTargets = [];
