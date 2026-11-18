@@ -45431,6 +45431,7 @@ async function sendMessage() {
                         text: note.originalText,
                         edits: [],
                         rejectedEdits: [],
+                        flags: [],
                         mode: "correction",
                         status: "ready",
                         protected: true,
@@ -45447,6 +45448,7 @@ async function sendMessage() {
                 let revisedText = "";
                 const noteEdits = [];
                 const noteRejected = [];
+                const noteFlags = [];
                 chunks.forEach(function (part) {
                     if (part.sourceOffset !== expectedOffset ||
                         String(note.originalText).slice(part.sourceOffset, part.sourceOffset + part.originalText.length) !== part.originalText) {
@@ -45462,6 +45464,12 @@ async function sendMessage() {
                     });
                     (part.rejected || []).forEach(function (edit) {
                         noteRejected.push(Object.assign({}, edit, {
+                            batch: part.notePartId,
+                            noteId: note.id
+                        }));
+                    });
+                    (part.flags || []).forEach(function (flag) {
+                        noteFlags.push(Object.assign({}, flag, {
                             batch: part.notePartId,
                             noteId: note.id
                         }));
@@ -45483,6 +45491,7 @@ async function sendMessage() {
                     text: revisedText,
                     edits: noteEdits,
                     rejectedEdits: noteRejected,
+                    flags: noteFlags,
                     mode: "correction",
                     status: "ready",
                     protected: false,
@@ -45624,12 +45633,22 @@ async function sendMessage() {
                     finalAnswer += "\nوعُزل " + noteRejectedCount +
                         " تصحيحًا في الحواشي لعدم إمكان التحقق من موضعه بأمان.";
                 }
+                const noteFlagCount = noteReviews.reduce(function (sum, note) {
+                    return sum + (Array.isArray(note.flags) ? note.flags.length : 0);
+                }, 0);
+                if (noteFlagCount) {
+                    finalAnswer += "\nووُضع " + noteFlagCount +
+                        " موضعًا في الحواشي ضمن قائمة التحقق البشري أو الرجوع إلى المصدر؛ لم تُدرج هذه المواضع ضمن التعديلات.";
+                }
 
                 revisionMetadata = Object.assign({}, mainReview, {
                     notes: noteReviews,
                     notesSupported: documentRevisionCapture.notesSupported !== false,
                     noteCount: noteReviews.length,
                     notesBatchCount: notesBatchCount,
+                    noteFlagCount: noteReviews.reduce(function (sum, note) {
+                        return sum + (Array.isArray(note.flags) ? note.flags.length : 0);
+                    }, 0),
                     status: "ready",
                     applied: false
                 });
