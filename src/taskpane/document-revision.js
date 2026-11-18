@@ -1505,6 +1505,63 @@
             // long spans can exceed search limits, and whitespace-only spans
             // may return no ranges. Fall back to short, verifiable anchors
             // around the edit, then expand only between their boundary points.
+            // Pure insertions often point at punctuation, whitespace, or a
+            // boundary that Word.search cannot return as a range. Search a
+            // short exact context ending at / starting at the insertion point
+            // instead, then insert at that context's edge.
+            function buildInsertionSearchCandidates(searchRange, sourceText, offset) {
+                const source = String(sourceText || "");
+                const position = Number(offset);
+                const previousBreak = Math.max(
+                    source.lastIndexOf("\\r", Math.max(0, position - 1)),
+                    source.lastIndexOf("\\n", Math.max(0, position - 1))
+                );
+                const lineStart = previousBreak + 1;
+                const nextCr = source.indexOf("\\r", position);
+                const nextLf = source.indexOf("\\n", position);
+                let lineEnd = source.length;
+                if (nextCr >= 0) lineEnd = Math.min(lineEnd, nextCr);
+                if (nextLf >= 0) lineEnd = Math.min(lineEnd, nextLf);
+                if (!Number.isInteger(position) || position < lineStart || position > lineEnd) {
+                    throw new Error("موضع الإضافة خارج الفقرة المصدرية.");
+                }
+
+                const candidates = [];
+                const seen = new Set();
+                const lengths = [80, 48, 24, 12, 6];
+
+                function add(text, start, location) {
+                    if (!text || !text.trim()) return;
+                    const key = location + "|" + start + "|" + text;
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    const search = searchRange.search(text, {
+                        matchCase: true,
+                        matchWholeWord: false
+                    });
+                    search.load("items");
+                    candidates.push({
+                        text: text,
+                        start: start,
+                        location: location,
+                        search: search
+                    });
+                }
+
+                lengths.forEach(function (length) {
+                    const prefixStart = Math.max(lineStart, position - length);
+                    if (prefixStart < position) {
+                        add(source.slice(prefixStart, position), prefixStart, "After");
+                    }
+                    const suffixEnd = Math.min(lineEnd, position + length);
+                    if (position < suffixEnd) {
+                        add(source.slice(position, suffixEnd), position, "Before");
+                    }
+                });
+
+                return candidates;
+            }
+
             function prepareContextFallback(item, expectedText, expectedStart) {
                 const source = String(item.searchSourceText || originalText);
                 const expectedEnd = expectedStart + expectedText.length;
@@ -1689,16 +1746,29 @@
                             anchor.token.value.length
                         );
                         const searchRange = paragraphTarget ? paragraphTarget.paragraph : range;
-                        const search = searchRange.search(anchor.token.value, { matchCase: true, matchWholeWord: false });
-                        search.load("items");
+                        const searchSourceText = paragraphTarget ? paragraphTarget.text : originalText;
+                        const searchExpectedStart = paragraphTarget
+                            ? anchor.token.start - paragraphTarget.start
+                            : anchor.token.start;
+                        const insertionOffset = paragraphTarget
+                            ? operation.start - paragraphTarget.start
+                            : operation.start;
+                        const candidates = buildInsertionSearchCandidates(
+                            searchRange,
+                            searchSourceText,
+                            insertionOffset
+                        );
+                        if (!candidates.length) {
+                            throw new Error("تعذر إنشاء علامات سياقية لتحديد موضع الإضافة بأمان.");
+                        }
                         prepared.push({
                             operation: operation,
-                            search: search,
+                            searchCandidates: candidates,
                             searchRange: searchRange,
                             kind: "insert",
                             anchor: anchor,
-                            searchSourceText: paragraphTarget ? paragraphTarget.text : originalText,
-                            searchExpectedStart: paragraphTarget ? anchor.token.start - paragraphTarget.start : anchor.token.start
+                            searchSourceText: searchSourceText,
+                            searchExpectedStart: searchExpectedStart
                         });
                     } else {
                         throw new Error("تعذر تحديد موضع إضافة إحدى العبارات بأمان؛ لم يُعدّل المستند.");
@@ -1710,14 +1780,22 @@
 
             // Load every search collection's item array before reading .items.
             // Then load each match's text in a second, explicit synchronization.
-            const searchable = prepared.filter(function (item) { return !!item.search; });
-            searchable.forEach(function (item) {
-                item.search.load("items");
+            const searchable = [];
+            prepared.forEach(function (item) {
+                if (item.search) searchable.push(item.search);
+                if (Array.isArray(item.searchCandidates)) {
+                    item.searchCandidates.forEach(function (candidate) {
+                        searchable.push(candidate.search);
+                    });
+                }
+            });
+            searchable.forEach(function (search) {
+                search.load("items");
             });
             await context.sync();
 
-            searchable.forEach(function (item) {
-                item.search.items.forEach(function (match) { match.load("text"); });
+            searchable.forEach(function (search) {
+                search.items.forEach(function (match) { match.load("text"); });
             });
             await context.sync();
 
@@ -1755,6 +1833,46 @@
                     } catch (_) {
                         fallbackPlans.push(prepareContextFallback(item, expectedText, expectedStart));
                     }
+                    continue;
+                }
+
+                if (item.kind === "insert") {
+                    let selected = null;
+                    const failures = [];
+                    item.searchCandidates.forEach(function (candidate) {
+                        if (selected) return;
+                        try {
+                            const target = resolveSearchMatchByOccurrence(
+                                candidate.search.items,
+                                item.searchSourceText || originalText,
+                                candidate.text,
+                                candidate.start
+                            );
+                            selected = {
+                                target: target,
+                                location: candidate.location
+                            };
+                        } catch (error) {
+                            failures.push({
+                                length: candidate.text.length,
+                                results: candidate.search.items.length,
+                                message: String(error && error.message || error)
+                            });
+                        }
+                    });
+                    if (!selected) {
+                        throw new Error(
+                            "تعذر تثبيت موضع الإضافة بسياق نصي فريد؛ لم يُعدّل المستند. " +
+                            "تفاصيل محاولات السياق: " +
+                            JSON.stringify(failures.slice(0, 6))
+                        );
+                    }
+                    resolved.push({
+                        ...item,
+                        target: selected.target,
+                        location: selected.location,
+                        replacement: item.operation.replacement
+                    });
                     continue;
                 }
 
@@ -1823,7 +1941,9 @@
             resolved.sort(function (a, b) { return b.operation.start - a.operation.start; });
             const insertedRanges = [];
             resolved.forEach(function (item) {
-                const location = item.kind === "insert" ? item.anchor.location : "Replace";
+                const location = item.kind === "insert"
+                    ? (item.location || item.anchor.location)
+                    : "Replace";
                 const replacement = item.replacement !== undefined
                     ? item.replacement
                     : item.operation.replacement;
