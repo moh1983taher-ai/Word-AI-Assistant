@@ -718,20 +718,46 @@
             throw failure;
         }
 
-        if (parsed && parsed.status === "clarify" && String(parsed.question || "").trim()) {
+        const activeRequestMetadata = requestMetadata ||
+            (pendingTarget && pendingTarget.lastRevisionMetadata) ||
+            null;
+
+        if (parsed && String(parsed.status || "").trim().toLowerCase() === "clarify" &&
+            String(parsed.question || "").trim()) {
             if (pendingTarget) pendingTarget.lastMaskedChunk = null;
             return { status: "clarify", question: String(parsed.question).trim() };
         }
 
-        const mode = String(parsed && parsed.mode || "");
-        if (!parsed || parsed.status !== "ready" ||
+        const responseStatus = String(parsed && parsed.status || "").trim().toLowerCase();
+        let mode = String(parsed && parsed.mode || "").trim().toLowerCase();
+        const expectedCorrection = Boolean(
+            activeRequestMetadata &&
+            (activeRequestMetadata.structuredCorrection === true ||
+                isCorrectionOnlyRequest(activeRequestMetadata.userInstruction))
+        );
+
+        // A few providers/models label a proofreading result as "review" or
+        // "proofreading" even though the request explicitly required the
+        // correction JSON schema. When the response contains the complete
+        // edits array, use the request contract (not the model's label) as
+        // the authority. All individual edits are still validated below.
+        if (expectedCorrection && Array.isArray(parsed && parsed.edits) &&
             !["correction", "rewrite", "combined"].includes(mode)) {
-            throw new Error("نتيجة المعالجة غير مكتملة أو غير صالحة؛ لم يُمس المستند.");
+            mode = "correction";
         }
 
-        const activeRequestMetadata = requestMetadata ||
-            (pendingTarget && pendingTarget.lastRevisionMetadata) ||
-            null;
+        if (!parsed || responseStatus !== "ready" ||
+            !["correction", "rewrite", "combined"].includes(mode)) {
+            const responseKeys = parsed && typeof parsed === "object"
+                ? Object.keys(parsed).slice(0, 10).join(", ")
+                : "غير متاح";
+            throw new Error(
+                "نتيجة المعالجة غير مكتملة أو غير صالحة؛ لم يُمس المستند. " +
+                "(status=" + (responseStatus || "مفقود") +
+                "، mode=" + (mode || "مفقود") +
+                "، الحقول=" + (responseKeys || "لا توجد") + ")."
+            );
+        }
 
         if (mode === "correction") {
             if (!Array.isArray(parsed.edits)) {

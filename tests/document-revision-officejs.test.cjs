@@ -534,6 +534,42 @@ global.Word = {
         false
     );
 
+    // Exercise the complete proofreading path in a note-bearing paragraph.
+    // Some model endpoints return "review" instead of the requested literal
+    // mode "correction"; the parser may normalize that label only because the
+    // request metadata explicitly identifies a proofreading operation and
+    // the payload contains the structured edits array.
+    documentText = "هذه فقرة فيها خطا.\u0002";
+    selectionText = "";
+    const correctionNoteCapture = await revision.capture({ scope: "document" });
+    const correctionNoteRequest = revision.buildRequest(
+        "صحح المستند لغويًا ونحويًا فقط",
+        correctionNoteCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    const correctionParagraphId = correctionNoteRequest.revision.paragraphRecords[0].paragraphId;
+    assert.equal(correctionNoteRequest.revision.structuredCorrection, true);
+    assert.equal(correctionNoteRequest.revision.paragraphRecords[0].locked, false);
+    const correctionNoteParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "review",
+        edits: [{
+            paragraphId: correctionParagraphId,
+            original: "خطا",
+            replacement: "خطأ",
+            contextBefore: "هذه فقرة فيها ",
+            contextAfter: ".",
+            reason: "تصويب إملائي"
+        }]
+    }), correctionNoteCapture.originalText, correctionNoteRequest.revision);
+    assert.equal(correctionNoteParsed.mode, "correction");
+    assert.equal(correctionNoteParsed.text, "هذه فقرة فيها خطأ.\u0002");
+    const correctionNoteResult = await revision.apply(Object.assign(
+        {}, correctionNoteCapture, correctionNoteParsed
+    ));
+    assert.equal(correctionNoteResult.applied, true);
+    assert.equal(documentText, "هذه فقرة فيها خطأ.\u0002");
+
     // Restore the base fixture for the existing document-correction tests.
     documentText = "هذا خطأ واضح";
     selectionText = "";
