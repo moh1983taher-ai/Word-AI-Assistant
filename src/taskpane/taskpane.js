@@ -45525,14 +45525,19 @@ async function sendMessage() {
                 }
 
                 if (changedNotes.length) {
-                    finalAnswer += "\n\nنتائج مراجعة الحواشي (" + changedNotes.length + "):\n" +
+                    const noteEditCount = changedNotes.reduce(function (sum, note) {
+                        return sum + (Array.isArray(note.edits) ? note.edits.length : 0);
+                    }, 0);
+                    finalAnswer += "\n\nنتائج مراجعة الحواشي (" + changedNotes.length + " حاشية):\n" +
                         changedNotes.map(function (note) {
                             const count = Array.isArray(note.edits) ? note.edits.length : 0;
                             return "• " + note.label + ": " +
                                 (note.mode === "correction" && count
                                     ? count + " موضعًا مقترحًا للتصحيح"
                                     : "صياغة مقترحة جاهزة للمعاينة");
-                        }).join("\n");
+                        }).join("\n") +
+                        "\nإجمالي التصحيحات المقترحة في الحواشي: " + noteEditCount +
+                        (notesBatchCount ? " (راجعت في " + notesBatchCount + " دفعة)." : ".");
                 } else if (noteReviews.length) {
                     finalAnswer += "\n\nتم فحص " + noteReviews.length +
                         " حاشية؛ لم تظهر تعديلات لغوية تستلزم التطبيق.";
