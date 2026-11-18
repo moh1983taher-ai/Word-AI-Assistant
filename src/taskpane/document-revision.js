@@ -2506,7 +2506,7 @@
             if (unverifiable) {
                 throw new Error("لم يجتز أحد التعديلات التحقق بعد إدراجه في Word؛ راجع المستند قبل متابعة العمل.");
             }
-            appliedCount = insertedRanges.length;
+            appliedCount = resolved.length;
 
             if (pendingTarget && pendingTarget.id === revision.id && !revision.retainCapture) {
                 const previous = pendingTarget;
@@ -2544,6 +2544,30 @@
         return { applied: true, unchanged: false, changedParts: appliedCount };
     }
 
+    async function getDocumentChangeTrackingMode() {
+        if (typeof Word === "undefined" || !Word.run ||
+            !Office.context.requirements.isSetSupported("WordApi", "1.4")) {
+            throw new Error("يتطلب تسجيل تصحيحات الحواشي دعم تتبع التغييرات في WordApi 1.4 على الأقل.");
+        }
+        let mode = "";
+        await Word.run(async function (context) {
+            context.document.load("changeTrackingMode");
+            await context.sync();
+            mode = String(context.document.changeTrackingMode || "");
+        });
+        if (!["Off", "TrackAll", "TrackMineOnly"].includes(mode)) {
+            throw new Error("تعذر قراءة حالة تتبع التغييرات في Word؛ لم تُطبق تصحيحات الحواشي.");
+        }
+        return mode;
+    }
+
+    async function setDocumentChangeTrackingMode(mode) {
+        await Word.run(async function (context) {
+            context.document.changeTrackingMode = mode;
+            await context.sync();
+        });
+    }
+
     async function applyWorkspace(revision) {
         if (!revision || !revision.id) {
             throw new Error("بيانات مساحة المراجعة غير مكتملة.");
@@ -2575,12 +2599,25 @@
             return { applied: false, unchanged: true, changedParts: 0, noteCount: 0 };
         }
 
+        let previousTrackingMode = "";
+        let restoreTrackingMode = false;
         try {
             // Resolve every body/note operation before the first mutation. This
             // prevents a stale or ambiguous note target from leaving a partly
             // revised main document.
             for (const part of parts) {
                 await apply(Object.assign({}, part, { preflightOnly: true, retainCapture: true }));
+            }
+
+            // Footnote/endnote corrections must be reviewable as native Word
+            // tracked changes, not merely colored insertions. Preserve the
+            // user's document-wide setting and restore it after all edits.
+            if (noteRevisions.length) {
+                previousTrackingMode = await getDocumentChangeTrackingMode();
+                if (previousTrackingMode === "Off") {
+                    await setDocumentChangeTrackingMode("TrackAll");
+                    restoreTrackingMode = true;
+                }
             }
 
             let changedParts = 0;
@@ -2600,7 +2637,13 @@
                 noteCount: noteRevisions.length
             };
         } finally {
-            await releasePendingTarget();
+            try {
+                if (restoreTrackingMode && previousTrackingMode) {
+                    await setDocumentChangeTrackingMode(previousTrackingMode);
+                }
+            } finally {
+                await releasePendingTarget();
+            }
         }
     }
 
