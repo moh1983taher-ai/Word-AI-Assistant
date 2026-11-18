@@ -45122,23 +45122,116 @@ async function sendMessage() {
             };
         }
 
-        const mainReview = await reviewRevisionTarget(
-            documentRevisionCapture,
-            "",
-            "المتن"
-        );
-        if (mainReview.status === "clarify") {
-            finalAnswer = mainReview.question;
-        } else {
-            const noteReviews = [];
-            const capturedNotes = Array.isArray(documentRevisionCapture.notes)
-                ? documentRevisionCapture.notes
-                : [];
+        async function reviewNotesInBatches(notes) {
+            const noteParts = [];
+            const maxPartCharacters = 3000;
+            const batchCharacterBudget = 5200;
+            const maxPartsPerBatch = 8;
 
-            for (const note of capturedNotes) {
+            (Array.isArray(notes) ? notes : []).forEach(function (note) {
+                const noteText = String(note && note.originalText || "");
+                if (!noteText.trim() || note.protected) return;
+                const chunks = window.DocumentRevision.splitText(noteText, maxPartCharacters);
+                let sourceOffset = 0;
+                chunks.forEach(function (chunk, index) {
+                    noteParts.push({
+                        noteId: note.id,
+                        notePartId: String(note.id) + "-part-" + String(index + 1),
+                        label: note.label || (note.kind === "endnote" ? "حاشية ختامية" : "حاشية سفلية"),
+                        sourceText: chunk,
+                        sourceOffset: sourceOffset
+                    });
+                    sourceOffset += chunk.length;
+                });
+            });
+
+            if (!noteParts.length) return { status: "ready", notes: [] };
+
+            const batches = [];
+            let currentBatch = [];
+            let currentCharacters = 0;
+            noteParts.forEach(function (part) {
+                const estimatedSize = part.sourceText.length + part.label.length + 100;
+                if (currentBatch.length &&
+                    (currentCharacters + estimatedSize > batchCharacterBudget ||
+                        currentBatch.length >= maxPartsPerBatch)) {
+                    batches.push(currentBatch);
+                    currentBatch = [];
+                    currentCharacters = 0;
+                }
+                currentBatch.push(part);
+                currentCharacters += estimatedSize;
+            });
+            if (currentBatch.length) batches.push(currentBatch);
+
+            async function processNoteBatch(parts, depth, batchLabel) {
+                const request = window.DocumentRevision.buildNotesBatchRequest(text, parts);
+                window.__documentRevisionRequest = request;
+                try {
+                    const answer = await streamAI(text, function () {});
+                    return window.DocumentRevision.parseNotesBatchResponse(answer, request.revision);
+                } catch (error) {
+                    if (!error || error.shouldSplit !== true || depth >= 6) throw error;
+
+                    if (parts.length > 1) {
+                        const midpoint = Math.ceil(parts.length / 2);
+                        loading.textContent = "الاستجابة غير مكتملة؛ يُعاد تقسيم دفعة الحواشي " + batchLabel + "...";
+                        const left = await processNoteBatch(parts.slice(0, midpoint), depth + 1, batchLabel + ".1");
+                        if (left.status === "clarify") return left;
+                        const right = await processNoteBatch(parts.slice(midpoint), depth + 1, batchLabel + ".2");
+                        if (right.status === "clarify") return right;
+                        return {
+                            status: "ready",
+                            mode: "correction",
+                            parts: left.parts.concat(right.parts)
+                        };
+                    }
+
+                    const part = parts[0];
+                    if (!part || part.sourceText.length <= 600) throw error;
+                    const nextLimit = Math.max(400, Math.floor(part.sourceText.length / 2));
+                    const smallerChunks = window.DocumentRevision.splitText(part.sourceText, nextLimit);
+                    if (smallerChunks.length < 2) throw error;
+                    const nestedParts = [];
+                    let offset = part.sourceOffset;
+                    smallerChunks.forEach(function (chunk, index) {
+                        nestedParts.push(Object.assign({}, part, {
+                            notePartId: part.notePartId + "-r" + String(depth + 1) + "-" + String(index + 1),
+                            sourceText: chunk,
+                            sourceOffset: offset
+                        }));
+                        offset += chunk.length;
+                    });
+                    return processNoteBatch(nestedParts, depth + 1, batchLabel + ".r");
+                }
+            }
+
+            const reviewedParts = [];
+            for (let index = 0; index < batches.length; index++) {
+                loading.textContent = "جارٍ تدقيق الحواشي في دفعة " +
+                    (index + 1) + " من " + batches.length + "...";
+                const result = await processNoteBatch(batches[index], 0, String(index + 1));
+                if (result.status === "clarify") return result;
+                reviewedParts.push.apply(reviewedParts, result.parts);
+            }
+
+            const resultByNote = new Map();
+            (Array.isArray(notes) ? notes : []).forEach(function (note) {
+                if (!note || note.protected) return;
+                resultByNote.set(note.id, []);
+            });
+            reviewedParts.forEach(function (part) {
+                if (!resultByNote.has(part.noteId)) {
+                    throw new Error("أعاد النموذج نتيجة لحاشية غير موجودة في قائمة المراجعة؛ أُلغيت النتائج.");
+                }
+                resultByNote.get(part.noteId).push(part);
+            });
+
+            const noteReviews = [];
+            for (const note of notes) {
                 if (note.protected) {
                     noteReviews.push({
-                        id: note.id,
+                        id: documentRevisionCapture.id,
                         targetPartId: note.id,
                         targetType: "note",
                         kind: note.kind,
@@ -45157,20 +45250,117 @@ async function sendMessage() {
                     continue;
                 }
 
-                const noteReview = await reviewRevisionTarget(
-                    note,
-                    note.id,
-                    note.label || (note.kind === "endnote" ? "حاشية ختامية" : "حاشية سفلية")
-                );
-                if (noteReview.status === "clarify") {
-                    finalAnswer = noteReview.question;
-                    break;
+                const chunks = (resultByNote.get(note.id) || []).slice().sort(function (a, b) {
+                    return a.sourceOffset - b.sourceOffset;
+                });
+                let expectedOffset = 0;
+                let revisedText = "";
+                const noteEdits = [];
+                const noteRejected = [];
+                chunks.forEach(function (part) {
+                    if (part.sourceOffset !== expectedOffset ||
+                        String(note.originalText).slice(part.sourceOffset, part.sourceOffset + part.originalText.length) !== part.originalText) {
+                        throw new Error("اختل تسلسل أجزاء " + note.label + " أو لم تطابق النص الأصلي؛ أُلغيت مراجعة الحواشي حمايةً لها.");
+                    }
+                    revisedText += part.text;
+                    expectedOffset += part.originalText.length;
+                    (part.edits || []).forEach(function (edit) {
+                        noteEdits.push(Object.assign({}, edit, {
+                            start: part.sourceOffset + edit.start,
+                            noteId: note.id
+                        }));
+                    });
+                    (part.rejected || []).forEach(function (edit) {
+                        noteRejected.push(Object.assign({}, edit, {
+                            batch: part.notePartId,
+                            noteId: note.id
+                        }));
+                    });
+                });
+                if (expectedOffset !== String(note.originalText).length) {
+                    throw new Error("لم تكتمل تغطية نص " + note.label + " في دفعات المراجعة؛ لم تُجهز أي تعديلات للتطبيق.");
                 }
-                noteReviews.push(Object.assign({}, noteReview, {
-                    id: note.id,
+
+                noteReviews.push({
+                    id: documentRevisionCapture.id,
                     targetPartId: note.id,
-                    referenceText: note.referenceText || ""
-                }));
+                    targetType: "note",
+                    kind: note.kind,
+                    index: note.index,
+                    label: note.label,
+                    referenceText: note.referenceText || "",
+                    originalText: note.originalText,
+                    text: revisedText,
+                    edits: noteEdits,
+                    rejectedEdits: noteRejected,
+                    mode: "correction",
+                    status: "ready",
+                    protected: false,
+                    applied: false
+                });
+            }
+
+            return { status: "ready", notes: noteReviews, batchCount: batches.length };
+        }
+
+        const mainReview = await reviewRevisionTarget(
+            documentRevisionCapture,
+            "",
+            "المتن"
+        );
+        if (mainReview.status === "clarify") {
+            finalAnswer = mainReview.question;
+        } else {
+            const noteReviews = [];
+            const capturedNotes = Array.isArray(documentRevisionCapture.notes)
+                ? documentRevisionCapture.notes
+                : [];
+
+            if (window.DocumentRevision.isCorrectionOnlyRequest(text)) {
+                const batchedReview = await reviewNotesInBatches(capturedNotes);
+                if (batchedReview.status === "clarify") {
+                    finalAnswer = batchedReview.question;
+                } else {
+                    noteReviews.push.apply(noteReviews, batchedReview.notes);
+                }
+            } else {
+                for (const note of capturedNotes) {
+                    if (note.protected) {
+                        noteReviews.push({
+                            id: documentRevisionCapture.id,
+                            targetPartId: note.id,
+                            targetType: "note",
+                            kind: note.kind,
+                            index: note.index,
+                            label: note.label,
+                            referenceText: note.referenceText,
+                            originalText: note.originalText,
+                            text: note.originalText,
+                            edits: [],
+                            rejectedEdits: [],
+                            mode: "correction",
+                            status: "ready",
+                            protected: true,
+                            applied: false
+                        });
+                        continue;
+                    }
+
+                    const noteReview = await reviewRevisionTarget(
+                        note,
+                        note.id,
+                        note.label || (note.kind === "endnote" ? "حاشية ختامية" : "حاشية سفلية")
+                    );
+                    if (noteReview.status === "clarify") {
+                        finalAnswer = noteReview.question;
+                        break;
+                    }
+                    noteReviews.push(Object.assign({}, noteReview, {
+                        id: documentRevisionCapture.id,
+                        targetPartId: note.id,
+                        referenceText: note.referenceText || ""
+                    }));
+                }
             }
 
             if (!finalAnswer) {
