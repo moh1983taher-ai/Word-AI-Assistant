@@ -1513,12 +1513,12 @@
                 const source = String(sourceText || "");
                 const position = Number(offset);
                 const previousBreak = Math.max(
-                    source.lastIndexOf("\\r", Math.max(0, position - 1)),
-                    source.lastIndexOf("\\n", Math.max(0, position - 1))
+                    source.lastIndexOf("\r", Math.max(0, position - 1)),
+                    source.lastIndexOf("\n", Math.max(0, position - 1))
                 );
                 const lineStart = previousBreak + 1;
-                const nextCr = source.indexOf("\\r", position);
-                const nextLf = source.indexOf("\\n", position);
+                const nextCr = source.indexOf("\r", position);
+                const nextLf = source.indexOf("\n", position);
                 let lineEnd = source.length;
                 if (nextCr >= 0) lineEnd = Math.min(lineEnd, nextCr);
                 if (nextLf >= 0) lineEnd = Math.min(lineEnd, nextLf);
