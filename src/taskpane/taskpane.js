@@ -21942,6 +21942,20 @@ function renderChat() {
 
             if (msg.role !== "user" && msg.documentRevision &&
                 msg.documentRevision.status === "ready" && !msg.documentRevision.applied) {
+                if (msg.documentRevision.partialApplied) {
+                    const partialNotice = document.createElement("div");
+                    partialNotice.className = "document-revision-partial-apply";
+                    partialNotice.textContent = String(msg.documentRevision.partialApplyMessage ||
+                        "توقف التطبيق بعد تنفيذ جزء من التعديلات. أعد التقاط المستند قبل المتابعة.");
+                    partialNotice.style.marginTop = "8px";
+                    partialNotice.style.padding = "8px";
+                    partialNotice.style.borderRadius = "7px";
+                    partialNotice.style.background = "rgba(181, 71, 8, 0.06)";
+                    partialNotice.style.color = "#B54708";
+                    partialNotice.style.fontSize = "12px";
+                    partialNotice.style.whiteSpace = "pre-wrap";
+                    div.appendChild(partialNotice);
+                }
                 const protectedParagraphCount = Number(msg.documentRevision.protectedParagraphCount) || 0;
                 if (protectedParagraphCount > 0) {
                     const revisionNotice = document.createElement("div");
@@ -22149,7 +22163,13 @@ function renderChat() {
                     });
                 const bodyHasChanges = String(msg.documentRevision.originalText || "") !==
                     String(msg.documentRevision.text || "");
-                if (!noteHasChanges && !bodyHasChanges) {
+                if (msg.documentRevision.partialApplied) {
+                    applyButton.disabled = true;
+                    applyButton.textContent = "توقف التطبيق بعد تنفيذ جزء من التعديلات";
+                    applyButton.title = String(msg.documentRevision.partialApplyMessage || "أعد التقاط المستند ومراجعته قبل أي تطبيق جديد.");
+                    applyButton.style.opacity = "0.7";
+                    applyButton.style.cursor = "default";
+                } else if (!noteHasChanges && !bodyHasChanges) {
                     applyButton.disabled = true;
                     applyButton.textContent = "لا توجد تعديلات للتطبيق";
                     applyButton.title = "لم ينتج التدقيق تغييرات معتمدة في المتن أو الحواشي";
@@ -22172,15 +22192,26 @@ function renderChat() {
                         }
                         msg.documentRevision.applied = true;
                         msg.documentRevision.appliedParts = Number(result.changedParts) || 0;
-                        msg.documentRevision.appliedNotes = Number(result.noteCount) || 0;
+                        msg.documentRevision.appliedNotes = Number(result.appliedNotes) || 0;
                         saveChat(currentChat);
                         applyButton.textContent = "تم تطبيق التعديلات";
                         applyButton.title = "أكد Word تطبيق " + result.changedParts +
                             " تغييرًا مع تتبع التعديلات في الحواشي عند وجودها.";
                     } catch (error) {
-                        applyButton.disabled = false;
-                        applyButton.textContent = "تعذر التطبيق — أعد المحاولة";
-                        applyButton.title = error && error.message ? error.message : "تعذر تطبيق التعديلات";
+                        if (error && error.partialApply === true) {
+                            msg.documentRevision.partialApplied = true;
+                            msg.documentRevision.appliedParts = Number(error.changedParts) || 0;
+                            msg.documentRevision.appliedNotes = Number(error.appliedNotes) || 0;
+                            msg.documentRevision.partialApplyMessage = String(error.message || "");
+                            saveChat(currentChat);
+                            applyButton.disabled = true;
+                            applyButton.textContent = "توقف التطبيق بعد تنفيذ جزء من التعديلات";
+                            applyButton.title = msg.documentRevision.partialApplyMessage;
+                        } else {
+                            applyButton.disabled = false;
+                            applyButton.textContent = "تعذر التطبيق — أعد المحاولة";
+                            applyButton.title = error && error.message ? error.message : "تعذر تطبيق التعديلات";
+                        }
                     }
                 };
                 div.appendChild(applyButton);
