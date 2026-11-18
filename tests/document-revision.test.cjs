@@ -17,6 +17,9 @@ assert.equal(revision.isRequest("صحح الأخطاء اللغوية في ال�
 assert.equal(revision.isRequest("جع النص المحدد لغويا"), true);
 assert.equal(revision.isRequest("راجع النص المحدد لغويًا"), true);
 assert.equal(revision.isRequest("تصحيح لغوي"), true);
+assert.equal(revision.isCorrectionOnlyRequest("راجع الحواشي"), true);
+assert.equal(revision.isCorrectionOnlyRequest("راجع جميع الحواشي السفلية والختامية"), true);
+assert.equal(revision.isCorrectionOnlyRequest("راجع الحواشي وأعد صياغتها بأسلوب أكاديمي"), false);
 assert.equal(revision.isRequest("أعد صياغة هذه الفقرة بأسلوب أكاديمي"), true);
 assert.equal(revision.isRequest("ما الفرق بين القياس والاستحسان؟"), false);
 
