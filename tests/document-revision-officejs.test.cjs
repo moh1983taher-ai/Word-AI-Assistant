@@ -955,6 +955,8 @@ global.Word = {
     // A new tracked edit introduced after capture must invalidate the note
     // preview, even when the visible text still matches the reviewed source.
     noteTrackedChanges = false;
+    footnoteText = "حاشية سفلية عاد فيها خطا بعد التقاط المراجعة.";
+    endnoteText = "حاشية ختامية عاد فيها خطا بعد التقاط المراجعة.";
     const staleNoteCapture = await revision.capture({ scope: "document" });
     assert.equal(staleNoteCapture.notes[0].protected, false);
     noteTrackedChanges = true;
