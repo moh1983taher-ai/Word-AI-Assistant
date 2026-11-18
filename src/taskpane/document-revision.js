@@ -38,6 +38,44 @@
         return (source.slice(0, end).match(/\r\n|\r|\n/g) || []).length;
     }
 
+    // Word exposes automatic footnote/endnote references in Range.text as
+    // the reserved U+0002 placeholder. Mask each placeholder before it reaches
+    // the model so it cannot be echoed as ordinary text or silently removed.
+    function buildNoteReferenceRanges(value, existingRanges) {
+        const source = String(value || "");
+        const protectedRanges = Array.isArray(existingRanges) ? existingRanges : [];
+        const ranges = [];
+        let cursor = 0;
+        while ((cursor = source.indexOf("\u0002", cursor)) !== -1) {
+            const start = cursor;
+            const end = cursor + 1;
+            const paragraphIndex = countParagraphsBefore(source, start);
+            const alreadyProtected = protectedRanges.some(function (range) {
+                return Number(range.paragraphIndex) === paragraphIndex ||
+                    (start >= Number(range.start) && end <= Number(range.end));
+            });
+            if (!alreadyProtected) {
+                const lineEndCandidates = [
+                    source.indexOf("\r", end),
+                    source.indexOf("\n", end)
+                ].filter(function (position) { return position >= 0; });
+                const lineEnd = lineEndCandidates.length
+                    ? Math.min.apply(Math, lineEndCandidates)
+                    : source.length;
+                ranges.push({
+                    paragraphIndex: paragraphIndex,
+                    start: start,
+                    end: end,
+                    text: "\u0002",
+                    kind: "note-reference",
+                    atParagraphEnd: !source.slice(end, lineEnd).trim()
+                });
+            }
+            cursor = end;
+        }
+        return protectedRanges.concat(ranges);
+    }
+
     function buildParagraphRecords(value, baseParagraphIndex) {
         const source = String(value || "");
         const records = [];
@@ -280,6 +318,20 @@
         const paragraphRecords = structuredCorrection
             ? buildParagraphRecords(requestText, paragraphBaseIndex)
             : [];
+        if (structuredCorrection && maskState && Array.isArray(maskState.segments)) {
+            const noteTokens = maskState.segments
+                .filter(function (segment) { return segment.kind === "note-reference"; })
+                .map(function (segment) { return segment.token; });
+            if (noteTokens.length) {
+                paragraphRecords.forEach(function (record) {
+                    let lockProbe = String(record.text || "");
+                    noteTokens.forEach(function (token) {
+                        lockProbe = lockProbe.split(token).join("");
+                    });
+                    record.locked = /\[\[WB_KEEP_[^\]]+\]\]/.test(lockProbe);
+                });
+            }
+        }
         const rewriteSegments = correctionOnly ? [] : buildRewriteSegments(requestText);
         const structuredParagraphText = structuredCorrection
             ? JSON.stringify({
@@ -345,7 +397,7 @@
                     : "في إعادة الصياغة أو الجمع بين التصحيح والتحسين، أعد النص المعالج لكل مقطع في paragraphs، ولا تُخرج النص كله في حقل text.",
                 "لا تختلق معلومة أو شاهدًا أو إحالة أو مصدرًا، ولا تحذف مضمونًا علميًا، ولا تستبدل المصطلحات المتخصصة بمرادفات قد تغير دلالتها.",
                 "حافظ على الآيات القرآنية والأحاديث والنقول الحرفية والمراجع والتوثيقات كما وردت، ولا تعد صياغتها.",
-                "قد تظهر في النص علامات حماية خاصة على صورة [[WB_KEEP_...]] بدل فقرات تحتوي على تغييرات متعقبة سابقة. هذه العلامات تمثل نصًا موجودًا في المستند ويجب إبقاؤها حرفيًا، مرة واحدة، وفي موضعها وترتيبها؛ لا تترجمها ولا تعدلها ولا تحذفها ولا تنقلها.",
+                "قد تظهر في النص علامات حماية خاصة على صورة [[WB_KEEP_...]] بدل فقرات ذات تغييرات متعقبة أو إحالات حواشٍ سفلية وختامية. هذه العلامات تمثل عناصر بنيوية موجودة في مستند Word؛ أعد كل علامة حرفيًا مرة واحدة وفي الفقرة نفسها وموضعها الدلالي نفسه، ولا تترجمها أو تعدلها أو تحذفها أو تنقلها، ولا تكتب محرف التحكم الداخلي بدل العلامة.",
                 "إذا كان طلب الباحث غامضًا إلى حد يمنع معرفة التعديل المقصود، فأعد سؤال استيضاح واحدًا ولا تعدل النص.",
                 "أعد JSON صالحًا فقط، دون Markdown أو سياج شيفرة أو نص خارجه.",
                 correctionOnly
@@ -1045,6 +1097,33 @@
         return [{ start: start, length: oldEnd - start, replacement: newText.slice(start, newEnd) }];
     }
 
+    function diffTextPreservingNoteReferences(oldValue, newValue, baseOffset) {
+        const oldText = String(oldValue || "");
+        const newText = String(newValue || "");
+        const oldParts = oldText.split("\u0002");
+        const newParts = newText.split("\u0002");
+        if (oldParts.length !== newParts.length) {
+            throw new Error(
+                "تغير عدد إحالات الحواشي في إحدى الفقرات؛ أُلغي التطبيق حتى لا تُحذف حاشية أو تتحول علامتها إلى نص عادي."
+            );
+        }
+
+        const operations = [];
+        let offset = Number(baseOffset) || 0;
+        oldParts.forEach(function (oldPart, index) {
+            diffText(oldPart, newParts[index]).forEach(function (operation) {
+                operations.push({
+                    start: offset + operation.start,
+                    length: operation.length,
+                    replacement: operation.replacement
+                });
+            });
+            offset += oldPart.length;
+            if (index < oldParts.length - 1) offset++;
+        });
+        return operations;
+    }
+
     function diffTextPreservingParagraphs(oldValue, newValue) {
         const oldText = String(oldValue || "");
         const newText = String(newValue || "");
@@ -1061,12 +1140,8 @@
             const oldPart = oldParts[index];
             const newPart = newParts[index] === undefined ? "" : newParts[index];
             if (index % 2 === 0) {
-                diffText(oldPart, newPart).forEach(function (operation) {
-                    operations.push({
-                        start: offset + operation.start,
-                        length: operation.length,
-                        replacement: operation.replacement
-                    });
+                diffTextPreservingNoteReferences(oldPart, newPart, offset).forEach(function (operation) {
+                    operations.push(operation);
                 });
             } else if (oldPart !== newPart && oldPart.length !== newPart.length) {
                 throw new Error("تعذر مطابقة فواصل الفقرات بأمان؛ أُلغي التطبيق للمحافظة على بنية المستند.");
@@ -1288,6 +1363,8 @@
                 );
             }
 
+            protectedRanges = buildNoteReferenceRanges(originalText, protectedRanges);
+
             range.track();
             await context.sync();
 
@@ -1439,6 +1516,18 @@
             operations = diffTextPreservingParagraphs(originalText, safeRevisedText);
         }
 
+        const sourceNoteCount = (originalText.match(/\u0002/g) || []).length;
+        const revisedNoteCount = (safeRevisedText.match(/\u0002/g) || []).length;
+        if (sourceNoteCount !== revisedNoteCount) {
+            throw new Error("تغير عدد علامات إحالات الحواشي؛ أُلغي التطبيق حمايةً للحواشي ومراجعها.");
+        }
+        operations.forEach(function (operation) {
+            const oldSpan = originalText.slice(operation.start, operation.start + operation.length);
+            if (oldSpan.includes("\u0002") || String(operation.replacement || "").includes("\u0002")) {
+                throw new Error("حاولت إحدى عمليات التطبيق استبدال علامة حاشية؛ أُلغي التطبيق حمايةً للإحالة.");
+            }
+        });
+
         if (!operations.length) return { applied: false, unchanged: true, changedParts: 0 };
 
         let appliedCount = 0;
@@ -1522,6 +1611,10 @@
                 let lineEnd = source.length;
                 if (nextCr >= 0) lineEnd = Math.min(lineEnd, nextCr);
                 if (nextLf >= 0) lineEnd = Math.min(lineEnd, nextLf);
+                const previousNote = source.lastIndexOf("\u0002", Math.max(0, position - 1));
+                const nextNote = source.indexOf("\u0002", position);
+                const safePrefixStart = previousNote >= lineStart ? previousNote + 1 : lineStart;
+                if (nextNote >= 0) lineEnd = Math.min(lineEnd, nextNote);
                 if (!Number.isInteger(position) || position < lineStart || position > lineEnd) {
                     throw new Error("موضع الإضافة خارج الفقرة المصدرية.");
                 }
@@ -1530,7 +1623,7 @@
                 const seen = new Set();
 
                 function add(text, start, location) {
-                    if (!text || !text.trim()) return;
+                    if (!text || !text.trim() || text.includes("\u0002")) return;
                     const key = location + "|" + start + "|" + text;
                     if (seen.has(key)) return;
                     seen.add(key);
@@ -1572,7 +1665,7 @@
                 // edge-token candidates to minimize overlap with other edits.
                 const lengths = [12, 24, 48, 80];
                 lengths.forEach(function (length) {
-                    const prefixStart = Math.max(lineStart, position - length);
+                    const prefixStart = Math.max(safePrefixStart, position - length);
                     if (prefixStart < position) {
                         add(source.slice(prefixStart, position), prefixStart, "After");
                     }

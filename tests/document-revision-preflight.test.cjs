@@ -199,4 +199,43 @@ assert.throws(
     /داخل فقرة لها تغييرات متعقبة/
 );
 
+const noteSource = "فقرة أصلية تنتهي بإحالة.\u0002";
+const noteStart = noteSource.indexOf("\u0002");
+const noteMask = preflight.maskChunk(noteSource, [{
+    paragraphIndex: 0,
+    start: noteStart,
+    end: noteStart + 1,
+    text: "\u0002",
+    kind: "note-reference",
+    atParagraphEnd: true
+}], 0, "note-test");
+assert.equal(noteMask.text.includes("\u0002"), false);
+assert.equal(noteMask.segments.length, 1);
+assert.equal(noteMask.segments[0].kind, "note-reference");
+const noteToken = noteMask.segments[0].token;
+assert.equal(
+    preflight.restoreChunk("صياغة جديدة تنتهي بالإحالة." + noteToken, noteMask),
+    "صياغة جديدة تنتهي بالإحالة.\u0002"
+);
+assert.throws(
+    () => preflight.restoreChunk("صياغة جديدة" + noteToken + " ثم نص بعد الإحالة", noteMask),
+    /نهاية فقرتها/
+);
+
+const inlineNoteSource = "الجملة الأولى.\u0002 ثم الجملة الثانية.";
+const inlineNoteStart = inlineNoteSource.indexOf("\u0002");
+const inlineNoteMask = preflight.maskChunk(inlineNoteSource, [{
+    paragraphIndex: 0,
+    start: inlineNoteStart,
+    end: inlineNoteStart + 1,
+    text: "\u0002",
+    kind: "note-reference",
+    atParagraphEnd: false
+}], 0, "inline-note-test");
+const inlineToken = inlineNoteMask.segments[0].token;
+assert.equal(
+    preflight.restoreChunk("صياغة أولى." + inlineToken + " ثم صياغة ثانية.", inlineNoteMask),
+    "صياغة أولى.\u0002 ثم صياغة ثانية."
+);
+
 console.log("Document revision preflight tests passed.");

@@ -183,6 +183,21 @@ assert.throws(
     /عدد فواصل الفقرات/
 );
 
+const noteOriginal = "الفقرة القديمة.\u0002";
+const noteRevised = "الفقرة الجديدة.\u0002";
+const noteOperations = revision.diffTextPreservingParagraphs(noteOriginal, noteRevised);
+assert.ok(noteOperations.length > 0);
+for (const operation of noteOperations) {
+    const oldSpan = noteOriginal.slice(operation.start, operation.start + operation.length);
+    assert.equal(oldSpan.includes("\u0002"), false, "a Word edit range must never contain a note reference marker");
+    assert.equal(String(operation.replacement || "").includes("\u0002"), false);
+}
+assert.equal(applyDiff(noteOriginal, noteOperations), noteRevised);
+assert.throws(
+    () => revision.diffTextPreservingParagraphs(noteOriginal, "الفقرة الجديدة."),
+    /عدد إحالات الحواشي/
+);
+
 const replacement = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "rewrite",

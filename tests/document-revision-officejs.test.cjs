@@ -7,6 +7,7 @@ let documentText = "هذا خطا واضح";
 let selectionText = documentText;
 let collectionLoads = 0;
 let itemLoads = 0;
+let searchQueries = [];
 
 function makeParagraphCollection(textGetter, baseOffsetGetter, context) {
     const source = String(textGetter());
@@ -113,12 +114,14 @@ function makeRange(textGetter, absoluteStartGetter) {
             return makeRangeSegment(absolutePosition, absolutePosition, this.context);
         },
         search(query) {
+            searchQueries.push(String(query));
             const source = String(textGetter());
             const baseOffset = Number(absoluteStartGetter ? absoluteStartGetter() : 0);
             const matches = [];
             let cursor = 0;
             if (String(query).trim() &&
                 String(query).length <= 255 &&
+                !String(query).includes("\u0002") &&
                 !/^[\s\p{P}\p{S}]+$/u.test(String(query))) {
                 while ((cursor = source.indexOf(query, cursor)) !== -1) {
                     matches.push(makeMatch(query, baseOffset + cursor, this.context));
@@ -452,6 +455,84 @@ global.Word = {
     ));
     assert.equal(punctuationResult.applied, true);
     assert.equal(documentText, "كلمة،.");
+
+    // Footnote references are structural Word anchors (U+0002), not text.
+    // The model receives a protected token, while Word replacement searches
+    // only the text around the reference and leaves the reference itself intact.
+    documentText = "هذه فقرة أصلية تنتهي بحاشية.\u0002";
+    selectionText = "";
+    const originalFootnoteBody = "مرجع المصدر، بيانات النشر والصفحة.";
+    const queryLogStart = searchQueries.length;
+    const footnoteCapture = await revision.capture({ scope: "document" });
+    const footnoteProofreadingRequest = revision.buildRequest(
+        "صحح المستند لغويًا ونحويًا فقط",
+        footnoteCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    assert.equal(
+        footnoteProofreadingRequest.revision.paragraphRecords[0].locked,
+        false,
+        "a note reference must not lock the whole paragraph against proofreading"
+    );
+    const footnoteRequest = revision.buildRequest(
+        "أعد صياغة المستند كاملًا بأسلوب أكاديمي",
+        footnoteCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    assert.equal(footnoteRequest.userPrompt.includes("\u0002"), false);
+    const noteTokenMatch = footnoteRequest.userPrompt.match(/\[\[WB_KEEP_[^\]]+\]\]/);
+    assert.ok(noteTokenMatch, "the footnote reference must be represented by a protected token");
+    const noteToken = noteTokenMatch[0];
+    const footnoteParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "rewrite",
+        paragraphs: footnoteRequest.revision.rewriteSegments.map(segment => ({
+            segmentId: segment.segmentId,
+            text: "صياغة جديدة تحفظ الإحالة." + noteToken
+        }))
+    }), footnoteCapture.originalText, footnoteRequest.revision);
+    assert.equal(footnoteParsed.text, "صياغة جديدة تحفظ الإحالة.\u0002");
+    const footnoteResult = await revision.apply(Object.assign(
+        {}, footnoteCapture, footnoteParsed
+    ));
+    assert.equal(footnoteResult.applied, true);
+    assert.equal(documentText, "صياغة جديدة تحفظ الإحالة.\u0002");
+    assert.equal(originalFootnoteBody, "مرجع المصدر، بيانات النشر والصفحة.");
+    assert.equal(
+        searchQueries.slice(queryLogStart).some(query => query.includes("\u0002")),
+        false,
+        "Word.search must never be asked to resolve a footnote/endnote placeholder"
+    );
+
+    // A pure insertion immediately before a note reference must anchor to
+    // the preceding word, never to the U+0002 control character itself.
+    documentText = "كلمة\u0002";
+    selectionText = "";
+    const inlineFootnoteCapture = await revision.capture({ scope: "document" });
+    const inlineFootnoteRequest = revision.buildRequest(
+        "أعد صياغة المستند بأسلوب أكاديمي",
+        inlineFootnoteCapture.originalText,
+        { sourceOffset: 0, paragraphBaseIndex: 0 }
+    );
+    const inlineFootnoteToken = inlineFootnoteRequest.userPrompt.match(/\[\[WB_KEEP_[^\]]+\]\]/)[0];
+    const inlineFootnoteParsed = revision.parseResponse(JSON.stringify({
+        status: "ready",
+        mode: "rewrite",
+        paragraphs: inlineFootnoteRequest.revision.rewriteSegments.map(segment => ({
+            segmentId: segment.segmentId,
+            text: "كلمة،" + inlineFootnoteToken
+        }))
+    }), inlineFootnoteCapture.originalText, inlineFootnoteRequest.revision);
+    const inlineQueryStart = searchQueries.length;
+    const inlineFootnoteResult = await revision.apply(Object.assign(
+        {}, inlineFootnoteCapture, inlineFootnoteParsed
+    ));
+    assert.equal(inlineFootnoteResult.applied, true);
+    assert.equal(documentText, "كلمة،\u0002");
+    assert.equal(
+        searchQueries.slice(inlineQueryStart).some(query => query.includes("\u0002")),
+        false
+    );
 
     // Restore the base fixture for the existing document-correction tests.
     documentText = "هذا خطأ واضح";
