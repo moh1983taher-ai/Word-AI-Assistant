@@ -290,27 +290,45 @@
         const sourceText = String(originalText || "");
         let requestText = sourceText;
         let maskState = null;
+        const targetPartId = String(requestOptions && requestOptions.targetPartId || "");
+        const noteTarget = targetPartId && pendingTarget && Array.isArray(pendingTarget.notes)
+            ? pendingTarget.notes.find(function (note) { return note.id === targetPartId; })
+            : null;
+        if (targetPartId && !noteTarget) {
+            throw new Error("تعذر العثور على الحاشية المرتبطة بطلب المراجعة الحالي.");
+        }
 
         const hasExplicitOffset = requestOptions && requestOptions.sourceOffset !== undefined &&
             Number.isFinite(Number(requestOptions.sourceOffset));
         const chunkOffset = hasExplicitOffset
             ? Math.max(0, Number(requestOptions.sourceOffset))
-            : (pendingTarget ? Number(pendingTarget.requestCursor) || 0 : 0);
+            : (noteTarget
+                ? Number(noteTarget.requestCursor) || 0
+                : (pendingTarget ? Number(pendingTarget.requestCursor) || 0 : 0));
+        const targetProtectedRanges = noteTarget
+            ? noteTarget.protectedRanges
+            : (pendingTarget ? pendingTarget.protectedRanges : []);
 
-        if (pendingTarget && Array.isArray(pendingTarget.protectedRanges)) {
+        if (pendingTarget && Array.isArray(targetProtectedRanges) && targetProtectedRanges.length) {
             maskState = DocumentRevisionPreflight.maskChunk(
                 sourceText,
-                pendingTarget.protectedRanges,
+                targetProtectedRanges,
                 chunkOffset,
-                pendingTarget.id
+                pendingTarget.id + (noteTarget ? "-" + noteTarget.id : "")
             );
             requestText = maskState.text;
-            pendingTarget.lastMaskedChunk = maskState;
-            pendingTarget.requestCursor = chunkOffset + sourceText.length;
+            if (noteTarget) {
+                noteTarget.lastMaskedChunk = maskState;
+                noteTarget.requestCursor = chunkOffset + sourceText.length;
+            } else {
+                pendingTarget.lastMaskedChunk = maskState;
+                pendingTarget.requestCursor = chunkOffset + sourceText.length;
+            }
         }
 
         const correctionOnly = isCorrectionOnlyRequest(userInstruction);
-        const scopeAllowsStructuredCorrection = !pendingTarget || pendingTarget.targetType === "document";
+        const scopeAllowsStructuredCorrection = !pendingTarget ||
+            pendingTarget.targetType === "document" || !!noteTarget;
         const structuredCorrection = scopeAllowsStructuredCorrection && correctionOnly;
         const paragraphBaseIndex = requestOptions && Number.isInteger(Number(requestOptions.paragraphBaseIndex))
             ? Math.max(0, Number(requestOptions.paragraphBaseIndex))
@@ -358,16 +376,20 @@
 
         const revisionMetadata = {
             structuredCorrection: structuredCorrection,
-            targetType: pendingTarget ? pendingTarget.targetType : "unknown",
+            targetType: noteTarget ? "note" : (pendingTarget ? pendingTarget.targetType : "unknown"),
+            targetPartId: noteTarget ? noteTarget.id : "",
+            targetPartLabel: noteTarget ? noteTarget.label : "",
             sourceOffset: chunkOffset,
             paragraphBaseIndex: paragraphBaseIndex,
             chunkLength: sourceText.length,
             userInstruction: String(userInstruction || ""),
             paragraphRecords: paragraphRecords,
-            rewriteSegments: rewriteSegments
+            rewriteSegments: rewriteSegments,
+            maskState: maskState
         };
         if (pendingTarget) {
             pendingTarget.lastRevisionMetadata = revisionMetadata;
+            if (noteTarget) noteTarget.lastRevisionMetadata = revisionMetadata;
         }
 
         return {
@@ -397,6 +419,9 @@
                     : "في إعادة الصياغة أو الجمع بين التصحيح والتحسين، أعد النص المعالج لكل مقطع في paragraphs، ولا تُخرج النص كله في حقل text.",
                 "لا تختلق معلومة أو شاهدًا أو إحالة أو مصدرًا، ولا تحذف مضمونًا علميًا، ولا تستبدل المصطلحات المتخصصة بمرادفات قد تغير دلالتها.",
                 "حافظ على الآيات القرآنية والأحاديث والنقول الحرفية والمراجع والتوثيقات كما وردت، ولا تعد صياغتها.",
+                noteTarget
+                    ? "هذا النص مأخوذ من " + noteTarget.label + ". راجع لغة الشرح والتعليق فقط، ولا تغيّر أسماء المؤلفين أو عناوين الكتب أو بيانات الطبعات أو أرقام الأجزاء والصفحات أو نصوص الاقتباس والتوثيق. لا تحذف أي بيان مرجعي، ولا تنقل علامة الحاشية أو تغيّر ارتباطها."
+                    : "",
                 "قد تظهر في النص علامات حماية خاصة على صورة [[WB_KEEP_...]] بدل فقرات ذات تغييرات متعقبة أو إحالات حواشٍ سفلية وختامية. هذه العلامات تمثل عناصر بنيوية موجودة في مستند Word؛ أعد كل علامة حرفيًا مرة واحدة وفي الفقرة نفسها وموضعها الدلالي نفسه، ولا تترجمها أو تعدلها أو تحذفها أو تنقلها، ولا تكتب محرف التحكم الداخلي بدل العلامة.",
                 "إذا كان طلب الباحث غامضًا إلى حد يمنع معرفة التعديل المقصود، فأعد سؤال استيضاح واحدًا ولا تعدل النص.",
                 "أعد JSON صالحًا فقط، دون Markdown أو سياج شيفرة أو نص خارجه.",
@@ -696,10 +721,13 @@
 
     function parseResponse(value, originalValue, requestMetadata) {
         const sourceText = String(originalValue || "");
-        const maskState = pendingTarget && pendingTarget.lastMaskedChunk &&
-            pendingTarget.lastMaskedChunk.source === sourceText
-            ? pendingTarget.lastMaskedChunk
-            : null;
+        const requestedMaskState = requestMetadata && requestMetadata.maskState;
+        const maskState = requestedMaskState && requestedMaskState.source === sourceText
+            ? requestedMaskState
+            : (pendingTarget && pendingTarget.lastMaskedChunk &&
+                pendingTarget.lastMaskedChunk.source === sourceText
+                ? pendingTarget.lastMaskedChunk
+                : null);
         const raw = String(value || "");
         let parsed;
         try {
@@ -1253,11 +1281,15 @@
         const previous = pendingTarget;
         pendingTarget = null;
         try {
-            // Re-enter the RequestContext that owns the tracked Range.
-            // Word.run(callback) would create a different context and cannot
-            // synchronize commands queued by previous.range.
             await Word.run(previous.range, async function (context) {
                 previous.range.untrack();
+                (previous.notes || []).forEach(function (note) {
+                    if (note.range && typeof note.range.untrack === "function") note.range.untrack();
+                    if (note.item && typeof note.item.untrack === "function") note.item.untrack();
+                });
+                (previous.noteCollections || []).forEach(function (collection) {
+                    if (collection && typeof collection.untrack === "function") collection.untrack();
+                });
                 await context.sync();
             });
         } catch (_) {}
@@ -1391,6 +1423,101 @@
 
             protectedRanges = buildNoteReferenceRanges(originalText, protectedRanges);
 
+            // Notes are independent Word stories. Capture their bodies and tracked
+            // ranges separately so the body diff can never address note text.
+            const notes = [];
+            const noteCollections = [];
+            const supportsNotes = typeof Office !== "undefined" && Office.context &&
+                Office.context.requirements &&
+                Office.context.requirements.isSetSupported("WordApi", "1.5");
+
+            if (supportsNotes) {
+                const noteCollectionSpecs = [
+                    { kind: "footnote", collection: range.footnotes, label: "حاشية سفلية" },
+                    { kind: "endnote", collection: range.endnotes, label: "حاشية ختامية" }
+                ];
+
+                for (const spec of noteCollectionSpecs) {
+                    if (!spec.collection || typeof spec.collection.load !== "function") continue;
+                    const collection = spec.collection;
+                    if (typeof collection.track === "function") collection.track();
+                    noteCollections.push(collection);
+
+                    const items = await loadOfficeCollectionItems(
+                        context,
+                        collection,
+                        "type",
+                        spec.label
+                    );
+
+                    for (let index = 0; index < items.length; index++) {
+                        const item = items[index];
+                        const noteRange = item.body.getRange();
+                        const reference = item.reference;
+                        noteRange.load("text");
+                        if (reference && typeof reference.load === "function") {
+                            reference.load("text");
+                        }
+                        if (typeof item.track === "function") item.track();
+                        noteRange.track();
+
+                        notes.push({
+                            id: spec.kind + "-" + String(index + 1),
+                            kind: spec.kind,
+                            index: index + 1,
+                            label: spec.label + " " + String(index + 1),
+                            type: String(item.type || (spec.kind === "footnote" ? "Footnote" : "Endnote")),
+                            reference: reference || null,
+                            referenceText: "",
+                            item: item,
+                            range: noteRange,
+                            originalText: "",
+                            protectedRanges: [],
+                            protected: false
+                        });
+                    }
+                }
+
+                await context.sync();
+
+                // Check note stories for pre-existing tracked changes. A note
+                // containing them is protected as a whole rather than risking
+                // the loss of an unresolved reviewer change.
+                const noteOoxmlResults = notes.map(function (note) {
+                    return typeof note.range.getOoxml === "function"
+                        ? note.range.getOoxml()
+                        : null;
+                });
+                if (noteOoxmlResults.some(Boolean)) await context.sync();
+
+                notes.forEach(function (note, index) {
+                    note.originalText = String(note.range.text || "");
+                    note.referenceText = note.reference
+                        ? String(note.reference.text || "")
+                        : "";
+                    if (!note.originalText.trim()) {
+                        note.protected = true;
+                        note.protectedRanges = [];
+                        return;
+                    }
+
+                    const hasChanges = noteOoxmlResults[index] &&
+                        DocumentRevisionPreflight.hasTrackedChanges(noteOoxmlResults[index].value);
+                    if (hasChanges) {
+                        note.protected = true;
+                        note.protectedRanges = [{
+                            paragraphIndex: 0,
+                            start: 0,
+                            end: note.originalText.length,
+                            text: note.originalText,
+                            kind: "protected-note"
+                        }];
+                    } else {
+                        note.protectedRanges = buildNoteReferenceRanges(note.originalText, []);
+                    }
+                });
+            }
+
             range.track();
             await context.sync();
 
@@ -1398,7 +1525,19 @@
                 id: "revision-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
                 targetType: targetType,
                 originalText: originalText,
-                protectedParagraphCount: protectedRanges.length
+                protectedParagraphCount: protectedRanges.length,
+                notesSupported: supportsNotes,
+                notes: notes.map(function (note) {
+                    return {
+                        id: note.id,
+                        kind: note.kind,
+                        index: note.index,
+                        label: note.label,
+                        referenceText: note.referenceText,
+                        originalText: note.originalText,
+                        protected: note.protected
+                    };
+                })
             };
             pendingTarget = {
                 id: result.id,
@@ -1406,8 +1545,11 @@
                 range: range,
                 originalText: originalText,
                 protectedRanges: protectedRanges,
+                notes: notes,
+                noteCollections: noteCollections,
                 requestCursor: 0,
-                lastMaskedChunk: null
+                lastMaskedChunk: null,
+                lastRevisionMetadata: null
             };
         });
 
@@ -1457,6 +1599,19 @@
 
     async function resolveTarget(context, revision) {
         const body = context.document.body;
+        if (revision.targetPartId) {
+            if (pendingTarget && pendingTarget.id === revision.id && Array.isArray(pendingTarget.notes)) {
+                const note = pendingTarget.notes.find(function (item) {
+                    return item.id === revision.targetPartId;
+                });
+                if (!note || !note.range) {
+                    throw new Error("انتهت صلاحية نطاق الحاشية؛ أعد التقاط المستند قبل التطبيق.");
+                }
+                return note.range;
+            }
+            throw new Error("تعذر استعادة نطاق الحاشية المرتبط بالمعاينة؛ أعد المراجعة على المستند الحالي.");
+        }
+
         if (revision.targetType === "document") {
             return body.getRange();
         }
@@ -1557,9 +1712,14 @@
         if (!operations.length) return { applied: false, unchanged: true, changedParts: 0 };
 
         let appliedCount = 0;
+        let preflightCompleted = false;
 
-        const trackedTarget = pendingTarget && pendingTarget.id === revision.id && pendingTarget.range
-            ? pendingTarget.range
+        const trackedTarget = pendingTarget && pendingTarget.id === revision.id
+            ? (revision.targetPartId
+                ? (pendingTarget.notes || []).find(function (note) {
+                    return note.id === revision.targetPartId;
+                })?.range || null
+                : pendingTarget.range)
             : null;
 
         const applyBatch = async function (context) {
@@ -2081,6 +2241,10 @@
             }
 
             resolved.sort(function (a, b) { return b.operation.start - a.operation.start; });
+            if (revision.preflightOnly) {
+                preflightCompleted = true;
+                return;
+            }
             const insertedRanges = [];
             resolved.forEach(function (item) {
                 const location = item.kind === "insert"
@@ -2107,9 +2271,17 @@
             }
             appliedCount = insertedRanges.length;
 
-            if (pendingTarget && pendingTarget.id === revision.id && pendingTarget.range) {
+            if (pendingTarget && pendingTarget.id === revision.id && !revision.retainCapture) {
+                const previous = pendingTarget;
                 try {
-                    pendingTarget.range.untrack();
+                    previous.range.untrack();
+                    (previous.notes || []).forEach(function (note) {
+                        if (note.range && typeof note.range.untrack === "function") note.range.untrack();
+                        if (note.item && typeof note.item.untrack === "function") note.item.untrack();
+                    });
+                    (previous.noteCollections || []).forEach(function (collection) {
+                        if (collection && typeof collection.untrack === "function") collection.untrack();
+                    });
                     await context.sync();
                 } catch (_) {}
                 pendingTarget = null;
@@ -2125,7 +2297,74 @@
             await Word.run(applyBatch);
         }
 
+        if (revision.preflightOnly) {
+            return {
+                preflight: preflightCompleted,
+                unchanged: operations.length === 0,
+                changedParts: operations.length
+            };
+        }
         return { applied: true, unchanged: false, changedParts: appliedCount };
+    }
+
+    async function applyWorkspace(revision) {
+        if (!revision || !revision.id) {
+            throw new Error("بيانات مساحة المراجعة غير مكتملة.");
+        }
+        const noteRevisions = Array.isArray(revision.notes)
+            ? revision.notes.filter(function (note) {
+                return note && !note.protected && note.originalText && note.text &&
+                    diffText(note.originalText, note.text).length > 0;
+            })
+            : [];
+        const bodyHasChanges = revision.originalText && revision.text &&
+            diffText(revision.originalText, revision.text).length > 0;
+        const parts = noteRevisions.map(function (note) {
+            return Object.assign({}, revision, note, {
+                id: revision.id,
+                targetType: "note",
+                targetPartId: note.targetPartId || note.id,
+                retainCapture: true
+            });
+        });
+        if (bodyHasChanges) {
+            parts.push(Object.assign({}, revision, {
+                retainCapture: true
+            }));
+        }
+
+        if (!parts.length) {
+            await releasePendingTarget();
+            return { applied: false, unchanged: true, changedParts: 0, noteCount: 0 };
+        }
+
+        try {
+            // Resolve every body/note operation before the first mutation. This
+            // prevents a stale or ambiguous note target from leaving a partly
+            // revised main document.
+            for (const part of parts) {
+                await apply(Object.assign({}, part, { preflightOnly: true, retainCapture: true }));
+            }
+
+            let changedParts = 0;
+            // Notes are independent Word stories. Apply them first and the body
+            // last; the note references in the main story remain untouched.
+            for (const part of parts) {
+                const result = await apply(Object.assign({}, part, {
+                    preflightOnly: false,
+                    retainCapture: true
+                }));
+                changedParts += Number(result && result.changedParts) || 0;
+            }
+            return {
+                applied: changedParts > 0,
+                unchanged: changedParts === 0,
+                changedParts: changedParts,
+                noteCount: noteRevisions.length
+            };
+        } finally {
+            await releasePendingTarget();
+        }
     }
 
     const api = {
@@ -2147,7 +2386,9 @@
         normalizeChunkLineBreaks: normalizeChunkLineBreaks,
         hasSameLineBreakCount: hasSameLineBreakCount,
         capture: capture,
-        apply: apply
+        apply: apply,
+        applyWorkspace: applyWorkspace,
+        release: releasePendingTarget
     };
 
     global.DocumentRevision = api;
