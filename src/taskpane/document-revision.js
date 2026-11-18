@@ -153,6 +153,11 @@
                 original: String(item && item.original || ""),
                 replacement: String(item && item.replacement || ""),
                 reason: String(item && item.reason || ""),
+                category: String(item && item.category || "other"),
+                confidence: Number.isFinite(Number(item && item.confidence))
+                    ? Math.max(0, Math.min(1, Number(item.confidence)))
+                    : null,
+                requiresSourceCheck: item && item.requiresSourceCheck === true,
                 rejectionCode: code,
                 rejectionReason: message
             });
@@ -243,7 +248,12 @@
                 paragraphId: paragraphId,
                 paragraphIndex: paragraph.paragraphIndex,
                 contextBefore: contextBefore,
-                contextAfter: contextAfter
+                contextAfter: contextAfter,
+                category: String(item && item.category || "other"),
+                confidence: Number.isFinite(Number(item && item.confidence))
+                    ? Math.max(0, Math.min(1, Number(item.confidence)))
+                    : null,
+                requiresSourceCheck: item && item.requiresSourceCheck === true
             });
         });
 
