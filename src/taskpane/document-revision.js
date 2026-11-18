@@ -1595,6 +1595,10 @@
                 let lineEnd = source.length;
                 if (nextCr >= 0) lineEnd = Math.min(lineEnd, nextCr);
                 if (nextLf >= 0) lineEnd = Math.min(lineEnd, nextLf);
+                const previousNote = source.lastIndexOf("\u0002", Math.max(0, position - 1));
+                const nextNote = source.indexOf("\u0002", position);
+                const safePrefixStart = previousNote >= lineStart ? previousNote + 1 : lineStart;
+                if (nextNote >= 0) lineEnd = Math.min(lineEnd, nextNote);
                 if (!Number.isInteger(position) || position < lineStart || position > lineEnd) {
                     throw new Error("موضع الإضافة خارج الفقرة المصدرية.");
                 }
@@ -1603,7 +1607,7 @@
                 const seen = new Set();
 
                 function add(text, start, location) {
-                    if (!text || !text.trim()) return;
+                    if (!text || !text.trim() || text.includes("\u0002")) return;
                     const key = location + "|" + start + "|" + text;
                     if (seen.has(key)) return;
                     seen.add(key);
@@ -1645,7 +1649,7 @@
                 // edge-token candidates to minimize overlap with other edits.
                 const lengths = [12, 24, 48, 80];
                 lengths.forEach(function (length) {
-                    const prefixStart = Math.max(lineStart, position - length);
+                    const prefixStart = Math.max(safePrefixStart, position - length);
                     if (prefixStart < position) {
                         add(source.slice(prefixStart, position), prefixStart, "After");
                     }
