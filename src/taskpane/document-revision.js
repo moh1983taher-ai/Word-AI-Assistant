@@ -2629,27 +2629,53 @@
                 await apply(Object.assign({}, part, { preflightOnly: true, retainCapture: true }));
             }
 
+            const noteParts = parts.filter(function (part) {
+                return !!part.targetPartId;
+            });
+            const bodyParts = parts.filter(function (part) {
+                return !part.targetPartId;
+            });
+
             // Footnote/endnote corrections must be reviewable as native Word
-            // tracked changes, not merely colored insertions. Preserve the
-            // user's document-wide setting and restore it after all edits.
-            if (noteRevisions.length) {
+            // tracked changes, not merely colored insertions. Limit the temporary
+            // tracking mode to note stories so the existing body-review behavior
+            // (red proposed insertions) remains unchanged.
+            if (noteParts.length) {
                 previousTrackingMode = await getDocumentChangeTrackingMode();
                 if (previousTrackingMode === "Off") {
                     await setDocumentChangeTrackingMode("TrackAll");
                     restoreTrackingMode = true;
                 }
+
+                try {
+                    // Notes are independent Word stories. Apply them while
+                    // tracking is enabled, each within its own captured range.
+                    for (const part of noteParts) {
+                        const result = await apply(Object.assign({}, part, {
+                            preflightOnly: false,
+                            retainCapture: true
+                        }));
+                        const partChanges = Number(result && result.changedParts) || 0;
+                        changedParts += partChanges;
+                        if (partChanges > 0) appliedNotes++;
+                    }
+                } finally {
+                    if (restoreTrackingMode && previousTrackingMode) {
+                        await setDocumentChangeTrackingMode(previousTrackingMode);
+                        restoreTrackingMode = false;
+                    }
+                }
             }
 
-            // Notes are independent Word stories. Apply them first and the body
-            // last; the note references in the main story remain untouched.
-            for (const part of parts) {
+            // Apply body revisions only after restoring the document's original
+            // tracking mode. This keeps note-specific review behavior from
+            // changing how existing paragraph edits appear in Word.
+            for (const part of bodyParts) {
                 const result = await apply(Object.assign({}, part, {
                     preflightOnly: false,
                     retainCapture: true
                 }));
-                const partChanges = Number(result && result.changedParts) || 0;
-                changedParts += partChanges;
-                if (partChanges > 0 && part.targetPartId) appliedNotes++;
+                changedParts += Number(result && result.changedParts) || 0;
             }
             return {
                 applied: changedParts > 0,
