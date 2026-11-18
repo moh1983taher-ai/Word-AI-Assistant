@@ -45310,7 +45310,7 @@ async function sendMessage() {
             noteParts.forEach(function (part) {
                 const paragraphCount = Math.max(
                     1,
-                    (String(part.sourceText).match(/\\r\\n|\\r|\\n/g) || []).length + 1
+                    (String(part.sourceText).match(/\r\n|\r|\n/g) || []).length + 1
                 );
                 const estimatedSize = part.sourceText.length + part.label.length +
                     140 + paragraphCount * 110;
