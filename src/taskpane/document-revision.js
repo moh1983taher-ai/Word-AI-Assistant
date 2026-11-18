@@ -316,6 +316,20 @@
         const paragraphRecords = structuredCorrection
             ? buildParagraphRecords(requestText, paragraphBaseIndex)
             : [];
+        if (structuredCorrection && maskState && Array.isArray(maskState.segments)) {
+            const noteTokens = maskState.segments
+                .filter(function (segment) { return segment.kind === "note-reference"; })
+                .map(function (segment) { return segment.token; });
+            if (noteTokens.length) {
+                paragraphRecords.forEach(function (record) {
+                    let lockProbe = String(record.text || "");
+                    noteTokens.forEach(function (token) {
+                        lockProbe = lockProbe.split(token).join("");
+                    });
+                    record.locked = /\[\[WB_KEEP_[^\]]+\]\]/.test(lockProbe);
+                });
+            }
+        }
         const rewriteSegments = correctionOnly ? [] : buildRewriteSegments(requestText);
         const structuredParagraphText = structuredCorrection
             ? JSON.stringify({
