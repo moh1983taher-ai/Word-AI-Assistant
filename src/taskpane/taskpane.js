@@ -45404,6 +45404,7 @@ async function sendMessage() {
                         text: note.originalText,
                         edits: [],
                         rejectedEdits: [],
+                        flags: [],
                         mode: "correction",
                         status: "ready",
                         protected: true,
@@ -45420,6 +45421,7 @@ async function sendMessage() {
                 let revisedText = "";
                 const noteEdits = [];
                 const noteRejected = [];
+                const noteFlags = [];
                 chunks.forEach(function (part) {
                     if (part.sourceOffset !== expectedOffset ||
                         String(note.originalText).slice(part.sourceOffset, part.sourceOffset + part.originalText.length) !== part.originalText) {
@@ -45439,6 +45441,12 @@ async function sendMessage() {
                             noteId: note.id
                         }));
                     });
+                    (part.flags || []).forEach(function (flag) {
+                        noteFlags.push(Object.assign({}, flag, {
+                            noteId: note.id,
+                            batch: part.notePartId
+                        }));
+                    });
                 });
                 if (expectedOffset !== String(note.originalText).length) {
                     throw new Error("لم تكتمل تغطية نص " + note.label + " في دفعات المراجعة؛ لم تُجهز أي تعديلات للتطبيق.");
@@ -45456,6 +45464,7 @@ async function sendMessage() {
                     text: revisedText,
                     edits: noteEdits,
                     rejectedEdits: noteRejected,
+                    flags: noteFlags,
                     mode: "correction",
                     status: "ready",
                     protected: false,
@@ -45503,6 +45512,7 @@ async function sendMessage() {
                             text: note.originalText,
                             edits: [],
                             rejectedEdits: [],
+                            flags: [],
                             mode: "correction",
                             status: "ready",
                             protected: true,
@@ -45523,7 +45533,8 @@ async function sendMessage() {
                     noteReviews.push(Object.assign({}, noteReview, {
                         id: documentRevisionCapture.id,
                         targetPartId: note.id,
-                        referenceText: note.referenceText || ""
+                        referenceText: note.referenceText || "",
+                        flags: Array.isArray(noteReview.flags) ? noteReview.flags : []
                     }));
                 }
             }
@@ -45593,6 +45604,13 @@ async function sendMessage() {
                 const noteRejectedCount = noteReviews.reduce(function (sum, note) {
                     return sum + (Array.isArray(note.rejectedEdits) ? note.rejectedEdits.length : 0);
                 }, 0);
+                const noteFlagCount = noteReviews.reduce(function (sum, note) {
+                    return sum + (Array.isArray(note.flags) ? note.flags.length : 0);
+                }, 0);
+                if (noteFlagCount) {
+                    finalAnswer += "\\n\\nأُحيل " + noteFlagCount +
+                        " موضعًا في الحواشي إلى التحقق من المصدر أو المراجعة البشرية؛ لم تُطبّق هذه المواضع تلقائيًا.";
+                }
                 if (noteRejectedCount) {
                     finalAnswer += "\nوعُزل " + noteRejectedCount +
                         " تصحيحًا في الحواشي لعدم إمكان التحقق من موضعه بأمان.";
