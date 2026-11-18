@@ -647,7 +647,8 @@
         });
 
         const allowedCategories = new Set([
-            "spelling", "grammar", "punctuation", "citation_format", "bibliographic_name", "other"
+            "spelling", "grammar", "punctuation", "citation_format", "bibliographic_name",
+            "bibliographic_verification", "low_confidence_review", "other"
         ]);
         const safeFlags = Array.isArray(parsed.flags) ? parsed.flags : [];
         safeFlags.forEach(function (flag) {
@@ -719,7 +720,10 @@
             const withheldEdits = [];
             const applicableEdits = [];
             scoped.edits.forEach(function (edit) {
-                const lowConfidence = Number.isFinite(Number(edit.confidence)) &&
+                const hasConfidence = edit.confidence !== null &&
+                    edit.confidence !== undefined && edit.confidence !== "";
+                const lowConfidence = hasConfidence &&
+                    Number.isFinite(Number(edit.confidence)) &&
                     Number(edit.confidence) < 0.85;
                 if (edit.requiresSourceCheck === true || lowConfidence) {
                     withheldEdits.push(Object.assign({}, edit, {
@@ -768,7 +772,9 @@
                         notePartId: part.notePartId,
                         paragraphId: edit.paragraphId,
                         text: edit.original,
-                        category: "bibliographic_verification",
+                        category: edit.requiresSourceCheck === true
+                            ? "bibliographic_verification"
+                            : "low_confidence_review",
                         reason: edit.withholdingReason,
                         confidence: edit.confidence,
                         sourceOffset: part.sourceOffset + edit.start
