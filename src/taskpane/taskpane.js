@@ -21942,6 +21942,20 @@ function renderChat() {
 
             if (msg.role !== "user" && msg.documentRevision &&
                 msg.documentRevision.status === "ready" && !msg.documentRevision.applied) {
+                if (msg.documentRevision.staleTarget) {
+                    const staleNotice = document.createElement("div");
+                    staleNotice.className = "document-revision-stale-note";
+                    staleNotice.textContent = String(msg.documentRevision.staleTargetMessage ||
+                        "تغيرت الحاشية في Word بعد المراجعة؛ التقط المستند وراجعه من جديد.");
+                    staleNotice.style.marginTop = "8px";
+                    staleNotice.style.padding = "8px";
+                    staleNotice.style.borderRadius = "7px";
+                    staleNotice.style.background = "rgba(181, 71, 8, 0.06)";
+                    staleNotice.style.color = "#B54708";
+                    staleNotice.style.fontSize = "12px";
+                    staleNotice.style.whiteSpace = "pre-wrap";
+                    div.appendChild(staleNotice);
+                }
                 if (msg.documentRevision.partialApplied) {
                     const partialNotice = document.createElement("div");
                     partialNotice.className = "document-revision-partial-apply";
@@ -22163,7 +22177,13 @@ function renderChat() {
                     });
                 const bodyHasChanges = String(msg.documentRevision.originalText || "") !==
                     String(msg.documentRevision.text || "");
-                if (msg.documentRevision.partialApplied) {
+                if (msg.documentRevision.staleTarget) {
+                    applyButton.disabled = true;
+                    applyButton.textContent = "تغيرت الحاشية — أعد التقاط المستند";
+                    applyButton.title = String(msg.documentRevision.staleTargetMessage || "لم يعد هذا العرض مطابقًا لحالة Word الحالية.");
+                    applyButton.style.opacity = "0.7";
+                    applyButton.style.cursor = "default";
+                } else if (msg.documentRevision.partialApplied) {
                     applyButton.disabled = true;
                     applyButton.textContent = "توقف التطبيق بعد تنفيذ جزء من التعديلات";
                     applyButton.title = String(msg.documentRevision.partialApplyMessage || "أعد التقاط المستند ومراجعته قبل أي تطبيق جديد.");
@@ -22207,6 +22227,13 @@ function renderChat() {
                             applyButton.disabled = true;
                             applyButton.textContent = "توقف التطبيق بعد تنفيذ جزء من التعديلات";
                             applyButton.title = msg.documentRevision.partialApplyMessage;
+                        } else if (error && error.staleTarget === true) {
+                            msg.documentRevision.staleTarget = true;
+                            msg.documentRevision.staleTargetMessage = String(error.message || "تغيرت الحاشية بعد التقاطها.");
+                            saveChat(currentChat);
+                            applyButton.disabled = true;
+                            applyButton.textContent = "تغيرت الحاشية — أعد التقاط المستند";
+                            applyButton.title = msg.documentRevision.staleTargetMessage;
                         } else {
                             applyButton.disabled = false;
                             applyButton.textContent = "تعذر التطبيق — أعد المحاولة";
