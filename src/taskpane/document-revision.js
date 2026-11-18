@@ -721,9 +721,11 @@
 
     function parseResponse(value, originalValue, requestMetadata) {
         const sourceText = String(originalValue || "");
-        const requestedMaskState = requestMetadata && requestMetadata.maskState;
-        const maskState = requestedMaskState && requestedMaskState.source === sourceText
-            ? requestedMaskState
+        const hasRequestMaskState = !!requestMetadata &&
+            Object.prototype.hasOwnProperty.call(requestMetadata, "maskState");
+        const requestedMaskState = hasRequestMaskState ? requestMetadata.maskState : null;
+        const maskState = hasRequestMaskState
+            ? (requestedMaskState && requestedMaskState.source === sourceText ? requestedMaskState : null)
             : (pendingTarget && pendingTarget.lastMaskedChunk &&
                 pendingTarget.lastMaskedChunk.source === sourceText
                 ? pendingTarget.lastMaskedChunk
