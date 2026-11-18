@@ -506,7 +506,7 @@
                         protectedTokens.forEach(function (token) {
                             probe = probe.split(token).join("");
                         });
-                        record.locked = /\\[\\[WB_KEEP_[^\\]]+\\]\\]/.test(probe);
+                        record.locked = /\[\[WB_KEEP_[^\]]+\]\]/.test(probe);
                     });
                 }
             }
@@ -559,9 +559,9 @@
                 "تجاهل الفقرات الموسومة locked=true، ولا تعدل علامة إحالة حاشية أو رمزًا محميًا.",
                 "لا تختلق بيانات ببليوغرافية أو أسماء أو أرقام صفحات أو مصادر. إذا لم يكن الصواب يقينيًا فاترك الموضع دون تعديل.",
                 "إذا لم توجد أخطاء في أي حاشية فأعد edits مصفوفة فارغة.",
-                "أعد كائن JSON كاملًا بهذا الشكل: {\\"status\\":\\"ready\\",\\"mode\\":\\"correction\\",\\"edits\\":[{\\"noteId\\":\\"footnote-1\\",\\"notePartId\\":\\"footnote-1-part-1\\",\\"paragraphId\\":\\"p0001\\",\\"original\\":\\"المقطع الخاطئ حرفيًا\\",\\"replacement\\":\\"الصواب\\",\\"contextBefore\\":\\"السياق السابق حرفيًا\\",\\"contextAfter\\":\\"السياق اللاحق حرفيًا\\",\\"reason\\":\\"سبب موجز\\\"}]}",
+                'أعد كائن JSON كاملًا بهذا الشكل: {"status":"ready","mode":"correction","edits":[{"noteId":"footnote-1","notePartId":"footnote-1-part-1","paragraphId":"p0001","original":"المقطع الخاطئ حرفيًا","replacement":"الصواب","contextBefore":"السياق السابق حرفيًا","contextAfter":"السياق اللاحق حرفيًا","reason":"سبب موجز"}]}',
                 "لا تخرج مصفوفة edits وحدها، ولا تحذف غلاف status أو mode، ولا تضف شرحًا خارج JSON."
-            ].join("\\n"),
+            ].join("\n"),
             userPrompt: [
                 "طلب الباحث:",
                 String(userInstruction || "").trim(),
@@ -572,7 +572,7 @@
                 "<<<END_NOTES>>>",
                 "",
                 "دقق جميع الحواشي في هذا الطلب دفعة واحدة. اربط كل تصحيح بالحاشية والجزء والفقرة المطابقة، وأعد كائن JSON واحدًا."
-            ].join("\\n"),
+            ].join("\n"),
             revision: {
                 structuredCorrection: true,
                 userInstruction: String(userInstruction || ""),
