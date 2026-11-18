@@ -11,6 +11,7 @@ let searchQueries = [];
 let footnoteText = "حاشية قديمة فيها خطا.";
 let endnoteText = "";
 let documentTrackingMode = "Off";
+let noteTrackedChanges = false;
 
 
 function makeParagraphCollection(textGetter, baseOffsetGetter, context) {
@@ -200,7 +201,11 @@ function makeMatch(initialText, absoluteStart, context) {
 function makeNoteRange(textGetter, textSetter, context) {
     const range = makeRange(textGetter, () => 0);
     range.context = context;
-    range.getOoxml = () => ({ value: "<w:p><w:r><w:t>" + String(textGetter()) + "</w:t></w:r></w:p>" });
+    range.getOoxml = () => ({
+        value: noteTrackedChanges
+            ? "<w:p><w:ins><w:r><w:t>" + String(textGetter()) + "</w:t></w:r></w:ins></w:p>"
+            : "<w:p><w:r><w:t>" + String(textGetter()) + "</w:t></w:r></w:p>"
+    });
     range.search = function (query) {
         searchQueries.push(String(query));
         const source = String(textGetter());
@@ -947,7 +952,47 @@ global.Word = {
     assert.equal(documentTrackingMode, "Off", "the user's original change-tracking mode must be restored after applying notes");
     assert.equal(searchQueries.some(query => query.includes("\u0002")), false);
 
-    process.stdout.write("document-revision-officejs: collection loading, selection, paragraph targeting, note capture, and grouped note application tests passed\n");
+    // A new tracked edit introduced after capture must invalidate the note
+    // preview, even when the visible text still matches the reviewed source.
+    noteTrackedChanges = false;
+    const staleNoteCapture = await revision.capture({ scope: "document" });
+    assert.equal(staleNoteCapture.notes[0].protected, false);
+    noteTrackedChanges = true;
+    const staleNoteReview = {
+        id: staleNoteCapture.id,
+        targetType: "document",
+        originalText: staleNoteCapture.originalText,
+        text: staleNoteCapture.originalText,
+        mode: "correction",
+        status: "ready",
+        notes: staleNoteCapture.notes.map(function (note) {
+            return {
+                targetPartId: note.id,
+                kind: note.kind,
+                originalText: note.originalText,
+                text: String(note.originalText).replace("خطا", "خطأ"),
+                mode: "correction",
+                status: "ready",
+                edits: [{
+                    start: note.originalText.indexOf("خطا"),
+                    original: "خطا",
+                    replacement: "خطأ"
+                }],
+                protected: false
+            };
+        })
+    };
+    const beforeStaleApplyFootnote = footnoteText;
+    const beforeStaleApplyEndnote = endnoteText;
+    await assert.rejects(
+        revision.applyWorkspace(staleNoteReview),
+        /تغييرات متعقبة جديدة في الحاشية/
+    );
+    assert.equal(footnoteText, beforeStaleApplyFootnote);
+    assert.equal(endnoteText, beforeStaleApplyEndnote);
+    assert.equal(documentTrackingMode, "Off");
+
+    process.stdout.write("document-revision-officejs: collection loading, selection, paragraph targeting, batched note capture, tracked application, and stale-note protection tests passed\n");
 })().catch(error => {
     process.stderr.write(String(error && error.stack || error) + "\n");
     process.exitCode = 1;
