@@ -1672,23 +1672,31 @@
                 const noteCollectionSpecs = [
                     { kind: "footnote", collection: range.footnotes, label: "حاشية سفلية" },
                     { kind: "endnote", collection: range.endnotes, label: "حاشية ختامية" }
-                ];
+                ].filter(function (spec) {
+                    return spec.collection && typeof spec.collection.load === "function";
+                });
 
-                for (const spec of noteCollectionSpecs) {
-                    if (!spec.collection || typeof spec.collection.load !== "function") continue;
-                    const collection = spec.collection;
-                    if (typeof collection.track === "function") collection.track();
-                    noteCollections.push(collection);
+                // Queue both collections together. The previous sequential
+                // collection/item loader required multiple round trips per
+                // note type; this path loads the footnote and endnote lists in
+                // one sync, then reads all note bodies and references in one sync.
+                noteCollectionSpecs.forEach(function (spec) {
+                    if (spec.collection.context && spec.collection.context !== context) {
+                        throw new Error("مجموعة الحواشي مرتبطة بسياق Word مختلف؛ أُوقف الالتقاط.");
+                    }
+                    spec.collection.load("items");
+                    if (typeof spec.collection.track === "function") spec.collection.track();
+                    noteCollections.push(spec.collection);
+                });
+                if (noteCollectionSpecs.length) await context.sync();
 
-                    const items = await loadOfficeCollectionItems(
-                        context,
-                        collection,
-                        "type",
-                        spec.label
-                    );
-
-                    for (let index = 0; index < items.length; index++) {
-                        const item = items[index];
+                noteCollectionSpecs.forEach(function (spec) {
+                    const items = spec.collection.items;
+                    if (!Array.isArray(items)) {
+                        throw new Error("لم يُرجع Word قائمة حواشٍ صالحة: " + spec.label);
+                    }
+                    items.forEach(function (item, index) {
+                        item.load("type");
                         const noteRange = item.body.getRange();
                         const reference = item.reference;
                         noteRange.load("text");
@@ -1703,7 +1711,7 @@
                             kind: spec.kind,
                             index: index + 1,
                             label: spec.label + " " + String(index + 1),
-                            type: String(item.type || (spec.kind === "footnote" ? "Footnote" : "Endnote")),
+                            type: "",
                             reference: reference || null,
                             referenceText: "",
                             item: item,
@@ -1712,26 +1720,25 @@
                             protectedRanges: [],
                             protected: false
                         });
-                    }
-                }
+                    });
+                });
 
-                await context.sync();
-
-                // Check note stories for pre-existing tracked changes. A note
-                // containing them is protected as a whole rather than risking
-                // the loss of an unresolved reviewer change.
+                // Check note stories for pre-existing tracked changes in the
+                // same synchronization that loads type, body text and reference.
                 const noteOoxmlResults = notes.map(function (note) {
                     return typeof note.range.getOoxml === "function"
                         ? note.range.getOoxml()
                         : null;
                 });
-                if (noteOoxmlResults.some(Boolean)) await context.sync();
+                if (notes.length) await context.sync();
 
                 notes.forEach(function (note, index) {
                     note.originalText = String(note.range.text || "");
                     note.referenceText = note.reference
                         ? String(note.reference.text || "")
                         : "";
+                    note.type = String(note.item && note.item.type ||
+                        (note.kind === "footnote" ? "Footnote" : "Endnote"));
                     if (!note.originalText.trim()) {
                         note.protected = true;
                         note.protectionReason = "الحاشية فارغة أو لم يُرجع Word نصها.";
