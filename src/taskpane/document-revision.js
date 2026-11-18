@@ -49,8 +49,10 @@
         while ((cursor = source.indexOf("\u0002", cursor)) !== -1) {
             const start = cursor;
             const end = cursor + 1;
+            const paragraphIndex = countParagraphsBefore(source, start);
             const alreadyProtected = protectedRanges.some(function (range) {
-                return start >= Number(range.start) && end <= Number(range.end);
+                return Number(range.paragraphIndex) === paragraphIndex ||
+                    (start >= Number(range.start) && end <= Number(range.end));
             });
             if (!alreadyProtected) {
                 const lineEndCandidates = [
@@ -61,7 +63,7 @@
                     ? Math.min.apply(Math, lineEndCandidates)
                     : source.length;
                 ranges.push({
-                    paragraphIndex: countParagraphsBefore(source, start),
+                    paragraphIndex: paragraphIndex,
                     start: start,
                     end: end,
                     text: "\u0002",
