@@ -21989,6 +21989,15 @@ function renderChat() {
                         summary.style.fontWeight = "500";
                         details.appendChild(summary);
 
+                        if (note.referenceText) {
+                            const referenceLocation = document.createElement("div");
+                            referenceLocation.textContent = "علامة الإحالة في المتن: " + String(note.referenceText);
+                            referenceLocation.style.fontSize = "11px";
+                            referenceLocation.style.color = "#667085";
+                            referenceLocation.style.marginTop = "5px";
+                            details.appendChild(referenceLocation);
+                        }
+
                         if (!note.protected && String(note.originalText || "") !== String(note.text || "")) {
                             const beforeLabel = document.createElement("div");
                             beforeLabel.textContent = "النص الأصلي";
