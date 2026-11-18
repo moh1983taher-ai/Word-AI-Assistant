@@ -21954,6 +21954,80 @@ function renderChat() {
                     revisionNotice.style.color = "#667085";
                     div.appendChild(revisionNotice);
                 }
+
+                if (Array.isArray(msg.documentRevision.notes) && msg.documentRevision.notes.length) {
+                    const notesPanel = document.createElement("div");
+                    notesPanel.className = "document-revision-notes-panel";
+                    notesPanel.style.marginTop = "12px";
+                    notesPanel.style.padding = "10px";
+                    notesPanel.style.border = "1px solid #D9E2E8";
+                    notesPanel.style.borderRadius = "10px";
+                    notesPanel.style.background = "rgba(11, 85, 83, 0.035)";
+
+                    const notesHeading = document.createElement("div");
+                    notesHeading.textContent = "مراجعة الحواشي";
+                    notesHeading.style.fontWeight = "600";
+                    notesHeading.style.marginBottom = "8px";
+                    notesPanel.appendChild(notesHeading);
+
+                    msg.documentRevision.notes.forEach(function (note) {
+                        const details = document.createElement("details");
+                        details.style.padding = "7px 0";
+                        details.style.borderTop = "1px solid #E4E9ED";
+
+                        const summary = document.createElement("summary");
+                        summary.textContent = note.label +
+                            (note.protected ? " — مستثناة للحماية" :
+                                (String(note.originalText || "") === String(note.text || "")
+                                    ? " — لا تغييرات"
+                                    : " — توجد تعديلات مقترحة"));
+                        summary.style.cursor = "pointer";
+                        summary.style.fontWeight = "500";
+                        details.appendChild(summary);
+
+                        if (!note.protected && String(note.originalText || "") !== String(note.text || "")) {
+                            const beforeLabel = document.createElement("div");
+                            beforeLabel.textContent = "النص الأصلي";
+                            beforeLabel.style.marginTop = "8px";
+                            beforeLabel.style.fontSize = "12px";
+                            beforeLabel.style.color = "#667085";
+                            details.appendChild(beforeLabel);
+
+                            const beforeText = document.createElement("div");
+                            beforeText.textContent = String(note.originalText || "");
+                            beforeText.style.whiteSpace = "pre-wrap";
+                            beforeText.style.padding = "7px";
+                            beforeText.style.borderRadius = "6px";
+                            beforeText.style.background = "rgba(120, 120, 120, 0.06)";
+                            details.appendChild(beforeText);
+
+                            const afterLabel = document.createElement("div");
+                            afterLabel.textContent = "النص المقترح";
+                            afterLabel.style.marginTop = "8px";
+                            afterLabel.style.fontSize = "12px";
+                            afterLabel.style.color = "#0B5553";
+                            details.appendChild(afterLabel);
+
+                            const afterText = document.createElement("div");
+                            afterText.textContent = String(note.text || "");
+                            afterText.style.whiteSpace = "pre-wrap";
+                            afterText.style.padding = "7px";
+                            afterText.style.borderRadius = "6px";
+                            afterText.style.background = "rgba(11, 85, 83, 0.06)";
+                            details.appendChild(afterText);
+                        } else if (note.protected) {
+                            const protectedText = document.createElement("div");
+                            protectedText.textContent = "لم تُعدّل هذه الحاشية لوجود تغييرات متعقبة سابقة.";
+                            protectedText.style.fontSize = "12px";
+                            protectedText.style.color = "#667085";
+                            protectedText.style.marginTop = "6px";
+                            details.appendChild(protectedText);
+                        }
+                        notesPanel.appendChild(details);
+                    });
+                    div.appendChild(notesPanel);
+                }
+
                 const applyButton = document.createElement("button");
                 applyButton.type = "button";
                 applyButton.className = "document-revision-apply-btn";
@@ -21972,7 +22046,7 @@ function renderChat() {
                     applyButton.disabled = true;
                     applyButton.textContent = "جارٍ تطبيق التعديلات...";
                     try {
-                        await window.DocumentRevision.apply(msg.documentRevision);
+                        await window.DocumentRevision.applyWorkspace(msg.documentRevision);
                         msg.documentRevision.applied = true;
                         saveChat(currentChat);
                         applyButton.textContent = "تم تطبيق التعديلات";
@@ -44878,185 +44952,303 @@ async function sendMessage() {
 
     if (isDocumentRevision) {
         const revisionChunkSize = window.DocumentRevision.getRecommendedChunkSize(text);
-        const chunks = window.DocumentRevision.splitText(
-            documentRevisionCapture.originalText,
-            revisionChunkSize
-        );
-        const revisedChunks = [];
-        const proofreadingEdits = [];
-        const proofreadingRejected = [];
-        let sourceOffset = 0;
-        let requestOffset = 0;
-        let revisionMode = "";
-        let clarification = "";
 
-        async function processRevisionChunk(chunkText, depth, label, chunkOffset) {
-            const revisionRequest = window.DocumentRevision.buildRequest(text, chunkText, {
-                sourceOffset: chunkOffset,
-                paragraphBaseIndex: window.DocumentRevision.countParagraphsBefore(
-                    documentRevisionCapture.originalText,
-                    chunkOffset
-                )
-            });
-            if (documentRevisionCapture.targetType === "document" &&
-                window.DocumentRevision.isCorrectionOnlyRequest(text) &&
-                !revisionRequest.revision.structuredCorrection) {
-                throw new Error(
-                    "لم يُفعّل مسار التصحيح المرتبط بفقرات المستند؛ أُوقف التدقيق بدل الرجوع إلى المطابقة النصية العامة."
-                );
-            }
-            window.__documentRevisionRequest = revisionRequest;
-            try {
-                const answer = await streamAI(text, function () {});
-                const parsed = window.DocumentRevision.parseResponse(
-                    answer,
-                    chunkText,
-                    revisionRequest.revision
-                );
-                return [{ sourceText: chunkText, parsed: parsed, label: label }];
-            } catch (error) {
-                const canSplit = error && error.shouldSplit === true &&
-                    depth < 6 && chunkText.length > 1200;
-                if (!canSplit) throw error;
+        async function reviewRevisionTarget(targetCapture, targetPartId, targetLabel) {
+            const targetText = String(targetCapture.originalText || "");
+            const chunks = window.DocumentRevision.splitText(targetText, revisionChunkSize);
+            const revisedChunks = [];
+            const proofreadingEdits = [];
+            const proofreadingRejected = [];
+            let sourceOffset = 0;
+            let requestOffset = 0;
+            let revisionMode = "";
+            let clarification = "";
 
-                const nextLimit = Math.max(600, Math.floor(chunkText.length / 2));
-                const smallerChunks = window.DocumentRevision.splitText(chunkText, nextLimit);
-                if (smallerChunks.length < 2) throw error;
-
-                console.warn("Revision response was incomplete; retrying with smaller chunks.", {
-                    part: label,
-                    depth: depth,
-                    previousLength: chunkText.length,
-                    nextChunkCount: smallerChunks.length,
+            async function processRevisionChunk(chunkText, depth, label, chunkOffset) {
+                const revisionRequest = window.DocumentRevision.buildRequest(text, chunkText, {
                     sourceOffset: chunkOffset,
-                    reason: String(error.message || error)
+                    paragraphBaseIndex: targetPartId
+                        ? window.DocumentRevision.countParagraphsBefore(targetText, chunkOffset)
+                        : window.DocumentRevision.countParagraphsBefore(
+                            documentRevisionCapture.originalText,
+                            chunkOffset
+                        ),
+                    targetPartId: targetPartId || ""
                 });
-                loading.textContent = "الاستجابة غير مكتملة؛ جارٍ تقسيم الجزء " + label + " وإعادة مراجعته بأجزاء أصغر...";
-
-                const results = [];
-                let nestedOffset = chunkOffset;
-                for (let subIndex = 0; subIndex < smallerChunks.length; subIndex++) {
-                    const nestedChunk = smallerChunks[subIndex];
-                    const nested = await processRevisionChunk(
-                        nestedChunk,
-                        depth + 1,
-                        label + "." + (subIndex + 1),
-                        nestedOffset
+                if ((documentRevisionCapture.targetType === "document" || targetPartId) &&
+                    window.DocumentRevision.isCorrectionOnlyRequest(text) &&
+                    !revisionRequest.revision.structuredCorrection) {
+                    throw new Error(
+                        "لم يُفعّل مسار التصحيح المرتبط بفقرات " +
+                        (targetPartId ? "الحاشية" : "المستند") +
+                        "؛ أُوقف التدقيق بدل الرجوع إلى المطابقة النصية العامة."
                     );
-                    results.push.apply(results, nested);
-                    nestedOffset += nestedChunk.length;
                 }
-                return results;
+
+                window.__documentRevisionRequest = revisionRequest;
+                try {
+                    const answer = await streamAI(text, function () {});
+                    const parsed = window.DocumentRevision.parseResponse(
+                        answer,
+                        chunkText,
+                        revisionRequest.revision
+                    );
+                    return [{ sourceText: chunkText, parsed: parsed, label: label }];
+                } catch (error) {
+                    const canSplit = error && error.shouldSplit === true &&
+                        depth < 6 && chunkText.length > 1200;
+                    if (!canSplit) throw error;
+
+                    const nextLimit = Math.max(600, Math.floor(chunkText.length / 2));
+                    const smallerChunks = window.DocumentRevision.splitText(chunkText, nextLimit);
+                    if (smallerChunks.length < 2) throw error;
+
+                    console.warn("Revision response was incomplete; retrying with smaller chunks.", {
+                        target: targetLabel,
+                        part: label,
+                        depth: depth,
+                        previousLength: chunkText.length,
+                        nextChunkCount: smallerChunks.length,
+                        sourceOffset: chunkOffset,
+                        reason: String(error.message || error)
+                    });
+                    loading.textContent = "الاستجابة غير مكتملة؛ جارٍ تقسيم " +
+                        targetLabel + "، الجزء " + label + " وإعادة مراجعته...";
+
+                    const results = [];
+                    let nestedOffset = chunkOffset;
+                    for (let subIndex = 0; subIndex < smallerChunks.length; subIndex++) {
+                        const nestedChunk = smallerChunks[subIndex];
+                        const nested = await processRevisionChunk(
+                            nestedChunk,
+                            depth + 1,
+                            label + "." + (subIndex + 1),
+                            nestedOffset
+                        );
+                        results.push.apply(results, nested);
+                        nestedOffset += nestedChunk.length;
+                    }
+                    return results;
+                }
             }
+
+            for (let index = 0; index < chunks.length; index++) {
+                loading.textContent = targetPartId
+                    ? "جارٍ مراجعة " + targetLabel + "، الجزء " + (index + 1) + " من " + chunks.length + "..."
+                    : (chunks.length > 1
+                        ? "جارٍ مراجعة المتن، الجزء " + (index + 1) + " من " + chunks.length + "..."
+                        : "جارٍ مراجعة المتن...");
+
+                const currentChunk = chunks[index];
+                const chunkResults = await processRevisionChunk(
+                    currentChunk,
+                    0,
+                    String(index + 1),
+                    requestOffset
+                );
+                requestOffset += currentChunk.length;
+
+                for (const chunkResult of chunkResults) {
+                    const parsedRevision = chunkResult.parsed;
+                    const sourceChunk = chunkResult.sourceText;
+
+                    if (parsedRevision.status === "clarify") {
+                        clarification = parsedRevision.question;
+                        break;
+                    }
+
+                    if (Array.isArray(parsedRevision.rejected) && parsedRevision.rejected.length) {
+                        proofreadingRejected.push.apply(
+                            proofreadingRejected,
+                            parsedRevision.rejected.map(function (item) {
+                                return Object.assign({ batch: chunkResult.label || "" }, item);
+                            })
+                        );
+                    }
+
+                    revisedChunks.push(
+                        window.DocumentRevision.normalizeBatchLineBreaks(sourceChunk, parsedRevision.text)
+                    );
+                    if (Array.isArray(parsedRevision.edits)) {
+                        parsedRevision.edits.forEach(function (edit) {
+                            proofreadingEdits.push({
+                                start: sourceOffset + edit.start,
+                                original: edit.original,
+                                replacement: edit.replacement,
+                                reason: edit.reason,
+                                paragraphId: edit.paragraphId,
+                                paragraphIndex: edit.paragraphIndex
+                            });
+                        });
+                    }
+                    sourceOffset += sourceChunk.length;
+
+                    if (!revisionMode) {
+                        revisionMode = parsedRevision.mode;
+                    } else if (revisionMode !== parsedRevision.mode) {
+                        revisionMode = "combined";
+                    }
+                }
+                if (clarification) break;
+            }
+
+            if (clarification) {
+                return {
+                    status: "clarify",
+                    question: clarification,
+                    targetPartId: targetPartId || "",
+                    label: targetLabel
+                };
+            }
+
+            const revisedText = revisedChunks.join("");
+            return {
+                status: "ready",
+                id: documentRevisionCapture.id,
+                targetType: targetPartId ? "note" : documentRevisionCapture.targetType,
+                targetPartId: targetPartId || "",
+                label: targetLabel,
+                kind: targetCapture.kind || "",
+                index: targetCapture.index || 0,
+                originalText: targetText,
+                text: revisedText,
+                edits: proofreadingEdits,
+                rejectedEdits: proofreadingRejected,
+                protectedParagraphCount: Number(targetCapture.protectedParagraphCount) || 0,
+                protected: Boolean(targetCapture.protected),
+                mode: revisionMode || "combined",
+                status: "ready",
+                applied: false
+            };
         }
 
-        for (let index = 0; index < chunks.length; index++) {
-            loading.textContent = chunks.length > 1
-                ? "جارٍ معالجة الجزء " + (index + 1) + " من " + chunks.length + "..."
-                : "جارٍ مراجعة النص...";
+        const mainReview = await reviewRevisionTarget(
+            documentRevisionCapture,
+            "",
+            "المتن"
+        );
+        if (mainReview.status === "clarify") {
+            finalAnswer = mainReview.question;
+        } else {
+            const noteReviews = [];
+            const capturedNotes = Array.isArray(documentRevisionCapture.notes)
+                ? documentRevisionCapture.notes
+                : [];
 
-            const currentChunk = chunks[index];
-            const chunkResults = await processRevisionChunk(
-                currentChunk,
-                0,
-                String(index + 1),
-                requestOffset
-            );
-            requestOffset += currentChunk.length;
-            for (const chunkResult of chunkResults) {
-                const parsedRevision = chunkResult.parsed;
-                const sourceChunk = chunkResult.sourceText;
+            for (const note of capturedNotes) {
+                if (note.protected) {
+                    noteReviews.push({
+                        id: note.id,
+                        targetPartId: note.id,
+                        targetType: "note",
+                        kind: note.kind,
+                        index: note.index,
+                        label: note.label,
+                        referenceText: note.referenceText,
+                        originalText: note.originalText,
+                        text: note.originalText,
+                        edits: [],
+                        rejectedEdits: [],
+                        mode: "correction",
+                        status: "ready",
+                        protected: true,
+                        applied: false
+                    });
+                    continue;
+                }
 
-                if (parsedRevision.status === "clarify") {
-                    clarification = parsedRevision.question;
+                const noteReview = await reviewRevisionTarget(
+                    note,
+                    note.id,
+                    note.label || (note.kind === "endnote" ? "حاشية ختامية" : "حاشية سفلية")
+                );
+                if (noteReview.status === "clarify") {
+                    finalAnswer = noteReview.question;
                     break;
                 }
-
-                if (Array.isArray(parsedRevision.rejected) && parsedRevision.rejected.length) {
-                    proofreadingRejected.push.apply(
-                        proofreadingRejected,
-                        parsedRevision.rejected.map(function (item) {
-                            return Object.assign({ batch: chunkResult.label || "" }, item);
-                        })
-                    );
-                }
-
-                revisedChunks.push(
-                    window.DocumentRevision.normalizeBatchLineBreaks(sourceChunk, parsedRevision.text)
-                );
-                if (Array.isArray(parsedRevision.edits)) {
-                    parsedRevision.edits.forEach(function (edit) {
-                        proofreadingEdits.push({
-                            start: sourceOffset + edit.start,
-                            original: edit.original,
-                            replacement: edit.replacement,
-                            reason: edit.reason,
-                            paragraphId: edit.paragraphId,
-                            paragraphIndex: edit.paragraphIndex
-                        });
-                    });
-                }
-                sourceOffset += sourceChunk.length;
-
-                if (!revisionMode) {
-                    revisionMode = parsedRevision.mode;
-                } else if (revisionMode !== parsedRevision.mode) {
-                    revisionMode = "combined";
-                }
+                noteReviews.push(Object.assign({}, noteReview, {
+                    id: note.id,
+                    targetPartId: note.id,
+                    referenceText: note.referenceText || ""
+                }));
             }
-            if (clarification) break;
-        }
 
-        if (clarification) {
-            finalAnswer = clarification;
-        } else {
-            const revisedText = revisedChunks.join("");
-            if (window.DocumentRevision.diffText(documentRevisionCapture.originalText, revisedText).length) {
-                if (revisionMode === "correction" && proofreadingEdits.length) {
-                    finalAnswer = "نتائج المراجعة اللغوية: " + proofreadingEdits.length + " موضعًا مقترحًا للتصحيح.\n\n" +
-                        proofreadingEdits.map(function (edit, index) {
-                            return (index + 1) + ". الأصل: «" + edit.original + "»\n" +
-                                "الصواب: «" + edit.replacement + "»\n" +
-                                "السبب: " + edit.reason;
-                        }).join("\n\n") +
-                        "\n\nراجع المقترحات، ثم طبّقها على مواضعها في المستند." +
-                        (proofreadingRejected.length
-                            ? "\n\nعُزل " + proofreadingRejected.length +
-                                " تصحيحًا لعدم إمكان التحقق من موضعه بأمان.\n" +
-                                proofreadingRejected.slice(0, 3).map(function (item) {
-                                    return "• «" + (item.original || "عبارة غير محددة") + "»: " +
-                                        (item.rejectionReason || "تعذر التحقق من الموضع");
-                                }).join("\n") +
-                                (proofreadingRejected.length > 3 ? "\nوتوجد حالات أخرى لم تُعرض." : "")
-                            : "");
+            if (!finalAnswer) {
+                const bodyChanged = window.DocumentRevision.diffText(
+                    mainReview.originalText,
+                    mainReview.text
+                ).length > 0;
+                const changedNotes = noteReviews.filter(function (note) {
+                    return !note.protected && window.DocumentRevision.diffText(
+                        note.originalText,
+                        note.text
+                    ).length > 0;
+                });
+                const bodyRejected = Array.isArray(mainReview.rejectedEdits)
+                    ? mainReview.rejectedEdits
+                    : [];
+
+                if (bodyChanged) {
+                    if (mainReview.mode === "correction" && mainReview.edits.length) {
+                        finalAnswer = "نتائج المراجعة اللغوية للمتن: " +
+                            mainReview.edits.length + " موضعًا مقترحًا للتصحيح.\n\n" +
+                            mainReview.edits.map(function (edit, index) {
+                                return (index + 1) + ". الأصل: «" + edit.original + "»\n" +
+                                    "الصواب: «" + edit.replacement + "»\n" +
+                                    "السبب: " + edit.reason;
+                            }).join("\n\n") +
+                            "\n\nراجع المقترحات في المتن والحواشي، ثم طبّقها في المستند.";
+                    } else {
+                        finalAnswer = "اكتملت مراجعة المتن، وتظهر الصياغة المقترحة في معاينة التعديلات.";
+                    }
                 } else {
-                    finalAnswer = revisedText;
+                    finalAnswer = "اكتملت مراجعة المتن؛ لم تظهر تعديلات تستلزم التطبيق فيه.";
                 }
-                revisionMetadata = {
-                    id: documentRevisionCapture.id,
-                    targetType: documentRevisionCapture.targetType,
-                    originalText: documentRevisionCapture.originalText,
-                    text: revisedText,
-                    edits: proofreadingEdits,
-                    rejectedEdits: proofreadingRejected,
-                    protectedParagraphCount: Number(documentRevisionCapture.protectedParagraphCount) || 0,
-                    mode: revisionMode || "combined",
+
+                if (changedNotes.length) {
+                    finalAnswer += "\n\nنتائج مراجعة الحواشي (" + changedNotes.length + "):\n" +
+                        changedNotes.map(function (note) {
+                            const count = Array.isArray(note.edits) ? note.edits.length : 0;
+                            return "• " + note.label + ": " +
+                                (note.mode === "correction" && count
+                                    ? count + " موضعًا مقترحًا للتصحيح"
+                                    : "صياغة مقترحة جاهزة للمعاينة");
+                        }).join("\n");
+                } else if (noteReviews.length) {
+                    finalAnswer += "\n\nتم فحص " + noteReviews.length +
+                        " حاشية؛ لم تظهر تعديلات لغوية تستلزم التطبيق.";
+                }
+
+                if (noteReviews.some(function (note) { return note.protected; })) {
+                    finalAnswer += "\n\nاستُثنيت بعض الحواشي التي تحتوي على تغييرات متعقبة سابقة حمايةً لها.";
+                }
+                if (!documentRevisionCapture.notesSupported) {
+                    finalAnswer += "\n\nلم يتوفر في إصدار Word الحالي دعم قراءة الحواشي؛ لذلك اقتصرت المراجعة على المتن.";
+                }
+
+                if (bodyRejected.length) {
+                    finalAnswer += "\n\nعُزل " + bodyRejected.length +
+                        " تصحيحًا في المتن لعدم إمكان التحقق من موضعه بأمان.";
+                }
+                const noteRejectedCount = noteReviews.reduce(function (sum, note) {
+                    return sum + (Array.isArray(note.rejectedEdits) ? note.rejectedEdits.length : 0);
+                }, 0);
+                if (noteRejectedCount) {
+                    finalAnswer += "\nوعُزل " + noteRejectedCount +
+                        " تصحيحًا في الحواشي لعدم إمكان التحقق من موضعه بأمان.";
+                }
+
+                revisionMetadata = Object.assign({}, mainReview, {
+                    notes: noteReviews,
+                    notesSupported: documentRevisionCapture.notesSupported !== false,
+                    noteCount: noteReviews.length,
                     status: "ready",
                     applied: false
-                };
-            } else if (proofreadingRejected.length) {
-                finalAnswer = "اكتملت المراجعة، لكن تعذر اعتماد " + proofreadingRejected.length +
-                    " تصحيحًا لعدم كفاية بيانات موضعها. لم تُطبق أي تغييرات على هذه المواضع.\n" +
-                    proofreadingRejected.slice(0, 5).map(function (item) {
-                        return "• «" + (item.original || "عبارة غير محددة") + "»: " +
-                            (item.rejectionReason || "تعذر التحقق من الموضع");
-                    }).join("\n") +
-                    (proofreadingRejected.length > 5 ? "\nوتوجد حالات أخرى لم تُعرض." : "");
-            } else {
-                finalAnswer = "راجعت النص، ولا توجد تغييرات تستلزم التطبيق.";
+                });
             }
         }
     } else {
+
         const answer = await streamAI(
             text,
             function (delta, fullText) {
