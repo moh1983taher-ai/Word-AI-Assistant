@@ -168,6 +168,10 @@
                 start: localStart,
                 end: localEnd,
                 text: protectedText,
+                kind: String(range.kind || "protected"),
+                atParagraphEnd: range.kind === "note-reference"
+                    ? !getParagraphLineSuffix(source, localEnd).trim()
+                    : false,
                 paragraphPrefix: getParagraphLinePrefix(source, localStart),
                 paragraphSuffix: getParagraphLineSuffix(source, localEnd)
             });
@@ -263,7 +267,14 @@
             }
             const actualPrefix = getParagraphLinePrefix(output, position);
             const actualSuffix = getParagraphLineSuffix(output, position + segment.token.length);
-            if (actualPrefix !== segment.paragraphPrefix || actualSuffix !== segment.paragraphSuffix) {
+            if (segment.kind === "note-reference") {
+                // A note reference is a structural anchor, not editable text.
+                // Its paragraph identity is checked by the line-break count
+                // above; for terminal references also keep it at paragraph end.
+                if (segment.atParagraphEnd && actualSuffix.trim()) {
+                    throw new Error("نقل النموذج إحالة الحاشية من نهاية فقرتها؛ أُلغي تجهيز النتيجة حمايةً للإحالة.");
+                }
+            } else if (actualPrefix !== segment.paragraphPrefix || actualSuffix !== segment.paragraphSuffix) {
                 throw new Error("غيّر النموذج موضع الفقرة المحمية داخل سطرها؛ أُلغي تجهيز النتيجة.");
             }
             positions.push(position);
