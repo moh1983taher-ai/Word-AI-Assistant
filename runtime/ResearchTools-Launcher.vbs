@@ -142,7 +142,7 @@ Function BridgeProcessExists()
     Dim service,processes,process,commandLine
     BridgeProcessExists=False
     On Error Resume Next
-    Set service=GetObject("winmgmts:\\\\.\\root\\cimv2")
+    Set service=GetObject("winmgmts:\\.\root\cimv2")
     Set processes=service.ExecQuery("SELECT * FROM Win32_Process WHERE Name='powershell.exe'")
     For Each process In processes
         commandLine=LCase(CStr(process.CommandLine))
@@ -156,7 +156,7 @@ End Function
 Sub StopBridgeProcess()
     Dim service,processes,process,commandLine
     On Error Resume Next
-    Set service=GetObject("winmgmts:\\\\.\\root\\cimv2")
+    Set service=GetObject("winmgmts:\\.\root\cimv2")
     Set processes=service.ExecQuery("SELECT * FROM Win32_Process WHERE Name='powershell.exe'")
     For Each process In processes
         commandLine=LCase(CStr(process.CommandLine))
