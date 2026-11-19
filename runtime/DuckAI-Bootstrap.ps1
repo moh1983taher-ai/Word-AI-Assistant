@@ -130,7 +130,13 @@ function Register-StartupTask {
 
     # Reuse the existing task name; never create a second background task.
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'تشغيل مشغل DuckAI المحلي بصمت عند تسجيل الدخول، مع استعادة ذاتية للمكونات عند الحاجة.' -Force | Out-Null
-    Write-Log 'تم تحديث مهمة التشغيل التلقائي للمشغل الدائم.'
+
+    $registered = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+    if ($registered.State -eq 'Disabled') {
+        throw 'تم تسجيل المهمة لكنها بقيت معطلة.'
+    }
+    $registeredAction = @($registered.Actions)[0]
+    if (-not $registeredAction -or [string]$registeredAction.Execute -notmatch '(?i)wscript\.exe
 }
 
 function Install-LatestRuntime {
@@ -219,7 +225,134 @@ try {
     $hasLock = $false
     try { $hasLock = $mutex.WaitOne(0) } catch { $hasLock = $false }
     if (-not $hasLock) {
-        Write-Log 'توجد عملية فحص أو استعادة أخرى؛ انتهت هذه النسخة دون تكرار العمل.'
+        Write-Log 'توجد عملية فحص أو استعادة أخرى؛ لن تُعلن خطوة تسجيل المهمة نجاحاً قبل امتلاك قفل التنفيذ.'
+        if ($RegisterTask) {
+            throw 'تعذر الحصول على قفل التهيئة؛ أُوقفت عملية تسجيل المهمة لمنع إعلان نجاح غير مؤكد.'
+        }
+        exit 0
+    }
+
+    if ($RegisterTask) { Register-StartupTask }
+
+    if ($EnsureRuntime -or -not $RegisterTask) {
+        if (Test-RuntimeIntegrity -Directory $RuntimeDir) {
+            Write-Log 'المكونات المحلية سليمة؛ لا حاجة إلى التنزيل.'
+            exit 0
+        }
+        Install-LatestRuntime
+        if (-not (Test-RuntimeIntegrity -Directory $RuntimeDir)) {
+            throw 'انتهت عملية الاستعادة لكن فحص الملفات النهائي لم ينجح.'
+        }
+        Write-Log 'اجتاز DuckAI فحص السلامة النهائي.'
+    }
+    exit 0
+}
+catch {
+    Write-Log ('تعذر تجهيز DuckAI: ' + $_.Exception.Message)
+    exit 1
+}
+finally {
+    if ($mutex -and $hasLock) {
+        try { $mutex.ReleaseMutex() } catch { }
+    }
+    if ($mutex) { $mutex.Dispose() }
+}
+ -or [string]$registeredAction.Arguments -notmatch 'ResearchTools-Launcher\.vbs') {
+        throw 'فشل التحقق من مسار المشغّل المسجل في المهمة.'
+    }
+    Write-Log 'تم تسجيل مهمة التشغيل التلقائي والتحقق من مسار المشغّل بنجاح.'
+}
+
+function Install-LatestRuntime {
+    $headers = @{
+        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/1.0'
+        'Accept' = 'application/vnd.github+json'
+    }
+
+    Write-Log 'بدء فحص إصدار DuckAI المنشور على GitHub.'
+    $releases = @(Invoke-RestMethod -TimeoutSec 60 -Uri $ReleaseApi -Headers $headers -Method Get)
+    $release = $releases | Where-Object {
+        -not $_.draft -and -not $_.prerelease -and
+        [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+$'
+    } | Sort-Object { [DateTime]::Parse($_.published_at).ToUniversalTime() } -Descending | Select-Object -First 1
+    if (-not $release) { throw 'لم يُعثر على إصدار DuckAI مستقر منشور.' }
+
+    $asset = @($release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1)
+    if ($asset.Count -eq 0) { throw "لم يُعثر على ملف $AssetName في أحدث إصدار." }
+    $asset = $asset[0]
+
+    if ([string]$asset.browser_download_url -notmatch '^https://github\.com/moh1983taher-ai/Word-AI-Assistant/releases/download/') {
+        throw 'رابط تنزيل الحزمة لا ينتمي إلى مستودع أدوات الباحث المتوقع.'
+    }
+    if ($asset.size -gt 100MB -or $asset.size -lt 1MB) { throw 'حجم حزمة DuckAI المنشورة غير متوقع.' }
+    if ([string]$asset.digest -notmatch '^sha256:([A-Fa-f0-9]{64})$') { throw 'لم يوفر GitHub بصمة SHA-256 موثوقة للحزمة؛ أُوقفت الاستعادة.' }
+    $expectedArchiveHash = $matches[1].ToUpperInvariant()
+
+    $downloadPath = Join-Path $env:TEMP ('DuckAI-Runtime-' + [Guid]::NewGuid().ToString('N') + '.zip')
+    $stagePath = Join-Path $RootDir ('DuckAI.Stage-' + [Guid]::NewGuid().ToString('N'))
+    $backupPath = Join-Path $RootDir ('DuckAI.Backup-' + [Guid]::NewGuid().ToString('N'))
+
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Write-Log ("تنزيل الحزمة: " + $release.tag_name)
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 180 -Uri $asset.browser_download_url -Headers $headers -OutFile $downloadPath
+        if ((Get-Item -LiteralPath $downloadPath).Length -ne [int64]$asset.size) {
+            throw 'حجم الملف المنزّل لا يطابق الحجم المعلن في GitHub.'
+        }
+
+        $actualArchiveHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        if ($actualArchiveHash -ne $expectedArchiveHash) {
+            throw 'فشل التحقق من بصمة SHA-256 لحزمة DuckAI؛ لن يتم تثبيتها.'
+        }
+
+        if (-not (Test-ZipPaths -ArchivePath $downloadPath)) { throw 'تحتوي الحزمة على مسارات غير آمنة.' }
+        New-Item -ItemType Directory -Path $stagePath -Force | Out-Null
+        Expand-Archive -LiteralPath $downloadPath -DestinationPath $stagePath -Force
+
+        if (-not (Test-RuntimeIntegrity -Directory $stagePath)) {
+            throw 'فشل التحقق من بصمات مكونات الحزمة الداخلية.'
+        }
+
+        $running = @(Get-Process -Name 'duck2api-main','ResearchTools-DuckAgent' -ErrorAction SilentlyContinue)
+        if ($running.Count -gt 0) {
+            throw 'تأجلت الاستعادة لأن إحدى خدمات DuckAI تعمل حالياً؛ ستُعاد المحاولة بعد توقفها.'
+        }
+
+        if (Test-Path -LiteralPath $RuntimeDir -PathType Container) {
+            Move-Item -LiteralPath $RuntimeDir -Destination $backupPath
+        }
+        try {
+            Move-Item -LiteralPath $stagePath -Destination $RuntimeDir
+        } catch {
+            if (Test-Path -LiteralPath $backupPath -PathType Container) {
+                Move-Item -LiteralPath $backupPath -Destination $RuntimeDir
+            }
+            throw
+        }
+
+        if (Test-Path -LiteralPath $backupPath -PathType Container) {
+            Remove-Item -LiteralPath $backupPath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Log ("اكتملت استعادة DuckAI والتحقق من مكوناته. الإصدار: " + $release.tag_name)
+    }
+    finally {
+        Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $stagePath -PathType Container) {
+            Remove-Item -LiteralPath $stagePath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+try {
+    New-Item -ItemType Directory -Path $RootDir -Force | Out-Null
+    $mutex = New-Object System.Threading.Mutex($false, 'Local\ResearchToolsDuckAIBootstrap')
+    $hasLock = $false
+    try { $hasLock = $mutex.WaitOne(0) } catch { $hasLock = $false }
+    if (-not $hasLock) {
+        Write-Log 'توجد عملية فحص أو استعادة أخرى؛ لن تُعلن خطوة تسجيل المهمة نجاحاً قبل امتلاك قفل التنفيذ.'
+        if ($RegisterTask) {
+            throw 'تعذر الحصول على قفل التهيئة؛ أُوقفت عملية تسجيل المهمة لمنع إعلان نجاح غير مؤكد.'
+        }
         exit 0
     }
 

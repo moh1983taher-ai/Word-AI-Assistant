@@ -14,7 +14,7 @@ $files = @(
         Name = 'ResearchTools-Launcher.vbs'
         Url = "https://raw.githubusercontent.com/$repo/main/runtime/ResearchTools-Launcher.vbs"
         Path = $launcher
-        Sha256 = '1e9a3b3598b5e429a686713724d0ca1f378b7381b29a8143e9ede64fb76d1f98'
+        Sha256 = 'de986495173078e0552731aa5783c323e86c65dd87cebf274609aa7ab9bf061b'
     },
     [pscustomobject]@{
         Name = 'DuckAI-Bootstrap.ps1'
@@ -34,6 +34,7 @@ function Write-InstallLog {
 
 try {
     New-Item -ItemType Directory -Path $root -Force | Out-Null
+    Write-InstallLog 'بدأت أداة التهيئة الأولية.'
 
     if (Get-Process -Name 'WINWORD' -ErrorAction SilentlyContinue) {
         throw 'أغلق Microsoft Word قبل تطبيق التحديث الأولي، ثم شغّل الملف مرة أخرى.'
@@ -75,6 +76,24 @@ try {
     if ($process.ExitCode -ne 0) {
         throw ("تعذر تسجيل مهمة التشغيل التلقائي (ExitCode=" + $process.ExitCode + ').')
     }
+
+    $registeredTask = Get-ScheduledTask -TaskName 'ResearchTools DuckAI Agent' -ErrorAction Stop
+    if ($registeredTask.State -eq 'Disabled') {
+        throw 'تم إنشاء مهمة التشغيل التلقائي لكنها معطلة.'
+    }
+    $registeredAction = @($registeredTask.Actions)[0]
+    if (-not $registeredAction -or [string]$registeredAction.Execute -notmatch '(?i)wscript\.exe
+    Start-Process -FilePath $wscript -ArgumentList ('"' + $launcher + '"') -WindowStyle Hidden
+    Write-InstallLog 'اكتمل إعداد المشغّل الدائم. سيجري فحص DuckAI وتنزيله عند أول فتح Word إذا كان مفقوداً أو غير سليم.'
+    exit 0
+}
+catch {
+    Write-InstallLog ('فشل التثبيت الأولي: ' + $_.Exception.Message + ' | ' + $_.ScriptStackTrace)
+    exit 1
+} -or [string]$registeredAction.Arguments -notmatch 'ResearchTools-Launcher\.vbs') {
+        throw 'لم يجتز إجراء مهمة التشغيل التلقائي فحص التحقق.'
+    }
+    Write-InstallLog 'تم التحقق من تسجيل مهمة التشغيل التلقائي وإعداد مشغّلها.'
 
     $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
     Start-Process -FilePath $wscript -ArgumentList ('"' + $launcher + '"') -WindowStyle Hidden
