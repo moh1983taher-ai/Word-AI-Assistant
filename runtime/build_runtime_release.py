@@ -117,8 +117,8 @@ def main() -> int:
         info_path = stage / "BUILD-INFO.txt"
         info = info_path.read_text(encoding="utf-8-sig")
         info = re.sub(
-            r"(?m)^Bundle Revision: 2026-11-19-r5 (clean PowerShell bootstrap and installer)
-            "Bundle Revision: 2026-11-19-r3 (synchronized bootstrap and launcher checksums)",
+            r"(?m)^Bundle Revision:.*$",
+            "Bundle Revision: 2026-11-19-r5 (clean PowerShell bootstrap and installer)",
             info,
             count=1,
         )
