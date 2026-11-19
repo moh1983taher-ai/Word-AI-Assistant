@@ -118,7 +118,7 @@ def main() -> int:
         info = info_path.read_text(encoding="utf-8-sig")
         info = re.sub(
             r"(?m)^Bundle Revision:.*$",
-            "Bundle Revision: 2026-11-19-r2 (installer checksum synchronization and verified startup registration)",
+            "Bundle Revision: 2026-11-19-r3 (synchronized bootstrap and launcher checksums)",
             info,
             count=1,
         )

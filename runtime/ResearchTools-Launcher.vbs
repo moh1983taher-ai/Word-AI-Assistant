@@ -1,7 +1,7 @@
 Option Explicit
 ' RESEARCHTOOLS_DUCKAI_BOOTSTRAP_V1
 
-Const BOOTSTRAP_SHA256 = "80ff8ca857e04cb23dce0d778fa32139a5c71b6f508f67e7c0a917b9e728d322"
+Const BOOTSTRAP_SHA256 = "766c8cc48917bf6417ba551d997ec8cfd7cafda12bd87a9be92ae5bff505cf15"
 Const BOOTSTRAP_RAW_URL = "https://raw.githubusercontent.com/moh1983taher-ai/Word-AI-Assistant/main/runtime/DuckAI-Bootstrap.ps1"
 Const TASK_NAME = "ResearchTools DuckAI Agent"
 
