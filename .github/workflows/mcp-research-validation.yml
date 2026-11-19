@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/mcp-research-mode
+  pull_request:
+    branches:
+      - main
 
 jobs:
   validate:
