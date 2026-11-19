@@ -62,7 +62,6 @@ jobs:
           Write-Host "Windows PowerShell 5.1 parsing, BOM and MCP bridge self-tests passed."
 
   build-and-release:
-    if: github.event_name != 'pull_request'
     needs: validate-windows-powershell-51
     runs-on: ubuntu-latest
     steps:
@@ -157,6 +156,7 @@ jobs:
           PY
 
       - name: Publish stable runtime release
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
