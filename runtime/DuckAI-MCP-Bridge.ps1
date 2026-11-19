@@ -123,20 +123,20 @@ function DiscoverTools([string]$id,[string]$token){
     $server=ServerDef $id $token
     try{
         $b=@{jsonrpc='2.0';id=1;method='tools/list';params=@{}}
-        $r=McpRequest $server 'tools/list' $b '2026-07-28' '' -modern
+        $r=McpRequest -server $server -method 'tools/list' -body $b -version '2026-07-28' -modern
         if($r.Status -ge 200 -and $r.Status -lt 300){$p=McpPayload $r.Body $r.Type 1;$result=Prop $p 'result';if($result){return [pscustomobject]@{Id=$id;Label=$server.Label;Server=$server;Mode='modern';Version='2026-07-28';Session='';Tools=@(Prop $result 'tools' @())}}}
     }catch{Log ('MCP modern negotiation '+$id+': '+$_.Exception.Message)}
     $errors=@()
     foreach($v in $script:LegacyVersions){
         try{
             $init=@{jsonrpc='2.0';id=1;method='initialize';params=@{protocolVersion=$v;capabilities=@{};clientInfo=@{name='ResearchTools-DuckAI-Bridge';version=$script:Version}}}
-            $ir=McpRequest $server 'initialize' $init
+            $ir=McpRequest -server $server -method 'initialize' -body $init
             $ip=McpPayload $ir.Body $ir.Type 1;$initResult=Prop $ip 'result'
             if($ir.Status -lt 200 -or $ir.Status -ge 300 -or -not $initResult){$errors+=($v+' initialize HTTP '+$ir.Status);continue}
             $actual=[string](Prop $initResult 'protocolVersion' $v);$session=$ir.Session
-            $nr=McpRequest $server 'notifications/initialized' @{jsonrpc='2.0';method='notifications/initialized'} $actual $session
+            $nr=McpRequest -server $server -method 'notifications/initialized' -body @{jsonrpc='2.0';method='notifications/initialized'} -version $actual -session $session
             if($nr.Status -lt 200 -or $nr.Status -ge 300){$errors+=($v+' initialized HTTP '+$nr.Status);continue}
-            $lr=McpRequest $server 'tools/list' @{jsonrpc='2.0';id=2;method='tools/list';params=@{}} $actual $session
+            $lr=McpRequest -server $server -method 'tools/list' -body @{jsonrpc='2.0';id=2;method='tools/list';params=@{}} -version $actual -session $session
             $lp=McpPayload $lr.Body $lr.Type 2;$list=Prop $lp 'result'
             if($lr.Status -ge 200 -and $lr.Status -lt 300 -and $list){return [pscustomobject]@{Id=$id;Label=$server.Label;Server=$server;Mode='legacy';Version=$actual;Session=$session;Tools=@(Prop $list 'tools' @())}}
             $errors+=($v+' tools/list HTTP '+$lr.Status)
@@ -179,7 +179,7 @@ function RunTool($ctx,[string]$name,$argsObject){
     $found=@($ctx.Tools|Where-Object{[string](Prop $_ 'name') -ceq $name});if($found.Count -ne 1){throw ('الأداة غير موجودة في فهرس الخادم: '+$name)}
     $v=ValidateArguments $found[0] $argsObject;if(-not $v.Valid){throw ('مدخلات أداة غير صالحة: '+$v.Reason)}
     $id=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$body=@{jsonrpc='2.0';id=$id;method='tools/call';params=@{name=$name;arguments=$argsObject}}
-    if($ctx.Mode -eq 'modern'){$r=McpRequest $ctx.Server 'tools/call' $body '2026-07-28' '' -modern $name}else{$r=McpRequest $ctx.Server 'tools/call' $body $ctx.Version $ctx.Session}
+    if($ctx.Mode -eq 'modern'){$r=McpRequest -server $ctx.Server -method 'tools/call' -body $body -version '2026-07-28' -modern -tool $name}else{$r=McpRequest -server $ctx.Server -method 'tools/call' -body $body -version $ctx.Version -session $ctx.Session}
     $p=McpPayload $r.Body $r.Type $id;$err=Prop $p 'error'
     if($r.Status -lt 200 -or $r.Status -ge 300 -or -not $p){throw ('فشل استدعاء '+$name+' HTTP '+$r.Status)}
     if($err){throw [string](Prop $err 'message' 'MCP tool error')}
