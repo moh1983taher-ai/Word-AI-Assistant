@@ -3,6 +3,7 @@
   "use strict";
 
   const SETTINGS_KEY = "AR_MCP_RESEARCH_SETTINGS";
+  const SESSION_SECRETS_KEY = "AR_MCP_RESEARCH_SECRETS";
   const THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
   const DEFAULT_MODEL = "gpt-6.2-astra";
   const RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -47,23 +48,30 @@
 
   function loadSettings() {
     const saved = safeJson(localStorage.getItem(SETTINGS_KEY), {});
+    const secrets = safeJson(sessionStorage.getItem(SESSION_SECRETS_KEY), {});
     const legacy = legacyOpenAISettings();
     return {
-      apiKey: saved.apiKey || (legacy && legacy.key) || "",
+      apiKey: secrets.apiKey || (legacy && legacy.key) || "",
       model: saved.model || DEFAULT_MODEL,
-      shamelaToken: saved.shamelaToken || ""
+      shamelaToken: secrets.shamelaToken || ""
     };
   }
 
   function saveSettings(settings) {
     const value = {
+      model: String(settings.model || DEFAULT_MODEL).trim() || DEFAULT_MODEL
+    };
+    sessionStorage.setItem(SESSION_SECRETS_KEY, JSON.stringify({
       apiKey: String(settings.apiKey || "").trim(),
-      model: String(settings.model || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
+      shamelaToken: String(settings.shamelaToken || "").trim()
+    }));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(value));
+    state.settings = {
+      apiKey: String(settings.apiKey || "").trim(),
+      model: value.model,
       shamelaToken: String(settings.shamelaToken || "").trim()
     };
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(value));
-    state.settings = value;
-    return value;
+    return state.settings;
   }
 
   function loadThread() {
@@ -157,7 +165,7 @@
 
     const note = document.createElement("p");
     note.className = "mcp-note";
-    note.textContent = "الجامع يتصل مباشرة دون رمز. وصلة الشاملة تحتاج رمز OAuth صالحاً. تُحفظ بيانات الاتصال محلياً في تخزين الإضافة على هذا الجهاز؛ ولا تُضاف إلى ملفات المستودع.";
+    note.textContent = "الجامع يتصل مباشرة دون رمز. وصلة الشاملة تحتاج رمز OAuth صالحاً. يُحفظ اختيار النموذج محلياً، أما مفتاح API ورمز OAuth فيبقيان في جلسة الإضافة فقط ولا يُحفظان في ملفات المستودع.";
     panel.appendChild(note);
 
     const actions = document.createElement("div");
