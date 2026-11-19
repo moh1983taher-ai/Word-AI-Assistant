@@ -32,7 +32,7 @@
     const secrets = safeJson(sessionStorage.getItem(SESSION_SECRETS_KEY), {});
     const savedModel = String(saved.model || "").trim();
     return {
-      model: /gpt-6\\.2-astra/i.test(savedModel) ? "" : savedModel,
+      model: /gpt-6\.2-astra/i.test(savedModel) ? "" : savedModel,
       shamelaToken: String(secrets.shamelaToken || "").trim()
     };
   }
