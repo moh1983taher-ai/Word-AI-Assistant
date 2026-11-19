@@ -28,6 +28,42 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Validate PowerShell syntax and integrity pins
+        shell: pwsh
+        run: |
+          $scriptPaths = @(
+            "runtime/Apply-DuckAI-AutoRepair.ps1",
+            "runtime/DuckAI-Bootstrap.ps1"
+          )
+          foreach ($scriptPath in $scriptPaths) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $scriptPath),
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object {
+                Write-Error ("{0}:{1}: {2}" -f $scriptPath, $_.Extent.StartLineNumber, $_.Message)
+              }
+              throw "PowerShell syntax validation failed: $scriptPath"
+            }
+          }
+
+          $launcherHash = (Get-FileHash "runtime/ResearchTools-Launcher.vbs" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $bootstrapHash = (Get-FileHash "runtime/DuckAI-Bootstrap.ps1" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $launcherText = Get-Content "runtime/ResearchTools-Launcher.vbs" -Raw
+          $installerText = Get-Content "runtime/Apply-DuckAI-AutoRepair.ps1" -Raw
+          if (-not $launcherText.Contains($bootstrapHash)) {
+            throw "Launcher bootstrap SHA-256 pin does not match the bootstrap file."
+          }
+          $pins = [regex]::Matches($installerText, "Sha256 = '([a-f0-9]{64})'") | ForEach-Object { $_.Groups[1].Value }
+          if ($pins.Count -ne 2 -or $pins[0] -ne $launcherHash -or $pins[1] -ne $bootstrapHash) {
+            throw "Installer SHA-256 pins do not match the launcher and bootstrap files."
+          }
+          Write-Host "PowerShell syntax and all bootstrap integrity pins passed."
+
       - name: Download verified v1.0.0 baseline
         env:
           GH_TOKEN: ${{ github.token }}
