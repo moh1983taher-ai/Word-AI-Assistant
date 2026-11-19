@@ -30,7 +30,7 @@ jobs:
 
       - name: Download verified v1.0.0 baseline
         env:
-          GH_TOKEN: \${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/duckai-base" dist
           gh release download duckai-runtime-v1.0.0 \
@@ -73,7 +73,7 @@ jobs:
 
       - name: Publish stable runtime release
         env:
-          GH_TOKEN: \${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           TAG="duckai-runtime-v1.0.1"
           TITLE="DuckAI Runtime v1.0.1"
@@ -98,10 +98,10 @@ jobs:
           )
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" "\${ASSETS[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file "$NOTES" --latest
           else
-            gh release create "$TAG" "\${ASSETS[@]}" \
+            gh release create "$TAG" "${ASSETS[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$TITLE" \
               --notes-file "$NOTES" \
