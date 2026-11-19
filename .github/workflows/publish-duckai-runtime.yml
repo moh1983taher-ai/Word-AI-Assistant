@@ -75,8 +75,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="duckai-runtime-v1.0.3"
-          TITLE="DuckAI Runtime v1.0.3"
+          TAG="duckai-runtime-v1.0.4"
+          TITLE="DuckAI Runtime v1.0.4"
           NOTES="$RUNNER_TEMP/duckai-release-notes.md"
           cat > "$NOTES" <<'EOF'
           يتضمن هذا الإصدار آلية التشغيل المحلي الصامت والاستعادة الذاتية لـ DuckAI.

@@ -117,7 +117,7 @@ def main() -> int:
         info_path = stage / "BUILD-INFO.txt"
         info = info_path.read_text(encoding="utf-8-sig")
         info = re.sub(
-            r"(?m)^Bundle Revision:.*$",
+            r"(?m)^Bundle Revision: 2026-11-19-r4 (reconstructed and verified automatic repair bootstrap)
             "Bundle Revision: 2026-11-19-r3 (synchronized bootstrap and launcher checksums)",
             info,
             count=1,
