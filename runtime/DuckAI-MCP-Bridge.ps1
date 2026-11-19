@@ -137,6 +137,7 @@ function IsAllowedReadTool($tool){
     if(-not $name){return $false}
     if($name -match '(?i)(delete|remove|update|edit|write|create|upload|submit|send|publish|purchase|execute|admin|حذف|تعديل|كتابة|إنشاء|رفع|إرسال|نشر|شراء)'){return $false}
     $annotations=Prop $tool 'annotations'
+    if((Prop $annotations 'destructiveHint') -eq $true){return $false}
     $readOnly=Prop $annotations 'readOnlyHint'
     if($readOnly -eq $false){return $false}
     if($readOnly -eq $true){return $true}
@@ -328,8 +329,10 @@ if($SelfTest){
     if(-not $modernRequest.params._meta.'io.modelcontextprotocol/clientInfo' -or $null -eq $modernRequest.params._meta.'io.modelcontextprotocol/clientCapabilities'){throw 'MCP client metadata test failed'}
     $searchTool=[pscustomobject]@{name='search_books';annotations=[pscustomobject]@{readOnlyHint=$true}}
     $writeTool=[pscustomobject]@{name='delete_book';annotations=[pscustomobject]@{readOnlyHint=$false}}
+    $destructiveSearch=[pscustomobject]@{name='search_books';annotations=[pscustomobject]@{destructiveHint=$true}}
     if(-not (IsAllowedReadTool $searchTool)){throw 'Read-only MCP tool allow test failed'}
     if(IsAllowedReadTool $writeTool){throw 'Write MCP tool rejection test failed'}
+    if(IsAllowedReadTool $destructiveSearch){throw 'Destructive MCP tool rejection test failed'}
     $nl=[Environment]::NewLine;$sse='event: message'+$nl+'data: {"jsonrpc":"2.0","id":7,"result":{"tools":[]}}'+$nl+$nl
     $p=McpPayload $sse 'text/event-stream' 7;if(-not $p){throw 'SSE response test failed'}
     Write-Output 'DuckAI MCP Bridge self-tests passed.';exit 0
