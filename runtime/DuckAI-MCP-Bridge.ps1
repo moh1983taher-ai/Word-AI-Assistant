@@ -1,5 +1,6 @@
 ﻿[CmdletBinding()]
 param([switch]$SelfTest)
+Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
