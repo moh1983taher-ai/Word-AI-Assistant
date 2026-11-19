@@ -30,8 +30,9 @@
   function loadSettings() {
     const saved = safeJson(localStorage.getItem(SETTINGS_KEY), {});
     const secrets = safeJson(sessionStorage.getItem(SESSION_SECRETS_KEY), {});
+    const savedModel = String(saved.model || "").trim();
     return {
-      model: String(saved.model || "").trim(),
+      model: /gpt-6\\.2-astra/i.test(savedModel) ? "" : savedModel,
       shamelaToken: String(secrets.shamelaToken || "").trim()
     };
   }
@@ -372,6 +373,15 @@
     return "\n\nالمصادر التي جرى الرجوع إليها: " + labels.join("، ");
   }
 
+  function formatConnectionWarnings(payload) {
+    const warnings = Array.isArray(payload.connectionWarnings) ? payload.connectionWarnings : [];
+    if (!warnings.length) return "";
+    const labels = warnings.map(function (warning) {
+      return String(warning).replace(/^aljam3:/, "الجامع:").replace(/^shamela_link:/, "وصلة الشاملة:");
+    });
+    return "\n\nتنبيه الاتصال بالمصادر: " + labels.join("؛ ");
+  }
+
   async function sendMessage(rawText) {
     const prompt = String(rawText || "").trim();
     if (!prompt || state.busy) return;
@@ -402,7 +412,7 @@
 
     try {
       const result = await callLocalResearch(state.messages, settings);
-      const answer = result.answer.trim() + formatToolTrace(result);
+      const answer = result.answer.trim() + formatToolTrace(result) + formatConnectionWarnings(result);
       if (status && status.parentNode) status.parentNode.removeChild(status);
       state.messages.push({ role: "assistant", text: answer });
       state.messages = state.messages.slice(-40);
