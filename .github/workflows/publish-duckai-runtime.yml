@@ -1,0 +1,110 @@
+name: Build and publish DuckAI Runtime
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'runtime/**'
+      - '.github/workflows/publish-duckai-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: duckai-runtime-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download verified v1.0.0 baseline
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/duckai-base" dist
+          gh release download duckai-runtime-v1.0.0 \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "DuckAI-Runtime-release.zip" \
+            --dir "$RUNNER_TEMP/duckai-base"
+
+      - name: Build runtime and one-time repair package
+        run: |
+          python runtime/build_runtime_release.py \
+            --input "$RUNNER_TEMP/duckai-base/DuckAI-Runtime-release.zip" \
+            --runtime-dir runtime \
+            --output dist/DuckAI-Runtime-release.zip
+
+          python - <<'PY'
+          import hashlib
+          import zipfile
+          from pathlib import Path
+
+          root = Path("runtime")
+          output = Path("dist/DuckAI-AutoRepair-Installer.zip")
+          entries = [
+              "Apply-DuckAI-AutoRepair.ps1",
+              "Install-DuckAI-AutoRepair.vbs",
+              "تعليمات-الاستعادة.txt",
+          ]
+          with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+              for name in entries:
+                  path = root / name
+                  if not path.is_file():
+                      raise SystemExit(f"Missing repair installer file: {path}")
+                  archive.write(path, arcname=name)
+
+          for path in sorted(Path("dist").glob("*.zip")):
+              digest = hashlib.sha256(path.read_bytes()).hexdigest().upper()
+              path.with_suffix(path.suffix + ".sha256").write_text(
+                  f"{digest}  {path.name}\n", encoding="ascii"
+              )
+          PY
+
+      - name: Publish stable runtime release
+        env:
+          GH_TOKEN: \${{ github.token }}
+        run: |
+          TAG="duckai-runtime-v1.0.1"
+          TITLE="DuckAI Runtime v1.0.1"
+          NOTES="$RUNNER_TEMP/duckai-release-notes.md"
+          cat > "$NOTES" <<'EOF'
+          يتضمن هذا الإصدار آلية التشغيل المحلي الصامت والاستعادة الذاتية لـ DuckAI.
+
+          - يتحقق المشغّل من سلامة الملفات المحلية قبل تشغيل الخدمات.
+          - ينزّل الحزمة عند غيابها أو تلفها فقط.
+          - يتحقق من بصمة SHA-256 التي يوفرها GitHub ومن البصمات الداخلية قبل التثبيت.
+          - يحتفظ بالمشغّل وملف الاستعادة خارج مجلد المحرك حتى تبقى نقطة الاستعادة متاحة.
+          - يعيد استخدام مهمة Windows الحالية ResearchTools DuckAI Agent دون إنشاء مهمة إضافية.
+
+          يحتوي الإصدار كذلك على ملف DuckAI-AutoRepair-Installer.zip لتهيئة الأجهزة التي تستخدم نسخة أقدم من المشغّل.
+          EOF
+
+          ASSETS=(
+            "dist/DuckAI-Runtime-release.zip"
+            "dist/DuckAI-Runtime-release.zip.sha256"
+            "dist/DuckAI-AutoRepair-Installer.zip"
+            "dist/DuckAI-AutoRepair-Installer.zip.sha256"
+          )
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "\${ASSETS[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file "$NOTES" --latest
+          else
+            gh release create "$TAG" "\${ASSETS[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
+              --notes-file "$NOTES" \
+              --target main \
+              --latest
+          fi
