@@ -1,0 +1,104 @@
+name: Build and publish ResearchTools Setup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'installer/**'
+      - '.github/workflows/build-researchtools-setup.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: researchtools-unified-setup
+  cancel-in-progress: false
+
+jobs:
+  build-setup:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Windows PowerShell and manifest
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = 'installer/Install-ResearchTools.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error ('{0}:{1}: {2}' -f $path, $_.Extent.StartLineNumber, $_.Message) }
+            throw 'PowerShell 5.1 parser validation failed.'
+          }
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $path))
+          if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) { throw 'UTF-8 BOM missing.' }
+          [xml]$manifest = Get-Content 'installer/Word-AI-Assistant.xml' -Raw
+          $id = $manifest.SelectSingleNode("//*[local-name()='Id']")
+          $source = $manifest.SelectSingleNode("//*[local-name()='DefaultSettings']/*[local-name()='SourceLocation']")
+          if (-not $id -or $id.InnerText -ne 'f8a582b1-eaf2-44f9-8166-d034255586ad') { throw 'Invalid Word add-in ID.' }
+          if (-not $source -or $source.GetAttribute('DefaultValue') -ne 'https://moh1983taher-ai.github.io/Word-AI-Assistant/taskpane.html') { throw 'Invalid production task pane URL.' }
+          if ((Get-Content 'installer/Word-AI-Assistant.xml' -Raw) -match 'localhost:3000') { throw 'Production manifest has a localhost URL.' }
+          Write-Host 'PowerShell 5.1 and Word manifest validated.'
+
+      - name: Download and verify embedded runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          gh release download duckai-runtime-v1.0.6 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip" --dir dist
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime download failed.' }
+          gh release download duckai-runtime-v1.0.6 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip.sha256" --dir dist
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime checksum download failed.' }
+          $sidecar = Get-Content 'dist/DuckAI-Runtime-release.zip.sha256' -Raw
+          if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+DuckAI-Runtime-release\.zip\s*$') { throw 'Invalid runtime checksum file.' }
+          $expected = $matches[1].ToUpperInvariant()
+          $actual = (Get-FileHash 'dist/DuckAI-Runtime-release.zip' -Algorithm SHA256).Hash.ToUpperInvariant()
+          if ($actual -ne $expected) { throw 'Embedded runtime SHA-256 mismatch.' }
+          Write-Host "Runtime verified: $actual"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+          $compiler = Join-Path $pf86 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $compiler)) { choco install innosetup -y --no-progress }
+          if (-not (Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler unavailable.' }
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+          $compiler = Join-Path $pf86 'Inno Setup 6\ISCC.exe'
+          & $compiler 'installer/ResearchToolsSetup.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed: $LASTEXITCODE" }
+          $setup = 'dist/ResearchTools-Setup.exe'
+          if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Setup EXE was not generated.' }
+          $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath ($setup + '.sha256') -Value ($hash + '  ResearchTools-Setup.exe') -Encoding ASCII
+          Write-Host "Built $setup, $((Get-Item $setup).Length) bytes, SHA256 $hash"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = 'researchtools-setup-v1.0.0'
+          $title = 'ResearchTools Unified Setup v1.0.0'
+          $notes = 'One-file installer: embedded DuckAI runtime, SHA-256 validation, shared Word catalog and manifest setup, existing scheduled task and durable launcher. Does not modify C:\Word AI Assistant v2.'
+          Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
+          gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag dist/ResearchTools-Setup.exe dist/ResearchTools-Setup.exe.sha256 --repo "$env:GITHUB_REPOSITORY" --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Release upload failed.' }
+            gh release edit $tag --repo "$env:GITHUB_REPOSITORY" --title $title --notes-file 'release-notes.txt' --latest
+          }
+          else {
+            gh release create $tag dist/ResearchTools-Setup.exe dist/ResearchTools-Setup.exe.sha256 --repo "$env:GITHUB_REPOSITORY" --title $title --notes-file 'release-notes.txt' --target main --latest
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Release publishing failed.' }
+          Write-Host "Published https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
