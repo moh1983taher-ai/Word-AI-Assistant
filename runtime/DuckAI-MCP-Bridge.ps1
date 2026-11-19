@@ -113,10 +113,23 @@ function ServerDef([string]$id,[string]$token){
     }
     throw ('MCP server not allowed: '+$id)
 }
+function Set-McpRequestMetadata($body,[string]$version){
+    if($null -eq $body.params){$body.params=@{}}
+    $body.params['_meta']=@{
+        'io.modelcontextprotocol/protocolVersion'=$version
+        'io.modelcontextprotocol/clientInfo'=@{name='ResearchTools-DuckAI-MCP-Bridge';version=$script:Version}
+        'io.modelcontextprotocol/clientCapabilities'=@{}
+    }
+    return $body
+}
 function McpRequest($server,[string]$method,$body,[string]$version='',[string]$session='',[switch]$modern,[string]$tool=''){
     $h=@{};if($server.Token){$h.Authorization='Bearer '+$server.Token}
     if($version){$h['MCP-Protocol-Version']=$version};if($session){$h['Mcp-Session-Id']=$session}
-    if($modern){$h['Mcp-Method']=$method;if($tool){$h['Mcp-Name']=$tool};$body['_meta']=@{'io.modelcontextprotocol/protocolVersion'=$version}}
+    if($modern){
+        $h['Mcp-Method']=$method
+        if($tool){$h['Mcp-Name']=$tool}
+        $body=Set-McpRequestMetadata $body $version
+    }
     return HttpJson $server.Url 'POST' $body $h 45
 }
 function IsAllowedReadTool($tool){
@@ -308,6 +321,11 @@ if($SelfTest){
     $schema=[pscustomobject]@{inputSchema=[pscustomobject]@{type='object';required=@('query');properties=[pscustomobject]@{query=[pscustomobject]@{type='string'}};additionalProperties=$false}}
     if(-not (ValidateArguments $schema ([pscustomobject]@{query='فقه'})).Valid){throw 'Valid schema test failed'}
     if((ValidateArguments $schema ([pscustomobject]@{other='فقه'})).Valid){throw 'Invalid schema test failed'}
+    $modernRequest=@{jsonrpc='2.0';id=1;method='tools/list';params=@{}}
+    $modernRequest=Set-McpRequestMetadata $modernRequest '2026-07-28'
+    if(-not $modernRequest.params._meta -or $modernRequest.params._meta.'io.modelcontextprotocol/protocolVersion' -ne '2026-07-28'){throw 'MCP protocol metadata placement test failed'}
+    if($modernRequest.ContainsKey('_meta')){throw 'MCP protocol metadata must not be at JSON-RPC root'}
+    if(-not $modernRequest.params._meta.'io.modelcontextprotocol/clientInfo' -or $null -eq $modernRequest.params._meta.'io.modelcontextprotocol/clientCapabilities'){throw 'MCP client metadata test failed'}
     $searchTool=[pscustomobject]@{name='search_books';annotations=[pscustomobject]@{readOnlyHint=$true}}
     $writeTool=[pscustomobject]@{name='delete_book';annotations=[pscustomobject]@{readOnlyHint=$false}}
     if(-not (IsAllowedReadTool $searchTool)){throw 'Read-only MCP tool allow test failed'}
