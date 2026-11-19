@@ -199,6 +199,7 @@ function Get-Catalog {
     Create-Share -Name $shareName -Path $local
     $unc = '\\' + $env:COMPUTERNAME + '\' + $shareName
     if (-not (Test-Writable $unc)) { throw ('تعذر الوصول إلى مجلد المشاركة بعد إنشائه: ' + $unc) }
+    New-Item -Path $registry -Force | Out-Null
     $newKey = Join-Path $registry '{4B78E8D1-1F8A-43B0-9859-4C10A5E127D2}'
     New-Item -Path $newKey -Force | Out-Null
     New-ItemProperty -LiteralPath $newKey -Name Id -PropertyType String -Value '{4B78E8D1-1F8A-43B0-9859-4C10A5E127D2}' -Force | Out-Null
