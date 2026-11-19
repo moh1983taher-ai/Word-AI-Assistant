@@ -4,6 +4,7 @@
 
   const SETTINGS_KEY = "AR_MCP_RESEARCH_SETTINGS";
   const SESSION_SECRETS_KEY = "AR_MCP_RESEARCH_SECRETS";
+  const CLIENT_KEY_ACK_KEY = "AR_MCP_BROWSER_KEY_ACK";
   const THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
   const DEFAULT_MODEL = "gpt-6.2-astra";
   const RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -165,7 +166,7 @@
 
     const note = document.createElement("p");
     note.className = "mcp-note";
-    note.textContent = "الجامع يتصل مباشرة دون رمز. وصلة الشاملة تحتاج رمز OAuth صالحاً. يُحفظ اختيار النموذج محلياً، أما مفتاح API ورمز OAuth فيبقيان في جلسة الإضافة فقط ولا يُحفظان في ملفات المستودع.";
+    note.textContent = "الجامع يتصل مباشرة دون رمز. وصلة الشاملة تحتاج رمز OAuth صالحاً. تنبيه: هذا اتصال اختباري من واجهة المتصفح، ومفتاح API يكون مكشوفاً داخل بيئة الإضافة؛ لا تستخدم مفتاحاً رئيسياً أو واسع الصلاحيات. للاستخدام الدائم يلزم وسيط محلي/خادمي يحفظ المفتاح بعيداً عن المتصفح. يُحفظ المفتاح ورمز OAuth في الجلسة فقط.";
     panel.appendChild(note);
 
     const actions = document.createElement("div");
@@ -376,6 +377,13 @@
     }
   }
 
+  function confirmClientKeyRisk() {
+    if (sessionStorage.getItem(CLIENT_KEY_ACK_KEY) === "accepted") return true;
+    const accepted = window.confirm("تنبيه أمني: سيُرسل مفتاح OpenAI API من واجهة الإضافة داخل Word، ويمكن كشفه من بيئة المتصفح. استخدم للاختبار مفتاح مشروع منفصلاً محدود الإنفاق والصلاحيات فقط، ولا تستخدم مفتاحك الرئيسي. للإنتاج يلزم خادم وسيط يحفظ المفتاح خارج المتصفح. هل تؤكد المتابعة للاختبار؟");
+    if (accepted) sessionStorage.setItem(CLIENT_KEY_ACK_KEY, "accepted");
+    return accepted;
+  }
+
   async function sendMessage(rawText) {
     const prompt = String(rawText || "").trim();
     if (!prompt || state.busy) return;
@@ -386,6 +394,7 @@
       showNotice("يلزم إدخال مفتاح OpenAI API لاستخدام مسار MCP. لا يكفي اشتراك ChatGPT وحده؛ هذا الاتصال يستخدم واجهة API.");
       return;
     }
+    if (!confirmClientKeyRisk()) return;
 
     const input = document.getElementById("user-input");
     if (input) {
