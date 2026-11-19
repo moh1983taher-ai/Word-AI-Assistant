@@ -20,7 +20,7 @@ $files = @(
         Name = 'DuckAI-Bootstrap.ps1'
         Url = "https://raw.githubusercontent.com/$repo/main/runtime/DuckAI-Bootstrap.ps1"
         Path = $bootstrap
-        Sha256 = '09ab9858b3c8cc1739d7b96a713264d2bb1ad87b5e141b9362f745d4f4c291bb'
+        Sha256 = '80ff8ca857e04cb23dce0d778fa32139a5c71b6f508f67e7c0a917b9e728d322'
     }
 )
 
