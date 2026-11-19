@@ -1,4 +1,4 @@
-# RESEARCHTOOLS_DUCKAI_BOOTSTRAP_V3
+﻿# RESEARCHTOOLS_DUCKAI_BOOTSTRAP_V3
 [CmdletBinding()]
 param(
     [switch]$EnsureRuntime,

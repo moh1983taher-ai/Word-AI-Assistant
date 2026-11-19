@@ -17,7 +17,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-windows-powershell-51:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Parse with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $paths = @(
+            "runtime/Apply-DuckAI-AutoRepair.ps1",
+            "runtime/DuckAI-Bootstrap.ps1"
+          )
+          foreach ($path in $paths) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object {
+                Write-Error ("{0}:{1}: {2}" -f $path, $_.Extent.StartLineNumber, $_.Message)
+              }
+              throw "Windows PowerShell 5.1 parse failed: $path"
+            }
+            $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $path))
+            if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+              throw "UTF-8 BOM missing: $path"
+            }
+          }
+          Write-Host "Windows PowerShell 5.1 parsing and UTF-8 BOM checks passed."
+
   build-and-release:
+    needs: validate-windows-powershell-51
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -111,8 +147,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="duckai-runtime-v1.0.5"
-          TITLE="DuckAI Runtime v1.0.5"
+          TAG="duckai-runtime-v1.0.6"
+          TITLE="DuckAI Runtime v1.0.6"
           NOTES="$RUNNER_TEMP/duckai-release-notes.md"
           cat > "$NOTES" <<'EOF'
           يتضمن هذا الإصدار آلية التشغيل المحلي الصامت والاستعادة الذاتية لـ DuckAI.

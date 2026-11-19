@@ -1,12 +1,16 @@
 Option Explicit
+
 Dim shell, fso, scriptDir, scriptPath, powershellPath, command, exitCode
-Dim rootPath, logPath
+Dim rootPath, logPath, psLogPath, cmdExe
 
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
+
 rootPath = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\ResearchTools"
 If Not fso.FolderExists(rootPath) Then fso.CreateFolder rootPath
 logPath = fso.BuildPath(rootPath, "DuckAI-AutoRepair-Install.log")
+psLogPath = fso.BuildPath(rootPath, "DuckAI-AutoRepair-PowerShell.log")
+
 WriteLog "Installer VBS started."
 
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
@@ -22,8 +26,14 @@ If Not fso.FileExists(powershellPath) Then
     WScript.Quit 3
 End If
 
-command = Chr(34) & powershellPath & Chr(34) & " -NoLogo -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File " & Chr(34) & scriptPath & Chr(34)
-WriteLog "Starting the PowerShell installer silently."
+cmdExe = shell.ExpandEnvironmentStrings("%ComSpec%")
+command = Chr(34) & cmdExe & Chr(34) & " /d /s /c " & Chr(34) & _
+          Chr(34) & powershellPath & Chr(34) & _
+          " -NoLogo -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File " & Chr(34) & scriptPath & Chr(34) & _
+          " 1>>" & Chr(34) & psLogPath & Chr(34) & " 2>>&1" & Chr(34)
+
+WriteLog "Starting PowerShell installer silently."
+WriteLog "PowerShell output will be captured in: " & psLogPath
 exitCode = shell.Run(command, 0, True)
 WriteLog "PowerShell installer finished. ExitCode=" & CStr(exitCode)
 WScript.Quit exitCode

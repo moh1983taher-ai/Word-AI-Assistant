@@ -1,4 +1,4 @@
-# RESEARCHTOOLS_DUCKAI_AUTOREPAIR_INSTALLER_V3
+﻿# RESEARCHTOOLS_DUCKAI_AUTOREPAIR_INSTALLER_V3
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -24,13 +24,13 @@ $files = @(
         Name = 'ResearchTools-Launcher.vbs'
         Url = "https://raw.githubusercontent.com/$repo/main/runtime/ResearchTools-Launcher.vbs"
         Path = $launcher
-        Sha256 = '0a544aabc9e3c2bf7b5f7f78e67db75cc9e5f0487bdfa63f76462ab6446eb52d'
+        Sha256 = 'fcccaecc8389a7393a2b3219978e5bfd02eeb43639f9d8be88698b8635262fd5'
     },
     [pscustomobject]@{
         Name = 'DuckAI-Bootstrap.ps1'
         Url = "https://raw.githubusercontent.com/$repo/main/runtime/DuckAI-Bootstrap.ps1"
         Path = $bootstrap
-        Sha256 = '70049bda6bc2d59e2fbca4e1a44a4020510d4b1e1ccad92b1f59b9bda2474046'
+        Sha256 = '59f0a32ad419d60b0d95ab6d591ac971e7b5a7e07ab19937106ebe09a500281f'
     }
 )
 
