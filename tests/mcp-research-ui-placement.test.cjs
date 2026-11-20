@@ -55,17 +55,17 @@ assert.match(
 
 assert.match(
   uiSource,
-  /requestOptions\\.targetAddressSpace = ["']loopback["']/, 
+  /requestOptions\.targetAddressSpace = ["']loopback["']/,
   "Local bridge fetches must explicitly target the loopback address space."
 );
 assert.match(
   uiSource,
-  /["']Content-Type["']:\\s*["']text\\/plain["']/, 
+  /["']Content-Type["']:\s*["']text\/plain["']/,
   "Research POST must use a CORS-safelisted content type to avoid an OPTIONS preflight."
 );
 assert.match(
   uiSource,
-  /client:\\s*["']word-addin["']/, 
+  /client:\s*["']word-addin["']/,
   "The client marker must travel in the JSON payload, not a custom request header."
 );
 assert.doesNotMatch(
@@ -75,12 +75,12 @@ assert.doesNotMatch(
 );
 assert.match(
   bridgeSource,
-  /function IsAllowedResearchClient[\\s\\S]*?AllowedOrigin[\\s\\S]*?word-addin/,
+  /function IsAllowedResearchClient[\s\S]*?AllowedOrigin[\s\S]*?word-addin/,
   "The bridge must validate the exact page origin and client marker."
 );
 assert.match(
   bridgeSource,
-  /IsAllowedResearchClient \\$origin \\$inputData/,
+  /IsAllowedResearchClient \$origin \$inputData/,
   "The research endpoint must enforce the simple-request origin/client validation."
 );
 
