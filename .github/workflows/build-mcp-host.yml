@@ -55,6 +55,7 @@ jobs:
           $hash = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content -LiteralPath ($exePath + '.sha256') -Value ($hash + '  ResearchTools.McpHost.exe') -Encoding ASCII
           Write-Host "Published $exePath ($((Get-Item $exePath).Length) bytes), SHA256=$hash"
+          Copy-Item 'runtime/McpHost/Test-McpHost-Preview.ps1' 'dist/mcp-host-win-x64/Test-McpHost-Preview.ps1'
 
       - name: MCP upstream integration smoke test
         shell: pwsh

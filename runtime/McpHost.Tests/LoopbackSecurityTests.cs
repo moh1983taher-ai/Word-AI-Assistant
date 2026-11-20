@@ -27,7 +27,7 @@ public sealed class LoopbackSecurityTests
     [Theory]
     [InlineData("127.0.0.1:18081")]
     [InlineData("localhost:18081")]
-    public void AllowsOnlyConfiguredLoopbackHosts(string host)
+    public void AllowsOnlyConfiguredDefaultLoopbackHosts(string host)
     {
         Assert.True(LoopbackSecurity.IsAllowedHost(host));
     }
@@ -40,6 +40,22 @@ public sealed class LoopbackSecurityTests
     public void RejectsNonLoopbackOrUnexpectedHosts(string host)
     {
         Assert.False(LoopbackSecurity.IsAllowedHost(host));
+    }
+
+    [Fact]
+    public void AllowsAnExplicitAlternateLoopbackPortWithoutOpeningNetworkInterfaces()
+    {
+        Assert.True(LoopbackSecurity.IsAllowedHost("127.0.0.1:18082", 18082));
+        Assert.True(LoopbackSecurity.IsAllowedHost("localhost:18082", 18082));
+        Assert.False(LoopbackSecurity.IsAllowedHost("192.168.1.10:18082", 18082));
+        Assert.False(LoopbackSecurity.IsAllowedHost("127.0.0.1:18081", 18082));
+    }
+
+    [Fact]
+    public void RejectsInvalidAlternatePorts()
+    {
+        Assert.False(LoopbackSecurity.IsAllowedHost("127.0.0.1:80", 80));
+        Assert.False(LoopbackSecurity.IsAllowedHost("127.0.0.1:70000", 70000));
     }
 
     [Fact]

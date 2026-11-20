@@ -38,7 +38,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["Cache-Control"] = "no-store";
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
 
-    if (!LoopbackSecurity.IsAllowedHost(context.Request.Host.Value))
+    if (!LoopbackSecurity.IsAllowedHost(context.Request.Host.Value, port))
     {
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         await context.Response.WriteAsJsonAsync(new { error = "Invalid Host header." });
