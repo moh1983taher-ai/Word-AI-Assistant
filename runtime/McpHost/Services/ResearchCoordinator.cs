@@ -346,12 +346,19 @@ public sealed class ResearchCoordinator
                 arguments,
                 cancellationToken);
 
+            var formattedResult = FormatToolResult(result);
+            if (result.IsError == true)
+            {
+                warnings.Add($"{descriptor.Server}/{descriptor.Name}: MCP reported a tool execution error");
+                return formattedResult;
+            }
+
             trace.Add(new ToolCallTrace(
                 descriptor.Server,
                 descriptor.ServerLabel,
                 descriptor.Name));
 
-            return FormatToolResult(result);
+            return formattedResult;
         }
         catch (OperationCanceledException)
         {
