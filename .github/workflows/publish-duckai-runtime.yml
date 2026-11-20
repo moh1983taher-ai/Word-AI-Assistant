@@ -125,8 +125,11 @@ jobs:
           if (-not $launcherText.Contains("BridgeListening()") -or -not $launcherText.Contains("/ping") -or -not $launcherText.Contains("MCP bridge is listening")) {
             throw "Launcher MCP readiness probe is missing."
           }
-          if (-not $updateText.Contains("/releases?per_page=100") -or -not $updateText.Contains("Get-FileHash")) {
-            throw "One-click updater latest-release or SHA-256 verification is missing."
+          if (-not $updateText.Contains("/releases/latest") -or -not $updateText.Contains("Get-FileHash")) {
+            throw "One-click updater latest-stable-release endpoint or SHA-256 verification is missing."
+          }
+          if (-not $bootstrapText.Contains("/releases/latest")) {
+            throw "Runtime bootstrap latest-stable-release endpoint is missing."
           }
           Write-Host "PowerShell syntax, MCP bridge self-tests, update-flow checks and bootstrap integrity pins passed."
 
