@@ -30,7 +30,7 @@ Source: "..\dist\DuckAI-Runtime-release.zip"; DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\dist\DuckAI-Runtime-release.zip.sha256"; DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\dist\ResearchTools-MCP-Host-release.zip"; DestDir: "{tmp}"; Flags: dontcopy
 Source: "..\dist\ResearchTools-MCP-Host-release.zip.sha256"; DestDir: "{tmp}"; Flags: dontcopy
-Source: "..\runtime\ResearchTools-Launcher.vbs"; DestDir: "{tmp}"; Flags: dontcopy
+Source: "ResearchTools-Launcher.vbs"; DestDir: "{tmp}"; Flags: dontcopy
 Source: "Install-ResearchTools.ps1"; DestDir: "{tmp}"; Flags: dontcopy
 Source: "Word-AI-Assistant.xml"; DestDir: "{tmp}"; Flags: dontcopy
 
