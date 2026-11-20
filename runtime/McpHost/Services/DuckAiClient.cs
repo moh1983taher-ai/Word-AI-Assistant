@@ -15,13 +15,16 @@ namespace ResearchTools.McpHost.Services;
 /// </summary>
 public sealed class DuckAiClient
 {
-    private static readonly string[] CandidateBaseAddresses =
+    internal static readonly string[] CandidateBaseAddresses =
     [
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:18080"
+        // Use the direct DuckAI inference backend first. The local agent proxy on
+        // 8080 may answer model-list requests while stalling chat completions.
+        "http://127.0.0.1:18080",
+        "http://127.0.0.1:8080"
     ];
 
-    private static readonly TimeSpan ModelCacheLifetime = TimeSpan.FromSeconds(15);
+    // Keep the selected endpoint stable throughout a multi-turn MCP research task.
+    private static readonly TimeSpan ModelCacheLifetime = TimeSpan.FromMinutes(5);
     private readonly HttpClient _http;
     private readonly HostLog _log;
     private readonly SemaphoreSlim _discoveryGate = new(1, 1);
