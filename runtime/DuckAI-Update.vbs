@@ -67,7 +67,7 @@ scriptText = Join(Array( _
 "} finally {", _
 "    if (Test-Path -LiteralPath $temp -PathType Container) { Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue }", _
 "}" _
-), [Environment]::NewLine)
+), vbCrLf)
 
 Set stream = fso.CreateTextFile(psPath, True, True)
 stream.Write scriptText
