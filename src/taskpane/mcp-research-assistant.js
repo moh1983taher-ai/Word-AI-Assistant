@@ -435,7 +435,24 @@
 
       if (!response.ok) {
         const errorObject = payload && payload.error ? payload.error : payload;
-        const detail = errorObject && (errorObject.message || errorObject.status || errorObject.code);
+        const detailParts = errorObject && typeof errorObject === "object"
+          ? [errorObject.message, errorObject.status, errorObject.code]
+          : [];
+        if (errorObject && typeof errorObject === "object" && errorObject.details !== undefined) {
+          try {
+            detailParts.push("details=" + JSON.stringify(errorObject.details).slice(0, 1400));
+          } catch (_) {
+            detailParts.push("details=[تعذر قراءة تفاصيل الخطأ]");
+          }
+        }
+        if (detailParts.length === 0 && errorObject && typeof errorObject === "object") {
+          try {
+            detailParts.push(JSON.stringify(errorObject).slice(0, 1400));
+          } catch (_) {
+            // Preserve the provider HTTP status if its error body cannot be serialized.
+          }
+        }
+        const detail = detailParts.filter(Boolean).join(" | ");
         if (response.status === 429) {
           throw new Error(providerLabel + ": تم تجاوز حصة الاستخدام أو حد الطلبات (429). " + (detail || ""));
         }
