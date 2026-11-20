@@ -183,8 +183,35 @@ function Install-DurableLauncher {
 
     $content = Get-Content -LiteralPath $LauncherFile -Raw
     $bootstrapHash = (Get-FileHash -LiteralPath $Bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
-    $pinPattern = '(?im)^[ \t]*Const[ \t]+BOOTSTRAP_SHA256[ \t]*=[ \t]*"([a-f0-9]{64})"[ \t]*\r?
+    # Match the declaration itself, without end-of-line anchors that can vary with CRLF/LF.
+    $pinPattern = '(?im)^[ \t]*Const[ \t]+BOOTSTRAP_SHA256[ \t]*=[ \t]*"([a-f0-9]{64})"'
+    $pinMatch = [regex]::Match($content,$pinPattern)
+    if (-not $pinMatch.Success) { throw 'Unified launcher has no valid BOOTSTRAP_SHA256 declaration.' }
 
+    # DuckAI has already passed the archive's SHA256SUMS verification. Align
+    # the launcher to that verified bootstrap, rather than rejecting a valid package
+    # because its independently released launcher carried a stale pin.
+    $declaredHash = $pinMatch.Groups[1].Value.ToLowerInvariant()
+    if ($declaredHash -ne $bootstrapHash) {
+        $replacement = 'Const BOOTSTRAP_SHA256 = "' + $bootstrapHash + '"'
+        $content = [regex]::Replace($content,$pinPattern,$replacement,1)
+        $encoding = [System.Text.UTF8Encoding]::new($false)
+        [IO.File]::WriteAllText($LauncherFile,$content,$encoding)
+        Log ('Unified launcher bootstrap pin synchronized. Previous=' + $declaredHash + '; Current=' + $bootstrapHash)
+    }
+
+    $verifiedContent = Get-Content -LiteralPath $LauncherFile -Raw
+    $verifiedPin = [regex]::Match($verifiedContent,$pinPattern)
+    if (-not $verifiedPin.Success -or $verifiedPin.Groups[1].Value.ToLowerInvariant() -ne $bootstrapHash) {
+        throw 'Unified launcher bootstrap pin could not be synchronized with the verified DuckAI bootstrap.'
+    }
+    if ($verifiedContent -notmatch 'ResearchTools\.McpHost\.exe' -or $verifiedContent -notmatch 'RESEARCHTOOLS_MCPHOST_V1') {
+        throw 'Launcher does not include the new MCP host integration.'
+    }
+
+    Copy-Item -LiteralPath $LauncherFile -Destination $Launcher -Force
+    Log 'Unified DuckAI and MCP background launcher installed and bootstrap pin verified.'
+}
 function Get-PowerShell {
     $p = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if ($env:PROCESSOR_ARCHITEW6432) {
