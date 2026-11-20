@@ -382,13 +382,13 @@ finally {
 }
 
 function Install-LatestRuntime {
-    param([object]$Release)
+    param([object]$LatestRelease)
     $headers = @{
         'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.1'
         'Accept' = 'application/vnd.github+json'
     }
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $release = $Release
+    $release = $LatestRelease
     if (-not $release) {
         $release = Get-LatestStableRelease
     }
