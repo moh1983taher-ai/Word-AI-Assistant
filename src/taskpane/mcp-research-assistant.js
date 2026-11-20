@@ -310,6 +310,8 @@
     try {
       const requestOptions = Object.assign({}, options || {});
       if (controller) requestOptions.signal = controller.signal;
+      // DuckAI is a loopback companion service. Declare its address space for modern Edge/Chromium.
+      requestOptions.targetAddressSpace = "loopback";
       const response = await fetch(url, requestOptions);
       const payload = await response.json().catch(function () { return {}; });
       if (!response.ok) {
@@ -352,11 +354,13 @@
       mode: "cors",
       cache: "no-store",
       credentials: "omit",
+      // text/plain is CORS-safelisted; the JSON payload is parsed by the local bridge.
+      // This avoids a cross-origin OPTIONS preflight to 127.0.0.1 in current Edge/Chromium.
       headers: {
-        "Content-Type": "application/json",
-        "X-ResearchTools-Client": "word-addin"
+        "Content-Type": "text/plain"
       },
       body: JSON.stringify({
+        client: "word-addin",
         messages: messages,
         model: settings.model || ""
       })
