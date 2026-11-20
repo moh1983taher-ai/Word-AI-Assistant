@@ -24,13 +24,13 @@ $files = @(
         Name = 'ResearchTools-Launcher.vbs'
         Url = "https://raw.githubusercontent.com/$repo/main/runtime/ResearchTools-Launcher.vbs"
         Path = $launcher
-        Sha256 = '74ca240defe40dc723471094066d98fd8dd050b8d06d2f4ac81230bae3783d8b'
+        Sha256 = '14b883a46dc8bbe3c92f91422dd68bd1b97c86ee6348d54a57596c8e26949b7b'
     },
     [pscustomobject]@{
         Name = 'DuckAI-Bootstrap.ps1'
         Url = "https://raw.githubusercontent.com/$repo/main/runtime/DuckAI-Bootstrap.ps1"
         Path = $bootstrap
-        Sha256 = '35ff0e4e92c948bbc98a5cf888f2e7bd7070deebd149364cb421df858cdb8393'
+        Sha256 = 'eb2956da96dcf5f7f957927f528af26db8c1adf4c5a0e5beb9583445b0483582'
     }
 )
 
