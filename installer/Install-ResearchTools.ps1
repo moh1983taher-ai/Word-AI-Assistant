@@ -127,31 +127,68 @@ function Test-McpHostArchive([string]$Path) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead($Path)
     try {
-        if ($zip.Entries.Count -ne 2) { throw 'عدد الملفات داخل حزمة مضيف MCP غير متوقع.' }
+        if ($zip.Entries.Count -ne 2) { throw 'Unexpected MCP archive entry count.' }
         $names = @{}
         [int64]$expanded = 0
         foreach ($entry in $zip.Entries) {
             $name = $entry.FullName
-            if ([string]::IsNullOrWhiteSpace($name) -or $name.Contains('/') -or $name.Contains('\') -or $name.Contains(':') -or $entry.Name -ne $name) {
-                throw ('مسار غير آمن داخل حزمة MCP: ' + $name)
-            }
-            if ($names.ContainsKey($name)) { throw ('ملف مكرر في حزمة MCP: ' + $name) }
+            if ([string]::IsNullOrWhiteSpace($name) -or $name.Contains('/') -or $name.Contains('\') -or $name.Contains(':') -or $entry.Name -ne $name) { throw ('Unsafe MCP archive path: ' + $name) }
+            if ($names.ContainsKey($name)) { throw ('Duplicate MCP archive entry: ' + $name) }
             $names[$name] = $true
             $expanded += [int64]$entry.Length
-            if ($expanded -gt 180MB) { throw 'الحجم بعد فك ضغط MCP يتجاوز الحد الآمن.' }
+            if ($expanded -gt 180MB) { throw 'MCP archive expands beyond the safe size limit.' }
         }
-        if (-not $names.ContainsKey('ResearchTools.McpHost.exe') -or -not $names.ContainsKey('ResearchTools.McpHost.exe.sha256')) {
-            throw 'حزمة MCP لا تحتوي الملف التنفيذي وبصمته الداخلية.'
-        }
+        if (-not $names.ContainsKey('ResearchTools.McpHost.exe') -or -not $names.ContainsKey('ResearchTools.McpHost.exe.sha256')) { throw 'MCP archive is incomplete.' }
     }
     finally { $zip.Dispose() }
 }
 function Install-McpHost {
-    if (-not (Test-Path -LiteralPath $McpHostArchive -PathType Leaf) -or -not (Test-Path -LiteralPath $McpHostShaFile -PathType Leaf)) {
-        throw 'ملفات مضيف MCP المضمنة غير مكتملة.'
-    }
+    if (-not (Test-Path -LiteralPath $McpHostArchive -PathType Leaf) -or -not (Test-Path -LiteralPath $McpHostShaFile -PathType Leaf)) { throw 'MCP host package files are missing.' }
     $sidecar = Get-Content -LiteralPath $McpHostShaFile -Raw
-    if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+ResearchTools-MCP-Host-release\.zip\s*
+    if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+ResearchTools-MCP-Host-release\.zip\s*$') { throw 'Invalid MCP host archive checksum file.' }
+    $expectedArchiveHash = $matches[1].ToUpperInvariant()
+    if ((Get-FileHash -LiteralPath $McpHostArchive -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedArchiveHash) { throw 'MCP host archive SHA-256 mismatch.' }
+    Test-McpHostArchive -Path $McpHostArchive
+    $stage = Join-Path $Root ('McpHost.Stage-' + [Guid]::NewGuid().ToString('N'))
+    $previous = Join-Path $Backup ('McpHost-Previous-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    New-Item -ItemType Directory -Path $stage -Force | Out-Null
+    try {
+        [IO.Compression.ZipFile]::ExtractToDirectory($McpHostArchive,$stage)
+        $exe = Join-Path $stage 'ResearchTools.McpHost.exe'
+        $internalSha = Join-Path $stage 'ResearchTools.McpHost.exe.sha256'
+        if (-not (Test-Path -LiteralPath $exe -PathType Leaf) -or -not (Test-Path -LiteralPath $internalSha -PathType Leaf)) { throw 'MCP host files are incomplete after extraction.' }
+        $inner = Get-Content -LiteralPath $internalSha -Raw
+        if ($inner -notmatch '(?i)^\s*([a-f0-9]{64})\s+ResearchTools\.McpHost\.exe\s*$') { throw 'Invalid MCP host executable checksum.' }
+        $expectedExeHash = $matches[1].ToUpperInvariant()
+        if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedExeHash) { throw 'MCP host executable SHA-256 mismatch.' }
+        if (Test-Path -LiteralPath $McpHost -PathType Container) { Move-Item -LiteralPath $McpHost -Destination $previous }
+        try {
+            Move-Item -LiteralPath $stage -Destination $McpHost
+            $installedExe = Join-Path $McpHost 'ResearchTools.McpHost.exe'
+            if ((Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedExeHash) { throw 'Installed MCP host verification failed.' }
+        }
+        catch {
+            if (Test-Path -LiteralPath $McpHost -PathType Container) { Remove-Item -LiteralPath $McpHost -Recurse -Force -ErrorAction SilentlyContinue }
+            if (Test-Path -LiteralPath $previous -PathType Container) { Move-Item -LiteralPath $previous -Destination $McpHost -Force }
+            throw
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $stage -PathType Container) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    Log 'MCP host installed and internal/external hashes verified.'
+}
+function Install-DurableLauncher {
+    if (-not (Test-Path -LiteralPath $LauncherFile -PathType Leaf)) { throw 'Unified ResearchTools launcher is missing.' }
+    $content = Get-Content -LiteralPath $LauncherFile -Raw
+    $bootstrapHash = (Get-FileHash -LiteralPath $Bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($content -notmatch '(?im)^Const BOOTSTRAP_SHA256 = "([a-f0-9]{64})"$' -or $matches[1].ToLowerInvariant() -ne $bootstrapHash) { throw 'Launcher bootstrap hash does not match the installed DuckAI bootstrap.' }
+    if ($content -notmatch 'ResearchTools\.McpHost\.exe' -or $content -notmatch 'RESEARCHTOOLS_MCPHOST_V1') { throw 'Launcher does not include the new MCP host integration.' }
+    Copy-Item -LiteralPath $LauncherFile -Destination $Launcher -Force
+    Log 'Unified DuckAI and MCP background launcher installed.'
+}
+
+function Get-PowerShell {
     $p = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if ($env:PROCESSOR_ARCHITEW6432) {
         $native = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe'
@@ -307,680 +344,6 @@ function Install-Runtime {
     }
     Copy-Item -LiteralPath (Join-Path $Runtime 'ResearchTools-Launcher.vbs') -Destination $Launcher -Force
     Copy-Item -LiteralPath (Join-Path $Runtime 'DuckAI-Bootstrap.ps1') -Destination $Bootstrap -Force
-    if (-not (Test-FileHashes -Directory $Runtime)) { throw 'فشل التحقق النهائي من ملفات DuckAI.' }
-}
-
-try {
-    Show-Progress
-    Stage 5 'التحقق من متطلبات التثبيت وإغلاق Word...'
-    if (@(Get-Process -Name WINWORD -ErrorAction SilentlyContinue).Count -gt 0) { throw 'أغلق Microsoft Word بالكامل ثم أعد تشغيل Setup.' }
-    Stage 15 'التحقق من ملفات التثبيت...'
-    if (-not (Test-Path -LiteralPath $ManifestFile -PathType Leaf)) { throw 'ملف Manifest غير موجود.' }
-    Stage 25 'إيقاف عمليات DuckAI السابقة دون المساس بملفات التطوير...'
-    Stop-OldProcesses
-    Stage 38 'تثبيت الخادم المحلي المضمن والتحقق من سلامته...'
-    Install-Runtime
-    Stage 67 'فحص مجلد Word المشترك وتهيئة الكتالوج الموثوق...'
-    $catalog = Get-Catalog
-    Stage 76 'إضافة أدوات الباحث إلى قائمة الإضافات المشتركة في Word...'
-    Install-Manifest -Catalog $catalog
-    Stage 86 'تسجيل مهمة التشغيل التلقائي لخادم DuckAI...'
-    $powershell = Get-PowerShell
-    $arguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $Bootstrap + '" -RegisterTask'
-    $bootstrapProcess = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
-    if ($bootstrapProcess.ExitCode -ne 0) { throw ('فشل تسجيل مهمة التشغيل التلقائي. ExitCode=' + $bootstrapProcess.ExitCode) }
-    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
-    if ($task.State -eq 'Disabled') { throw 'مهمة تشغيل DuckAI مسجلة لكنها معطلة.' }
-    $action = @($task.Actions) | Select-Object -First 1
-    if (-not $action -or [string]$action.Execute -notmatch '(?i)wscript\.exe$' -or [string]$action.Arguments -notmatch 'ResearchTools-Launcher\.vbs') { throw 'مهمة التشغيل لا تشير إلى المشغّل المثبت.' }
-    Stage 94 'تشغيل المشغّل الدائم والتحقق من وجوده...'
-    $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
-    Start-Process -FilePath $wscript -ArgumentList ('"' + $Launcher + '"') -WindowStyle Hidden | Out-Null
-    Start-Sleep -Seconds 2
-    $running = @(Get-CimInstance Win32_Process -Filter "Name='wscript.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0 })
-    if ($running.Count -eq 0) { throw 'تعذر تشغيل المشغّل الدائم.' }
-    Stage 100 'اكتمل تثبيت أدوات الباحث وخادم DuckAI وإعداد Word بنجاح.'
-    Log 'SUCCESS: runtime, Word shared catalog, manifest, task and launcher installed.'
-    Start-Sleep -Milliseconds 1000
-    $script:Form.Close()
-    exit 0
-}
-catch {
-    $message = $_.Exception.Message
-    try { Log ('ERROR: ' + $message) } catch { }
-    try {
-        $details = 'تعذر إكمال التثبيت:' + [Environment]::NewLine + $message + [Environment]::NewLine + [Environment]::NewLine + 'راجع السجل:' + [Environment]::NewLine + $Log
-        [System.Windows.Forms.MessageBox]::Show($details,'تعذر تثبيت أدوات الباحث',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
-    }
-    catch { Write-Error $message }
-    if ($script:Form) { $script:Form.Close() }
-    exit 1
-}
-) {
-        throw 'صيغة بصمة حزمة MCP غير صحيحة.'
-    }
-    $expectedArchiveHash = $matches[1].ToUpperInvariant()
-    if ((Get-FileHash -LiteralPath $McpHostArchive -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedArchiveHash) {
-        throw 'فشل التحقق من SHA-256 لحزمة مضيف MCP.'
-    }
-
-    Test-McpHostArchive -Path $McpHostArchive
-    $stage = Join-Path $Root ('McpHost.Stage-' + [Guid]::NewGuid().ToString('N'))
-    $previous = Join-Path $Backup ('McpHost-Previous-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    try {
-        [IO.Compression.ZipFile]::ExtractToDirectory($McpHostArchive,$stage)
-        $exe = Join-Path $stage 'ResearchTools.McpHost.exe'
-        $internalSha = Join-Path $stage 'ResearchTools.McpHost.exe.sha256'
-        if (-not (Test-Path -LiteralPath $exe -PathType Leaf) -or -not (Test-Path -LiteralPath $internalSha -PathType Leaf)) {
-            throw 'ملفات مضيف MCP بعد فك الضغط غير مكتملة.'
-        }
-        $inner = Get-Content -LiteralPath $internalSha -Raw
-        if ($inner -notmatch '(?i)^\s*([a-f0-9]{64})\s+ResearchTools\.McpHost\.exe\s*
-    $p = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if ($env:PROCESSOR_ARCHITEW6432) {
-        $native = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe'
-        if (Test-Path -LiteralPath $native) { return $native }
-    }
-    return $p
-}
-function Test-Writable([string]$Path) {
-    try {
-        if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
-        $probe = Join-Path $Path ('.rt-' + [Guid]::NewGuid().ToString('N') + '.tmp')
-        [IO.File]::WriteAllText($probe,'ok')
-        Remove-Item -LiteralPath $probe -Force
-        return $true
-    }
-    catch { return $false }
-}
-function Create-Share([string]$Name,[string]$Path) {
-    $account = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $helper = Join-Path $env:TEMP ('ResearchTools-Share-' + [Guid]::NewGuid().ToString('N') + '.ps1')
-    $code = @'
-param([string]$ShareName,[string]$SharePath,[string]$Account)
-$ErrorActionPreference = 'Stop'
-Import-Module SmbShare -ErrorAction Stop
-$existing = Get-SmbShare -Name $ShareName -ErrorAction SilentlyContinue
-if ($existing) {
-    if (-not ([IO.Path]::GetFullPath([string]$existing.Path).TrimEnd('\')).Equals([IO.Path]::GetFullPath($SharePath).TrimEnd('\'),[StringComparison]::OrdinalIgnoreCase)) { throw 'مشاركة ResearchTools موجودة لمسار آخر.' }
-}
-else {
-    New-SmbShare -Name $ShareName -Path $SharePath -FullAccess $Account -Description 'ResearchTools Office add-in catalog' -ErrorAction Stop | Out-Null
-}
-'@
-    Set-Content -LiteralPath $helper -Value $code -Encoding UTF8
-    try {
-        $args = '-NoProfile -ExecutionPolicy Bypass -File "' + $helper + '" -ShareName "' + $Name + '" -SharePath "' + $Path + '" -Account "' + $account + '"'
-        $p = Start-Process -FilePath (Get-PowerShell) -Verb RunAs -ArgumentList $args -Wait -PassThru
-        if ($p.ExitCode -ne 0) { throw ('تعذر إنشاء مجلد المشاركة. رمز الخروج: ' + $p.ExitCode) }
-    }
-    finally { Remove-Item -LiteralPath $helper -Force -ErrorAction SilentlyContinue }
-}
-function Get-Catalog {
-    $registry = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs'
-    $found = @()
-    if (Test-Path -LiteralPath $registry) {
-        foreach ($key in @(Get-ChildItem -LiteralPath $registry -ErrorAction SilentlyContinue)) {
-            try {
-                $props = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction Stop
-                $url = [string]$props.Url
-                if ($url.StartsWith('\\') -and (Test-Writable $url)) {
-                    $id = [string]$props.Id
-                    if (-not $id) { $id = $key.PSChildName }
-                    $found += [pscustomobject]@{Path=$url;Id=$id;Key=$key.PSPath}
-                }
-            }
-            catch { }
-        }
-    }
-    $chosen = $found | Sort-Object @{Expression={if (([string]$_.Id).Replace('{','').Replace('}','') -ieq $PreferredCatalog) {0} else {1}}} | Select-Object -First 1
-    if ($chosen) {
-        New-ItemProperty -LiteralPath $chosen.Key -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
-        Log ('إعادة استخدام كتالوج Word المشترك: ' + $chosen.Path)
-        return [string]$chosen.Path
-    }
-
-    $local = Join-Path $Root 'OfficeAddins'
-    New-Item -ItemType Directory -Path $local -Force | Out-Null
-    $shareName = 'ResearchToolsAddins'
-    try {
-        Import-Module SmbShare -ErrorAction Stop
-        $share = Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue
-        if ($share -and -not ([IO.Path]::GetFullPath([string]$share.Path).TrimEnd('\')).Equals([IO.Path]::GetFullPath($local).TrimEnd('\'),[StringComparison]::OrdinalIgnoreCase)) {
-            $suffix = ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -replace '[^A-Fa-f0-9]','')
-            $shareName = 'ResearchToolsAddins-' + $suffix.Substring([Math]::Max(0,$suffix.Length - 6))
-        }
-    }
-    catch { }
-    Create-Share -Name $shareName -Path $local
-    $unc = '\\' + $env:COMPUTERNAME + '\' + $shareName
-    if (-not (Test-Writable $unc)) { throw ('تعذر الوصول إلى مجلد المشاركة بعد إنشائه: ' + $unc) }
-    New-Item -Path $registry -Force | Out-Null
-    $newKey = Join-Path $registry '{4B78E8D1-1F8A-43B0-9859-4C10A5E127D2}'
-    New-Item -Path $newKey -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Id -PropertyType String -Value '{4B78E8D1-1F8A-43B0-9859-4C10A5E127D2}' -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Url -PropertyType String -Value $unc -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
-    Log ('إنشاء كتالوج Word مشترك جديد: ' + $unc)
-    return $unc
-}
-function Install-Manifest([string]$Catalog) {
-    [xml]$xml = Get-Content -LiteralPath $ManifestFile -Raw
-    $id = $xml.SelectSingleNode("//*[local-name()='Id']")
-    $source = $xml.SelectSingleNode("//*[local-name()='DefaultSettings']/*[local-name()='SourceLocation']")
-    if (-not $id -or $id.InnerText -ne $AppId) { throw 'معرّف إضافة Word غير مطابق.' }
-    if (-not $source -or $source.GetAttribute('DefaultValue') -notmatch '^https://moh1983taher-ai\.github\.io/Word-AI-Assistant/taskpane\.html$') { throw 'رابط تشغيل إضافة Word غير صحيح.' }
-
-    $filename = 'Word-AI-Assistant.xml'
-    foreach ($file in @(Get-ChildItem -LiteralPath $Catalog -Filter '*.xml' -File -ErrorAction Stop)) {
-        try {
-            [xml]$existing = Get-Content -LiteralPath $file.FullName -Raw
-            $existingId = $existing.SelectSingleNode("//*[local-name()='Id']")
-            if ($existingId -and $existingId.InnerText -eq $AppId) { $filename = $file.Name; break }
-        }
-        catch { }
-    }
-    $destination = Join-Path $Catalog $filename
-    if (Test-Path -LiteralPath $destination -PathType Leaf) {
-        Copy-Item -LiteralPath $destination -Destination (Join-Path $Backup ($filename + '.' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.bak')) -Force
-    }
-    $temp = $destination + '.new'
-    Copy-Item -LiteralPath $ManifestFile -Destination $temp -Force
-    Move-Item -LiteralPath $temp -Destination $destination -Force
-    Log ('تثبيت Manifest في مجلد Word المشترك: ' + $destination)
-}
-function Stop-OldProcesses {
-    foreach ($proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
-        $name = [string]$proc.Name
-        $path = [string]$proc.ExecutablePath
-        $cmd = [string]$proc.CommandLine
-        $runtimeProc = ($name -in @('duck2api-main.exe','ResearchTools-DuckAgent.exe')) -and $path -and $path.StartsWith($Runtime,[StringComparison]::OrdinalIgnoreCase)
-        $launcherProc = ($name -ieq 'wscript.exe') -and $cmd -and $cmd.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0
-        if ($runtimeProc -or $launcherProc) { Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue }
-    }
-}
-function Install-Runtime {
-    if (-not (Test-Path -LiteralPath $RuntimeArchive -PathType Leaf) -or -not (Test-Path -LiteralPath $RuntimeShaFile -PathType Leaf)) { throw 'ملفات الخادم المضمنة غير مكتملة.' }
-    $sidecar = Get-Content -LiteralPath $RuntimeShaFile -Raw
-    if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+DuckAI-Runtime-release\.zip\s*$') { throw 'صيغة ملف SHA-256 غير صحيحة.' }
-    $expected = $matches[1].ToUpperInvariant()
-    $actual = (Get-FileHash -LiteralPath $RuntimeArchive -Algorithm SHA256).Hash.ToUpperInvariant()
-    if ($actual -ne $expected) { throw 'فشل التحقق من SHA-256 لحزمة DuckAI.' }
-    Test-Archive -Path $RuntimeArchive
-    $stage = Join-Path $Root ('DuckAI.Stage-' + [Guid]::NewGuid().ToString('N'))
-    $previous = Join-Path $Backup ('DuckAI-Previous-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    try {
-        [IO.Compression.ZipFile]::ExtractToDirectory($RuntimeArchive,$stage)
-        if (-not (Test-FileHashes -Directory $stage)) { throw 'فشل التحقق من البصمات الداخلية لملفات الخادم.' }
-        if (Test-Path -LiteralPath $Runtime -PathType Container) { Move-Item -LiteralPath $Runtime -Destination $previous }
-        try {
-            Move-Item -LiteralPath $stage -Destination $Runtime
-            if (-not (Test-FileHashes -Directory $Runtime)) { throw 'فشل الفحص النهائي لمجلد الخادم.' }
-        }
-        catch {
-            if (Test-Path -LiteralPath $Runtime) { Remove-Item -LiteralPath $Runtime -Recurse -Force -ErrorAction SilentlyContinue }
-            if (Test-Path -LiteralPath $previous) { Move-Item -LiteralPath $previous -Destination $Runtime -Force }
-            throw
-        }
-    }
-    finally {
-        if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
-    }
-    Copy-Item -LiteralPath (Join-Path $Runtime 'ResearchTools-Launcher.vbs') -Destination $Launcher -Force
-    Copy-Item -LiteralPath (Join-Path $Runtime 'DuckAI-Bootstrap.ps1') -Destination $Bootstrap -Force
-    $hash = (Get-FileHash -LiteralPath $Bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
-    if (-not (Get-Content -LiteralPath $Launcher -Raw).Contains($hash)) { throw 'بصمة Bootstrap داخل المشغّل لا تطابق الملف المثبت.' }
-    if (-not (Test-FileHashes -Directory $Runtime)) { throw 'فشل التحقق النهائي من ملفات DuckAI.' }
-}
-
-try {
-    Show-Progress
-    Stage 5 'التحقق من متطلبات التثبيت وإغلاق Word...'
-    if (@(Get-Process -Name WINWORD -ErrorAction SilentlyContinue).Count -gt 0) { throw 'أغلق Microsoft Word بالكامل ثم أعد تشغيل Setup.' }
-    Stage 15 'التحقق من ملفات التثبيت...'
-    if (-not (Test-Path -LiteralPath $ManifestFile -PathType Leaf)) { throw 'ملف Manifest غير موجود.' }
-    Stage 25 'إيقاف عمليات DuckAI السابقة دون المساس بملفات التطوير...'
-    Stop-OldProcesses
-    Stage 38 'تثبيت الخادم المحلي المضمن والتحقق من سلامته...'
-    Install-Runtime
-    Stage 67 'فحص مجلد Word المشترك وتهيئة الكتالوج الموثوق...'
-    $catalog = Get-Catalog
-    Stage 76 'إضافة أدوات الباحث إلى قائمة الإضافات المشتركة في Word...'
-    Install-Manifest -Catalog $catalog
-    Stage 86 'تسجيل مهمة التشغيل التلقائي لخادم DuckAI...'
-    $powershell = Get-PowerShell
-    $arguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $Bootstrap + '" -RegisterTask'
-    $bootstrapProcess = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
-    if ($bootstrapProcess.ExitCode -ne 0) { throw ('فشل تسجيل مهمة التشغيل التلقائي. ExitCode=' + $bootstrapProcess.ExitCode) }
-    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
-    if ($task.State -eq 'Disabled') { throw 'مهمة تشغيل DuckAI مسجلة لكنها معطلة.' }
-    $action = @($task.Actions) | Select-Object -First 1
-    if (-not $action -or [string]$action.Execute -notmatch '(?i)wscript\.exe$' -or [string]$action.Arguments -notmatch 'ResearchTools-Launcher\.vbs') { throw 'مهمة التشغيل لا تشير إلى المشغّل المثبت.' }
-    Stage 94 'تشغيل المشغّل الدائم والتحقق من وجوده...'
-    $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
-    Start-Process -FilePath $wscript -ArgumentList ('"' + $Launcher + '"') -WindowStyle Hidden | Out-Null
-    Start-Sleep -Seconds 2
-    $running = @(Get-CimInstance Win32_Process -Filter "Name='wscript.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0 })
-    if ($running.Count -eq 0) { throw 'تعذر تشغيل المشغّل الدائم.' }
-    Stage 100 'اكتمل تثبيت أدوات الباحث وخادم DuckAI وإعداد Word بنجاح.'
-    Log 'SUCCESS: runtime, Word shared catalog, manifest, task and launcher installed.'
-    Start-Sleep -Milliseconds 1000
-    $script:Form.Close()
-    exit 0
-}
-catch {
-    $message = $_.Exception.Message
-    try { Log ('ERROR: ' + $message) } catch { }
-    try {
-        $details = 'تعذر إكمال التثبيت:' + [Environment]::NewLine + $message + [Environment]::NewLine + [Environment]::NewLine + 'راجع السجل:' + [Environment]::NewLine + $Log
-        [System.Windows.Forms.MessageBox]::Show($details,'تعذر تثبيت أدوات الباحث',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
-    }
-    catch { Write-Error $message }
-    if ($script:Form) { $script:Form.Close() }
-    exit 1
-}
-) {
-            throw 'صيغة البصمة الداخلية لمضيف MCP غير صحيحة.'
-        }
-        $expectedExeHash = $matches[1].ToUpperInvariant()
-        if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedExeHash) {
-            throw 'فشل التحقق من بصمة الملف التنفيذي لمضيف MCP.'
-        }
-
-        if (Test-Path -LiteralPath $McpHost -PathType Container) { Move-Item -LiteralPath $McpHost -Destination $previous }
-        try {
-            Move-Item -LiteralPath $stage -Destination $McpHost
-            $installedExe = Join-Path $McpHost 'ResearchTools.McpHost.exe'
-            if ((Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedExeHash) {
-                throw 'فشل الفحص النهائي لمضيف MCP بعد التثبيت.'
-            }
-        }
-        catch {
-            if (Test-Path -LiteralPath $McpHost -PathType Container) { Remove-Item -LiteralPath $McpHost -Recurse -Force -ErrorAction SilentlyContinue }
-            if (Test-Path -LiteralPath $previous -PathType Container) { Move-Item -LiteralPath $previous -Destination $McpHost -Force }
-            throw
-        }
-    }
-    finally {
-        if (Test-Path -LiteralPath $stage -PathType Container) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
-    }
-    Log 'تم تثبيت مضيف MCP والتحقق من بصمته الداخلية والخارجية.'
-}
-function Install-DurableLauncher {
-    if (-not (Test-Path -LiteralPath $LauncherFile -PathType Leaf)) { throw 'ملف مشغّل أدوات الباحث الموحّد غير موجود.' }
-    $content = Get-Content -LiteralPath $LauncherFile -Raw
-    $bootstrapHash = (Get-FileHash -LiteralPath $Bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($content -notmatch '(?im)^Const BOOTSTRAP_SHA256 = "([a-f0-9]{64})"
-    $p = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if ($env:PROCESSOR_ARCHITEW6432) {
-        $native = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe'
-        if (Test-Path -LiteralPath $native) { return $native }
-    }
-    return $p
-}
-function Test-Writable([string]$Path) {
-    try {
-        if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
-        $probe = Join-Path $Path ('.rt-' + [Guid]::NewGuid().ToString('N') + '.tmp')
-        [IO.File]::WriteAllText($probe,'ok')
-        Remove-Item -LiteralPath $probe -Force
-        return $true
-    }
-    catch { return $false }
-}
-function Create-Share([string]$Name,[string]$Path) {
-    $account = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $helper = Join-Path $env:TEMP ('ResearchTools-Share-' + [Guid]::NewGuid().ToString('N') + '.ps1')
-    $code = @'
-param([string]$ShareName,[string]$SharePath,[string]$Account)
-$ErrorActionPreference = 'Stop'
-Import-Module SmbShare -ErrorAction Stop
-$existing = Get-SmbShare -Name $ShareName -ErrorAction SilentlyContinue
-if ($existing) {
-    if (-not ([IO.Path]::GetFullPath([string]$existing.Path).TrimEnd('\')).Equals([IO.Path]::GetFullPath($SharePath).TrimEnd('\'),[StringComparison]::OrdinalIgnoreCase)) { throw 'مشاركة ResearchTools موجودة لمسار آخر.' }
-}
-else {
-    New-SmbShare -Name $ShareName -Path $SharePath -FullAccess $Account -Description 'ResearchTools Office add-in catalog' -ErrorAction Stop | Out-Null
-}
-'@
-    Set-Content -LiteralPath $helper -Value $code -Encoding UTF8
-    try {
-        $args = '-NoProfile -ExecutionPolicy Bypass -File "' + $helper + '" -ShareName "' + $Name + '" -SharePath "' + $Path + '" -Account "' + $account + '"'
-        $p = Start-Process -FilePath (Get-PowerShell) -Verb RunAs -ArgumentList $args -Wait -PassThru
-        if ($p.ExitCode -ne 0) { throw ('تعذر إنشاء مجلد المشاركة. رمز الخروج: ' + $p.ExitCode) }
-    }
-    finally { Remove-Item -LiteralPath $helper -Force -ErrorAction SilentlyContinue }
-}
-function Get-Catalog {
-    $registry = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs'
-    $found = @()
-    if (Test-Path -LiteralPath $registry) {
-        foreach ($key in @(Get-ChildItem -LiteralPath $registry -ErrorAction SilentlyContinue)) {
-            try {
-                $props = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction Stop
-                $url = [string]$props.Url
-                if ($url.StartsWith('\\') -and (Test-Writable $url)) {
-                    $id = [string]$props.Id
-                    if (-not $id) { $id = $key.PSChildName }
-                    $found += [pscustomobject]@{Path=$url;Id=$id;Key=$key.PSPath}
-                }
-            }
-            catch { }
-        }
-    }
-    $chosen = $found | Sort-Object @{Expression={if (([string]$_.Id).Replace('{','').Replace('}','') -ieq $PreferredCatalog) {0} else {1}}} | Select-Object -First 1
-    if ($chosen) {
-        New-ItemProperty -LiteralPath $chosen.Key -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
-        Log ('إعادة استخدام كتالوج Word المشترك: ' + $chosen.Path)
-        return [string]$chosen.Path
-    }
-
-    $local = Join-Path $Root 'OfficeAddins'
-    New-Item -ItemType Directory -Path $local -Force | Out-Null
-    $shareName = 'ResearchToolsAddins'
-    try {
-        Import-Module SmbShare -ErrorAction Stop
-        $share = Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue
-        if ($share -and -not ([IO.Path]::GetFullPath([string]$share.Path).TrimEnd('\')).Equals([IO.Path]::GetFullPath($local).TrimEnd('\'),[StringComparison]::OrdinalIgnoreCase)) {
-            $suffix = ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -replace '[^A-Fa-f0-9]','')
-            $shareName = 'ResearchToolsAddins-' + $suffix.Substring([Math]::Max(0,$suffix.Length - 6))
-        }
-    }
-    catch { }
-    Create-Share -Name $shareName -Path $local
-    $unc = '\\' + $env:COMPUTERNAME + '\' + $shareName
-    if (-not (Test-Writable $unc)) { throw ('تعذر الوصول إلى مجلد المشاركة بعد إنشائه: ' + $unc) }
-    New-Item -Path $registry -Force | Out-Null
-    $newKey = Join-Path $registry '{4B78E8D1-1F8A-43B0-9859-4C10A5E127D2}'
-    New-Item -Path $newKey -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Id -PropertyType String -Value '{4B78E8D1-1F8A-43B0-9859-4C10A5E127D2}' -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Url -PropertyType String -Value $unc -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
-    Log ('إنشاء كتالوج Word مشترك جديد: ' + $unc)
-    return $unc
-}
-function Install-Manifest([string]$Catalog) {
-    [xml]$xml = Get-Content -LiteralPath $ManifestFile -Raw
-    $id = $xml.SelectSingleNode("//*[local-name()='Id']")
-    $source = $xml.SelectSingleNode("//*[local-name()='DefaultSettings']/*[local-name()='SourceLocation']")
-    if (-not $id -or $id.InnerText -ne $AppId) { throw 'معرّف إضافة Word غير مطابق.' }
-    if (-not $source -or $source.GetAttribute('DefaultValue') -notmatch '^https://moh1983taher-ai\.github\.io/Word-AI-Assistant/taskpane\.html$') { throw 'رابط تشغيل إضافة Word غير صحيح.' }
-
-    $filename = 'Word-AI-Assistant.xml'
-    foreach ($file in @(Get-ChildItem -LiteralPath $Catalog -Filter '*.xml' -File -ErrorAction Stop)) {
-        try {
-            [xml]$existing = Get-Content -LiteralPath $file.FullName -Raw
-            $existingId = $existing.SelectSingleNode("//*[local-name()='Id']")
-            if ($existingId -and $existingId.InnerText -eq $AppId) { $filename = $file.Name; break }
-        }
-        catch { }
-    }
-    $destination = Join-Path $Catalog $filename
-    if (Test-Path -LiteralPath $destination -PathType Leaf) {
-        Copy-Item -LiteralPath $destination -Destination (Join-Path $Backup ($filename + '.' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.bak')) -Force
-    }
-    $temp = $destination + '.new'
-    Copy-Item -LiteralPath $ManifestFile -Destination $temp -Force
-    Move-Item -LiteralPath $temp -Destination $destination -Force
-    Log ('تثبيت Manifest في مجلد Word المشترك: ' + $destination)
-}
-function Stop-OldProcesses {
-    foreach ($proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
-        $name = [string]$proc.Name
-        $path = [string]$proc.ExecutablePath
-        $cmd = [string]$proc.CommandLine
-        $runtimeProc = ($name -in @('duck2api-main.exe','ResearchTools-DuckAgent.exe')) -and $path -and $path.StartsWith($Runtime,[StringComparison]::OrdinalIgnoreCase)
-        $launcherProc = ($name -ieq 'wscript.exe') -and $cmd -and $cmd.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0
-        if ($runtimeProc -or $launcherProc) { Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue }
-    }
-}
-function Install-Runtime {
-    if (-not (Test-Path -LiteralPath $RuntimeArchive -PathType Leaf) -or -not (Test-Path -LiteralPath $RuntimeShaFile -PathType Leaf)) { throw 'ملفات الخادم المضمنة غير مكتملة.' }
-    $sidecar = Get-Content -LiteralPath $RuntimeShaFile -Raw
-    if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+DuckAI-Runtime-release\.zip\s*$') { throw 'صيغة ملف SHA-256 غير صحيحة.' }
-    $expected = $matches[1].ToUpperInvariant()
-    $actual = (Get-FileHash -LiteralPath $RuntimeArchive -Algorithm SHA256).Hash.ToUpperInvariant()
-    if ($actual -ne $expected) { throw 'فشل التحقق من SHA-256 لحزمة DuckAI.' }
-    Test-Archive -Path $RuntimeArchive
-    $stage = Join-Path $Root ('DuckAI.Stage-' + [Guid]::NewGuid().ToString('N'))
-    $previous = Join-Path $Backup ('DuckAI-Previous-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    try {
-        [IO.Compression.ZipFile]::ExtractToDirectory($RuntimeArchive,$stage)
-        if (-not (Test-FileHashes -Directory $stage)) { throw 'فشل التحقق من البصمات الداخلية لملفات الخادم.' }
-        if (Test-Path -LiteralPath $Runtime -PathType Container) { Move-Item -LiteralPath $Runtime -Destination $previous }
-        try {
-            Move-Item -LiteralPath $stage -Destination $Runtime
-            if (-not (Test-FileHashes -Directory $Runtime)) { throw 'فشل الفحص النهائي لمجلد الخادم.' }
-        }
-        catch {
-            if (Test-Path -LiteralPath $Runtime) { Remove-Item -LiteralPath $Runtime -Recurse -Force -ErrorAction SilentlyContinue }
-            if (Test-Path -LiteralPath $previous) { Move-Item -LiteralPath $previous -Destination $Runtime -Force }
-            throw
-        }
-    }
-    finally {
-        if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
-    }
-    Copy-Item -LiteralPath (Join-Path $Runtime 'ResearchTools-Launcher.vbs') -Destination $Launcher -Force
-    Copy-Item -LiteralPath (Join-Path $Runtime 'DuckAI-Bootstrap.ps1') -Destination $Bootstrap -Force
-    $hash = (Get-FileHash -LiteralPath $Bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
-    if (-not (Get-Content -LiteralPath $Launcher -Raw).Contains($hash)) { throw 'بصمة Bootstrap داخل المشغّل لا تطابق الملف المثبت.' }
-    if (-not (Test-FileHashes -Directory $Runtime)) { throw 'فشل التحقق النهائي من ملفات DuckAI.' }
-}
-
-try {
-    Show-Progress
-    Stage 5 'التحقق من متطلبات التثبيت وإغلاق Word...'
-    if (@(Get-Process -Name WINWORD -ErrorAction SilentlyContinue).Count -gt 0) { throw 'أغلق Microsoft Word بالكامل ثم أعد تشغيل Setup.' }
-    Stage 15 'التحقق من ملفات التثبيت...'
-    if (-not (Test-Path -LiteralPath $ManifestFile -PathType Leaf)) { throw 'ملف Manifest غير موجود.' }
-    Stage 25 'إيقاف عمليات DuckAI السابقة دون المساس بملفات التطوير...'
-    Stop-OldProcesses
-    Stage 38 'تثبيت الخادم المحلي المضمن والتحقق من سلامته...'
-    Install-Runtime
-    Stage 67 'فحص مجلد Word المشترك وتهيئة الكتالوج الموثوق...'
-    $catalog = Get-Catalog
-    Stage 76 'إضافة أدوات الباحث إلى قائمة الإضافات المشتركة في Word...'
-    Install-Manifest -Catalog $catalog
-    Stage 86 'تسجيل مهمة التشغيل التلقائي لخادم DuckAI...'
-    $powershell = Get-PowerShell
-    $arguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $Bootstrap + '" -RegisterTask'
-    $bootstrapProcess = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
-    if ($bootstrapProcess.ExitCode -ne 0) { throw ('فشل تسجيل مهمة التشغيل التلقائي. ExitCode=' + $bootstrapProcess.ExitCode) }
-    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
-    if ($task.State -eq 'Disabled') { throw 'مهمة تشغيل DuckAI مسجلة لكنها معطلة.' }
-    $action = @($task.Actions) | Select-Object -First 1
-    if (-not $action -or [string]$action.Execute -notmatch '(?i)wscript\.exe$' -or [string]$action.Arguments -notmatch 'ResearchTools-Launcher\.vbs') { throw 'مهمة التشغيل لا تشير إلى المشغّل المثبت.' }
-    Stage 94 'تشغيل المشغّل الدائم والتحقق من وجوده...'
-    $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
-    Start-Process -FilePath $wscript -ArgumentList ('"' + $Launcher + '"') -WindowStyle Hidden | Out-Null
-    Start-Sleep -Seconds 2
-    $running = @(Get-CimInstance Win32_Process -Filter "Name='wscript.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0 })
-    if ($running.Count -eq 0) { throw 'تعذر تشغيل المشغّل الدائم.' }
-    Stage 100 'اكتمل تثبيت أدوات الباحث وخادم DuckAI وإعداد Word بنجاح.'
-    Log 'SUCCESS: runtime, Word shared catalog, manifest, task and launcher installed.'
-    Start-Sleep -Milliseconds 1000
-    $script:Form.Close()
-    exit 0
-}
-catch {
-    $message = $_.Exception.Message
-    try { Log ('ERROR: ' + $message) } catch { }
-    try {
-        $details = 'تعذر إكمال التثبيت:' + [Environment]::NewLine + $message + [Environment]::NewLine + [Environment]::NewLine + 'راجع السجل:' + [Environment]::NewLine + $Log
-        [System.Windows.Forms.MessageBox]::Show($details,'تعذر تثبيت أدوات الباحث',[System.Windows.Forms.MessageBoxButtons]::OK,[System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
-    }
-    catch { Write-Error $message }
-    if ($script:Form) { $script:Form.Close() }
-    exit 1
-}
- -or $matches[1].ToLowerInvariant() -ne $bootstrapHash) {
-        throw 'بصمة DuckAI Bootstrap داخل المشغّل لا تطابق الملف المثبت.'
-    }
-    if ($content -notmatch 'ResearchTools\.McpHost\.exe' -or $content -notmatch 'RESEARCHTOOLS_MCPHOST_V1') {
-        throw 'المشغّل لا يتضمن ربط مضيف MCP الجديد.'
-    }
-    Copy-Item -LiteralPath $LauncherFile -Destination $Launcher -Force
-    Log 'تم تثبيت مشغّل الخلفية الموحّد الذي يدير DuckAI ومضيف MCP.'
-}
-
-function Get-PowerShell {
-    $p = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if ($env:PROCESSOR_ARCHITEW6432) {
-        $native = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe'
-        if (Test-Path -LiteralPath $native) { return $native }
-    }
-    return $p
-}
-function Test-Writable([string]$Path) {
-    try {
-        if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
-        $probe = Join-Path $Path ('.rt-' + [Guid]::NewGuid().ToString('N') + '.tmp')
-        [IO.File]::WriteAllText($probe,'ok')
-        Remove-Item -LiteralPath $probe -Force
-        return $true
-    }
-    catch { return $false }
-}
-function Create-Share([string]$Name,[string]$Path) {
-    $account = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $helper = Join-Path $env:TEMP ('ResearchTools-Share-' + [Guid]::NewGuid().ToString('N') + '.ps1')
-    $code = @'
-param([string]$ShareName,[string]$SharePath,[string]$Account)
-$ErrorActionPreference = 'Stop'
-Import-Module SmbShare -ErrorAction Stop
-$existing = Get-SmbShare -Name $ShareName -ErrorAction SilentlyContinue
-if ($existing) {
-    if (-not ([IO.Path]::GetFullPath([string]$existing.Path).TrimEnd('\')).Equals([IO.Path]::GetFullPath($SharePath).TrimEnd('\'),[StringComparison]::OrdinalIgnoreCase)) { throw 'مشاركة ResearchTools موجودة لمسار آخر.' }
-}
-else {
-    New-SmbShare -Name $ShareName -Path $SharePath -FullAccess $Account -Description 'ResearchTools Office add-in catalog' -ErrorAction Stop | Out-Null
-}
-'@
-    Set-Content -LiteralPath $helper -Value $code -Encoding UTF8
-    try {
-        $args = '-NoProfile -ExecutionPolicy Bypass -File "' + $helper + '" -ShareName "' + $Name + '" -SharePath "' + $Path + '" -Account "' + $account + '"'
-        $p = Start-Process -FilePath (Get-PowerShell) -Verb RunAs -ArgumentList $args -Wait -PassThru
-        if ($p.ExitCode -ne 0) { throw ('تعذر إنشاء مجلد المشاركة. رمز الخروج: ' + $p.ExitCode) }
-    }
-    finally { Remove-Item -LiteralPath $helper -Force -ErrorAction SilentlyContinue }
-}
-function Get-Catalog {
-    $registry = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs'
-    $found = @()
-    if (Test-Path -LiteralPath $registry) {
-        foreach ($key in @(Get-ChildItem -LiteralPath $registry -ErrorAction SilentlyContinue)) {
-            try {
-                $props = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction Stop
-                $url = [string]$props.Url
-                if ($url.StartsWith('\\') -and (Test-Writable $url)) {
-                    $id = [string]$props.Id
-                    if (-not $id) { $id = $key.PSChildName }
-                    $found += [pscustomobject]@{Path=$url;Id=$id;Key=$key.PSPath}
-                }
-            }
-            catch { }
-        }
-    }
-    $chosen = $found | Sort-Object @{Expression={if (([string]$_.Id).Replace('{','').Replace('}','') -ieq $PreferredCatalog) {0} else {1}}} | Select-Object -First 1
-    if ($chosen) {
-        New-ItemProperty -LiteralPath $chosen.Key -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
-        Log ('إعادة استخدام كتالوج Word المشترك: ' + $chosen.Path)
-        return [string]$chosen.Path
-    }
-
-    $local = Join-Path $Root 'OfficeAddins'
-    New-Item -ItemType Directory -Path $local -Force | Out-Null
-    $shareName = 'ResearchToolsAddins'
-    try {
-        Import-Module SmbShare -ErrorAction Stop
-        $share = Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue
-        if ($share -and -not ([IO.Path]::GetFullPath([string]$share.Path).TrimEnd('\')).Equals([IO.Path]::GetFullPath($local).TrimEnd('\'),[StringComparison]::OrdinalIgnoreCase)) {
-            $suffix = ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -replace '[^A-Fa-f0-9]','')
-            $shareName = 'ResearchToolsAddins-' + $suffix.Substring([Math]::Max(0,$suffix.Length - 6))
-        }
-    }
-    catch { }
-    Create-Share -Name $shareName -Path $local
-    $unc = '\\' + $env:COMPUTERNAME + '\' + $shareName
-    if (-not (Test-Writable $unc)) { throw ('تعذر الوصول إلى مجلد المشاركة بعد إنشائه: ' + $unc) }
-    New-Item -Path $registry -Force | Out-Null
-    $newKey = Join-Path $registry '{4B78E8D1-1F8A-43B0-9859-4C10A5E127D2}'
-    New-Item -Path $newKey -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Id -PropertyType String -Value '{4B78E8D1-1F8A-43B0-9859-4C10A5E127D2}' -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Url -PropertyType String -Value $unc -Force | Out-Null
-    New-ItemProperty -LiteralPath $newKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
-    Log ('إنشاء كتالوج Word مشترك جديد: ' + $unc)
-    return $unc
-}
-function Install-Manifest([string]$Catalog) {
-    [xml]$xml = Get-Content -LiteralPath $ManifestFile -Raw
-    $id = $xml.SelectSingleNode("//*[local-name()='Id']")
-    $source = $xml.SelectSingleNode("//*[local-name()='DefaultSettings']/*[local-name()='SourceLocation']")
-    if (-not $id -or $id.InnerText -ne $AppId) { throw 'معرّف إضافة Word غير مطابق.' }
-    if (-not $source -or $source.GetAttribute('DefaultValue') -notmatch '^https://moh1983taher-ai\.github\.io/Word-AI-Assistant/taskpane\.html$') { throw 'رابط تشغيل إضافة Word غير صحيح.' }
-
-    $filename = 'Word-AI-Assistant.xml'
-    foreach ($file in @(Get-ChildItem -LiteralPath $Catalog -Filter '*.xml' -File -ErrorAction Stop)) {
-        try {
-            [xml]$existing = Get-Content -LiteralPath $file.FullName -Raw
-            $existingId = $existing.SelectSingleNode("//*[local-name()='Id']")
-            if ($existingId -and $existingId.InnerText -eq $AppId) { $filename = $file.Name; break }
-        }
-        catch { }
-    }
-    $destination = Join-Path $Catalog $filename
-    if (Test-Path -LiteralPath $destination -PathType Leaf) {
-        Copy-Item -LiteralPath $destination -Destination (Join-Path $Backup ($filename + '.' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.bak')) -Force
-    }
-    $temp = $destination + '.new'
-    Copy-Item -LiteralPath $ManifestFile -Destination $temp -Force
-    Move-Item -LiteralPath $temp -Destination $destination -Force
-    Log ('تثبيت Manifest في مجلد Word المشترك: ' + $destination)
-}
-function Stop-OldProcesses {
-    foreach ($proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
-        $name = [string]$proc.Name
-        $path = [string]$proc.ExecutablePath
-        $cmd = [string]$proc.CommandLine
-        $runtimeProc = ($name -in @('duck2api-main.exe','ResearchTools-DuckAgent.exe')) -and $path -and $path.StartsWith($Runtime,[StringComparison]::OrdinalIgnoreCase)
-        $launcherProc = ($name -ieq 'wscript.exe') -and $cmd -and $cmd.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0
-        if ($runtimeProc -or $launcherProc) { Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue }
-    }
-}
-function Install-Runtime {
-    if (-not (Test-Path -LiteralPath $RuntimeArchive -PathType Leaf) -or -not (Test-Path -LiteralPath $RuntimeShaFile -PathType Leaf)) { throw 'ملفات الخادم المضمنة غير مكتملة.' }
-    $sidecar = Get-Content -LiteralPath $RuntimeShaFile -Raw
-    if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+DuckAI-Runtime-release\.zip\s*$') { throw 'صيغة ملف SHA-256 غير صحيحة.' }
-    $expected = $matches[1].ToUpperInvariant()
-    $actual = (Get-FileHash -LiteralPath $RuntimeArchive -Algorithm SHA256).Hash.ToUpperInvariant()
-    if ($actual -ne $expected) { throw 'فشل التحقق من SHA-256 لحزمة DuckAI.' }
-    Test-Archive -Path $RuntimeArchive
-    $stage = Join-Path $Root ('DuckAI.Stage-' + [Guid]::NewGuid().ToString('N'))
-    $previous = Join-Path $Backup ('DuckAI-Previous-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    try {
-        [IO.Compression.ZipFile]::ExtractToDirectory($RuntimeArchive,$stage)
-        if (-not (Test-FileHashes -Directory $stage)) { throw 'فشل التحقق من البصمات الداخلية لملفات الخادم.' }
-        if (Test-Path -LiteralPath $Runtime -PathType Container) { Move-Item -LiteralPath $Runtime -Destination $previous }
-        try {
-            Move-Item -LiteralPath $stage -Destination $Runtime
-            if (-not (Test-FileHashes -Directory $Runtime)) { throw 'فشل الفحص النهائي لمجلد الخادم.' }
-        }
-        catch {
-            if (Test-Path -LiteralPath $Runtime) { Remove-Item -LiteralPath $Runtime -Recurse -Force -ErrorAction SilentlyContinue }
-            if (Test-Path -LiteralPath $previous) { Move-Item -LiteralPath $previous -Destination $Runtime -Force }
-            throw
-        }
-    }
-    finally {
-        if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
-    }
-    Copy-Item -LiteralPath (Join-Path $Runtime 'ResearchTools-Launcher.vbs') -Destination $Launcher -Force
-    Copy-Item -LiteralPath (Join-Path $Runtime 'DuckAI-Bootstrap.ps1') -Destination $Bootstrap -Force
     $hash = (Get-FileHash -LiteralPath $Bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
     if (-not (Get-Content -LiteralPath $Launcher -Raw).Contains($hash)) { throw 'بصمة Bootstrap داخل المشغّل لا تطابق الملف المثبت.' }
     if (-not (Test-FileHashes -Directory $Runtime)) { throw 'فشل التحقق النهائي من ملفات DuckAI.' }
@@ -1002,9 +365,9 @@ try {
     Install-DurableLauncher
     Stage 68 'فحص مجلد Word المشترك وتهيئة الكتالوج الموثوق...'
     $catalog = Get-Catalog
-    Stage 78 'إظهار أدوات الباحث داخل Word وتسجيل ملف الإضافة...'
+    Stage 76 'إضافة أدوات الباحث إلى قائمة الإضافات المشتركة في Word...'
     Install-Manifest -Catalog $catalog
-    Stage 88 'تسجيل مهمة التشغيل التلقائي الموحدة...'
+    Stage 86 'تسجيل مهمة التشغيل التلقائي لخادم DuckAI...'
     $powershell = Get-PowerShell
     $arguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $Bootstrap + '" -RegisterTask'
     $bootstrapProcess = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
@@ -1013,7 +376,7 @@ try {
     if ($task.State -eq 'Disabled') { throw 'مهمة تشغيل DuckAI مسجلة لكنها معطلة.' }
     $action = @($task.Actions) | Select-Object -First 1
     if (-not $action -or [string]$action.Execute -notmatch '(?i)wscript\.exe$' -or [string]$action.Arguments -notmatch 'ResearchTools-Launcher\.vbs') { throw 'مهمة التشغيل لا تشير إلى المشغّل المثبت.' }
-    Stage 95 'تشغيل مشغّل DuckAI وMCP والتحقق من تسجيله...'
+    Stage 94 'تشغيل المشغّل الدائم والتحقق من وجوده...'
     $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
     Start-Process -FilePath $wscript -ArgumentList ('"' + $Launcher + '"') -WindowStyle Hidden | Out-Null
     Start-Sleep -Seconds 2
