@@ -1,7 +1,7 @@
 Option Explicit
 ' RESEARCHTOOLS_DUCKAI_BOOTSTRAP_V3
 ' RESEARCHTOOLS_MCPHOST_V1
-Const BOOTSTRAP_SHA256 = "3f09a278c3170379b06fa6dbe17a80c259a8c042f5ace1d1117481b1f9bbbdbd"
+Const BOOTSTRAP_SHA256 = "59f0a32ad419d60b0d95ab6d591ac971e7b5a7e07ab19937106ebe09a500281f"
 Const BOOTSTRAP_RAW_URL = "https://raw.githubusercontent.com/moh1983taher-ai/Word-AI-Assistant/main/runtime/DuckAI-Bootstrap.ps1"
 Dim shell,fso,env,rootDir,installDir,launcherPath,bootstrapPath
 Dim duckExe,agentExe,bridgeScript,mcpHostExe,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
