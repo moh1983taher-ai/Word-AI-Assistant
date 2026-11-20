@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <AssemblyName>ResearchTools.McpHost</AssemblyName>
+    <RootNamespace>ResearchTools.McpHost</RootNamespace>
+    <Version>1.1.0</Version>
+    <Description>Local asynchronous MCP host for ResearchTools and DuckAI.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.4.0" />
+  </ItemGroup>
+</Project>

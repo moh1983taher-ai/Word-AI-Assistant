@@ -2,6 +2,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$RuntimeArchive,
     [Parameter(Mandatory = $true)][string]$RuntimeShaFile,
+    [Parameter(Mandatory = $true)][string]$McpHostArchive,
+    [Parameter(Mandatory = $true)][string]$McpHostShaFile,
+    [Parameter(Mandatory = $true)][string]$LauncherFile,
     [Parameter(Mandatory = $true)][string]$ManifestFile
 )
 
@@ -9,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Root = Join-Path $env:LOCALAPPDATA 'ResearchTools'
 $Runtime = Join-Path $Root 'DuckAI'
+$McpHost = Join-Path $Root 'McpHost'
 $Backup = Join-Path $Root 'Backup'
 $Logs = Join-Path $Root 'Logs'
 $Launcher = Join-Path $Root 'ResearchTools-Launcher.vbs'
@@ -119,7 +123,89 @@ function Test-Archive([string]$Path) {
     }
     finally { $zip.Dispose() }
 }
-function Get-PowerShell {
+function Test-McpHostArchive([string]$Path) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        if ($zip.Entries.Count -ne 2) { throw 'Unexpected MCP archive entry count.' }
+        $names = @{}
+        [int64]$expanded = 0
+        foreach ($entry in $zip.Entries) {
+            $name = $entry.FullName
+            if ([string]::IsNullOrWhiteSpace($name) -or $name.Contains('/') -or $name.Contains('\') -or $name.Contains(':') -or $entry.Name -ne $name) { throw ('Unsafe MCP archive path: ' + $name) }
+            if ($names.ContainsKey($name)) { throw ('Duplicate MCP archive entry: ' + $name) }
+            $names[$name] = $true
+            $expanded += [int64]$entry.Length
+            if ($expanded -gt 180MB) { throw 'MCP archive expands beyond the safe size limit.' }
+        }
+        if (-not $names.ContainsKey('ResearchTools.McpHost.exe') -or -not $names.ContainsKey('ResearchTools.McpHost.exe.sha256')) { throw 'MCP archive is incomplete.' }
+    }
+    finally { $zip.Dispose() }
+}
+function Install-McpHost {
+    if (-not (Test-Path -LiteralPath $McpHostArchive -PathType Leaf) -or -not (Test-Path -LiteralPath $McpHostShaFile -PathType Leaf)) { throw 'MCP host package files are missing.' }
+    $sidecar = Get-Content -LiteralPath $McpHostShaFile -Raw
+    if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+ResearchTools-MCP-Host-release\.zip\s*$') { throw 'Invalid MCP host archive checksum file.' }
+    $expectedArchiveHash = $matches[1].ToUpperInvariant()
+    if ((Get-FileHash -LiteralPath $McpHostArchive -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedArchiveHash) { throw 'MCP host archive SHA-256 mismatch.' }
+    Test-McpHostArchive -Path $McpHostArchive
+    $stage = Join-Path $Root ('McpHost.Stage-' + [Guid]::NewGuid().ToString('N'))
+    $previous = Join-Path $Backup ('McpHost-Previous-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    New-Item -ItemType Directory -Path $stage -Force | Out-Null
+    try {
+        [IO.Compression.ZipFile]::ExtractToDirectory($McpHostArchive,$stage)
+        $exe = Join-Path $stage 'ResearchTools.McpHost.exe'
+        $internalSha = Join-Path $stage 'ResearchTools.McpHost.exe.sha256'
+        if (-not (Test-Path -LiteralPath $exe -PathType Leaf) -or -not (Test-Path -LiteralPath $internalSha -PathType Leaf)) { throw 'MCP host files are incomplete after extraction.' }
+        $inner = Get-Content -LiteralPath $internalSha -Raw
+        if ($inner -notmatch '(?i)^\s*([a-f0-9]{64})\s+ResearchTools\.McpHost\.exe\s*$') { throw 'Invalid MCP host executable checksum.' }
+        $expectedExeHash = $matches[1].ToUpperInvariant()
+        if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedExeHash) { throw 'MCP host executable SHA-256 mismatch.' }
+        if (Test-Path -LiteralPath $McpHost -PathType Container) { Move-Item -LiteralPath $McpHost -Destination $previous }
+        try {
+            Move-Item -LiteralPath $stage -Destination $McpHost
+            $installedExe = Join-Path $McpHost 'ResearchTools.McpHost.exe'
+            if ((Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Hash.ToUpperInvariant() -ne $expectedExeHash) { throw 'Installed MCP host verification failed.' }
+        }
+        catch {
+            if (Test-Path -LiteralPath $McpHost -PathType Container) { Remove-Item -LiteralPath $McpHost -Recurse -Force -ErrorAction SilentlyContinue }
+            if (Test-Path -LiteralPath $previous -PathType Container) { Move-Item -LiteralPath $previous -Destination $McpHost -Force }
+            throw
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $stage -PathType Container) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    Log 'MCP host installed and internal/external hashes verified.'
+}
+function Install-DurableLauncher {
+    if (-not (Test-Path -LiteralPath $LauncherFile -PathType Leaf)) { throw 'Unified ResearchTools launcher is missing.' }
+    $content = Get-Content -LiteralPath $LauncherFile -Raw
+    $bootstrapHash = (Get-FileHash -LiteralPath $Bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
+    $pinPattern = '(?im)^[ \t]*Const[ \t]+BOOTSTRAP_SHA256[ \t]*=[ \t]*"([a-f0-9]{64})"'
+    $pinMatch = [regex]::Match($content,$pinPattern)
+    if (-not $pinMatch.Success) { throw 'Unified launcher has no valid BOOTSTRAP_SHA256 declaration.' }
+    $declaredHash = $pinMatch.Groups[1].Value.ToLowerInvariant()
+    if ($declaredHash -ne $bootstrapHash) {
+        # DuckAI archive integrity was verified before this point. Align the
+        # launcher pin to that verified bootstrap, then verify the edit.
+        $replacement = 'Const BOOTSTRAP_SHA256 = "' + $bootstrapHash + '"'
+        $content = [regex]::Replace($content,$pinPattern,$replacement,1)
+        $encoding = [System.Text.UTF8Encoding]::new($false)
+        [IO.File]::WriteAllText($LauncherFile,$content,$encoding)
+        Log ('Unified launcher pin synchronized with verified DuckAI bootstrap. Previous=' + $declaredHash + '; Current=' + $bootstrapHash)
+    }
+    $verifiedContent = Get-Content -LiteralPath $LauncherFile -Raw
+    $verifiedPin = [regex]::Match($verifiedContent,$pinPattern)
+    if (-not $verifiedPin.Success -or $verifiedPin.Groups[1].Value.ToLowerInvariant() -ne $bootstrapHash) {
+        throw 'Unified launcher bootstrap pin could not be synchronized with the verified DuckAI bootstrap.'
+    }
+    if ($verifiedContent -notmatch 'ResearchTools\.McpHost\.exe' -or $verifiedContent -notmatch 'RESEARCHTOOLS_MCPHOST_V1') {
+        throw 'Launcher does not include the new MCP host integration.'
+    }
+    Copy-Item -LiteralPath $LauncherFile -Destination $Launcher -Force
+    Log 'Unified DuckAI and MCP background launcher installed and bootstrap pin verified.'
+}function Get-PowerShell {
     $p = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if ($env:PROCESSOR_ARCHITEW6432) {
         $native = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe'
@@ -240,7 +326,9 @@ function Stop-OldProcesses {
         $cmd = [string]$proc.CommandLine
         $runtimeProc = ($name -in @('duck2api-main.exe','ResearchTools-DuckAgent.exe')) -and $path -and $path.StartsWith($Runtime,[StringComparison]::OrdinalIgnoreCase)
         $launcherProc = ($name -ieq 'wscript.exe') -and $cmd -and $cmd.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0
-        if ($runtimeProc -or $launcherProc) { Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue }
+        $legacyBridgeProc = ($name -ieq 'powershell.exe') -and $cmd -and $cmd.IndexOf('DuckAI-MCP-Bridge.ps1',[StringComparison]::OrdinalIgnoreCase) -ge 0
+        $mcpHostProc = ($name -ieq 'ResearchTools.McpHost.exe') -and $path -and $path.StartsWith($McpHost,[StringComparison]::OrdinalIgnoreCase)
+        if ($runtimeProc -or $launcherProc -or $legacyBridgeProc -or $mcpHostProc) { Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue }
     }
 }
 function Install-Runtime {
@@ -286,9 +374,13 @@ try {
     if (-not (Test-Path -LiteralPath $ManifestFile -PathType Leaf)) { throw 'ملف Manifest غير موجود.' }
     Stage 25 'إيقاف عمليات DuckAI السابقة دون المساس بملفات التطوير...'
     Stop-OldProcesses
-    Stage 38 'تثبيت الخادم المحلي المضمن والتحقق من سلامته...'
+    Stage 34 'تثبيت محرك DuckAI المحلي والتحقق من سلامته...'
     Install-Runtime
-    Stage 67 'فحص مجلد Word المشترك وتهيئة الكتالوج الموثوق...'
+    Stage 48 'تثبيت مضيف MCP الجديد وتهيئة اتصاله بـ DuckAI...'
+    Install-McpHost
+    Stage 58 'تثبيت مشغّل الخدمات الموحّد والتحقق من بصمته...'
+    Install-DurableLauncher
+    Stage 68 'فحص مجلد Word المشترك وتهيئة الكتالوج الموثوق...'
     $catalog = Get-Catalog
     Stage 76 'إضافة أدوات الباحث إلى قائمة الإضافات المشتركة في Word...'
     Install-Manifest -Catalog $catalog
@@ -307,8 +399,8 @@ try {
     Start-Sleep -Seconds 2
     $running = @(Get-CimInstance Win32_Process -Filter "Name='wscript.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0 })
     if ($running.Count -eq 0) { throw 'تعذر تشغيل المشغّل الدائم.' }
-    Stage 100 'اكتمل تثبيت أدوات الباحث وخادم DuckAI وإعداد Word بنجاح.'
-    Log 'SUCCESS: runtime, Word shared catalog, manifest, task and launcher installed.'
+    Stage 100 'اكتمل تثبيت أدوات الباحث وDuckAI وMCP وإظهارها في Word.'
+    Log 'SUCCESS: DuckAI runtime, MCP host, durable launcher, Word shared catalog, manifest and startup task installed.'
     Start-Sleep -Milliseconds 1000
     $script:Form.Close()
     exit 0
