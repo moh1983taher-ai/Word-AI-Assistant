@@ -8,9 +8,10 @@ using ResearchTools.McpHost.Models;
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Adapter for DuckAI's local OpenAI-compatible HTTP API. Native Chat Completions
-/// function calling is preferred; the coordinator can fall back to JSON decisions
-/// when the selected local provider does not accept the tools parameter.
+/// Adapter for DuckAI's local OpenAI-compatible HTTP API. It can parse standard
+/// Chat Completions tool calls, while the research coordinator currently uses
+/// schema-described JSON decisions because the installed endpoint did not honor
+/// forced function calling during Windows integration tests.
 /// </summary>
 public sealed class DuckAiClient
 {
