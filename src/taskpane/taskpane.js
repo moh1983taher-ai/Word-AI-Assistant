@@ -1,4 +1,5 @@
 // ======================================
+require("./orama-runtime");
 const CitationWorkflow = require("./citation-workflow");
 
 // Word AI Assistant

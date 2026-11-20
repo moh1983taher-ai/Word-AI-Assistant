@@ -1071,35 +1071,7 @@
      JAVASCRIPT
      ========================================= -->
 
-     <script type="module">
-    import {
-        create,
-        insert,
-        insertMultiple,
-        search
-    } from "https://cdn.jsdelivr.net/npm/@orama/orama@3.1.18/+esm";
-
-    import {
-        pluginQPS
-    } from "https://cdn.jsdelivr.net/npm/@orama/plugin-qps@3.1.18/+esm";
-
-
-    window.Orama = {
-
-        create,
-        insert,
-        insertMultiple,
-        search,
-
-        pluginQPS
-
-    };
-
-
-    console.log(
-        "تم تحميل Orama + QPS بنجاح."
-    );
-</script><script src="taskpane.js"></script>
+     <!-- Orama and QPS are bundled with the task pane Webpack entry. -->
 
 
 </body>
