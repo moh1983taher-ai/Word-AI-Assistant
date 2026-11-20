@@ -12,8 +12,9 @@ public sealed class ResearchBusyException : Exception
 }
 
 /// <summary>
-/// Orchestrates native model function calls against official MCP clients. A JSON-decision
-/// compatibility mode is retained only for local DuckAI providers that reject function tools.
+/// Orchestrates JSON-decision turns against official MCP clients. The installed DuckAI
+/// endpoint returns plain text instead of tool_calls even when a function is forced, so
+/// the host uses the explicit JSON protocol from the first model turn.
 /// </summary>
 public sealed class ResearchCoordinator
 {
