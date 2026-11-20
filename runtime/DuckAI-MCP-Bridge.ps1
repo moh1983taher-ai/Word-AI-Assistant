@@ -122,12 +122,13 @@ function Set-McpRequestMetadata($body,[string]$version){
     }
     return $body
 }
-function McpRequest($server,[string]$method,$body,[string]$version='',[string]$session='',[switch]$modern,[string]$tool=''){
+function McpRequest($server,[string]$method,$body,[string]$version='',[string]$session='',[switch]$modern,[string]$tool='',[hashtable]$extraHeaders=@{}){
     $h=@{};if($server.Token){$h.Authorization='Bearer '+$server.Token}
     if($version){$h['MCP-Protocol-Version']=$version};if($session){$h['Mcp-Session-Id']=$session}
     if($modern){
         $h['Mcp-Method']=$method
-        if($tool){$h['Mcp-Name']=$tool}
+        if($tool){$h['Mcp-Name']=EncodeMcpHeaderValue ([string]$tool) 'string'}
+        foreach($headerName in $extraHeaders.Keys){$h[[string]$headerName]=[string]$extraHeaders[$headerName]}
         $body=Set-McpRequestMetadata $body $version
     }
     return HttpJson $server.Url 'POST' $body $h 45
@@ -143,18 +144,115 @@ function IsAllowedReadTool($tool){
     if($readOnly -eq $true){return $true}
     return $name -match '(?i)(search|find|query|lookup|get|fetch|read|open|list|retrieve|browse|catalog|book|page|text|بحث|استعلام|قراءة|جلب|استرجاع|عرض|فهرس)'
 }
+function HasMcpHeaderAnnotation($node){
+    if($null -eq $node -or $node -is [string] -or $node -is [ValueType]){return $false}
+    if($node -is [array]){foreach($item in $node){if(HasMcpHeaderAnnotation $item){return $true}};return $false}
+    if($node -is [System.Collections.IDictionary]){if($node.Contains('x-mcp-header')){return $true};foreach($key in $node.Keys){if(HasMcpHeaderAnnotation $node[$key]){return $true}};return $false}
+    if($null -ne $node.PSObject.Properties['x-mcp-header']){return $true}
+    foreach($property in $node.PSObject.Properties){if($property.MemberType -in @('NoteProperty','Property') -and (HasMcpHeaderAnnotation $property.Value)){return $true}}
+    return $false
+}
+function CollectMcpPropertyHeaders($schema,[string[]]$prefix,[System.Collections.ArrayList]$bindings,[hashtable]$seen){
+    $properties=Prop $schema 'properties';if($null -eq $properties){return}
+    foreach($property in $properties.PSObject.Properties){
+        if($property.MemberType -notin @('NoteProperty','Property')){continue}
+        $definition=$property.Value;$path=@($prefix)+@([string]$property.Name)
+        if($null -ne $definition.PSObject.Properties['x-mcp-header']){
+            $name=[string](Prop $definition 'x-mcp-header' '');$type=[string](Prop $definition 'type' '')
+            if([string]::IsNullOrWhiteSpace($name) -or $name -notmatch '^[A-Za-z0-9!#$%&''*+.^_\x60|~-]+$'){throw ('قيمة x-mcp-header غير صالحة: '+($path -join '.'))}
+            if($type -notin @('string','integer','boolean')){throw ('نوع x-mcp-header غير مسموح: '+$type)}
+            $key=$name.ToLowerInvariant();if($seen.ContainsKey($key)){throw ('ترويسة MCP مكررة: '+$name)}
+            $seen[$key]=$true;[void]$bindings.Add([pscustomobject]@{Name=$name;Path=$path;Type=$type})
+        }
+        foreach($child in $definition.PSObject.Properties){
+            if($child.MemberType -notin @('NoteProperty','Property') -or $child.Name -in @('properties','x-mcp-header')){continue}
+            if(HasMcpHeaderAnnotation $child.Value){throw ('x-mcp-header ليست ضمن مسار properties: '+($path -join '.'))}
+        }
+        if($null -ne (Prop $definition 'properties')){CollectMcpPropertyHeaders $definition $path $bindings $seen}
+    }
+}
+function GetMcpHeaderBindings($tool){
+    $schema=Prop $tool 'inputSchema';$bindings=New-Object System.Collections.ArrayList
+    if($null -eq $schema){return [pscustomobject]@{Valid=$true;Headers=@();Reason=''}}
+    if($null -ne $schema.PSObject.Properties['x-mcp-header']){return [pscustomobject]@{Valid=$false;Headers=@();Reason='x-mcp-header غير مسموح به في جذر المخطط.'}}
+    foreach($child in $schema.PSObject.Properties){
+        if($child.MemberType -in @('NoteProperty','Property') -and $child.Name -ne 'properties' -and (HasMcpHeaderAnnotation $child.Value)){
+            return [pscustomobject]@{Valid=$false;Headers=@();Reason=('x-mcp-header في موضع غير مدعوم: '+$child.Name)}
+        }
+    }
+    try{CollectMcpPropertyHeaders $schema @() $bindings @{};return [pscustomobject]@{Valid=$true;Headers=@($bindings.ToArray());Reason=''}}
+    catch{return [pscustomobject]@{Valid=$false;Headers=@();Reason=$_.Exception.Message}}
+}
+function GetMcpArgumentValue($arguments,[string[]]$path){
+    $current=$arguments
+    foreach($segment in $path){
+        if($null -eq $current){return [pscustomobject]@{Found=$false;Value=$null}}
+        if($current -is [System.Collections.IDictionary]){
+            if(-not $current.Contains($segment)){return [pscustomobject]@{Found=$false;Value=$null}}
+            $current=$current[$segment]
+        }else{
+            $property=$current.PSObject.Properties[$segment]
+            if($null -eq $property){return [pscustomobject]@{Found=$false;Value=$null}}
+            $current=$property.Value
+        }
+    }
+    return [pscustomobject]@{Found=$true;Value=$current}
+}
+function EncodeMcpHeaderValue($value,[string]$type){
+    switch($type){
+        'string' {if($value -isnot [string]){throw 'قيمة ترويسة MCP النصية ليست سلسلة.'};$plain=[string]$value}
+        'integer' {if(($value -isnot [int]) -and ($value -isnot [long])){throw 'قيمة ترويسة MCP الصحيحة ليست عدداً صحيحاً.'};if([decimal]$value -lt -9007199254740991 -or [decimal]$value -gt 9007199254740991){throw 'قيمة integer تتجاوز المجال الآمن لـ IEEE754.'};$plain=[string]$value}
+        'boolean' {if($value -isnot [bool]){throw 'قيمة ترويسة MCP المنطقية ليست Boolean.'};$plain=if($value){'true'}else{'false'}}
+        default {throw ('نوع ترويسة MCP غير مدعوم: '+$type)}
+    }
+    $safe=($plain -match '^[\x20-\x7E\t]*$') -and ($plain -eq $plain.Trim()) -and ($plain -notmatch '^=\?base64\?.*\?=$')
+    if($safe){return $plain}
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($plain))
+    return '=?base64?'+$encoded+'?='
+}
+function IsModernMcpError($payload){
+    if($null -eq $payload -or [string](Prop $payload 'jsonrpc' '') -ne '2.0'){return $false}
+    $error=Prop $payload 'error';if($null -eq $error){return $false}
+    return ($null -ne (Prop $error 'code') -and -not [string]::IsNullOrWhiteSpace([string](Prop $error 'message' '')))
+}
+function ShouldFallbackToLegacy([int]$status,$payload){
+    if($status -notin @(400,404,405,501)){return $false}
+    return -not (IsModernMcpError $payload)
+}
 function FilterReadTools($tools){
     $safe=@()
-    foreach($tool in @($tools)){if(IsAllowedReadTool $tool){$safe+=$tool}}
+    foreach($tool in @($tools)){
+        if(-not (IsAllowedReadTool $tool)){continue}
+        $validation=GetMcpHeaderBindings $tool
+        if(-not $validation.Valid){Log ('Excluded invalid MCP tool '+[string](Prop $tool 'name' '')+': '+$validation.Reason);continue}
+        $safe+=$tool
+    }
     return $safe
 }
 function DiscoverTools([string]$id,[string]$token){
-    $server=ServerDef $id $token
+    $server=ServerDef $id $token;$allowLegacy=$false
     try{
-        $b=@{jsonrpc='2.0';id=1;method='tools/list';params=@{}}
-        $r=McpRequest -server $server -method 'tools/list' -body $b -version '2026-07-28' -modern
-        if($r.Status -ge 200 -and $r.Status -lt 300){$p=McpPayload $r.Body $r.Type 1;$result=Prop $p 'result';if($result){return [pscustomobject]@{Id=$id;Label=$server.Label;Server=$server;Mode='modern';Version='2026-07-28';Session='';Tools=(FilterReadTools (Prop $result 'tools' @()))}}}
-    }catch{Log ('MCP modern negotiation '+$id+': '+$_.Exception.Message)}
+        $body=@{jsonrpc='2.0';id=1;method='tools/list';params=@{}}
+        $response=McpRequest -server $server -method 'tools/list' -body $body -version '2026-07-28' -modern
+        $payload=McpPayload $response.Body $response.Type 1
+        if($response.Status -ge 200 -and $response.Status -lt 300){
+            $result=Prop $payload 'result'
+            if($null -ne $result){return [pscustomobject]@{Id=$id;Label=$server.Label;Server=$server;Mode='modern';Version='2026-07-28';Session='';Tools=(FilterReadTools (Prop $result 'tools' @()))}}
+            throw 'استجابة MCP الحديثة لا تتضمن result صالحاً.'
+        }
+        if(ShouldFallbackToLegacy $response.Status $payload){
+            $allowLegacy=$true
+            Log ('MCP legacy transport detected for '+$id+' (HTTP '+$response.Status+').')
+        }else{
+            $message=[string](Prop (Prop $payload 'error') 'message' '')
+            if($message){throw ('رفض خادم MCP الطلب الحديث: '+$message)}
+            throw ('فشل تفاوض MCP الحديث مع '+$id+' (HTTP '+$response.Status+').')
+        }
+    }catch{
+        if(-not $allowLegacy){throw}
+        Log ('MCP legacy fallback '+$id+': '+$_.Exception.Message)
+    }
+    if(-not $allowLegacy){throw ('تعذر تحديد بروتوكول MCP للخادم '+$id+'.')}
     $errors=@()
     foreach($v in $script:LegacyVersions){
         try{
@@ -207,8 +305,18 @@ function ParseDecision([string]$text){
 function RunTool($ctx,[string]$name,$argsObject){
     $found=@($ctx.Tools|Where-Object{[string](Prop $_ 'name') -ceq $name});if($found.Count -ne 1){throw ('الأداة غير موجودة في فهرس الخادم: '+$name)}
     $v=ValidateArguments $found[0] $argsObject;if(-not $v.Valid){throw ('مدخلات أداة غير صالحة: '+$v.Reason)}
+    $extraHeaders=@{}
+    if($ctx.Mode -eq 'modern'){
+        $plan=GetMcpHeaderBindings $found[0]
+        if(-not $plan.Valid){throw ('تعريف ترويسات الأداة غير صالح: '+$plan.Reason)}
+        foreach($binding in $plan.Headers){
+            $argument=GetMcpArgumentValue $argsObject $binding.Path
+            if(-not $argument.Found -or $null -eq $argument.Value){continue}
+            $extraHeaders['Mcp-Param-'+$binding.Name]=EncodeMcpHeaderValue $argument.Value $binding.Type
+        }
+    }
     $id=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();$body=@{jsonrpc='2.0';id=$id;method='tools/call';params=@{name=$name;arguments=$argsObject}}
-    if($ctx.Mode -eq 'modern'){$r=McpRequest -server $ctx.Server -method 'tools/call' -body $body -version '2026-07-28' -modern -tool $name}else{$r=McpRequest -server $ctx.Server -method 'tools/call' -body $body -version $ctx.Version -session $ctx.Session}
+    if($ctx.Mode -eq 'modern'){$r=McpRequest -server $ctx.Server -method 'tools/call' -body $body -version '2026-07-28' -modern -tool $name -extraHeaders $extraHeaders}else{$r=McpRequest -server $ctx.Server -method 'tools/call' -body $body -version $ctx.Version -session $ctx.Session}
     $p=McpPayload $r.Body $r.Type $id;$err=Prop $p 'error'
     if($r.Status -lt 200 -or $r.Status -ge 300 -or -not $p){throw ('فشل استدعاء '+$name+' HTTP '+$r.Status)}
     if($err){throw [string](Prop $err 'message' 'MCP tool error')}
@@ -335,6 +443,25 @@ if($SelfTest){
     if(IsAllowedReadTool $destructiveSearch){throw 'Destructive MCP tool rejection test failed'}
     $nl=[Environment]::NewLine;$sse='event: message'+$nl+'data: {"jsonrpc":"2.0","id":7,"result":{"tools":[]}}'+$nl+$nl
     $p=McpPayload $sse 'text/event-stream' 7;if(-not $p){throw 'SSE response test failed'}
+    $headerTool=ConvertFrom-Json '{"name":"nested_search","inputSchema":{"type":"object","properties":{"region":{"type":"string","x-mcp-header":"Region"},"filters":{"type":"object","properties":{"tenant":{"type":"integer","x-mcp-header":"Tenant"}}}}}}'
+    $headerPlan=GetMcpHeaderBindings $headerTool
+    if(-not $headerPlan.Valid -or $headerPlan.Headers.Count -ne 2){throw 'MCP nested header discovery test failed'}
+    $nested=GetMcpArgumentValue ([pscustomobject]@{filters=[pscustomobject]@{tenant=42}}) @('filters','tenant')
+    if(-not $nested.Found -or $nested.Value -ne 42){throw 'MCP nested header argument extraction test failed'}
+    if((EncodeMcpHeaderValue 'us-west1' 'string') -ne 'us-west1'){throw 'MCP plain ASCII header encoding test failed'}
+    if((EncodeMcpHeaderValue 'Hello, 世界' 'string') -ne '=?base64?SGVsbG8sIOS4lueVjA==?='){throw 'MCP UTF-8 header encoding test failed'}
+    if((EncodeMcpHeaderValue $false 'boolean') -ne 'false'){throw 'MCP boolean header encoding test failed'}
+    if((EncodeMcpHeaderValue '=?base64?literal?=' 'string') -eq '=?base64?literal?='){throw 'MCP sentinel collision test failed'}
+    $duplicateTool=ConvertFrom-Json '{"name":"duplicate_headers","inputSchema":{"type":"object","properties":{"a":{"type":"string","x-mcp-header":"Region"},"b":{"type":"boolean","x-mcp-header":"region"}}}}'
+    if((GetMcpHeaderBindings $duplicateTool).Valid){throw 'MCP duplicate custom header rejection test failed'}
+    $badTypeTool=ConvertFrom-Json '{"name":"bad_type","inputSchema":{"type":"object","properties":{"amount":{"type":"number","x-mcp-header":"Amount"}}}}'
+    if((GetMcpHeaderBindings $badTypeTool).Valid){throw 'MCP invalid custom header type test failed'}
+    $badPathTool=ConvertFrom-Json '{"name":"bad_path","inputSchema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"region":{"type":"string","x-mcp-header":"Region"}}}}}}}'
+    if((GetMcpHeaderBindings $badPathTool).Valid){throw 'MCP invalid custom header path test failed'}
+    $modernError=ConvertFrom-Json '{"jsonrpc":"2.0","id":1,"error":{"code":-32020,"message":"Header mismatch"}}'
+    if(ShouldFallbackToLegacy 400 $modernError){throw 'Modern MCP error must not downgrade'}
+    if(-not (ShouldFallbackToLegacy 404 $null)){throw 'Legacy endpoint detection test failed'}
+    if(ShouldFallbackToLegacy 401 $null){throw 'Authentication errors must not downgrade'}
     Write-Output 'DuckAI MCP Bridge self-tests passed.';exit 0
 }
 StartBridge
