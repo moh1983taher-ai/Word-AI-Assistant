@@ -49,10 +49,13 @@ try {
         Start-Sleep -Milliseconds 800
     }
 
-    $result = Receive-Job -Job $job -Wait -AutoRemoveJob
+    $result = Receive-Job -Job $job -Wait
 }
 finally {
-    if ($job -and $job.State -ne 'Running') {
+    if ($job) {
+        if ($job.State -eq 'Running') {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue
+        }
         Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
     }
 }

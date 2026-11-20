@@ -1,13 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using ResearchTools.McpHost.Infrastructure;
 using ResearchTools.McpHost.Models;
 
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Adapter for DuckAI's local OpenAI-compatible HTTP API. No cloud credentials are used.
+/// Adapter for DuckAI's local OpenAI-compatible HTTP API. Native Chat Completions
+/// function calling is preferred; the coordinator can fall back to JSON decisions
+/// when the selected local provider does not accept the tools parameter.
 /// </summary>
 public sealed class DuckAiClient
 {
@@ -82,7 +85,7 @@ public sealed class DuckAiClient
                 }
                 catch (Exception exception)
                 {
-                    failures.Add($"{baseAddress}: {exception.Message}");
+                    failures.Add($"{baseAddress}: {exception.GetType().Name}");
                 }
             }
 
@@ -95,9 +98,10 @@ public sealed class DuckAiClient
         }
     }
 
-    public async Task<(string Text, string Model)> CompleteAsync(
+    public async Task<DuckAiCompletion> CompleteAsync(
         string requestedModel,
         IReadOnlyList<DuckChatMessage> messages,
+        IReadOnlyList<DuckFunctionTool>? functionTools,
         CancellationToken cancellationToken)
     {
         var snapshot = await GetModelsAsync(cancellationToken);
@@ -108,14 +112,21 @@ public sealed class DuckAiClient
         if (!snapshot.Models.Contains(model, StringComparer.Ordinal))
             throw new InvalidOperationException($"النموذج غير متاح محلياً: {model}");
 
-        var payload = new
+        var payload = new Dictionary<string, object?>
         {
-            model,
-            messages,
-            temperature = 0.1,
-            max_tokens = 5000,
-            stream = false
+            ["model"] = model,
+            ["messages"] = messages,
+            ["temperature"] = 0.1,
+            ["max_tokens"] = 5000,
+            ["stream"] = false
         };
+
+        var hasFunctionTools = functionTools is { Count: > 0 };
+        if (hasFunctionTools)
+        {
+            payload["tools"] = functionTools;
+            payload["tool_choice"] = "auto";
+        }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(175));
@@ -130,27 +141,32 @@ public sealed class DuckAiClient
             request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         var responseBody = await response.Content.ReadAsStringAsync(timeout.Token);
 
-        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed ||
-            (int)response.StatusCode == 501)
-        {
-            return await CompleteWithResponsesApiAsync(
-                snapshot, model, messages, cancellationToken);
-        }
-
         if (!response.IsSuccessStatusCode)
+        {
+            if (hasFunctionTools && IsFunctionCallingUnsupportedStatus(response.StatusCode))
+            {
+                throw new NativeToolCallingNotSupportedException(
+                    $"DuckAI rejected native function tools (HTTP {(int)response.StatusCode}).");
+            }
+
+            if (!hasFunctionTools &&
+                (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed ||
+                 (int)response.StatusCode == 501))
+            {
+                return await CompleteWithResponsesApiAsync(
+                    snapshot, model, messages, cancellationToken);
+            }
+
             throw new HttpRequestException(
                 $"DuckAI HTTP {(int)response.StatusCode}: {Limit(responseBody, 1800)}",
                 null, response.StatusCode);
+        }
 
         using var document = JsonDocument.Parse(responseBody);
-        var text = ExtractAssistantText(document.RootElement);
-        if (string.IsNullOrWhiteSpace(text))
-            throw new InvalidOperationException("DuckAI returned an empty chat response.");
-
-        return (text.Trim(), model);
+        return ParseChatCompletion(document.RootElement, model);
     }
 
-    private async Task<(string Text, string Model)> CompleteWithResponsesApiAsync(
+    private async Task<DuckAiCompletion> CompleteWithResponsesApiAsync(
         DuckAiModelSnapshot snapshot,
         string model,
         IReadOnlyList<DuckChatMessage> messages,
@@ -180,11 +196,99 @@ public sealed class DuckAiClient
                 null, response.StatusCode);
 
         using var document = JsonDocument.Parse(body);
-        var text = ExtractAssistantText(document.RootElement);
+        var text = ExtractResponsesText(document.RootElement);
         if (string.IsNullOrWhiteSpace(text))
             throw new InvalidOperationException("DuckAI Responses returned no text.");
 
-        return (text.Trim(), model);
+        return new DuckAiCompletion(text.Trim(), [], model);
+    }
+
+    private static bool IsFunctionCallingUnsupportedStatus(HttpStatusCode statusCode) =>
+        statusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity or
+            HttpStatusCode.NotImplemented or HttpStatusCode.NotFound or
+            HttpStatusCode.MethodNotAllowed ||
+        (int)statusCode == 501;
+
+    internal static DuckAiCompletion ParseChatCompletion(JsonElement root, string model)
+    {
+        var choices = TryProperty(root, "choices", out var choiceRows) &&
+                      choiceRows.ValueKind == JsonValueKind.Array
+            ? choiceRows
+            : default;
+
+        if (choices.ValueKind != JsonValueKind.Array || choices.GetArrayLength() == 0)
+        {
+            var text = ExtractResponsesText(root);
+            if (string.IsNullOrWhiteSpace(text))
+                throw new InvalidOperationException("DuckAI returned no assistant message.");
+            return new DuckAiCompletion(text.Trim(), [], model);
+        }
+
+        var first = choices[0];
+        if (!TryProperty(first, "message", out var message))
+            throw new InvalidOperationException("DuckAI chat response omitted choices[0].message.");
+
+        var content = TryProperty(message, "content", out var contentElement)
+            ? ReadContent(contentElement)
+            : string.Empty;
+
+        var calls = new List<DuckFunctionCall>();
+        if (TryProperty(message, "tool_calls", out var callRows) &&
+            callRows.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var call in callRows.EnumerateArray())
+            {
+                var id = ReadString(call, "id");
+                if (!TryProperty(call, "function", out var function))
+                    continue;
+
+                var name = ReadString(function, "name");
+                var arguments = ReadRawArgumentString(function);
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name))
+                    continue;
+
+                calls.Add(new DuckFunctionCall(id, name, arguments));
+            }
+        }
+
+        return new DuckAiCompletion(content.Trim(), calls, model);
+    }
+
+    private static string ReadRawArgumentString(JsonElement function)
+    {
+        if (!TryProperty(function, "arguments", out var arguments))
+            return "{}";
+
+        return arguments.ValueKind == JsonValueKind.String
+            ? arguments.GetString() ?? "{}"
+            : arguments.GetRawText();
+    }
+
+    private static string ExtractResponsesText(JsonElement root)
+    {
+        if (TryProperty(root, "output_text", out var outputText) &&
+            outputText.ValueKind == JsonValueKind.String)
+            return outputText.GetString() ?? string.Empty;
+
+        if (!TryProperty(root, "output", out var output) || output.ValueKind != JsonValueKind.Array)
+            return string.Empty;
+
+        var parts = new List<string>();
+        foreach (var item in output.EnumerateArray())
+        {
+            if (!TryProperty(item, "content", out var content) ||
+                content.ValueKind != JsonValueKind.Array)
+                continue;
+
+            foreach (var block in content.EnumerateArray())
+            {
+                if (TryProperty(block, "text", out var text) &&
+                    text.ValueKind == JsonValueKind.String)
+                    parts.Add(text.GetString() ?? string.Empty);
+            }
+        }
+
+        return string.Join(Environment.NewLine, parts).Trim();
     }
 
     private static IReadOnlyList<string> ReadModels(JsonElement root)
@@ -216,42 +320,6 @@ public sealed class DuckAiClient
         return models.Distinct(StringComparer.Ordinal).ToArray();
     }
 
-    private static string ExtractAssistantText(JsonElement root)
-    {
-        if (TryProperty(root, "output_text", out var outputText) &&
-            outputText.ValueKind == JsonValueKind.String)
-            return outputText.GetString() ?? string.Empty;
-
-        if (TryProperty(root, "choices", out var choices) && choices.ValueKind == JsonValueKind.Array &&
-            choices.GetArrayLength() > 0)
-        {
-            var first = choices[0];
-            if (TryProperty(first, "message", out var message) &&
-                TryProperty(message, "content", out var content))
-                return ReadContent(content);
-        }
-
-        if (TryProperty(root, "output", out var output) && output.ValueKind == JsonValueKind.Array)
-        {
-            var parts = new List<string>();
-            foreach (var item in output.EnumerateArray())
-            {
-                if (!TryProperty(item, "content", out var content) || content.ValueKind != JsonValueKind.Array)
-                    continue;
-
-                foreach (var block in content.EnumerateArray())
-                {
-                    if (TryProperty(block, "text", out var text) && text.ValueKind == JsonValueKind.String)
-                        parts.Add(text.GetString() ?? string.Empty);
-                }
-            }
-
-            return string.Join(Environment.NewLine, parts).Trim();
-        }
-
-        return string.Empty;
-    }
-
     private static string ReadContent(JsonElement content)
     {
         if (content.ValueKind == JsonValueKind.String)
@@ -270,6 +338,11 @@ public sealed class DuckAiClient
 
         return string.Empty;
     }
+
+    private static string ReadString(JsonElement element, string name) =>
+        TryProperty(element, name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : string.Empty;
 
     private static bool TryProperty(JsonElement element, string name, out JsonElement value)
     {
@@ -293,4 +366,37 @@ public sealed class DuckAiClient
         value.Length <= maximum ? value : value[..maximum] + " [truncated]";
 }
 
-public sealed record DuckChatMessage(string Role, string Content);
+public sealed class NativeToolCallingNotSupportedException(string message) : Exception(message);
+
+public sealed record DuckChatMessage(
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("content")] string? Content,
+    [property: JsonPropertyName("tool_call_id"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? ToolCallId = null,
+    [property: JsonPropertyName("tool_calls"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<DuckChatToolCall>? ToolCalls = null);
+
+public sealed record DuckChatToolCall(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("function")] DuckChatFunction Function);
+
+public sealed record DuckChatFunction(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("arguments")] string Arguments);
+
+public sealed record DuckFunctionTool(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("function")] DuckFunctionDefinition Function);
+
+public sealed record DuckFunctionDefinition(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("description")] string Description,
+    [property: JsonPropertyName("parameters")] JsonElement Parameters);
+
+public sealed record DuckFunctionCall(string Id, string Name, string Arguments);
+
+public sealed record DuckAiCompletion(
+    string Text,
+    IReadOnlyList<DuckFunctionCall> ToolCalls,
+    string Model);
