@@ -114,7 +114,7 @@ Function EnsureRuntime(checkUpdates)
     EnsureRuntime=RunBootstrap(False,True,checkUpdates)
 End Function
 Sub StartServices()
-    If fso.FileExists(duckExe) Then
+    If fso.FileExists(duckExe) And Not ProcessExists("duck2api-main.exe") Then
         env("SERVER_HOST")="127.0.0.1"
         env("SERVER_PORT")="18080"
         shell.Run Chr(34)&duckExe&Chr(34),0,False
@@ -122,7 +122,7 @@ Sub StartServices()
         env("SERVER_HOST")=""
         env("SERVER_PORT")=""
     End If
-    If fso.FileExists(agentExe) Then
+    If fso.FileExists(agentExe) And Not ProcessExists("ResearchTools-DuckAgent.exe") Then
         env("SERVER_HOST")=""
         env("SERVER_PORT")=""
         shell.Run Chr(34)&agentExe&Chr(34),0,False
