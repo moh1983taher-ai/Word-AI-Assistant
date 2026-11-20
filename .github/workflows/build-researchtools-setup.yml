@@ -2,9 +2,18 @@ name: Build and publish ResearchTools Setup
 
 on:
   push:
+    branches: [main, feature/mcp-host-dotnet10]
+    paths:
+      - 'installer/**'
+      - 'runtime/McpHost/**'
+      - 'runtime/ResearchTools-Launcher.vbs'
+      - '.github/workflows/build-researchtools-setup.yml'
+  pull_request:
     branches: [main]
     paths:
       - 'installer/**'
+      - 'runtime/McpHost/**'
+      - 'runtime/ResearchTools-Launcher.vbs'
       - '.github/workflows/build-researchtools-setup.yml'
   workflow_dispatch:
 
@@ -42,7 +51,13 @@ jobs:
           if (-not $id -or $id.InnerText -ne 'f8a582b1-eaf2-44f9-8166-d034255586ad') { throw 'Invalid Word add-in ID.' }
           if (-not $source -or $source.GetAttribute('DefaultValue') -ne 'https://moh1983taher-ai.github.io/Word-AI-Assistant/taskpane.html') { throw 'Invalid production task pane URL.' }
           if ((Get-Content 'installer/Word-AI-Assistant.xml' -Raw) -match 'localhost:3000') { throw 'Production manifest has a localhost URL.' }
-          Write-Host 'PowerShell 5.1 and Word manifest validated.'
+          $launcher = Get-Content 'runtime/ResearchTools-Launcher.vbs' -Raw
+          if ($launcher -notmatch 'RESEARCHTOOLS_MCPHOST_V1' -or $launcher -notmatch 'McpHost\\ResearchTools\.McpHost\.exe') { throw 'Unified launcher is missing MCP host integration.' }
+          $iss = Get-Content 'installer/ResearchToolsSetup.iss' -Raw
+          foreach ($required in @('ResearchTools-MCP-Host-release.zip','ResearchTools-Launcher.vbs','-McpHostArchive','-McpHostShaFile','-LauncherFile')) {
+            if ($iss -notmatch [regex]::Escape($required)) { throw "Setup script does not embed $required." }
+          }
+          Write-Host 'PowerShell 5.1, Word manifest, unified launcher and Setup inputs validated.'
 
       - name: Download and verify embedded runtime
         env:
@@ -60,6 +75,39 @@ jobs:
           $actual = (Get-FileHash 'dist/DuckAI-Runtime-release.zip' -Algorithm SHA256).Hash.ToUpperInvariant()
           if ($actual -ne $expected) { throw 'Embedded runtime SHA-256 mismatch.' }
           Write-Host "Runtime verified: $actual"
+
+      - name: Publish self-contained .NET 10 MCP host package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet --info
+          dotnet publish runtime/McpHost/ResearchTools.McpHost.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false --output dist/mcp-host-win-x64
+          if ($LASTEXITCODE -ne 0) { throw "MCP host publish failed: $LASTEXITCODE" }
+
+          $exe = 'dist/mcp-host-win-x64/ResearchTools.McpHost.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Self-contained MCP host executable is missing.' }
+          $exeHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath ($exe + '.sha256') -Value ($exeHash + '  ResearchTools.McpHost.exe') -Encoding ASCII
+
+          $package = 'dist/mcp-host-package'
+          New-Item -ItemType Directory -Path $package -Force | Out-Null
+          Copy-Item -LiteralPath $exe -Destination $package
+          Copy-Item -LiteralPath ($exe + '.sha256') -Destination $package
+          $archive = 'dist/ResearchTools-MCP-Host-release.zip'
+          Compress-Archive -Path (Join-Path $package '*') -DestinationPath $archive -CompressionLevel Optimal -Force
+          $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath ($archive + '.sha256') -Value ($archiveHash + '  ResearchTools-MCP-Host-release.zip') -Encoding ASCII
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead($archive)
+          try {
+            $names = @($zip.Entries | ForEach-Object { $_.FullName })
+            if ($names.Count -ne 2 -or $names -notcontains 'ResearchTools.McpHost.exe' -or $names -notcontains 'ResearchTools.McpHost.exe.sha256') {
+              throw 'MCP host installer archive layout is invalid.'
+            }
+          }
+          finally { $zip.Dispose() }
+          Write-Host "MCP host published and checksummed: $exeHash; archive=$archiveHash"
 
       - name: Install Inno Setup
         shell: pwsh
@@ -82,14 +130,25 @@ jobs:
           Set-Content -LiteralPath ($setup + '.sha256') -Value ($hash + '  ResearchTools-Setup.exe') -Encoding ASCII
           Write-Host "Built $setup, $((Get-Item $setup).Length) bytes, SHA256 $hash"
 
+      - name: Upload unified Setup preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ResearchTools-Unified-Setup
+          path: |
+            dist/ResearchTools-Setup.exe
+            dist/ResearchTools-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Publish release
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.0.0'
-          $title = 'ResearchTools Unified Setup v1.0.0'
-          $notes = 'One-file installer: embedded DuckAI runtime, SHA-256 validation, shared Word catalog and manifest setup, existing scheduled task and durable launcher. Does not modify C:\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.1.0'
+          $title = 'ResearchTools Unified Setup v1.1.0'
+          $notes = 'Unified one-file x64 installer: DuckAI runtime, self-contained .NET 10 MCP host using the official SDK, JSON decision research protocol, background launcher, Word trusted shared catalog and Arabic Word ribbon add-in. SHA-256 checks, staged MCP installation and rollback backup. Does not modify C:\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
