@@ -16,6 +16,7 @@
     panel: null,
     turns: null,
     modeButton: null,
+    modeStatus: null,
     connection: null
   };
 
@@ -72,11 +73,22 @@
     const style = document.createElement("style");
     style.id = "mcp-research-styles";
     style.textContent = [
-      ".mcp-research-toolbar{display:flex;align-items:center;gap:6px;}",
-      ".mcp-research-mode,.mcp-research-settings{border:1px solid #d8dfd8;border-radius:8px;background:#fffdf8;color:#315957;min-height:30px;padding:4px 9px;font:12px 'Segoe UI',Arial,sans-serif;cursor:pointer;}",
-      ".mcp-research-mode[aria-pressed='true']{background:#0b5553;color:#fff;border-color:#0b5553;}",
-      ".mcp-research-mode:disabled{opacity:.65;cursor:wait;}",
-      ".mcp-research-settings{width:30px;padding:3px;font-size:15px;}",
+      ".mcp-research-entry{grid-column:1/-1;display:flex;align-items:stretch;gap:7px;min-width:0;margin-top:2px;}",
+      ".mcp-research-option{flex:1;min-width:0;min-height:58px;display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid #d8dfd8;border-radius:12px;background:#fffdf8;color:#0b5553;cursor:pointer;text-align:right;direction:rtl;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease;}",
+      ".mcp-research-option:hover{background:#f5f8f4;border-color:#aebfb5;}",
+      ".mcp-research-option[aria-pressed='true']{background:#edf5f0;border-color:#8ba99a;box-shadow:inset 0 0 0 1px rgba(11,85,83,.08);}",
+      ".mcp-research-option:disabled{opacity:.65;cursor:wait;}",
+      ".mcp-research-option:focus-visible,.mcp-research-settings-option:focus-visible{outline:2px solid #72a49b;outline-offset:2px;}",
+      ".mcp-research-option-icon{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 22px;color:#0b5553;}",
+      ".mcp-research-option-icon svg{width:20px;height:20px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}",
+      ".mcp-research-option-copy{display:flex;flex-direction:column;gap:2px;min-width:0;}",
+      ".mcp-research-option-title{font-size:13px;font-weight:650;color:#174b46;line-height:1.35;}",
+      ".mcp-research-option-description{font-size:10.5px;font-weight:400;color:#718078;line-height:1.4;white-space:normal;}",
+      ".mcp-research-option-state{margin-inline-start:auto;flex:0 0 auto;font-size:10px;color:#718078;padding:3px 7px;border-radius:20px;background:#f1f3ef;}",
+      ".mcp-research-option[aria-pressed='true'] .mcp-research-option-state{background:#dcebe1;color:#225b48;}",
+      ".mcp-research-settings-option{width:42px;min-width:42px;display:flex;align-items:center;justify-content:center;border:1px solid #e2e7e0;border-radius:11px;background:#fffdf8;color:#52645c;cursor:pointer;transition:background .15s ease,border-color .15s ease;}",
+      ".mcp-research-settings-option:hover{background:#f5f8f4;border-color:#b8c8be;}",
+      ".mcp-research-settings-option svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}",
       ".mcp-research-panel{position:absolute;z-index:4500;right:12px;bottom:76px;width:min(370px,calc(100vw - 90px));padding:15px;background:#fffdf8;border:1px solid #d8dfd8;border-radius:12px;box-shadow:0 10px 35px rgba(5,45,43,.16);color:#173e3d;direction:rtl;}",
       ".mcp-research-panel[hidden]{display:none;}",
       ".mcp-research-panel h3{font-size:14px;margin:0 0 10px;font-weight:650;}",
@@ -290,10 +302,23 @@
   function updateModeButton() {
     if (!state.modeButton) return;
     state.modeButton.setAttribute("aria-pressed", state.enabled ? "true" : "false");
-    state.modeButton.textContent = state.busy ? "جارٍ البحث…" : (state.enabled ? "بحث MCP مفعّل" : "بحث MCP");
+    state.modeButton.disabled = state.busy;
     state.modeButton.title = state.enabled
-      ? "البحث عبر DuckAI المحلي وخوادم المكتبات المتصلة؛ اضغط للعودة إلى المسار السابق"
-      : "تفعيل البحث بالمصادر عبر DuckAI المحلي";
+      ? "البحث بالمصادر مفعّل؛ اضغط لإيقافه والعودة إلى المحادثة العادية"
+      : "تفعيل البحث بالمصادر باستخدام DuckAI المحلي";
+    if (state.modeStatus) {
+      state.modeStatus.textContent = state.enabled ? "مفعّل" : "غير مفعّل";
+    }
+  }
+
+  function closeScopePanel() {
+    const panel = document.getElementById("scope-panel");
+    if (panel) {
+      panel.classList.remove("open");
+      panel.setAttribute("aria-hidden", "true");
+    }
+    const trigger = document.getElementById("scope-btn");
+    if (trigger) trigger.setAttribute("aria-expanded", "false");
   }
 
   async function fetchJson(url, options, timeoutMs) {
@@ -451,33 +476,83 @@
   }
 
   function initialize() {
-    if (document.getElementById("mcp-research-mode")) return;
-    const toolbar = document.querySelector(".input-tools");
+    if (document.getElementById("mcp-research-entry")) return;
+    const scopeMenu = document.querySelector("#scope-panel .scope-panel-content");
     const inputArea = document.querySelector(".input-area");
-    if (!toolbar || !inputArea || !document.getElementById("send-btn")) return;
+    if (!scopeMenu || !inputArea || !document.getElementById("send-btn")) return;
 
     loadThread();
     state.settings = loadSettings();
     addStyles();
 
-    const controls = document.createElement("div");
-    controls.className = "mcp-research-toolbar";
-    const modeButton = createButton("بحث MCP", "mcp-research-mode", "mcp-research-mode", "تفعيل البحث بالمصادر عبر DuckAI المحلي");
+    const entry = document.createElement("div");
+    entry.className = "mcp-research-entry";
+    entry.id = "mcp-research-entry";
+
+    const modeButton = createButton(
+      "",
+      "mcp-research-mode-option",
+      "mcp-research-option",
+      "تفعيل البحث بالمصادر باستخدام DuckAI المحلي"
+    );
     modeButton.setAttribute("aria-pressed", "false");
-    const settingsButton = createButton("⚙", "mcp-research-settings", "mcp-research-settings", "إعدادات مصادر البحث");
-    controls.appendChild(modeButton);
-    controls.appendChild(settingsButton);
-    toolbar.insertBefore(controls, toolbar.firstChild);
+
+    const modeIcon = document.createElement("span");
+    modeIcon.className = "mcp-research-option-icon";
+    modeIcon.setAttribute("aria-hidden", "true");
+    modeIcon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 1 4 17.5z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/><path d="M8 7h8M8 10h6"/></svg>';
+
+    const copy = document.createElement("span");
+    copy.className = "mcp-research-option-copy";
+    const modeLabel = document.createElement("span");
+    modeLabel.className = "mcp-research-option-title";
+    modeLabel.textContent = "بحث في المصادر المتصلة";
+    const modeDescription = document.createElement("span");
+    modeDescription.className = "mcp-research-option-description";
+    modeDescription.textContent = "استخدم DuckAI للبحث في المكتبات عند الحاجة";
+    copy.appendChild(modeLabel);
+    copy.appendChild(modeDescription);
+
+    const modeStatus = document.createElement("span");
+    modeStatus.className = "mcp-research-option-state";
+    modeStatus.textContent = "غير مفعّل";
+    copy.setAttribute("aria-live", "polite");
+
+    modeButton.appendChild(modeIcon);
+    modeButton.appendChild(copy);
+    modeButton.appendChild(modeStatus);
+
+    const settingsButton = createButton(
+      "",
+      "mcp-research-settings-option",
+      "mcp-research-settings-option",
+      "إعدادات البحث بالمصادر"
+    );
+    settingsButton.setAttribute("aria-label", "إعدادات البحث بالمصادر");
+    settingsButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 0 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3.1a2 2 0 0 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5v-.2a2 2 0 0 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.2a2 2 0 0 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+
+    entry.appendChild(modeButton);
+    entry.appendChild(settingsButton);
+    scopeMenu.appendChild(entry);
     state.modeButton = modeButton;
+    state.modeStatus = modeStatus;
 
     buildSettingsPanel(inputArea);
-    modeButton.addEventListener("click", toggleMode);
-    settingsButton.addEventListener("click", function () {
+    modeButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleMode();
+      closeScopePanel();
+    });
+    settingsButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
       const settings = state.settings || loadSettings();
       const modelInput = document.getElementById("mcp-duckai-model");
       const tokenInput = document.getElementById("mcp-shamela-token");
       if (modelInput) modelInput.value = settings.model || "";
       if (tokenInput) tokenInput.value = settings.shamelaToken || "";
+      closeScopePanel();
       if (state.panel) state.panel.hidden = !state.panel.hidden;
     });
 
@@ -511,7 +586,6 @@
       }, true);
     }
   }
-
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initialize, { once: true });
   } else {
