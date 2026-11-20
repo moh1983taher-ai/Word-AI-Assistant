@@ -120,7 +120,7 @@ def main() -> int:
         info = info_path.read_text(encoding="utf-8-sig")
         info = re.sub(
             r"(?m)^Bundle Revision:.*$",
-            "Bundle Revision: 2026-11-19-r6 (local DuckAI MCP orchestration bridge)",
+            "Bundle Revision: 2026-11-20-r7 (verified one-click updater, startup release checks, MCP bridge readiness probe)",
             info,
             count=1,
         )
