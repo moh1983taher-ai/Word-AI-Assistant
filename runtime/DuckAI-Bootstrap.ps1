@@ -198,8 +198,30 @@ function Get-LatestStableRelease {
     $releases = @(Invoke-RestMethod -TimeoutSec 60 -Uri $ReleaseApi -Headers $headers -Method Get)
     $release = $releases |
         Where-Object {
-            -not $_.draft -and -not $_.prerelease -and
-            [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+    $asset = @($release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1)
+            -not $_.draft -and
+            -not $_.prerelease -and
+            [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+$'
+        } |
+        Sort-Object { [DateTime]::Parse($_.published_at).ToUniversalTime() } -Descending |
+        Select-Object -First 1
+    if (-not $release) {
+        throw 'لم يُعثر على إصدار DuckAI مستقر منشور.'
+    }
+    return $release
+}
+
+function Install-LatestRuntime {
+    param([object]$LatestRelease)
+    $headers = @{
+        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.1'
+        'Accept' = 'application/vnd.github+json'
+    }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $release = $LatestRelease
+    if (-not $release) {
+        $release = Get-LatestStableRelease
+    }
+    $asset = @($release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1)
     if ($asset.Count -eq 0) {
         throw "لم يُعثر على ملف $AssetName في أحدث إصدار."
     }
