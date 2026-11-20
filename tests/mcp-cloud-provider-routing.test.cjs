@@ -32,6 +32,10 @@ assert.match(source, /gemini-4-hydrogen/);
 assert.match(source, /type: "mcp_server"/);
 assert.match(source, /name: server\.id/);
 assert.match(source, /url: server\.url/);
+assert.match(
+  source,
+  /function getGeminiTools\(\)[\s\S]*?allowed_tools: \[\{\s*mode: "auto",\s*tools: server\.tools\.slice\(\)\s*\}\]/
+);
 assert.match(source, /environment: "remote"/);
 assert.match(source, /function callGeminiResearch[\s\S]*?tools: getGeminiTools\(\)/);
 

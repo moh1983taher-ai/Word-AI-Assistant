@@ -398,7 +398,10 @@
         type: "mcp_server",
         name: server.id,
         url: server.url,
-        allowed_tools: server.tools.slice()
+        allowed_tools: [{
+          mode: "auto",
+          tools: server.tools.slice()
+        }]
       };
     });
   }
