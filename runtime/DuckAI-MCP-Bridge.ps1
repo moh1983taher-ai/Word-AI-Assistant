@@ -29,6 +29,7 @@ function Log([string]$s){
     }catch{}
 }
 function AllowedOrigin([string]$o){return (-not [string]::IsNullOrWhiteSpace($o)) -and ($script:Origins -contains $o.TrimEnd('/'))}
+function IsAllowedResearchClient([string]$origin,$payload){return (AllowedOrigin $origin) -and ([string](Prop $payload 'client' '') -eq 'word-addin')}
 function HttpJson([string]$url,[string]$method,$body=$null,[hashtable]$headers=@{},[int]$seconds=60){
     $req=[System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::new($method),[Uri]$url)
     $null=$req.Headers.Accept.Add([System.Net.Http.Headers.MediaTypeWithQualityHeaderValue]::new('application/json'))
@@ -378,7 +379,7 @@ function Research($request){
 function Reply($stream,[int]$status,[string]$reason,[string]$body='',[string]$origin='',[switch]$empty){
     $bytes=[Text.Encoding]::UTF8.GetBytes([string]$body);$crlf=[string][char]13+[char]10
     $headers=@("HTTP/1.1 $status $reason",'Content-Type: application/json; charset=utf-8',('Content-Length: '+$(if($empty){0}else{$bytes.Length})),'Connection: close','Cache-Control: no-store','X-Content-Type-Options: nosniff')
-    if(AllowedOrigin $origin){$headers+=('Access-Control-Allow-Origin: '+$origin);$headers+='Access-Control-Allow-Methods: GET, POST, OPTIONS';$headers+='Access-Control-Allow-Headers: Content-Type, X-ResearchTools-Client';$headers+='Access-Control-Allow-Private-Network: true';$headers+='Vary: Origin'}
+    if(AllowedOrigin $origin){$headers+=('Access-Control-Allow-Origin: '+$origin);$headers+='Access-Control-Allow-Methods: GET, POST, OPTIONS';$headers+='Access-Control-Allow-Headers: Content-Type';$headers+='Access-Control-Allow-Private-Network: true';$headers+='Vary: Origin'}
     $h=[Text.Encoding]::ASCII.GetBytes(($headers -join $crlf)+$crlf+$crlf);$stream.Write($h,0,$h.Length);if(-not $empty -and $bytes.Length -gt 0){$stream.Write($bytes,0,$bytes.Length)};$stream.Flush()
 }
 function ReadRequest($stream){
@@ -417,8 +418,10 @@ function StartBridge {
                     continue
                 }
                 if($req.Method -eq 'POST' -and $req.Path -eq '/v1/research'){
-                    if([string](Prop $req.Headers 'x-researchtools-client' '') -ne 'word-addin'){Reply $stream 403 'Forbidden' '{"error":"Missing client header."}' $origin;continue}
-                    try{$inputData=ConvertFrom-Json -InputObject $req.Body -ErrorAction Stop;$result=Research $inputData;Reply $stream 200 'OK' (ConvertTo-Json -InputObject $result -Depth 50 -Compress) $origin}
+                    try{$inputData=ConvertFrom-Json -InputObject $req.Body -ErrorAction Stop}
+                    catch{Reply $stream 400 'Bad Request' '{"error":"Invalid research payload."}' $origin;continue}
+                    if(-not (IsAllowedResearchClient $origin $inputData)){Reply $stream 403 'Forbidden' '{"error":"Research origin or client is not allowed."}' $origin;continue}
+                    try{$result=Research $inputData;Reply $stream 200 'OK' (ConvertTo-Json -InputObject $result -Depth 50 -Compress) $origin}
                     catch{Log ('Research failed: '+$_.Exception.Message);Reply $stream 502 'Bad Gateway' (ConvertTo-Json @{error=$_.Exception.Message} -Compress) $origin}
                     continue
                 }
@@ -431,6 +434,9 @@ function StartBridge {
 if($SelfTest){
     if(-not (AllowedOrigin 'https://moh1983taher-ai.github.io')){throw 'Allowed-origin test failed'}
     if(AllowedOrigin 'https://attacker.example'){throw 'Rejected-origin test failed'}
+    if(-not (IsAllowedResearchClient 'https://moh1983taher-ai.github.io' ([pscustomobject]@{client='word-addin'}))){throw 'Allowed simple research request test failed'}
+    if(IsAllowedResearchClient 'https://attacker.example' ([pscustomobject]@{client='word-addin'})){throw 'Rejected simple research origin test failed'}
+    if(IsAllowedResearchClient 'https://moh1983taher-ai.github.io' ([pscustomobject]@{client='other'})){throw 'Rejected simple research client test failed'}
     $d=ParseDecision '{"type":"tool_call","server":"aljam3","tool":"search_books","arguments":{"query":"فقه"}}';if($d.Type -ne 'tool_call' -or $d.Tool -ne 'search_books'){throw 'Tool JSON test failed'}
     $shamela=ServerDef 'shamela' ''
     if($shamela.Url -ne 'https://mcp.shamela.ws' -or $shamela.Token -ne '' -or $shamela.Label -ne 'المكتبة الشاملة'){throw 'Official Shamela endpoint configuration test failed'}
