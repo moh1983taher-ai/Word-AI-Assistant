@@ -13,10 +13,6 @@ const taskpaneHtml = fs.readFileSync(
   path.join(root, "src/taskpane/taskpane.html"),
   "utf8"
 );
-const bridgeSource = fs.readFileSync(
-  path.join(root, "runtime/DuckAI-MCP-Bridge.ps1"),
-  "utf8"
-);
 
 assert.match(taskpaneHtml, /id="scope-btn"/, "The existing plus trigger must remain present.");
 assert.match(taskpaneHtml, /id="scope-panel"/, "The existing plus menu must remain present.");
@@ -30,7 +26,7 @@ assert.match(
 assert.match(
   uiSource,
   /scopeMenu\.appendChild\(entry\)/,
-  "The MCP entry must be appended inside the plus menu."
+  "The source-search option must remain inside the plus menu."
 );
 assert.match(
   uiSource,
@@ -40,7 +36,7 @@ assert.match(
 assert.match(
   uiSource,
   /mcp-research-settings-option/,
-  "Settings must be reachable from the plus-menu entry."
+  "The provider-status panel must remain reachable from the plus-menu entry."
 );
 assert.doesNotMatch(
   uiSource,
@@ -55,33 +51,18 @@ assert.match(
 
 assert.match(
   uiSource,
-  /requestOptions\.targetAddressSpace = ["']loopback["']/,
-  "Local bridge fetches must explicitly target the loopback address space."
+  /const AI_SETTINGS_KEY = ["']AI_SETTINGS["']/,
+  "Cloud research must reuse the existing AI_SETTINGS credential store."
 );
 assert.match(
   uiSource,
-  /["']Content-Type["']:\s*["']text\/plain["']/,
-  "Research POST must use a CORS-safelisted content type to avoid an OPTIONS preflight."
-);
-assert.match(
-  uiSource,
-  /client:\s*["']word-addin["']/,
-  "The client marker must travel in the JSON payload, not a custom request header."
+  /localStorage\.getItem\(AI_SETTINGS_KEY\)/,
+  "Cloud research must read the currently saved provider, key and model."
 );
 assert.doesNotMatch(
   uiSource,
-  /X-ResearchTools-Client/,
-  "Research fetch must not add a non-safelisted custom header."
-);
-assert.match(
-  bridgeSource,
-  /function IsAllowedResearchClient[\s\S]*?AllowedOrigin[\s\S]*?word-addin/,
-  "The bridge must validate the exact page origin and client marker."
-);
-assert.match(
-  bridgeSource,
-  /IsAllowedResearchClient \$origin \$inputData/,
-  "The research endpoint must enforce the simple-request origin/client validation."
+  /AR_MCP_RESEARCH_SETTINGS|BRIDGE_URL|callLocalResearch|127\.0\.0\.1|DuckAI|Duck\.ai/,
+  "The source-search feature must not retain a separate key store or local DuckAI route."
 );
 
-console.log("MCP research menu placement tests passed.");
+console.log("Cloud MCP research menu and provider integration tests passed.");
