@@ -76,6 +76,11 @@ jobs:
           if ($actual -ne $expected) { throw 'Embedded runtime SHA-256 mismatch.' }
           Write-Host "Runtime verified: $actual"
 
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
       - name: Publish self-contained .NET 10 MCP host package
         shell: pwsh
         run: |
