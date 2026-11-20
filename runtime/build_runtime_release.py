@@ -120,7 +120,7 @@ def main() -> int:
         info = info_path.read_text(encoding="utf-8-sig")
         info = re.sub(
             r"(?m)^Bundle Revision:.*$",
-            "Bundle Revision: 2026-11-20-r8 (stable latest-release detection, startup recovery and MCP bridge readiness)",
+            "Bundle Revision: 2026-11-20-r9 (official Shamela MCP endpoint, standard session transport and no OAuth token)",
             info,
             count=1,
         )

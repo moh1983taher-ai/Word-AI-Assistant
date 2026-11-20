@@ -3,7 +3,6 @@
   "use strict";
 
   const SETTINGS_KEY = "AR_MCP_RESEARCH_SETTINGS";
-  const SESSION_SECRETS_KEY = "AR_MCP_RESEARCH_SECRETS";
   const THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
   const BRIDGE_URL = "http://127.0.0.1:18081";
   const DEFAULT_TIMEOUT_MS = 180000;
@@ -30,24 +29,16 @@
 
   function loadSettings() {
     const saved = safeJson(localStorage.getItem(SETTINGS_KEY), {});
-    const secrets = safeJson(sessionStorage.getItem(SESSION_SECRETS_KEY), {});
     const savedModel = String(saved.model || "").trim();
     return {
-      model: /gpt-6\.2-astra/i.test(savedModel) ? "" : savedModel,
-      shamelaToken: String(secrets.shamelaToken || "").trim()
+      model: /gpt-6\.2-astra/i.test(savedModel) ? "" : savedModel
     };
   }
 
   function saveSettings(settings) {
     const value = { model: String(settings.model || "").trim() };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(value));
-    sessionStorage.setItem(SESSION_SECRETS_KEY, JSON.stringify({
-      shamelaToken: String(settings.shamelaToken || "").trim()
-    }));
-    state.settings = {
-      model: value.model,
-      shamelaToken: String(settings.shamelaToken || "").trim()
-    };
+    state.settings = { model: value.model };
     return state.settings;
   }
 
@@ -156,19 +147,11 @@
       "اتركه فارغاً لاختيار Luna تلقائياً",
       settings.model
     );
-    const shamelaField = makeField(
-      "رمز OAuth لوصلة الشاملة (اختياري)",
-      "mcp-shamela-token",
-      "password",
-      "Access token",
-      settings.shamelaToken
-    );
     panel.appendChild(modelField.wrapper);
-    panel.appendChild(shamelaField.wrapper);
 
     const note = document.createElement("p");
     note.className = "mcp-note";
-    note.textContent = "يعتمد هذا المسار على DuckAI المحلي الموجود لديك، ولا يحتاج إلى مفتاح OpenAI أو اشتراك API. يتصل خادم الجامع تلقائياً، أما وصلة الشاملة فتحتاج رمز OAuth. يحفظ الرمز في جلسة Word فقط.";
+    note.textContent = "يعتمد هذا المسار على DuckAI المحلي الموجود لديك، ولا يحتاج إلى مفتاح OpenAI أو اشتراك API. يتصل خادم الجامع والمكتبة الشاملة الرسمية تلقائياً؛ ولا تتطلب الشاملة رمز OAuth أو مفتاح API.";
     panel.appendChild(note);
 
     const health = document.createElement("div");
@@ -191,8 +174,7 @@
 
     save.addEventListener("click", function () {
       saveSettings({
-        model: modelField.input.value,
-        shamelaToken: shamelaField.input.value
+        model: modelField.input.value
       });
       panel.hidden = true;
       showNotice("حُفظت إعدادات مصادر البحث على هذا الجهاز.");
@@ -376,8 +358,7 @@
       },
       body: JSON.stringify({
         messages: messages,
-        model: settings.model || "",
-        shamelaToken: settings.shamelaToken || ""
+        model: settings.model || ""
       })
     }, DEFAULT_TIMEOUT_MS);
 
@@ -549,9 +530,7 @@
       event.stopPropagation();
       const settings = state.settings || loadSettings();
       const modelInput = document.getElementById("mcp-duckai-model");
-      const tokenInput = document.getElementById("mcp-shamela-token");
       if (modelInput) modelInput.value = settings.model || "";
-      if (tokenInput) tokenInput.value = settings.shamelaToken || "";
       closeScopePanel();
       if (state.panel) state.panel.hidden = !state.panel.hidden;
     });
