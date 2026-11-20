@@ -1,10 +1,9 @@
 Option Explicit
 ' RESEARCHTOOLS_DUCKAI_BOOTSTRAP_V3
-' RESEARCHTOOLS_MCPHOST_V1
 Const BOOTSTRAP_SHA256 = "3f09a278c3170379b06fa6dbe17a80c259a8c042f5ace1d1117481b1f9bbbdbd"
 Const BOOTSTRAP_RAW_URL = "https://raw.githubusercontent.com/moh1983taher-ai/Word-AI-Assistant/main/runtime/DuckAI-Bootstrap.ps1"
 Dim shell,fso,env,rootDir,installDir,launcherPath,bootstrapPath
-Dim duckExe,agentExe,bridgeScript,mcpHostExe,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
+Dim duckExe,agentExe,bridgeScript,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
 Set shell=CreateObject("WScript.Shell")
 Set fso=CreateObject("Scripting.FileSystemObject")
 Set env=shell.Environment("Process")
@@ -15,7 +14,6 @@ bootstrapPath=rootDir & "\DuckAI-Bootstrap.ps1"
 duckExe=installDir & "\duck2api-main.exe"
 agentExe=installDir & "\ResearchTools-DuckAgent.exe"
 bridgeScript=installDir & "\DuckAI-MCP-Bridge.ps1"
-mcpHostExe=rootDir & "\McpHost\ResearchTools.McpHost.exe"
 powershellExe=shell.ExpandEnvironmentStrings("%SystemRoot%") & "\System32\WindowsPowerShell\v1.0\powershell.exe"
 wscriptExe=shell.ExpandEnvironmentStrings("%SystemRoot%") & "\System32\wscript.exe"
 runtimeReady=False
@@ -46,14 +44,14 @@ End If
 
 Do
     If ProcessExists("WINWORD.EXE") Then
-        If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not ResearchMcpRunning() Then
+        If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not BridgeListening() Then
             ensureCode=EnsureRuntime(True)
             lastEnsureAt=Now
             runtimeReady=(ensureCode=0)
             If runtimeReady Then StartServices
         End If
         Do While ProcessExists("WINWORD.EXE")
-            If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not ResearchMcpRunning() Then
+            If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not BridgeListening() Then
                 If DateDiff("s",lastEnsureAt,Now)>=30 Then
                     ensureCode=EnsureRuntime(False)
                     lastEnsureAt=Now
@@ -63,7 +61,7 @@ Do
             End If
             WScript.Sleep 3000
         Loop
-        StopResearchMcp
+        StopBridgeProcess
         StopProcess "ResearchTools-DuckAgent.exe"
         WScript.Sleep 1000
         StopProcess "duck2api-main.exe"
@@ -130,81 +128,7 @@ Sub StartServices()
         shell.Run Chr(34)&agentExe&Chr(34),0,False
         WScript.Sleep 1500
     End If
-    StartMcpHost
-End Sub
-Sub StartMcpHost()
-    Dim attempt
-    If Not fso.FileExists(mcpHostExe) Then
-        WriteLauncherLog "WARNING: .NET MCP host is missing; using the legacy bridge for compatibility."
-        StartBridge
-        Exit Sub
-    End If
-
-    If McpHostListening() Then
-        If BridgeProcessExists() Then StopBridgeProcess
-        WriteLauncherLog "SUCCESS: .NET MCP host is already listening on 127.0.0.1:18081."
-        Exit Sub
-    End If
-
-    If BridgeProcessExists() Then
-        WriteLauncherLog "INFO: stopping the legacy MCP bridge before starting the .NET host."
-        StopBridgeProcess
-        WScript.Sleep 700
-    End If
-    If ProcessExists("ResearchTools.McpHost.exe") Then
-        StopMcpHostProcess
-        WScript.Sleep 500
-    End If
-
-    shell.Run Chr(34)&mcpHostExe&Chr(34),0,False
-    For attempt=1 To 25
-        WScript.Sleep 1000
-        If McpHostListening() Then
-            WriteLauncherLog "SUCCESS: .NET MCP host v1.1.0 is listening on 127.0.0.1:18081."
-            Exit Sub
-        End If
-    Next
-    WriteLauncherLog "ERROR: .NET MCP host did not become ready on 127.0.0.1:18081. Inspect MCP host log."
-End Sub
-Function ResearchMcpRunning()
-    If fso.FileExists(mcpHostExe) Then
-        ResearchMcpRunning=McpHostListening()
-    Else
-        ResearchMcpRunning=BridgeListening()
-    End If
-End Function
-Function McpHostListening()
-    Dim request,status,responseBody
-    McpHostListening=False
-    On Error Resume Next
-    Set request=CreateObject("WinHttp.WinHttpRequest.5.1")
-    If Err.Number<>0 Then
-        Err.Clear
-        On Error GoTo 0
-        Exit Function
-    End If
-    request.SetTimeouts 1000,1000,1000,1000
-    request.Open "GET","http://127.0.0.1:18081/ping",False
-    request.Send
-    status=0
-    responseBody=""
-    If Err.Number=0 Then
-        status=request.Status
-        responseBody=CStr(request.ResponseText)
-    End If
-    Err.Clear
-    McpHostListening=(status=200 And InStr(1,responseBody,"ResearchTools.McpHost",vbTextCompare)>0)
-    Set request=Nothing
-    On Error GoTo 0
-End Function
-Sub StopResearchMcp()
-    StopBridgeProcess
-    StopMcpHostProcess
-End Sub
-Sub StopMcpHostProcess()
-    If ProcessExists("ResearchTools.McpHost.exe") Then
-        StopProcess "ResearchTools.McpHost.exe"
-    End If
+    StartBridge
 End Sub
 Sub StartBridge()
     Dim attempt
