@@ -79,7 +79,7 @@ try {
         throw 'تعذر العثور على Windows PowerShell.'
     }
 
-    $bootstrapArgs = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $bootstrap + '" -RegisterTask'
+    $bootstrapArgs = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $bootstrap + '" -RegisterTask -EnsureRuntime -CheckForUpdates'
     $process = Start-Process -FilePath $powershell -ArgumentList $bootstrapArgs -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) {
         throw ("Bootstrap failed while registering startup task. ExitCode=" + $process.ExitCode + ". See DuckAI-Bootstrap.log.")
