@@ -13,6 +13,10 @@ const taskpaneHtml = fs.readFileSync(
   path.join(root, "src/taskpane/taskpane.html"),
   "utf8"
 );
+const bridgeSource = fs.readFileSync(
+  path.join(root, "runtime/DuckAI-MCP-Bridge.ps1"),
+  "utf8"
+);
 
 assert.match(taskpaneHtml, /id="scope-btn"/, "The existing plus trigger must remain present.");
 assert.match(taskpaneHtml, /id="scope-panel"/, "The existing plus menu must remain present.");
@@ -47,6 +51,37 @@ assert.match(
   uiSource,
   /if \(!state\.enabled\) return;\s*const target = event\.target[\s\S]*?closest\("\#send-btn"\)/,
   "Normal message submission must remain unchanged unless source-search mode is enabled."
+);
+
+assert.match(
+  uiSource,
+  /requestOptions\\.targetAddressSpace = ["']loopback["']/, 
+  "Local bridge fetches must explicitly target the loopback address space."
+);
+assert.match(
+  uiSource,
+  /["']Content-Type["']:\\s*["']text\\/plain["']/, 
+  "Research POST must use a CORS-safelisted content type to avoid an OPTIONS preflight."
+);
+assert.match(
+  uiSource,
+  /client:\\s*["']word-addin["']/, 
+  "The client marker must travel in the JSON payload, not a custom request header."
+);
+assert.doesNotMatch(
+  uiSource,
+  /X-ResearchTools-Client/,
+  "Research fetch must not add a non-safelisted custom header."
+);
+assert.match(
+  bridgeSource,
+  /function IsAllowedResearchClient[\\s\\S]*?AllowedOrigin[\\s\\S]*?word-addin/,
+  "The bridge must validate the exact page origin and client marker."
+);
+assert.match(
+  bridgeSource,
+  /IsAllowedResearchClient \\$origin \\$inputData/,
+  "The research endpoint must enforce the simple-request origin/client validation."
 );
 
 console.log("MCP research menu placement tests passed.");
