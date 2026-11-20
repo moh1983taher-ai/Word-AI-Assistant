@@ -69,11 +69,9 @@ Write-Host "نجح البحث عبر النموذج: $($result.model)"
 Write-Host "عدد فحوص /ping أثناء البحث: $pingCount"
 Write-Host ([Environment]::NewLine + 'الأدوات التي استُدعيت:')
 if (@($result.toolCalls).Count -eq 0) {
-    Write-Host 'لم يستدع النموذج أداة؛ راجع الإجابة قبل اعتبار اختبار الأدوات مكتملاً.'
+    throw 'أعاد DuckAI إجابة دون تنفيذ أداة MCP بنجاح؛ فشل اختبار البحث الفعلي، ولا تُعد هذه الإجابة بحثاً موثقاً.'
 }
-else {
-    $result.toolCalls | Format-Table server, label, tool -AutoSize
-}
+$result.toolCalls | Format-Table server, label, tool -AutoSize
 if (@($result.connectionWarnings).Count -gt 0) {
     Write-Warning ($result.connectionWarnings -join '; ')
 }
