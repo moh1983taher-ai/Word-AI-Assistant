@@ -354,7 +354,7 @@ try {
 
         if (-not $runtimeHealthy) {
             Write-Log 'ملفات DuckAI مفقودة أو غير سليمة؛ ستتم استعادة أحدث إصدار مستقر.'
-            Install-LatestRuntime -Release $latestRelease
+            Install-LatestRuntime -LatestRelease $latestRelease
         }
         elseif ($CheckForUpdates -and $latestRelease) {
             $installedTag = ''
@@ -363,7 +363,7 @@ try {
             }
             if ($installedTag -ne [string]$latestRelease.tag_name) {
                 Write-Log ("يتوفر تحديث: " + $latestRelease.tag_name + "؛ الإصدار المسجل محلياً: " + $(if ($installedTag) { $installedTag } else { 'غير معروف' }))
-                Install-LatestRuntime -Release $latestRelease
+                Install-LatestRuntime -LatestRelease $latestRelease
             }
             else {
                 Write-Log ("DuckAI محدث بالفعل: " + $installedTag)
