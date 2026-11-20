@@ -116,7 +116,7 @@ jobs:
           if (-not $bootstrapText.Contains("[switch]$CheckForUpdates") -or -not $bootstrapText.Contains("DuckAI-Installed-Release.txt")) {
             throw "Runtime release-version update check is missing."
           }
-          if (-not $launcherText.Contains("BridgeListening()") -or -not $launcherText.Contains("MCP bridge is listening")) {
+          if (-not $launcherText.Contains("BridgeListening()") -or -not $launcherText.Contains("/ping") -or -not $launcherText.Contains("MCP bridge is listening")) {
             throw "Launcher MCP readiness probe is missing."
           }
           if (-not $updateText.Contains("/releases/latest") -or -not $updateText.Contains("Get-FileHash")) {
