@@ -113,7 +113,7 @@
     return settings || loadSettings();
   }
 
-  function loadThread()  function loadThread() {
+  function loadThread() {
     const saved = safeJson(localStorage.getItem(THREAD_KEY), {});
     state.enabled = saved.enabled === true;
     state.messages = Array.isArray(saved.messages)
@@ -252,7 +252,7 @@
     renderProviderStatus(health);
   }
 
-  function ensureTurns()  function ensureTurns() {
+  function ensureTurns() {
     const chatArea = document.getElementById("chat-area");
     if (!chatArea) return null;
     let turns = document.getElementById("mcp-research-transcript");
@@ -729,7 +729,7 @@
     }
   }
 
-  function resetThread()  function resetThread() {
+  function resetThread() {
     state.messages = [];
     saveThread();
     if (state.turns) state.turns.remove();
