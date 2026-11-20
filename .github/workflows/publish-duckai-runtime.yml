@@ -115,7 +115,7 @@ jobs:
           $bootstrapText = Get-Content "runtime/DuckAI-Bootstrap.ps1" -Raw
           $launcherText = Get-Content "runtime/ResearchTools-Launcher.vbs" -Raw
           $updateText = Get-Content "runtime/DuckAI-Update.vbs" -Raw
-          if (-not $bootstrapText.Contains("[switch]$CheckForUpdates") -or -not $bootstrapText.Contains("DuckAI-Installed-Release.txt")) {
+          if (-not $bootstrapText.Contains('[switch]$CheckForUpdates') -or -not $bootstrapText.Contains("DuckAI-Installed-Release.txt")) {
             throw "Runtime release-version update check is missing."
           }
           if (-not $launcherText.Contains("BridgeListening()") -or -not $launcherText.Contains("/ping") -or -not $launcherText.Contains("MCP bridge is listening")) {
