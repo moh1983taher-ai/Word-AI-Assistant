@@ -516,12 +516,31 @@
 
   function extractGeminiToolCalls(payload) {
     const steps = Array.isArray(payload && payload.steps) ? payload.steps : [];
-    return steps.filter(function (step) {
+    const calls = steps.filter(function (step) {
       return step && step.type === "mcp_server_tool_call";
-    }).map(function (step) {
-      const detail = step.mcp_server_tool_call || step.mcpServerToolCall || step;
-      const server = String(detail.server_name || detail.serverName || step.server_name || step.serverName || "");
-      const tool = String(detail.name || step.name || "");
+    });
+    const results = steps.filter(function (step) {
+      return step && step.type === "mcp_server_tool_result";
+    });
+
+    return calls.filter(function (call) {
+      const callId = String(call.id || call.call_id || call.callId || "");
+      if (!callId) return false;
+      return results.some(function (result) {
+        const resultCallId = String(result.call_id || result.callId || "");
+        if (!resultCallId || resultCallId !== callId) return false;
+        const resultBody = result.result || result.content || result;
+        return !(
+          result.is_error === true ||
+          result.isError === true ||
+          (resultBody && typeof resultBody === "object" &&
+            (resultBody.is_error === true || resultBody.isError === true || resultBody.error))
+        );
+      });
+    }).map(function (call) {
+      const detail = call.mcp_server_tool_call || call.mcpServerToolCall || call;
+      const server = String(detail.server_name || detail.serverName || call.server_name || call.serverName || "");
+      const tool = String(detail.name || call.name || "");
       return {
         server: server || "MCP",
         label: server === "aljam3" ? "الجامع" :
@@ -592,8 +611,7 @@
         store: false,
         agent_config: {
           type: "antigravity",
-          model: GEMINI_MCP_MODEL,
-          max_total_tokens: 24000
+          model: GEMINI_MCP_MODEL
         },
         tools: getGeminiTools()
       },
@@ -622,7 +640,7 @@
     throw new Error("البحث السحابي عبر MCP متاح حالياً مع Groq وGemini فقط.");
   }
 
-  function formatToolTrace(payload)  function formatToolTrace(payload) {
+  function formatToolTrace(payload) {
     const calls = Array.isArray(payload.toolCalls) ? payload.toolCalls : [];
     if (!calls.length) return "";
     const labels = calls.map(function (call) {
@@ -631,15 +649,6 @@
       return tool ? server + " (" + tool + ")" : server;
     });
     return "\n\nالمصادر التي جرى الرجوع إليها: " + labels.join("، ");
-  }
-
-  function formatConnectionWarnings(payload) {
-    const warnings = Array.isArray(payload.connectionWarnings) ? payload.connectionWarnings : [];
-    if (!warnings.length) return "";
-    const labels = warnings.map(function (warning) {
-      return String(warning).replace(/^aljam3:/, "الجامع:").replace(/^shamela_link:/, "وصلة الشاملة:");
-    });
-    return "\n\nتنبيه الاتصال بالمصادر: " + labels.join("؛ ");
   }
 
   async function sendMessage(rawText) {
