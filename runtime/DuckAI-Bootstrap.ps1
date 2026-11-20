@@ -48,7 +48,8 @@ function Test-RuntimeIntegrity {
         'DuckAI-Bootstrap.ps1',
         'duck2api-main.exe',
         'manifest.xml',
-        'uninstall.ps1'
+        'uninstall.ps1',
+        'DuckAI-MCP-Bridge.ps1'
     )
 
     foreach ($name in $required) {

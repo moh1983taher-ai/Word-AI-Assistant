@@ -64,6 +64,7 @@ def verify_internal_sums(directory: Path, *, require_bootstrap: bool) -> None:
     required = set(REQUIRED_BASE)
     if require_bootstrap:
         required.add("DuckAI-Bootstrap.ps1")
+        required.add("DuckAI-MCP-Bridge.ps1")
     missing = required - entries.keys()
     if missing:
         raise ValueError(f"SHA256SUMS missing required files: {sorted(missing)}")
@@ -96,7 +97,7 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path, help="Output ZIP path")
     args = parser.parse_args()
 
-    for filename in ("ResearchTools-Launcher.vbs", "DuckAI-Bootstrap.ps1"):
+    for filename in ("ResearchTools-Launcher.vbs", "DuckAI-Bootstrap.ps1", "DuckAI-MCP-Bridge.ps1"):
         source = args.runtime_dir / filename
         if not source.is_file():
             raise FileNotFoundError(f"Missing repository runtime file: {source}")
@@ -113,12 +114,13 @@ def main() -> int:
 
         shutil.copy2(args.runtime_dir / "ResearchTools-Launcher.vbs", stage / "ResearchTools-Launcher.vbs")
         shutil.copy2(args.runtime_dir / "DuckAI-Bootstrap.ps1", stage / "DuckAI-Bootstrap.ps1")
+        shutil.copy2(args.runtime_dir / "DuckAI-MCP-Bridge.ps1", stage / "DuckAI-MCP-Bridge.ps1")
 
         info_path = stage / "BUILD-INFO.txt"
         info = info_path.read_text(encoding="utf-8-sig")
         info = re.sub(
             r"(?m)^Bundle Revision:.*$",
-            "Bundle Revision: 2026-11-19-r5 (clean PowerShell bootstrap and installer)",
+            "Bundle Revision: 2026-11-19-r6 (local DuckAI MCP orchestration bridge)",
             info,
             count=1,
         )

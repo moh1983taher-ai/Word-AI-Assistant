@@ -1,9 +1,9 @@
 Option Explicit
 ' RESEARCHTOOLS_DUCKAI_BOOTSTRAP_V3
-Const BOOTSTRAP_SHA256 = "59f0a32ad419d60b0d95ab6d591ac971e7b5a7e07ab19937106ebe09a500281f"
+Const BOOTSTRAP_SHA256 = "abcde208ec3cec7623711e0fdd0ab286d1729d9dec310e03c1205d0e54e095ff"
 Const BOOTSTRAP_RAW_URL = "https://raw.githubusercontent.com/moh1983taher-ai/Word-AI-Assistant/main/runtime/DuckAI-Bootstrap.ps1"
 Dim shell,fso,env,rootDir,installDir,launcherPath,bootstrapPath
-Dim duckExe,agentExe,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
+Dim duckExe,agentExe,bridgeScript,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
 Set shell=CreateObject("WScript.Shell")
 Set fso=CreateObject("Scripting.FileSystemObject")
 Set env=shell.Environment("Process")
@@ -13,6 +13,7 @@ launcherPath=rootDir & "\ResearchTools-Launcher.vbs"
 bootstrapPath=rootDir & "\DuckAI-Bootstrap.ps1"
 duckExe=installDir & "\duck2api-main.exe"
 agentExe=installDir & "\ResearchTools-DuckAgent.exe"
+bridgeScript=installDir & "\DuckAI-MCP-Bridge.ps1"
 powershellExe=shell.ExpandEnvironmentStrings("%SystemRoot%") & "\System32\WindowsPowerShell\v1.0\powershell.exe"
 wscriptExe=shell.ExpandEnvironmentStrings("%SystemRoot%") & "\System32\wscript.exe"
 runtimeReady=False
@@ -43,14 +44,14 @@ End If
 
 Do
     If ProcessExists("WINWORD.EXE") Then
-        If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Then
+        If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not BridgeProcessExists() Then
             ensureCode=EnsureRuntime()
             lastEnsureAt=Now
             runtimeReady=(ensureCode=0)
             If runtimeReady Then StartServices
         End If
         Do While ProcessExists("WINWORD.EXE")
-            If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Then
+            If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not BridgeProcessExists() Then
                 If DateDiff("s",lastEnsureAt,Now)>=30 Then
                     ensureCode=EnsureRuntime()
                     lastEnsureAt=Now
@@ -60,6 +61,7 @@ Do
             End If
             WScript.Sleep 3000
         Loop
+        StopBridgeProcess
         StopProcess "ResearchTools-DuckAgent.exe"
         WScript.Sleep 1000
         StopProcess "duck2api-main.exe"
@@ -123,7 +125,46 @@ Sub StartServices()
         env("SERVER_HOST")=""
         env("SERVER_PORT")=""
         shell.Run Chr(34)&agentExe&Chr(34),0,False
+        WScript.Sleep 1500
     End If
+    StartBridge
+End Sub
+Sub StartBridge()
+    If Not fso.FileExists(bridgeScript) Then
+        WriteLauncherLog "ERROR: MCP bridge script is missing."
+        Exit Sub
+    End If
+    If BridgeProcessExists() Then Exit Sub
+    shell.Run Chr(34)&powershellExe&Chr(34)&" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "&Chr(34)&bridgeScript&Chr(34),0,False
+    WScript.Sleep 1000
+End Sub
+Function BridgeProcessExists()
+    Dim service,processes,process,commandLine
+    BridgeProcessExists=False
+    On Error Resume Next
+    Set service=GetObject("winmgmts:\\.\root\cimv2")
+    Set processes=service.ExecQuery("SELECT * FROM Win32_Process WHERE Name='powershell.exe'")
+    For Each process In processes
+        commandLine=LCase(CStr(process.CommandLine))
+        If InStr(commandLine,LCase("DuckAI-MCP-Bridge.ps1"))>0 Then
+            BridgeProcessExists=True
+            Exit For
+        End If
+    Next
+    On Error GoTo 0
+End Function
+Sub StopBridgeProcess()
+    Dim service,processes,process,commandLine
+    On Error Resume Next
+    Set service=GetObject("winmgmts:\\.\root\cimv2")
+    Set processes=service.ExecQuery("SELECT * FROM Win32_Process WHERE Name='powershell.exe'")
+    For Each process In processes
+        commandLine=LCase(CStr(process.CommandLine))
+        If InStr(commandLine,LCase("DuckAI-MCP-Bridge.ps1"))>0 Then
+            shell.Run "taskkill /F /PID "&CStr(process.ProcessId),0,True
+        End If
+    Next
+    On Error GoTo 0
 End Sub
 Function ProcessExists(processName)
     Dim service,processes,process

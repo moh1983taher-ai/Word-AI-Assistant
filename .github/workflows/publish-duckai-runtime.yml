@@ -7,6 +7,12 @@ on:
     paths:
       - 'runtime/**'
       - '.github/workflows/publish-duckai-runtime.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'runtime/**'
+      - '.github/workflows/publish-duckai-runtime.yml'
   workflow_dispatch:
 
 permissions:
@@ -29,7 +35,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $paths = @(
             "runtime/Apply-DuckAI-AutoRepair.ps1",
-            "runtime/DuckAI-Bootstrap.ps1"
+            "runtime/DuckAI-Bootstrap.ps1",
+            "runtime/DuckAI-MCP-Bridge.ps1"
           )
           foreach ($path in $paths) {
             $tokens = $null
@@ -50,7 +57,9 @@ jobs:
               throw "UTF-8 BOM missing: $path"
             }
           }
-          Write-Host "Windows PowerShell 5.1 parsing and UTF-8 BOM checks passed."
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "runtime/DuckAI-MCP-Bridge.ps1" -SelfTest
+          if ($LASTEXITCODE -ne 0) { throw "DuckAI MCP bridge self-tests failed." }
+          Write-Host "Windows PowerShell 5.1 parsing, BOM and MCP bridge self-tests passed."
 
   build-and-release:
     needs: validate-windows-powershell-51
@@ -69,7 +78,8 @@ jobs:
         run: |
           $scriptPaths = @(
             "runtime/Apply-DuckAI-AutoRepair.ps1",
-            "runtime/DuckAI-Bootstrap.ps1"
+            "runtime/DuckAI-Bootstrap.ps1",
+            "runtime/DuckAI-MCP-Bridge.ps1"
           )
           foreach ($scriptPath in $scriptPaths) {
             $tokens = $null
@@ -98,7 +108,9 @@ jobs:
           if ($pins.Count -ne 2 -or $pins[0] -ne $launcherHash -or $pins[1] -ne $bootstrapHash) {
             throw "Installer SHA-256 pins do not match the launcher and bootstrap files."
           }
-          Write-Host "PowerShell syntax and all bootstrap integrity pins passed."
+          & pwsh -NoProfile -File "runtime/DuckAI-MCP-Bridge.ps1" -SelfTest
+          if ($LASTEXITCODE -ne 0) { throw "DuckAI MCP bridge self-tests failed." }
+          Write-Host "PowerShell syntax, bridge self-tests and all bootstrap integrity pins passed."
 
       - name: Download verified v1.0.0 baseline
         env:
@@ -144,14 +156,15 @@ jobs:
           PY
 
       - name: Publish stable runtime release
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="duckai-runtime-v1.0.6"
-          TITLE="DuckAI Runtime v1.0.6"
+          TAG="duckai-runtime-v1.0.7"
+          TITLE="DuckAI Runtime v1.0.7"
           NOTES="$RUNNER_TEMP/duckai-release-notes.md"
           cat > "$NOTES" <<'EOF'
-          يتضمن هذا الإصدار آلية التشغيل المحلي الصامت والاستعادة الذاتية لـ DuckAI.
+          يتضمن هذا الإصدار آلية التشغيل المحلي الصامت والاستعادة الذاتية لـ DuckAI، مع وسيط MCP محلي يربط Luna بخوادم المكتبات.
 
           - يتحقق المشغّل من سلامة الملفات المحلية قبل تشغيل الخدمات.
           - ينزّل الحزمة عند غيابها أو تلفها فقط.
@@ -160,6 +173,9 @@ jobs:
           - يسجل بداية التهيئة ورمز خروج كل مرحلة لتسهيل تشخيص الفشل دون إظهار نوافذ.
           - يحتفظ بالمشغّل وملف الاستعادة خارج مجلد المحرك حتى تبقى نقطة الاستعادة متاحة.
           - يعيد استخدام مهمة Windows الحالية ResearchTools DuckAI Agent دون إنشاء مهمة إضافية.
+          - يشغل وسيط MCP محلياً على 127.0.0.1:18081 دون كشفه على الشبكة.
+          - يوجه طلبات البحث إلى DuckAI المحلي، ويكتشف أدوات الجامع ووصلة الشاملة عند توافر رمز OAuth.
+          - يتحقق من اسم الأداة ومخطط مدخلاتها ويضع حداً أقصى لعدد الاستدعاءات في المهمة الواحدة.
 
           يحتوي الإصدار كذلك على ملف DuckAI-AutoRepair-Installer.zip لتهيئة الأجهزة التي تستخدم نسخة أقدم من المشغّل.
           EOF
