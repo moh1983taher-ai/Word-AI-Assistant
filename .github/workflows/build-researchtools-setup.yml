@@ -51,7 +51,7 @@ jobs:
           if (-not $id -or $id.InnerText -ne 'f8a582b1-eaf2-44f9-8166-d034255586ad') { throw 'Invalid Word add-in ID.' }
           if (-not $source -or $source.GetAttribute('DefaultValue') -ne 'https://moh1983taher-ai.github.io/Word-AI-Assistant/taskpane.html') { throw 'Invalid production task pane URL.' }
           if ((Get-Content 'installer/Word-AI-Assistant.xml' -Raw) -match 'localhost:3000') { throw 'Production manifest has a localhost URL.' }
-          $launcher = Get-Content 'runtime/ResearchTools-Launcher.vbs' -Raw
+          $launcher = Get-Content 'installer/ResearchTools-Launcher.vbs' -Raw
           if ($launcher -notmatch 'RESEARCHTOOLS_MCPHOST_V1' -or $launcher -notmatch 'McpHost\\ResearchTools\.McpHost\.exe') { throw 'Unified launcher is missing MCP host integration.' }
           $iss = Get-Content 'installer/ResearchToolsSetup.iss' -Raw
           foreach ($required in @('ResearchTools-MCP-Host-release.zip','ResearchTools-Launcher.vbs','-McpHostArchive','-McpHostShaFile','-LauncherFile')) {
