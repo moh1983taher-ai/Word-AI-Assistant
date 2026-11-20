@@ -58,8 +58,8 @@ jobs:
           Copy-Item 'runtime/McpHost/Test-McpHost-Preview.ps1' 'dist/mcp-host-win-x64/Test-McpHost-Preview.ps1'
           Copy-Item 'runtime/McpHost/Start-McpHost-Preview.ps1' 'dist/mcp-host-win-x64/Start-McpHost-Preview.ps1'
 
-      - name: Validate preview PowerShell script syntax
-        shell: pwsh
+      - name: Validate preview PowerShell script syntax (Windows PowerShell 5.1)
+        shell: powershell
         run: |
           $tokens = $null
           $parseErrors = $null
