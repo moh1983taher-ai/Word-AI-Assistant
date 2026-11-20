@@ -163,7 +163,7 @@ Function BridgeListening()
         Exit Function
     End If
     request.SetTimeouts 1000,1000,1000,1000
-    request.Open "GET","http://127.0.0.1:18081/health",False
+    request.Open "GET","http://127.0.0.1:18081/ping",False
     request.Send
     status=0
     If Err.Number=0 Then status=request.Status
