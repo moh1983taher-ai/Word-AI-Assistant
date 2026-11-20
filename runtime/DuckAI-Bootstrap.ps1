@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
     [switch]$EnsureRuntime,
-    [switch]$RegisterTask
+    [switch]$RegisterTask,
+    [switch]$CheckForUpdates
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +16,7 @@ $RootDir = Join-Path $env:LOCALAPPDATA 'ResearchTools'
 $RuntimeDir = Join-Path $RootDir 'DuckAI'
 $LauncherPath = Join-Path $RootDir 'ResearchTools-Launcher.vbs'
 $LogPath = Join-Path $RootDir 'DuckAI-Bootstrap.log'
+$InstalledReleasePath = Join-Path $RootDir 'DuckAI-Installed-Release.txt'
 $ReleaseApi = "https://api.github.com/repos/$Repository/releases?per_page=100"
 
 function Write-Log {
@@ -186,28 +188,210 @@ function Register-StartupTask {
     Write-Log 'تم تسجيل مهمة التشغيل التلقائي والتحقق من مسار المشغّل بنجاح.'
 }
 
-function Install-LatestRuntime {
+function Get-LatestStableRelease {
     $headers = @{
-        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.0'
+        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.1'
         'Accept' = 'application/vnd.github+json'
     }
-
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Write-Log 'بدء فحص إصدار DuckAI المنشور على GitHub.'
-
+    Write-Log 'بدء فحص أحدث إصدار مستقر من DuckAI على GitHub.'
     $releases = @(Invoke-RestMethod -TimeoutSec 60 -Uri $ReleaseApi -Headers $headers -Method Get)
     $release = $releases |
         Where-Object {
             -not $_.draft -and -not $_.prerelease -and
-            [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+$'
+            [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+    $asset = @($release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1)
+    if ($asset.Count -eq 0) {
+        throw "لم يُعثر على ملف $AssetName في أحدث إصدار."
+    }
+    $asset = $asset[0]
+
+    if ([string]$asset.browser_download_url -notmatch '^https://github\.com/moh1983taher-ai/Word-AI-Assistant/releases/download/') {
+        throw 'رابط تنزيل الحزمة لا ينتمي إلى مستودع أدوات الباحث المتوقع.'
+    }
+    if ([int64]$asset.size -gt 100MB -or [int64]$asset.size -lt 1MB) {
+        throw 'حجم حزمة DuckAI المنشورة غير متوقع.'
+    }
+    if ([string]$asset.digest -notmatch '^sha256:([A-Fa-f0-9]{64})$') {
+        throw 'لم يوفر GitHub بصمة SHA-256 موثوقة للحزمة؛ أُوقفت الاستعادة.'
+    }
+
+    $expectedArchiveHash = $matches[1].ToUpperInvariant()
+    $downloadPath = Join-Path $env:TEMP ('DuckAI-Runtime-' + [Guid]::NewGuid().ToString('N') + '.zip')
+    $stagePath = Join-Path $RootDir ('DuckAI.Stage-' + [Guid]::NewGuid().ToString('N'))
+    $backupPath = Join-Path $RootDir ('DuckAI.Backup-' + [Guid]::NewGuid().ToString('N'))
+
+    try {
+        Write-Log ("تنزيل الحزمة: " + $release.tag_name)
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 180 -Uri $asset.browser_download_url -Headers $headers -OutFile $downloadPath
+
+        if ((Get-Item -LiteralPath $downloadPath).Length -ne [int64]$asset.size) {
+            throw 'حجم الملف المنزّل لا يطابق الحجم المعلن في GitHub.'
+        }
+
+        $actualArchiveHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToUpperInvariant()
+        if ($actualArchiveHash -ne $expectedArchiveHash) {
+            throw 'فشل التحقق من بصمة SHA-256 لحزمة DuckAI؛ لن يتم تثبيتها.'
+        }
+
+        if (-not (Test-ZipPaths -ArchivePath $downloadPath)) {
+            throw 'تحتوي الحزمة على مسارات غير آمنة.'
+        }
+
+        New-Item -ItemType Directory -Path $stagePath -Force | Out-Null
+        Expand-Archive -LiteralPath $downloadPath -DestinationPath $stagePath -Force
+
+        if (-not (Test-RuntimeIntegrity -Directory $stagePath)) {
+            throw 'فشل التحقق من بصمات مكونات الحزمة الداخلية.'
+        }
+
+        $running = @(Get-Process -Name 'duck2api-main', 'ResearchTools-DuckAgent' -ErrorAction SilentlyContinue)
+        if ($running.Count -gt 0) {
+            throw 'تأجلت الاستعادة لأن إحدى خدمات DuckAI تعمل حالياً؛ أغلق Word وانتظر توقف الخدمات ثم أعد المحاولة.'
+        }
+
+        if (Test-Path -LiteralPath $RuntimeDir -PathType Container) {
+            Move-Item -LiteralPath $RuntimeDir -Destination $backupPath
+        }
+
+        try {
+            Move-Item -LiteralPath $stagePath -Destination $RuntimeDir
+        }
+        catch {
+            if (Test-Path -LiteralPath $backupPath -PathType Container) {
+                Move-Item -LiteralPath $backupPath -Destination $RuntimeDir
+            }
+            throw
+        }
+
+        if (-not (Test-RuntimeIntegrity -Directory $RuntimeDir)) {
+            throw 'لم يجتز مجلد DuckAI الجديد فحص السلامة بعد نقله إلى موضعه النهائي.'
+        }
+
+        if (Test-Path -LiteralPath $backupPath -PathType Container) {
+            Remove-Item -LiteralPath $backupPath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        [System.IO.File]::WriteAllText(
+            $InstalledReleasePath,
+            ([string]$release.tag_name + [Environment]::NewLine),
+            [System.Text.UTF8Encoding]::new($true)
+        )
+        Write-Log ("اكتملت استعادة DuckAI والتحقق من مكوناته. الإصدار: " + $release.tag_name)
+    }
+    finally {
+        Remove-Item -LiteralPath $downloadPath -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $stagePath -PathType Container) {
+            Remove-Item -LiteralPath $stagePath -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+$mutex = $null
+$hasLock = $false
+try {
+    New-Item -ItemType Directory -Path $RootDir -Force | Out-Null
+    Write-Log 'بدأ DuckAI Bootstrap.'
+
+    $mutex = New-Object System.Threading.Mutex($false, 'Local\ResearchToolsDuckAIBootstrap')
+    try {
+        $hasLock = $mutex.WaitOne(0)
+    }
+    catch {
+        $hasLock = $false
+    }
+
+    if (-not $hasLock) {
+        if ($RegisterTask) {
+            throw 'توجد عملية استعادة أخرى؛ تعذر تنفيذ التهيئة بأمان.'
+        }
+        Write-Log 'توجد عملية فحص أو استعادة أخرى؛ انتهت هذه النسخة دون تكرار العمل.'
+        exit 0
+    }
+
+    if ($RegisterTask) {
+        Register-StartupTask
+    }
+
+    if ($EnsureRuntime -or -not $RegisterTask) {
+        $runtimeHealthy = Test-RuntimeIntegrity -Directory $RuntimeDir
+        $latestRelease = $null
+
+        if ($CheckForUpdates) {
+            try {
+                $latestRelease = Get-LatestStableRelease
+            }
+            catch {
+                if ($runtimeHealthy) {
+                    Write-Log ('تعذر فحص التحديثات؛ سيستمر التشغيل بالنسخة المحلية السليمة. السبب: ' + $_.Exception.Message)
+                }
+                else {
+                    throw
+                }
+            }
+        }
+
+        if (-not $runtimeHealthy) {
+            Write-Log 'ملفات DuckAI مفقودة أو غير سليمة؛ ستتم استعادة أحدث إصدار مستقر.'
+            Install-LatestRuntime -Release $latestRelease
+        }
+        elseif ($CheckForUpdates -and $latestRelease) {
+            $installedTag = ''
+            if (Test-Path -LiteralPath $InstalledReleasePath -PathType Leaf) {
+                $installedTag = (Get-Content -LiteralPath $InstalledReleasePath -Raw -Encoding UTF8).Trim()
+            }
+            if ($installedTag -ne [string]$latestRelease.tag_name) {
+                Write-Log ("يتوفر تحديث: " + $latestRelease.tag_name + "؛ الإصدار المسجل محلياً: " + $(if ($installedTag) { $installedTag } else { 'غير معروف' }))
+                Install-LatestRuntime -Release $latestRelease
+            }
+            else {
+                Write-Log ("DuckAI محدث بالفعل: " + $installedTag)
+            }
+        }
+        else {
+            Write-Log 'المكونات المحلية سليمة؛ لم يُطلب فحص إصدار جديد.'
+        }
+
+        if (-not (Test-RuntimeIntegrity -Directory $RuntimeDir)) {
+            throw 'انتهت عملية الاستعادة أو التحديث لكن فحص الملفات النهائي لم ينجح.'
+        }
+        Write-Log 'اجتاز DuckAI فحص السلامة النهائي.'
+    }
+
+    exit 0
+}
+catch {
+    Write-Log ('تعذر تجهيز DuckAI: ' + $_.Exception.Message)
+    exit 1
+}
+finally {
+    if ($mutex -and $hasLock) {
+        try { $mutex.ReleaseMutex() } catch { }
+    }
+    if ($mutex) {
+        $mutex.Dispose()
+    }
+}
+
         } |
         Sort-Object { [DateTime]::Parse($_.published_at).ToUniversalTime() } -Descending |
         Select-Object -First 1
-
     if (-not $release) {
         throw 'لم يُعثر على إصدار DuckAI مستقر منشور.'
     }
+    return $release
+}
 
+function Install-LatestRuntime {
+    param([object]$Release)
+    $headers = @{
+        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.1'
+        'Accept' = 'application/vnd.github+json'
+    }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $release = $Release
+    if (-not $release) {
+        $release = Get-LatestStableRelease
+    }
     $asset = @($release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1)
     if ($asset.Count -eq 0) {
         throw "لم يُعثر على ملف $AssetName في أحدث إصدار."
