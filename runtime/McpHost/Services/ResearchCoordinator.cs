@@ -84,16 +84,34 @@ public sealed class ResearchCoordinator
                 descriptor => descriptor,
                 StringComparer.Ordinal);
 
-            var nativeFunctionCalling = functionTools.Count > 0;
-            var jsonCompatibilityMode = false;
+            // The installed DuckAI endpoint was verified to return ordinary text even when
+            // tool_choice forces a specific function. Use the explicit JSON decision protocol
+            // from the first turn rather than mistaking a plain-text answer for an MCP search.
+            var nativeFunctionCalling = false;
+            var jsonCompatibilityMode = true;
+            var requiresMcpSources = ResearchIntentClassifier.RequiresMcpSources(
+                incoming.LastOrDefault(message => message.Role == "user")?.Content);
+            var systemPrompt = BuildSystemPrompt(activeTools, warnings, jsonCompatibilityMode);
+            if (requiresMcpSources)
+            {
+                systemPrompt += """
+
+                شرط توثيق إلزامي لهذه المهمة:
+                طلب المستخدم يتضمن بحثاً أو مصادر أو مراجع أو توثيقاً. لا تصدر type=final قبل تنفيذ أداة MCP واحدة على الأقل بنجاح.
+                ابدأ باستدعاء أداة مناسبة من الفهرس باستخدام JSON من الشكل المحدد. لا تذكر أي نتيجة أو مرجع على أنه مستخرج من المصادر قبل ورود نتيجة الأداة.
+                إذا تعذّر العثور على أداة مناسبة أو فشل تنفيذها، وضّح تعذر التحقق ولا تختلق نتائج أو مراجع.
+                """;
+            }
+
             var messages = new List<DuckChatMessage>
             {
-                new("system", BuildSystemPrompt(activeTools, warnings, jsonCompatibilityMode))
+                new("system", systemPrompt)
             };
             messages.AddRange(incoming);
 
             var trace = new List<ToolCallTrace>();
             var repairAttempted = false;
+            var sourceRequirementRetryAttempted = false;
             var toolCallsAttempted = 0;
             var model = request.Model ?? string.Empty;
 
@@ -105,7 +123,7 @@ public sealed class ResearchCoordinator
                     completion = await _duckAi.CompleteAsync(
                         model,
                         messages,
-                        nativeFunctionCalling ? functionTools : null,
+                        functionTools: null,
                         timeout.Token);
                 }
                 catch (NativeToolCallingNotSupportedException) when (nativeFunctionCalling)
@@ -217,7 +235,7 @@ public sealed class ResearchCoordinator
                         }
                     }
 
-                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; mode=native-text; model={model}.");
+                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; mode=json-decision; model={model}.");
                     return new ResearchResponse(
                         completion.Text.Trim(),
                         model,
@@ -240,7 +258,21 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
-                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; mode=json-compatibility; model={model}.");
+                    if (requiresMcpSources && trace.Count == 0)
+                    {
+                        if (sourceRequirementRetryAttempted)
+                            throw new InvalidOperationException(
+                                "لم ينفذ النموذج أداة MCP بنجاح رغم أن الطلب يتطلب مصادر؛ أُوقفت الإجابة منعاً لاختلاق المراجع.");
+
+                        sourceRequirementRetryAttempted = true;
+                        messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                        messages.Add(new DuckChatMessage(
+                            "user",
+                            "لا تقدم إجابة نهائية بعد. هذه المهمة تتطلب مصادر فعلية. اختر أداة قراءة مناسبة من فهرس MCP، وأخرج قرار tool_call بصيغة JSON الصحيحة. لا تذكر مراجع من الذاكرة."));
+                        continue;
+                    }
+
+                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; mode=json-decision; model={model}.");
                     return new ResearchResponse(
                         decision.Answer,
                         model,
