@@ -53,7 +53,7 @@ scriptText = Join(Array( _
 "    $apply = Join-Path $stage 'Apply-DuckAI-AutoRepair.ps1'", _
 "    if (-not (Test-Path -LiteralPath $installer -PathType Leaf) -or -not (Test-Path -LiteralPath $apply -PathType Leaf)) { throw 'The updater package does not contain the required installer files.' }", _
 "    $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'", _
-"    $process = Start-Process -FilePath $wscript -ArgumentList ('"' + $installer + '"') -WindowStyle Hidden -Wait -PassThru", _
+"    $process = Start-Process -FilePath $wscript -ArgumentList ('""' + $installer + '""') -WindowStyle Hidden -Wait -PassThru", _
 "    if ($process.ExitCode -ne 0) { throw ('Local installation failed with exit code ' + $process.ExitCode + '. See DuckAI-AutoRepair-Install.log.') }", _
 "    [System.IO.File]::WriteAllText($resultPath, ('SUCCESS|' + $release.tag_name + '|' + 'DuckAI runtime, launcher and MCP bridge were checked and updated.'), [System.Text.UTF8Encoding]::new($true))", _
 "    Write-UpdateLog ('Successfully installed ' + $release.tag_name)", _
