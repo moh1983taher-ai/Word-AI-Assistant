@@ -103,6 +103,10 @@ jobs:
           $bootstrapHash = (Get-FileHash "runtime/DuckAI-Bootstrap.ps1" -Algorithm SHA256).Hash.ToLowerInvariant()
           $launcherText = Get-Content "runtime/ResearchTools-Launcher.vbs" -Raw
           $installerText = Get-Content "runtime/Apply-DuckAI-AutoRepair.ps1" -Raw
+          Write-Host ("CI launcher SHA-256: " + $launcherHash)
+          Write-Host ("CI bootstrap SHA-256: " + $bootstrapHash)
+          Write-Host ("Launcher pinned bootstrap SHA-256: " + ([regex]::Match($launcherText, 'Const BOOTSTRAP_SHA256 = "([a-f0-9]{64})"').Groups[1].Value))
+          Write-Host ("Installer SHA-256 pins: " + (([regex]::Matches($installerText, "Sha256 = '([a-f0-9]{64})'") | ForEach-Object { $_.Groups[1].Value }) -join ','))
           if (-not $launcherText.Contains($bootstrapHash)) {
             throw "Launcher bootstrap SHA-256 pin does not match the bootstrap file."
           }
