@@ -59,6 +59,8 @@ jobs:
           }
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "runtime/DuckAI-MCP-Bridge.ps1" -SelfTest
           if ($LASTEXITCODE -ne 0) { throw "DuckAI MCP bridge self-tests failed." }
+          & cscript.exe //nologo "runtime/DuckAI-Update.vbs" --self-test
+          if ($LASTEXITCODE -ne 0) { throw "DuckAI one-click updater VBScript validation failed." }
           Write-Host "Windows PowerShell 5.1 parsing, BOM and MCP bridge self-tests passed."
 
   build-and-release:
@@ -101,6 +103,10 @@ jobs:
           $bootstrapHash = (Get-FileHash "runtime/DuckAI-Bootstrap.ps1" -Algorithm SHA256).Hash.ToLowerInvariant()
           $launcherText = Get-Content "runtime/ResearchTools-Launcher.vbs" -Raw
           $installerText = Get-Content "runtime/Apply-DuckAI-AutoRepair.ps1" -Raw
+          Write-Host ("CI launcher SHA-256: " + $launcherHash)
+          Write-Host ("CI bootstrap SHA-256: " + $bootstrapHash)
+          Write-Host ("Launcher pinned bootstrap SHA-256: " + ([regex]::Match($launcherText, 'Const BOOTSTRAP_SHA256 = "([a-f0-9]{64})"').Groups[1].Value))
+          Write-Host ("Installer SHA-256 pins: " + (([regex]::Matches($installerText, "Sha256 = '([a-f0-9]{64})'") | ForEach-Object { $_.Groups[1].Value }) -join ','))
           if (-not $launcherText.Contains($bootstrapHash)) {
             throw "Launcher bootstrap SHA-256 pin does not match the bootstrap file."
           }
@@ -110,7 +116,19 @@ jobs:
           }
           & pwsh -NoProfile -File "runtime/DuckAI-MCP-Bridge.ps1" -SelfTest
           if ($LASTEXITCODE -ne 0) { throw "DuckAI MCP bridge self-tests failed." }
-          Write-Host "PowerShell syntax, bridge self-tests and all bootstrap integrity pins passed."
+          $bootstrapText = Get-Content "runtime/DuckAI-Bootstrap.ps1" -Raw
+          $launcherText = Get-Content "runtime/ResearchTools-Launcher.vbs" -Raw
+          $updateText = Get-Content "runtime/DuckAI-Update.vbs" -Raw
+          if (-not $bootstrapText.Contains('[switch]$CheckForUpdates') -or -not $bootstrapText.Contains("DuckAI-Installed-Release.txt")) {
+            throw "Runtime release-version update check is missing."
+          }
+          if (-not $launcherText.Contains("BridgeListening()") -or -not $launcherText.Contains("/ping") -or -not $launcherText.Contains("MCP bridge is listening")) {
+            throw "Launcher MCP readiness probe is missing."
+          }
+          if (-not $updateText.Contains("/releases?per_page=100") -or -not $updateText.Contains("Get-FileHash")) {
+            throw "One-click updater latest-release or SHA-256 verification is missing."
+          }
+          Write-Host "PowerShell syntax, MCP bridge self-tests, update-flow checks and bootstrap integrity pins passed."
 
       - name: Download verified v1.0.0 baseline
         env:
@@ -160,14 +178,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="duckai-runtime-v1.0.7"
-          TITLE="DuckAI Runtime v1.0.7"
+          TAG="duckai-runtime-v1.0.8"
+          TITLE="DuckAI Runtime v1.0.8"
           NOTES="$RUNNER_TEMP/duckai-release-notes.md"
           cat > "$NOTES" <<'EOF'
           يتضمن هذا الإصدار آلية التشغيل المحلي الصامت والاستعادة الذاتية لـ DuckAI، مع وسيط MCP محلي يربط Luna بخوادم المكتبات.
 
-          - يتحقق المشغّل من سلامة الملفات المحلية قبل تشغيل الخدمات.
-          - ينزّل الحزمة عند غيابها أو تلفها فقط.
+          - يفحص المشغّل أحدث إصدار مستقر عند بدء Word، ويقارن رقم الإصدار المحلي بالإصدار المنشور.
+          - ينزّل الإصدار الأحدث عند توفره، ويتحقق من بصمة SHA-256 قبل التثبيت، مع الاستمرار بالنسخة المحلية السليمة عند تعذر الاتصال بـ GitHub.
+          - يتحقق المشغّل من استجابة جسر MCP فعلياً على 127.0.0.1:18081، ويعيد تشغيله عند توقف الاستماع.
+          - يوفر ملف DuckAI-Update.vbs مستقلاً لفحص التحديثات وتنزيلها وتثبيتها بالنقر المزدوج، مع رسالة نتيجة وسجل تشخيص.
           - يتحقق من بصمة SHA-256 التي يوفرها GitHub ومن البصمات الداخلية قبل التثبيت.
           - يتحقق من إنشاء مهمة التشغيل التلقائي ومسار المشغّل قبل إعلان نجاح التهيئة.
           - يسجل بداية التهيئة ورمز خروج كل مرحلة لتسهيل تشخيص الفشل دون إظهار نوافذ.
@@ -177,7 +197,7 @@ jobs:
           - يوجه طلبات البحث إلى DuckAI المحلي، ويكتشف أدوات الجامع ووصلة الشاملة عند توافر رمز OAuth.
           - يتحقق من اسم الأداة ومخطط مدخلاتها ويضع حداً أقصى لعدد الاستدعاءات في المهمة الواحدة.
 
-          يحتوي الإصدار كذلك على ملف DuckAI-AutoRepair-Installer.zip لتهيئة الأجهزة التي تستخدم نسخة أقدم من المشغّل.
+          يحتوي الإصدار كذلك على ملف DuckAI-AutoRepair-Installer.zip لتهيئة الأجهزة القديمة، وملف DuckAI-Update.vbs للتحديث والصيانة بنقرة واحدة.
           EOF
 
           ASSETS=(
@@ -185,6 +205,7 @@ jobs:
             "dist/DuckAI-Runtime-release.zip.sha256"
             "dist/DuckAI-AutoRepair-Installer.zip"
             "dist/DuckAI-AutoRepair-Installer.zip.sha256"
+            "runtime/DuckAI-Update.vbs"
           )
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then

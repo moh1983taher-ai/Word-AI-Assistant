@@ -24,13 +24,13 @@ $files = @(
         Name = 'ResearchTools-Launcher.vbs'
         Url = "https://raw.githubusercontent.com/$repo/main/runtime/ResearchTools-Launcher.vbs"
         Path = $launcher
-        Sha256 = '26fc798358cab1daaecf8500d3f731f52c12f631a0d76f7242313e08cff82de7'
+        Sha256 = '5c06cf10a3a1c2202620550c3d1297a0f97c3157365ff4c8a5b5b7f9671886a1'
     },
     [pscustomobject]@{
         Name = 'DuckAI-Bootstrap.ps1'
         Url = "https://raw.githubusercontent.com/$repo/main/runtime/DuckAI-Bootstrap.ps1"
         Path = $bootstrap
-        Sha256 = 'abcde208ec3cec7623711e0fdd0ab286d1729d9dec310e03c1205d0e54e095ff'
+        Sha256 = '8155a619a26adf9a6bedacc6e7ebbfc4684162ac643cc857c0aeaf735e8acaf7'
     }
 )
 
@@ -79,7 +79,7 @@ try {
         throw 'تعذر العثور على Windows PowerShell.'
     }
 
-    $bootstrapArgs = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $bootstrap + '" -RegisterTask'
+    $bootstrapArgs = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $bootstrap + '" -RegisterTask -EnsureRuntime -CheckForUpdates'
     $process = Start-Process -FilePath $powershell -ArgumentList $bootstrapArgs -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -ne 0) {
         throw ("Bootstrap failed while registering startup task. ExitCode=" + $process.ExitCode + ". See DuckAI-Bootstrap.log.")

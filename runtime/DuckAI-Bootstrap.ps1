@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
     [switch]$EnsureRuntime,
-    [switch]$RegisterTask
+    [switch]$RegisterTask,
+    [switch]$CheckForUpdates
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +16,7 @@ $RootDir = Join-Path $env:LOCALAPPDATA 'ResearchTools'
 $RuntimeDir = Join-Path $RootDir 'DuckAI'
 $LauncherPath = Join-Path $RootDir 'ResearchTools-Launcher.vbs'
 $LogPath = Join-Path $RootDir 'DuckAI-Bootstrap.log'
+$InstalledReleasePath = Join-Path $RootDir 'DuckAI-Installed-Release.txt'
 $ReleaseApi = "https://api.github.com/repos/$Repository/releases?per_page=100"
 
 function Write-Log {
@@ -186,28 +188,39 @@ function Register-StartupTask {
     Write-Log 'تم تسجيل مهمة التشغيل التلقائي والتحقق من مسار المشغّل بنجاح.'
 }
 
-function Install-LatestRuntime {
+function Get-LatestStableRelease {
     $headers = @{
-        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.0'
+        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.1'
         'Accept' = 'application/vnd.github+json'
     }
-
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Write-Log 'بدء فحص إصدار DuckAI المنشور على GitHub.'
-
+    Write-Log 'بدء فحص أحدث إصدار مستقر من DuckAI على GitHub.'
     $releases = @(Invoke-RestMethod -TimeoutSec 60 -Uri $ReleaseApi -Headers $headers -Method Get)
     $release = $releases |
         Where-Object {
-            -not $_.draft -and -not $_.prerelease -and
+            -not $_.draft -and
+            -not $_.prerelease -and
             [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+$'
         } |
         Sort-Object { [DateTime]::Parse($_.published_at).ToUniversalTime() } -Descending |
         Select-Object -First 1
-
     if (-not $release) {
         throw 'لم يُعثر على إصدار DuckAI مستقر منشور.'
     }
+    return $release
+}
 
+function Install-LatestRuntime {
+    param([object]$LatestRelease)
+    $headers = @{
+        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.1'
+        'Accept' = 'application/vnd.github+json'
+    }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $release = $LatestRelease
+    if (-not $release) {
+        $release = Get-LatestStableRelease
+    }
     $asset = @($release.assets | Where-Object { $_.name -eq $AssetName } | Select-Object -First 1)
     if ($asset.Count -eq 0) {
         throw "لم يُعثر على ملف $AssetName في أحدث إصدار."
@@ -280,6 +293,11 @@ function Install-LatestRuntime {
             Remove-Item -LiteralPath $backupPath -Recurse -Force -ErrorAction SilentlyContinue
         }
 
+        [System.IO.File]::WriteAllText(
+            $InstalledReleasePath,
+            ([string]$release.tag_name + [Environment]::NewLine),
+            [System.Text.UTF8Encoding]::new($true)
+        )
         Write-Log ("اكتملت استعادة DuckAI والتحقق من مكوناته. الإصدار: " + $release.tag_name)
     }
     finally {
@@ -317,14 +335,46 @@ try {
     }
 
     if ($EnsureRuntime -or -not $RegisterTask) {
-        if (Test-RuntimeIntegrity -Directory $RuntimeDir) {
-            Write-Log 'المكونات المحلية سليمة؛ لا حاجة إلى التنزيل.'
-            exit 0
+        $runtimeHealthy = Test-RuntimeIntegrity -Directory $RuntimeDir
+        $latestRelease = $null
+
+        if ($CheckForUpdates) {
+            try {
+                $latestRelease = Get-LatestStableRelease
+            }
+            catch {
+                if ($runtimeHealthy) {
+                    Write-Log ('تعذر فحص التحديثات؛ سيستمر التشغيل بالنسخة المحلية السليمة. السبب: ' + $_.Exception.Message)
+                }
+                else {
+                    throw
+                }
+            }
         }
 
-        Install-LatestRuntime
+        if (-not $runtimeHealthy) {
+            Write-Log 'ملفات DuckAI مفقودة أو غير سليمة؛ ستتم استعادة أحدث إصدار مستقر.'
+            Install-LatestRuntime -LatestRelease $latestRelease
+        }
+        elseif ($CheckForUpdates -and $latestRelease) {
+            $installedTag = ''
+            if (Test-Path -LiteralPath $InstalledReleasePath -PathType Leaf) {
+                $installedTag = (Get-Content -LiteralPath $InstalledReleasePath -Raw -Encoding UTF8).Trim()
+            }
+            if ($installedTag -ne [string]$latestRelease.tag_name) {
+                Write-Log ("يتوفر تحديث: " + $latestRelease.tag_name + "؛ الإصدار المسجل محلياً: " + $(if ($installedTag) { $installedTag } else { 'غير معروف' }))
+                Install-LatestRuntime -LatestRelease $latestRelease
+            }
+            else {
+                Write-Log ("DuckAI محدث بالفعل: " + $installedTag)
+            }
+        }
+        else {
+            Write-Log 'المكونات المحلية سليمة؛ لم يُطلب فحص إصدار جديد.'
+        }
+
         if (-not (Test-RuntimeIntegrity -Directory $RuntimeDir)) {
-            throw 'انتهت عملية الاستعادة لكن فحص الملفات النهائي لم ينجح.'
+            throw 'انتهت عملية الاستعادة أو التحديث لكن فحص الملفات النهائي لم ينجح.'
         }
         Write-Log 'اجتاز DuckAI فحص السلامة النهائي.'
     }

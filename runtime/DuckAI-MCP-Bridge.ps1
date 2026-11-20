@@ -400,6 +400,10 @@ function StartBridge {
                 if($hostHeader -notmatch '^(127\.0\.0\.1|localhost):18081$'){Reply $stream 403 'Forbidden' '{"error":"Invalid Host header."}' $origin;continue}
                 if($origin -and -not (AllowedOrigin $origin)){Reply $stream 403 'Forbidden' '{"error":"Origin is not allowed."}';continue}
                 if($req.Method -eq 'OPTIONS'){Reply $stream 204 'No Content' '' $origin -empty;continue}
+                if($req.Method -eq 'GET' -and $req.Path -eq '/ping'){
+                    Reply $stream 200 'OK' '{"service":"DuckAI-MCP-Bridge","listening":true}' $origin
+                    continue
+                }
                 if($req.Method -eq 'GET' -and $req.Path -eq '/health'){
                     try{$ep=DuckEndpoint;$body=ConvertTo-Json @{ready=$true;version=$script:Version;provider='DuckAI';model=$ep.Default;models=$ep.Models} -Compress;Reply $stream 200 'OK' $body $origin}
                     catch{$body=ConvertTo-Json @{ready=$false;error=$_.Exception.Message} -Compress;Reply $stream 503 'Service Unavailable' $body $origin}

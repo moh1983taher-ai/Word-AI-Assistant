@@ -1,6 +1,6 @@
 Option Explicit
 ' RESEARCHTOOLS_DUCKAI_BOOTSTRAP_V3
-Const BOOTSTRAP_SHA256 = "abcde208ec3cec7623711e0fdd0ab286d1729d9dec310e03c1205d0e54e095ff"
+Const BOOTSTRAP_SHA256 = "8155a619a26adf9a6bedacc6e7ebbfc4684162ac643cc857c0aeaf735e8acaf7"
 Const BOOTSTRAP_RAW_URL = "https://raw.githubusercontent.com/moh1983taher-ai/Word-AI-Assistant/main/runtime/DuckAI-Bootstrap.ps1"
 Dim shell,fso,env,rootDir,installDir,launcherPath,bootstrapPath
 Dim duckExe,agentExe,bridgeScript,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
@@ -33,7 +33,7 @@ If LCase(fso.GetAbsolutePathName(WScript.ScriptFullName)) <> LCase(fso.GetAbsolu
         WriteLauncherLog "ERROR: bootstrap verification failed."
         WScript.Quit 11
     End If
-    ensureCode=RunBootstrap(True,False)
+    ensureCode=RunBootstrap(True,False,False)
     If ensureCode <> 0 Then
         WriteLauncherLog "ERROR: startup task registration failed. ExitCode=" & CStr(ensureCode)
         WScript.Quit 12
@@ -44,16 +44,16 @@ End If
 
 Do
     If ProcessExists("WINWORD.EXE") Then
-        If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not BridgeProcessExists() Then
-            ensureCode=EnsureRuntime()
+        If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not BridgeListening() Then
+            ensureCode=EnsureRuntime(True)
             lastEnsureAt=Now
             runtimeReady=(ensureCode=0)
             If runtimeReady Then StartServices
         End If
         Do While ProcessExists("WINWORD.EXE")
-            If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not BridgeProcessExists() Then
+            If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not BridgeListening() Then
                 If DateDiff("s",lastEnsureAt,Now)>=30 Then
-                    ensureCode=EnsureRuntime()
+                    ensureCode=EnsureRuntime(False)
                     lastEnsureAt=Now
                     runtimeReady=(ensureCode=0)
                     If runtimeReady Then StartServices
@@ -99,21 +99,22 @@ Function EnsureBootstrapScript()
     result=shell.Run(Chr(34)&powershellExe&Chr(34)&" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "&Chr(34)&command&Chr(34),0,True)
     EnsureBootstrapScript=(result=0)
 End Function
-Function RunBootstrap(registerTask,ensureRuntime)
+Function RunBootstrap(registerTask,ensureRuntime,checkUpdates)
     Dim command,result
     RunBootstrap=1
     If Not EnsureBootstrapScript() Then Exit Function
     command="-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "&Chr(34)&bootstrapPath&Chr(34)
     If ensureRuntime Then command=command&" -EnsureRuntime"
     If registerTask Then command=command&" -RegisterTask"
+    If checkUpdates Then command=command&" -CheckForUpdates"
     result=shell.Run(Chr(34)&powershellExe&Chr(34)&" "&command,0,True)
     RunBootstrap=result
 End Function
-Function EnsureRuntime()
-    EnsureRuntime=RunBootstrap(False,True)
+Function EnsureRuntime(checkUpdates)
+    EnsureRuntime=RunBootstrap(False,True,checkUpdates)
 End Function
 Sub StartServices()
-    If fso.FileExists(duckExe) Then
+    If fso.FileExists(duckExe) And Not ProcessExists("duck2api-main.exe") Then
         env("SERVER_HOST")="127.0.0.1"
         env("SERVER_PORT")="18080"
         shell.Run Chr(34)&duckExe&Chr(34),0,False
@@ -121,7 +122,7 @@ Sub StartServices()
         env("SERVER_HOST")=""
         env("SERVER_PORT")=""
     End If
-    If fso.FileExists(agentExe) Then
+    If fso.FileExists(agentExe) And Not ProcessExists("ResearchTools-DuckAgent.exe") Then
         env("SERVER_HOST")=""
         env("SERVER_PORT")=""
         shell.Run Chr(34)&agentExe&Chr(34),0,False
@@ -130,14 +131,47 @@ Sub StartServices()
     StartBridge
 End Sub
 Sub StartBridge()
+    Dim attempt
     If Not fso.FileExists(bridgeScript) Then
         WriteLauncherLog "ERROR: MCP bridge script is missing."
         Exit Sub
     End If
-    If BridgeProcessExists() Then Exit Sub
+    If BridgeListening() Then Exit Sub
+    If BridgeProcessExists() Then
+        WriteLauncherLog "WARNING: MCP bridge process exists but port 18081 is not responding; restarting it."
+        StopBridgeProcess
+        WScript.Sleep 500
+    End If
     shell.Run Chr(34)&powershellExe&Chr(34)&" -NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "&Chr(34)&bridgeScript&Chr(34),0,False
-    WScript.Sleep 1000
+    For attempt=1 To 10
+        WScript.Sleep 1000
+        If BridgeListening() Then
+            WriteLauncherLog "SUCCESS: MCP bridge is listening on 127.0.0.1:18081."
+            Exit Sub
+        End If
+    Next
+    WriteLauncherLog "ERROR: MCP bridge did not start listening on 127.0.0.1:18081. Inspect DuckAI-MCP-Bridge.log."
 End Sub
+Function BridgeListening()
+    Dim request,status
+    BridgeListening=False
+    On Error Resume Next
+    Set request=CreateObject("WinHttp.WinHttpRequest.5.1")
+    If Err.Number<>0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    request.SetTimeouts 1000,1000,1000,1000
+    request.Open "GET","http://127.0.0.1:18081/ping",False
+    request.Send
+    status=0
+    If Err.Number=0 Then status=request.Status
+    Err.Clear
+    BridgeListening=(status=200 Or status=503)
+    Set request=Nothing
+    On Error GoTo 0
+End Function
 Function BridgeProcessExists()
     Dim service,processes,process,commandLine
     BridgeProcessExists=False
