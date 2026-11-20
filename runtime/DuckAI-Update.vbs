@@ -33,13 +33,13 @@ scriptText = Join(Array( _
 "try {", _
 "    if (Get-Process -Name 'WINWORD' -ErrorAction SilentlyContinue) { throw 'Close all Microsoft Word windows before updating.' }", _
 "    $headers = @{ 'User-Agent' = 'ResearchTools-DuckAI-OneClickUpdater/1.0'; 'Accept' = 'application/vnd.github+json' }", _
-""    $releaseUri = 'https://api.github.com/repos/' + $repo + '/releases/latest'", _
+"    $releaseUri = 'https://api.github.com/repos/' + $repo + '/releases/latest'", _
 "    Write-UpdateLog ('Querying GitHub stable release: ' + $releaseUri)", _
 "    $release = Invoke-RestMethod -TimeoutSec 60 -Uri $releaseUri -Headers $headers -Method Get", _
 "    $releaseTag = [string]$release.tag_name", _
 "    if ([string]::IsNullOrWhiteSpace($releaseTag) -or $releaseTag -notmatch '^duckai-runtime-v\d+\.\d+\.\d+$' -or $release.draft -or $release.prerelease) { throw ('GitHub latest release is not a stable DuckAI release. Returned tag: ' + $releaseTag) }", _
 "    Write-UpdateLog ('Stable release detected: ' + $releaseTag)", _
-    $asset = @($release.assets | Where-Object { $_.name -eq 'DuckAI-AutoRepair-Installer.zip' } | Select-Object -First 1)", _
+"    $asset = @($release.assets | Where-Object { $_.name -eq 'DuckAI-AutoRepair-Installer.zip' } | Select-Object -First 1)", _
 "    if ($asset.Count -eq 0) { throw 'The updater package is missing from the latest release.' }", _
 "    $asset = $asset[0]", _
 "    if ([string]$asset.browser_download_url -notmatch '^https://github\.com/moh1983taher-ai/Word-AI-Assistant/releases/download/' -or [int64]$asset.size -lt 1000 -or [int64]$asset.size -gt 20MB) { throw 'Published updater package metadata is invalid.' }", _
