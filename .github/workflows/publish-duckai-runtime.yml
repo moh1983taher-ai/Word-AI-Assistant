@@ -59,6 +59,8 @@ jobs:
           }
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "runtime/DuckAI-MCP-Bridge.ps1" -SelfTest
           if ($LASTEXITCODE -ne 0) { throw "DuckAI MCP bridge self-tests failed." }
+          & cscript.exe //nologo "runtime/DuckAI-Update.vbs" --self-test
+          if ($LASTEXITCODE -ne 0) { throw "DuckAI one-click updater VBScript validation failed." }
           Write-Host "Windows PowerShell 5.1 parsing, BOM and MCP bridge self-tests passed."
 
   build-and-release:
@@ -119,7 +121,7 @@ jobs:
           if (-not $launcherText.Contains("BridgeListening()") -or -not $launcherText.Contains("/ping") -or -not $launcherText.Contains("MCP bridge is listening")) {
             throw "Launcher MCP readiness probe is missing."
           }
-          if (-not $updateText.Contains("/releases/latest") -or -not $updateText.Contains("Get-FileHash")) {
+          if (-not $updateText.Contains("/releases?per_page=100") -or -not $updateText.Contains("Get-FileHash")) {
             throw "One-click updater latest-release or SHA-256 verification is missing."
           }
           Write-Host "PowerShell syntax, MCP bridge self-tests, update-flow checks and bootstrap integrity pins passed."
