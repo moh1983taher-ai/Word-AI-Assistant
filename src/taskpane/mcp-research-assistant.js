@@ -5,7 +5,10 @@
   const AI_SETTINGS_KEY = "AI_SETTINGS";
   const LEGACY_THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
   const SELECTED_SERVERS_KEY = "AR_MCP_SELECTED_SERVERS";
+  const RESEARCH_ENGINE_KEY = "AR_MCP_RESEARCH_ENGINE";
   const DEFAULT_SELECTED_SERVER_IDS = Object.freeze(["aljam3", "shamela"]);
+  const DEFAULT_RESEARCH_ENGINE = "auto";
+  const LOCAL_MCP_HOST_URL = "http://127.0.0.1:18081";
   const DEFAULT_TIMEOUT_MS = 300000;
   const GROQ_RESPONSES_URL = "https://api.groq.com/openai/v1/responses";
   const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
@@ -98,7 +101,7 @@
     return MCP_SERVERS.filter(function (server) { return selected.indexOf(server.id) >= 0; });
   }
 
-  function getProviderStatus(settings) {
+  function getCloudProviderStatus(settings) {
     const current = settings || loadSettings();
     if (!current.provider) {
       return { ready: false, title: "لم يُحدد مزود الذكاء الاصطناعي", detail: "اختر Groq أو Gemini من إعدادات الذكاء الاصطناعي العامة." };
@@ -136,8 +139,40 @@
     };
   }
 
+  function loadResearchEngine() {
+    const saved = String(localStorage.getItem(RESEARCH_ENGINE_KEY) || DEFAULT_RESEARCH_ENGINE);
+    return ["auto", "local", "cloud"].indexOf(saved) >= 0 ? saved : DEFAULT_RESEARCH_ENGINE;
+  }
+
+  function saveResearchEngine(engine) {
+    const value = ["auto", "local", "cloud"].indexOf(engine) >= 0
+      ? engine
+      : DEFAULT_RESEARCH_ENGINE;
+    localStorage.setItem(RESEARCH_ENGINE_KEY, value);
+    return value;
+  }
+
+  function getProviderStatus(settings) {
+    const engine = loadResearchEngine();
+    if (engine === "local") {
+      return {
+        ready: true,
+        title: "DuckAI المحلي هو محرك البحث",
+        detail: "يُنفّذ البحث على الجهاز عبر مضيف MCP المحلي، دون الحاجة إلى مفتاح API."
+      };
+    }
+    if (engine === "auto") {
+      return {
+        ready: true,
+        title: "وضع تلقائي: DuckAI المحلي أولاً",
+        detail: "يُجرّب DuckAI المحلي، ثم يستخدم Groq أو Gemini من إعداداتك العامة عند تعذر المسار المحلي."
+      };
+    }
+    return getCloudProviderStatus(settings);
+  }
+
   function validateProviderSettings(settings) {
-    const status = getProviderStatus(settings);
+    const status = getCloudProviderStatus(settings);
     if (!status.ready) throw new Error(status.title + ". " + status.detail);
     return settings || loadSettings();
   }
@@ -216,11 +251,18 @@
     const settings = loadSettings();
     state.settings = settings;
     const status = getProviderStatus(settings);
+    const engine = loadResearchEngine();
+    const engineNames = {
+      auto: "تلقائي (DuckAI المحلي ثم Groq/Gemini)",
+      local: "DuckAI المحلي",
+      cloud: "المزود السحابي من إعدادات الذكاء الاصطناعي"
+    };
     const selectedNames = getSelectedMcpServers(loadSelectedServerIds()).map(function (server) {
       return server.label;
     });
-    health.textContent = "المزود: " + (settings.provider || "غير محدد") +
-      (settings.model ? "\nالنموذج المحدد: " + settings.model : "") +
+    health.textContent = "مسار التنفيذ: " + engineNames[engine] +
+      "\nالمزود السحابي المحفوظ: " + (settings.provider || "غير محدد") +
+      (settings.model ? "\nالنموذج السحابي المحدد: " + settings.model : "") +
       "\nالمكتبات التي اخترتها: " + (selectedNames.length ? selectedNames.join(" + ") : "لم تختر أي مكتبة") +
       "\n" + status.title + "\n" + status.detail;
   }
@@ -233,8 +275,34 @@
     panel.setAttribute("aria-label", "إعدادات مصادر البحث");
 
     const heading = document.createElement("h3");
-    heading.textContent = "البحث السحابي بالمصادر المتصلة";
+    heading.textContent = "إعدادات البحث بالمصادر المتصلة";
     panel.appendChild(heading);
+
+    const engineLabel = document.createElement("label");
+    engineLabel.htmlFor = "mcp-research-engine";
+    engineLabel.textContent = "طريقة تنفيذ البحث";
+    const engineSelect = document.createElement("select");
+    engineSelect.id = "mcp-research-engine";
+    engineSelect.style.width = "100%";
+    engineSelect.style.minHeight = "36px";
+    engineSelect.style.border = "1px solid #ccd7d1";
+    engineSelect.style.borderRadius = "7px";
+    engineSelect.style.padding = "6px 9px";
+    engineSelect.style.background = "#fff";
+    engineSelect.style.color = "#183c3b";
+    [
+      { value: "auto", text: "تلقائي: DuckAI المحلي أولاً، ثم Groq/Gemini عند الحاجة" },
+      { value: "local", text: "DuckAI المحلي فقط" },
+      { value: "cloud", text: "Groq أو Gemini من إعدادات الذكاء الاصطناعي" }
+    ].forEach(function (option) {
+      const item = document.createElement("option");
+      item.value = option.value;
+      item.textContent = option.text;
+      engineSelect.appendChild(item);
+    });
+    engineSelect.value = loadResearchEngine();
+    panel.appendChild(engineLabel);
+    panel.appendChild(engineSelect);
 
     const sourceSelection = document.createElement("div");
     sourceSelection.className = "mcp-source-selection";
@@ -270,6 +338,11 @@
       choice.appendChild(labelText);
       sourceSelection.appendChild(choice);
     });
+    engineSelect.addEventListener("change", function () {
+      saveResearchEngine(engineSelect.value);
+      renderProviderStatus(health);
+      updateModeButton();
+    });
     panel.appendChild(sourceSelection);
 
     const health = document.createElement("div");
@@ -280,15 +353,33 @@
 
     const actions = document.createElement("div");
     actions.className = "mcp-actions";
-    const refresh = createButton("تحديث حالة الإعدادات", "mcp-research-refresh-settings", "");
+    const refresh = createButton("تحديث الإعدادات", "mcp-research-refresh-settings", "");
+    const testLocal = createButton("اختبار DuckAI المحلي", "mcp-research-test-local", "");
     const close = createButton("إغلاق", "mcp-research-close-settings", "");
     actions.appendChild(refresh);
+    actions.appendChild(testLocal);
     actions.appendChild(close);
     panel.appendChild(actions);
     parent.appendChild(panel);
 
     refresh.addEventListener("click", function () {
+      engineSelect.value = loadResearchEngine();
       renderProviderStatus(health);
+    });
+    testLocal.addEventListener("click", async function () {
+      testLocal.disabled = true;
+      health.textContent = "يجري الاتصال بمضيف MCP المحلي وDuckAI…";
+      try {
+        const result = await checkLocalHost();
+        state.connection = result;
+        health.textContent = "DuckAI المحلي متصل · النموذج: " + result.model +
+          "\nالنماذج المتاحة: " + (result.models || []).join("، ");
+      } catch (error) {
+        health.textContent = "تعذر الاتصال المحلي: " +
+          (error && error.message ? error.message : String(error));
+      } finally {
+        testLocal.disabled = false;
+      }
     });
     close.addEventListener("click", function () {
       panel.hidden = true;
@@ -1048,6 +1139,148 @@
     };
   }
 
+  async function fetchLocalHostJson(path, options, timeoutMs) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    let timer = null;
+    if (controller) {
+      timer = window.setTimeout(function () { controller.abort(); }, timeoutMs || DEFAULT_TIMEOUT_MS);
+    }
+
+    try {
+      const requestOptions = Object.assign({
+        mode: "cors",
+        cache: "no-store",
+        credentials: "omit"
+      }, options || {});
+      requestOptions.targetAddressSpace = "loopback";
+      if (controller) requestOptions.signal = controller.signal;
+
+      const response = await fetch(LOCAL_MCP_HOST_URL + path, requestOptions);
+      const responseText = await response.text();
+      let payload = {};
+      try {
+        payload = responseText ? JSON.parse(responseText) : {};
+      } catch (_) {
+        payload = { raw: responseText };
+      }
+
+      if (!response.ok) {
+        const detail = payload && (payload.error || payload.message);
+        throw new Error(detail ? String(detail) : "HTTP " + response.status);
+      }
+      return payload;
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        throw new Error("انتهت مهلة الاتصال بمضيف MCP المحلي.");
+      }
+      if (error instanceof TypeError) {
+        throw new Error("تعذر الوصول إلى مضيف MCP المحلي على 127.0.0.1:18081. تحقق من تشغيل Word وخدمة أدوات الباحث.");
+      }
+      throw error;
+    } finally {
+      if (timer !== null) window.clearTimeout(timer);
+    }
+  }
+
+  async function checkLocalHost() {
+    const ping = await fetchLocalHostJson("/ping", { method: "GET" }, 8000);
+    if (!ping || ping.listening !== true || ping.service !== "ResearchTools.McpHost") {
+      throw new Error("مضيف MCP المحلي غير جاهز.");
+    }
+    const health = await fetchLocalHostJson("/health", { method: "GET" }, 15000);
+    if (!health || health.ready !== true) {
+      throw new Error(health && health.error ? health.error : "DuckAI المحلي غير جاهز.");
+    }
+    return {
+      model: String(health.model || "غير محدد"),
+      models: Array.isArray(health.models) ? health.models.map(String) : []
+    };
+  }
+
+  async function callLocalResearch(messages, settings, selectedServerIds) {
+    const selected = normalizeSelectedServerIds(selectedServerIds);
+    if (!selected.length) {
+      throw new Error("لم تختر أي مكتبة للبحث. اختر الجامع أو المكتبة الشاملة أو كليهما.");
+    }
+
+    const payload = await fetchLocalHostJson("/v1/research", {
+      method: "POST",
+      headers: {
+        // A simple CORS content type avoids a preflight from the Word task pane.
+        "Content-Type": "text/plain"
+      },
+      body: JSON.stringify({
+        client: "word-addin",
+        servers: selected,
+        model: "",
+        messages: (Array.isArray(messages) ? messages : []).map(function (message) {
+          return {
+            role: message && message.role === "assistant" ? "assistant" : "user",
+            text: String(message && message.text || "")
+          };
+        })
+      })
+    }, DEFAULT_TIMEOUT_MS);
+
+    if (!payload || typeof payload.answer !== "string" || !payload.answer.trim()) {
+      throw new Error("لم يُرجع DuckAI المحلي إجابة نهائية صالحة.");
+    }
+
+    const validated = validateResearchResult(
+      "DuckAI المحلي",
+      payload.answer,
+      payload.toolCalls,
+      selected
+    );
+
+    return {
+      answer: validated.answer,
+      toolCalls: validated.toolCalls,
+      model: String(payload.model || "DuckAI المحلي"),
+      provider: "duckai"
+    };
+  }
+
+  async function callSelectedResearch(messages, settings, selectedServerIds) {
+    const engine = loadResearchEngine();
+    if (engine === "local") {
+      return callLocalResearch(messages, settings, selectedServerIds);
+    }
+    if (engine === "cloud") {
+      return callCloudResearch(messages, settings, selectedServerIds);
+    }
+
+    // Automatic mode prefers the local MCP host and falls back to the existing
+    // cloud provider settings. No second key or provider configuration is created.
+    let localError = null;
+    try {
+      return await callLocalResearch(messages, settings, selectedServerIds);
+    } catch (error) {
+      localError = error;
+    }
+
+    const cloudStatus = getCloudProviderStatus(settings);
+    if (!cloudStatus.ready) {
+      throw new Error(
+        "تعذر البحث عبر DuckAI المحلي: " + (localError && localError.message ? localError.message : String(localError)) +
+        ". كما لا يوجد مزود سحابي جاهز للاحتياط؛ " + cloudStatus.title + ". " + cloudStatus.detail
+      );
+    }
+
+    try {
+      const cloudResult = await callCloudResearch(messages, settings, selectedServerIds);
+      cloudResult.fallbackFrom = localError && localError.message ? localError.message : String(localError);
+      return cloudResult;
+    } catch (cloudError) {
+      throw new Error(
+        "تعذر إكمال البحث محلياً أو سحابياً. DuckAI المحلي: " +
+        (localError && localError.message ? localError.message : String(localError)) +
+        ". المسار السحابي: " +
+        (cloudError && cloudError.message ? cloudError.message : String(cloudError))
+      );
+    }
+  }
+
   async function callCloudResearch(messages, settings, selectedServerIds) {
     const active = validateProviderSettings(settings);
     const selected = normalizeSelectedServerIds(selectedServerIds);
@@ -1091,9 +1324,10 @@
 
     const settings = loadSettings();
     const selectedServerIds = loadSelectedServerIds();
+    const engine = loadResearchEngine();
     state.settings = settings;
     try {
-      validateProviderSettings(settings);
+      if (engine === "cloud") validateProviderSettings(settings);
       if (!selectedServerIds.length) {
         throw new Error("لم تختر أي مكتبة للبحث. اختر الجامع أو المكتبة الشاملة أو كليهما من إعدادات المصادر.");
       }
@@ -1115,26 +1349,33 @@
     }
 
     const history = bridge.getMessages(chatId);
-    const providerName = settings.provider === "groq" ? "Groq" : "Gemini";
+    const providerName = engine === "local"
+      ? "DuckAI المحلي"
+      : (engine === "cloud"
+        ? (settings.provider === "groq" ? "Groq" : "Gemini")
+        : "DuckAI المحلي، مع احتياط Groq/Gemini");
     const selectedServerLabels = getSelectedMcpServers(selectedServerIds).map(function (server) {
       return server.label;
     }).join(" + ");
     const pending = bridge.addPendingMessage(
       chatId,
-      "يتصل بـ " + providerName + " وينفذ البحث في " + selectedServerLabels + " عبر MCP…"
+      "ينفّذ البحث في " + selectedServerLabels + " عبر " + providerName + "…"
     );
 
     state.busy = true;
     updateModeButton();
 
     try {
-      const result = await callCloudResearch(history, settings, selectedServerIds);
+      const result = await callSelectedResearch(history, settings, selectedServerIds);
       const sources = normalizeToolCalls(result.toolCalls);
-      const answer = result.answer.trim() + formatToolTrace(result);
+      const fallbackNote = result.fallbackFrom
+        ? "\n\nملاحظة: تعذر المسار المحلي، فاستُخدم المزود السحابي المحفوظ احتياطياً. سبب التحويل: " + result.fallbackFrom
+        : "";
+      const answer = result.answer.trim() + formatToolTrace(result) + fallbackNote;
       bridge.removePendingMessage(pending);
       bridge.appendAssistantMessage(chatId, answer, {
         sources: sources,
-        provider: result.provider || settings.provider,
+        provider: result.provider || settings.provider || "duckai",
         model: result.model || settings.model
       });
     } catch (error) {
@@ -1143,7 +1384,7 @@
         ? error.message
         : "حدث خطأ غير متوقع أثناء البحث السحابي.";
       bridge.appendAssistantMessage(chatId, message, {
-        provider: settings.provider,
+        provider: settings.provider || "duckai",
         model: settings.model,
         isError: true
       });
@@ -1207,7 +1448,7 @@
       "",
       "mcp-research-mode-option",
       "mcp-research-option",
-      "تفعيل البحث بالمصادر باستخدام Groq أو Gemini"
+      "تفعيل البحث بالمصادر عبر DuckAI المحلي أو المزود السحابي المحفوظ"
     );
     modeButton.setAttribute("aria-pressed", "false");
 
@@ -1223,7 +1464,7 @@
     modeLabel.textContent = "بحث في المصادر المتصلة";
     const modeDescription = document.createElement("span");
     modeDescription.className = "mcp-research-option-description";
-    modeDescription.textContent = "استخدم Groq أو Gemini للبحث المباشر عبر MCP";
+    modeDescription.textContent = "DuckAI المحلي أولاً، مع إمكانية الاحتياط إلى Groq أو Gemini";
     copy.appendChild(modeLabel);
     copy.appendChild(modeDescription);
 
