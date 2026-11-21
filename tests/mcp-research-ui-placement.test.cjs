@@ -77,8 +77,13 @@ assert.match(
 );
 assert.match(
   uiSource,
-  /function appendSanitizedMarkdownNode[\s\S]*?SAFE_MARKDOWN_TAGS/,
-  "Markdown output must pass through a safe element allow-list."
+  /const SAFE_MARKDOWN_TAGS = Object\.freeze\(/,
+  "The Markdown renderer must define an explicit safe element allow-list."
+);
+assert.match(
+  uiSource,
+  /function appendSanitizedMarkdownNode\(parent, node\)[\s\S]*?SAFE_MARKDOWN_TAGS\.indexOf\(tag\)/,
+  "Markdown output must pass through the safe element allow-list."
 );
 assert.match(
   uiSource,
