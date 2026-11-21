@@ -4,6 +4,8 @@
 
   const AI_SETTINGS_KEY = "AI_SETTINGS";
   const LEGACY_THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
+  const SELECTED_SERVERS_KEY = "AR_MCP_SELECTED_SERVERS";
+  const DEFAULT_SELECTED_SERVER_IDS = Object.freeze(["aljam3", "shamela"]);
   const DEFAULT_TIMEOUT_MS = 300000;
   const GROQ_RESPONSES_URL = "https://api.groq.com/openai/v1/responses";
   const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
@@ -70,6 +72,30 @@
       key: String(saved.key || "").trim(),
       model: String(saved.model || "").trim()
     };
+  }
+
+  function normalizeSelectedServerIds(serverIds) {
+    const requested = Array.isArray(serverIds) ? serverIds : [];
+    return MCP_SERVERS.filter(function (server) {
+      return requested.indexOf(server.id) >= 0;
+    }).map(function (server) { return server.id; });
+  }
+
+  function loadSelectedServerIds() {
+    const saved = localStorage.getItem(SELECTED_SERVERS_KEY);
+    if (saved === null) return DEFAULT_SELECTED_SERVER_IDS.slice();
+    return normalizeSelectedServerIds(safeJson(saved, DEFAULT_SELECTED_SERVER_IDS));
+  }
+
+  function saveSelectedServerIds(serverIds) {
+    const selected = normalizeSelectedServerIds(serverIds);
+    localStorage.setItem(SELECTED_SERVERS_KEY, JSON.stringify(selected));
+    return selected;
+  }
+
+  function getSelectedMcpServers(serverIds) {
+    const selected = normalizeSelectedServerIds(serverIds);
+    return MCP_SERVERS.filter(function (server) { return selected.indexOf(server.id) >= 0; });
   }
 
   function getProviderStatus(settings) {
@@ -142,6 +168,11 @@
       ".mcp-research-panel h3{font-size:14px;margin:0 0 10px;font-weight:650;}",
       ".mcp-research-panel label{display:block;font-size:12px;margin:9px 0 4px;color:#405b58;}",
       ".mcp-research-panel input{box-sizing:border-box;width:100%;height:34px;border:1px solid #ccd7d1;border-radius:7px;padding:6px 9px;background:#fff;color:#183c3b;direction:ltr;text-align:left;}",
+      ".mcp-source-selection{margin:12px 0;padding:10px 11px;border:1px solid #e0e7df;border-radius:9px;background:#fbfcf8;}",
+      ".mcp-source-selection-title{font-size:12px;font-weight:650;color:#244b48;margin-bottom:3px;}",
+      ".mcp-source-selection-note{font-size:10.5px;line-height:1.55;color:#718078;margin-bottom:6px;}",
+      ".mcp-source-choice{display:flex!important;align-items:center;gap:8px;margin:8px 0!important;font-size:12px;color:#284b46;cursor:pointer;}",
+      ".mcp-research-panel .mcp-source-choice input{width:16px;height:16px;flex:0 0 16px;margin:0;padding:0;direction:rtl;accent-color:#0b5553;}",
       ".mcp-research-panel .mcp-note{font-size:11px;line-height:1.7;color:#667772;margin:9px 0;}",
       ".mcp-research-panel .mcp-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap;}",
       ".mcp-research-panel button{border:1px solid #ccd7d1;border-radius:7px;background:#f7f8f3;padding:7px 12px;color:#244b48;cursor:pointer;font-size:12px;}",
@@ -185,8 +216,12 @@
     const settings = loadSettings();
     state.settings = settings;
     const status = getProviderStatus(settings);
+    const selectedNames = getSelectedMcpServers(loadSelectedServerIds()).map(function (server) {
+      return server.label;
+    });
     health.textContent = "المزود: " + (settings.provider || "غير محدد") +
       (settings.model ? "\nالنموذج المحدد: " + settings.model : "") +
+      "\nالمكتبات التي اخترتها: " + (selectedNames.length ? selectedNames.join(" + ") : "لم تختر أي مكتبة") +
       "\n" + status.title + "\n" + status.detail;
   }
 
@@ -203,8 +238,44 @@
 
     const note = document.createElement("p");
     note.className = "mcp-note";
-    note.textContent = "تستخدم هذه الميزة المزود والمفتاح والنموذج المحفوظة في إعدادات الذكاء الاصطناعي العامة؛ لا يوجد مفتاح ثانٍ أو خادم محلي. يدعم Groq الاتصال المباشر بخادمي MCP، ويستخدم Gemini النموذج المحدد في إعدادات الذكاء الاصطناعي العامة مباشرةً، دون فرض وكيل أو نموذج ثابت. يتطلب مسار Gemini حفظ التفاعل لدى Google وفق مدة الاحتفاظ وإعدادات المشروع. تقتصر الأدوات المتاحة على البحث والقراءة.";
+    note.textContent = "تستخدم هذه الميزة المزود والمفتاح والنموذج المحفوظة في إعدادات الذكاء الاصطناعي العامة؛ لا يوجد مفتاح ثانٍ أو خادم محلي. اختر بنفسك المكتبة التي تريد البحث فيها؛ ولا يُتاح للنموذج إلا الخادم أو الخوادم التي تحددها. يدعم Groq الاتصال المباشر بخوادم MCP، ويستخدم Gemini النموذج المحدد في الإعدادات العامة. تقتصر الأدوات المتاحة على البحث والقراءة.";
     panel.appendChild(note);
+
+    const sourceSelection = document.createElement("div");
+    sourceSelection.className = "mcp-source-selection";
+    const sourceTitle = document.createElement("div");
+    sourceTitle.className = "mcp-source-selection-title";
+    sourceTitle.textContent = "المكتبات التي سيبحث فيها النموذج";
+    sourceSelection.appendChild(sourceTitle);
+
+    const sourceHelp = document.createElement("div");
+    sourceHelp.className = "mcp-source-selection-note";
+    sourceHelp.textContent = "حدد المكتبة التي تريد البحث فيها، أو اختر المكتبتين معاً. لن يُتاح للنموذج استخدام مكتبة لم تحددها.";
+    sourceSelection.appendChild(sourceHelp);
+
+    MCP_SERVERS.forEach(function (server) {
+      const choice = document.createElement("label");
+      choice.className = "mcp-source-choice";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = "mcp-source-" + server.id;
+      checkbox.checked = loadSelectedServerIds().indexOf(server.id) >= 0;
+      checkbox.addEventListener("change", function () {
+        const selected = MCP_SERVERS.filter(function (item) {
+          const control = document.getElementById("mcp-source-" + item.id);
+          return control && control.checked;
+        }).map(function (item) { return item.id; });
+        saveSelectedServerIds(selected);
+        renderProviderStatus(health);
+        updateModeButton();
+      });
+      const labelText = document.createElement("span");
+      labelText.textContent = server.label;
+      choice.appendChild(checkbox);
+      choice.appendChild(labelText);
+      sourceSelection.appendChild(choice);
+    });
+    panel.appendChild(sourceSelection);
 
     const health = document.createElement("div");
     health.id = "mcp-research-health";
@@ -269,7 +340,12 @@
     if (trigger) trigger.setAttribute("aria-expanded", "false");
   }
 
-  function buildResearchInput(messages) {
+  function buildResearchInput(messages, selectedServerIds) {
+    const selectedServers = getSelectedMcpServers(selectedServerIds);
+    if (!selectedServers.length) {
+      throw new Error("لم تختر أي مكتبة للبحث. اختر الجامع أو المكتبة الشاملة أو كليهما من إعدادات المصادر.");
+    }
+    const selectedLabels = selectedServers.map(function (server) { return server.label; });
     const history = (Array.isArray(messages) ? messages : [])
       .slice(-20)
       .map(function (message) {
@@ -281,8 +357,12 @@
 
     return [
       "أنت مساعد بحث علمي في أدوات الباحث، وتعمل بالعربية.",
-      "استخدم خادمي MCP المرفقين عند الإجابة عن الأسئلة البحثية، واستدع أدوات البحث والقراءة فعلياً قبل صياغة النتائج.",
-      "اعتمد على النصوص والبيانات التي تعيدها أدوات الجامع والمكتبة الشاملة فقط عند نسبة معلومة إلى مصدر.",
+      "المكتبات التي حددها المستخدم بنفسه لهذه المهمة هي: " + selectedLabels.join("، ") + ".",
+      "لا تستدع أي خادم أو مكتبة غير محددة في اختيار المستخدم؛ قائمة أدوات MCP المتاحة لك مقصورة على هذه المكتبات.",
+      selectedServers.length > 1
+        ? "حدد المستخدم المكتبتين معاً؛ لذلك نفذ بحثاً فعلياً في كل مكتبة محددة، ولا تكتف باستخدام واحدة منهما."
+        : "اقتصر في البحث على المكتبة الوحيدة التي حددها المستخدم.",
+      "اعتمد عند نسبة المعلومات إلى المصادر على النصوص والبيانات التي تعيدها المكتبة أو المكتبات المحددة فقط.",
       "اذكر اسم الكتاب والمؤلف والجزء والصفحة متى أعادت الأداة هذه البيانات. لا تخترع بيانات ببليوغرافية ولا أرقام صفحات ولا اقتباسات.",
       "ميّز بين النقل الحرفي والتحليل، واذكر بوضوح متى لا تتضمن نتيجة الأداة بيانات كافية للتوثيق.",
       "لا تنفذ أي كتابة أو تعديل أو حذف. الأدوات المتاحة للبحث والقراءة فقط.",
@@ -294,8 +374,8 @@
     ].join("\n");
   }
 
-  function getGroqTools() {
-    return MCP_SERVERS.map(function (server) {
+  function getGroqTools(selectedServerIds) {
+    return getSelectedMcpServers(selectedServerIds).map(function (server) {
       return {
         type: "mcp",
         server_label: server.id,
@@ -307,8 +387,8 @@
     });
   }
 
-  function getGeminiTools() {
-    return MCP_SERVERS.map(function (server) {
+  function getGeminiTools(selectedServerIds) {
+    return getSelectedMcpServers(selectedServerIds).map(function (server) {
       return {
         type: "mcp_server",
         name: server.id,
@@ -829,10 +909,12 @@
     }
   }
 
-  function extractGroqToolCalls(payload) {
+  function extractGroqToolCalls(payload, selectedServerIds) {
+    const allowedServers = normalizeSelectedServerIds(selectedServerIds);
     const output = Array.isArray(payload && payload.output) ? payload.output : [];
     return output.filter(function (item) {
-      return item && item.type === "mcp_call" && item.name;
+      const server = String(item && (item.server_label || item.server) || "");
+      return item && item.type === "mcp_call" && item.name && allowedServers.indexOf(server) >= 0;
     }).map(function (item) {
       return {
         server: String(item.server_label || item.server || "MCP"),
@@ -844,7 +926,8 @@
     });
   }
 
-  function extractGeminiToolCalls(payload) {
+  function extractGeminiToolCalls(payload, selectedServerIds) {
+    const allowedServers = normalizeSelectedServerIds(selectedServerIds);
     const steps = getGeminiSteps(payload);
     const calls = steps.filter(function (step) {
       return step && step.type === "mcp_server_tool_call";
@@ -854,6 +937,10 @@
     });
 
     return calls.filter(function (call) {
+      const detail = call && (call.mcp_server_tool_call || call.mcpServerToolCall || call);
+      const server = String(detail && (detail.server_name || detail.serverName) ||
+        call.server_name || call.serverName || "");
+      if (allowedServers.indexOf(server) < 0) return false;
       const callId = String(call.id || call.call_id || call.callId || "");
       if (!callId) return false;
       return results.some(function (result) {
@@ -881,24 +968,31 @@
     });
   }
 
-  function validateResearchResult(providerLabel, answer, toolCalls) {
+  function validateResearchResult(providerLabel, answer, toolCalls, selectedServerIds) {
     if (!answer) {
       throw new Error(providerLabel + " لم يُرجع إجابة نهائية.");
     }
+    const allowedServers = normalizeSelectedServerIds(selectedServerIds);
     if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
-      throw new Error(providerLabel + " لم يُظهر أي استدعاء فعلي لأدوات MCP؛ لم تُعرض الإجابة بوصفها بحثاً موثقاً.");
+      throw new Error(providerLabel + " لم يُظهر أي استدعاء فعلي لأدوات المكتبات التي اخترتها؛ لم تُعرض الإجابة بوصفها بحثاً موثقاً.");
     }
-    const completed = toolCalls.filter(function (call) { return call.completed !== false; });
+    const completed = toolCalls.filter(function (call) {
+      return call.completed !== false && allowedServers.indexOf(call.server) >= 0;
+    });
     if (completed.length === 0) {
-      throw new Error(providerLabel + " لم يُرجع نتيجة ناجحة من أدوات MCP.");
+      throw new Error(providerLabel + " لم يُرجع نتيجة ناجحة من المكتبات التي اخترتها.");
     }
-    return {
-      answer: answer,
-      toolCalls: completed
-    };
+    const missingServers = allowedServers.filter(function (serverId) {
+      return !completed.some(function (call) { return call.server === serverId; });
+    });
+    if (missingServers.length) {
+      const missingLabels = getSelectedMcpServers(missingServers).map(function (server) { return server.label; });
+      throw new Error(providerLabel + " لم يستكمل البحث في جميع المكتبات التي اخترتها. لم تصل نتيجة بحث ناجحة من: " + missingLabels.join("، ") + ". أعد المحاولة أو غيّر اختيار المكتبات.");
+    }
+    return { answer: answer, toolCalls: completed };
   }
 
-  async function callGroqResearch(messages, settings) {
+  async function callGroqResearch(messages, settings, selectedServerIds) {
     if (GROQ_REMOTE_MCP_MODELS.indexOf(settings.model) < 0) {
       throw new Error("النموذج المختار في Groq لا يدعم Remote MCP. اختر أحد النماذج المدعومة: " + GROQ_REMOTE_MCP_MODELS.join("، "));
     }
@@ -908,8 +1002,8 @@
       { Authorization: "Bearer " + settings.key },
       {
         model: settings.model,
-        input: buildResearchInput(messages),
-        tools: getGroqTools(),
+        input: buildResearchInput(messages, selectedServerIds),
+        tools: getGroqTools(selectedServerIds),
         max_output_tokens: 12000
       },
       "Groq"
@@ -920,8 +1014,8 @@
     }
 
     const answer = extractGroqAnswer(payload);
-    const toolCalls = extractGroqToolCalls(payload);
-    const validated = validateResearchResult("Groq", answer, toolCalls);
+    const toolCalls = extractGroqToolCalls(payload, selectedServerIds);
+    const validated = validateResearchResult("Groq", answer, toolCalls, selectedServerIds);
     return {
       answer: validated.answer,
       toolCalls: validated.toolCalls,
@@ -930,12 +1024,12 @@
     };
   }
 
-  async function callGeminiResearch(messages, settings) {
+  async function callGeminiResearch(messages, settings, selectedServerIds) {
     const payload = await postGeminiInteractionStream({
       model: settings.model,
-      input: buildResearchInput(messages),
+      input: buildResearchInput(messages, selectedServerIds),
       environment: "remote",
-      tools: getGeminiTools()
+      tools: getGeminiTools(selectedServerIds)
     }, settings.key);
 
     const interaction = getGeminiInteraction(payload);
@@ -949,8 +1043,8 @@
     if (!answer) {
       throw new Error("Gemini لم يُرجع إجابة نهائية. " + describeGeminiResponse(payload));
     }
-    const toolCalls = extractGeminiToolCalls(payload);
-    const validated = validateResearchResult("Gemini", answer, toolCalls);
+    const toolCalls = extractGeminiToolCalls(payload, selectedServerIds);
+    const validated = validateResearchResult("Gemini", answer, toolCalls, selectedServerIds);
     return {
       answer: validated.answer,
       toolCalls: validated.toolCalls,
@@ -959,10 +1053,14 @@
     };
   }
 
-  async function callCloudResearch(messages, settings) {
+  async function callCloudResearch(messages, settings, selectedServerIds) {
     const active = validateProviderSettings(settings);
-    if (active.provider === "groq") return callGroqResearch(messages, active);
-    if (active.provider === "gemini") return callGeminiResearch(messages, active);
+    const selected = normalizeSelectedServerIds(selectedServerIds);
+    if (!selected.length) {
+      throw new Error("لم تختر أي مكتبة للبحث. افتح إعدادات المصادر واختر الجامع أو المكتبة الشاملة أو كليهما.");
+    }
+    if (active.provider === "groq") return callGroqResearch(messages, active, selected);
+    if (active.provider === "gemini") return callGeminiResearch(messages, active, selected);
     throw new Error("البحث السحابي عبر MCP متاح حالياً مع Groq وGemini فقط.");
   }
 
@@ -997,9 +1095,13 @@
     }
 
     const settings = loadSettings();
+    const selectedServerIds = loadSelectedServerIds();
     state.settings = settings;
     try {
       validateProviderSettings(settings);
+      if (!selectedServerIds.length) {
+        throw new Error("لم تختر أي مكتبة للبحث. اختر الجامع أو المكتبة الشاملة أو كليهما من إعدادات المصادر.");
+      }
     } catch (error) {
       showNotice(error.message);
       return;
@@ -1028,7 +1130,7 @@
     updateModeButton();
 
     try {
-      const result = await callCloudResearch(history, settings);
+      const result = await callCloudResearch(history, settings, selectedServerIds);
       const sources = normalizeToolCalls(result.toolCalls);
       const answer = result.answer.trim() + formatToolTrace(result);
       bridge.removePendingMessage(pending);
@@ -1055,6 +1157,10 @@
 
   function toggleMode() {
     if (!state.enabled) {
+      if (!loadSelectedServerIds().length) {
+        showNotice("اختر مكتبة واحدة على الأقل من إعدادات المصادر قبل تفعيل البحث.");
+        return;
+      }
       const settings = loadSettings();
       const status = getProviderStatus(settings);
       if (!status.ready) {
