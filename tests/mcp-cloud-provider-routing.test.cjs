@@ -37,6 +37,9 @@ assert.match(
   /function getGeminiTools\(\)[\s\S]*?allowed_tools: \[\{\s*mode: "auto",\s*tools: server\.tools\.slice\(\)\s*\}\]/
 );
 assert.match(source, /environment: "remote"/);
+assert.match(source, /Antigravity managed agents reject store:false/);
+assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
+assert.match(source, /يتطلب مسار Gemini حفظ التفاعل لدى Google/);
 assert.match(source, /function callGeminiResearch[\s\S]*?tools: getGeminiTools\(\)/);
 
 assert.match(source, /https:\/\/aljam3\.com\/mcp/);
