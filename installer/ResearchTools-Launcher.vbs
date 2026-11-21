@@ -160,7 +160,7 @@ Sub StartMcpHost()
     For attempt=1 To 25
         WScript.Sleep 1000
         If McpHostListening() Then
-            WriteLauncherLog "SUCCESS: .NET MCP host v1.1.0 is listening on 127.0.0.1:18081."
+            WriteLauncherLog "SUCCESS: .NET MCP host v1.1.1 is listening on 127.0.0.1:18081."
             Exit Sub
         End If
     Next
