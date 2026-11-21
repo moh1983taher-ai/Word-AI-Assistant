@@ -1121,9 +1121,12 @@
 
     const history = bridge.getMessages(chatId);
     const providerName = settings.provider === "groq" ? "Groq" : "Gemini";
+    const selectedServerLabels = getSelectedMcpServers(selectedServerIds).map(function (server) {
+      return server.label;
+    }).join(" + ");
     const pending = bridge.addPendingMessage(
       chatId,
-      "يتصل بـ " + providerName + " وينفذ البحث مباشرة عبر خادمي MCP…"
+      "يتصل بـ " + providerName + " وينفذ البحث في " + selectedServerLabels + " عبر MCP…"
     );
 
     state.busy = true;
