@@ -32,9 +32,22 @@ public sealed class McpSourceRegistry : IAsyncDisposable
             _states.TryAdd(definition.Id, new SourceState(definition));
     }
 
-    public async Task<SourceDiscovery> DiscoverAllAsync(CancellationToken cancellationToken)
+    public Task<SourceDiscovery> DiscoverAllAsync(CancellationToken cancellationToken) =>
+        DiscoverSelectedAsync(ResearchSourceSelection.AllSourceIds, cancellationToken);
+
+    public async Task<SourceDiscovery> DiscoverSelectedAsync(
+        IReadOnlyCollection<string> selectedSourceIds,
+        CancellationToken cancellationToken)
     {
-        var tasks = Definitions.Select(async definition =>
+        var selected = ResearchSourceSelection.Normalize(selectedSourceIds);
+        if (selected.Count == 0)
+            throw new ArgumentException("يجب تحديد مكتبة واحدة على الأقل للبحث.", nameof(selectedSourceIds));
+
+        var definitions = Definitions
+            .Where(definition => selected.Contains(definition.Id, StringComparer.Ordinal))
+            .ToArray();
+
+        var tasks = definitions.Select(async definition =>
         {
             try
             {
