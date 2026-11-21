@@ -11,6 +11,9 @@ public sealed class ResearchRequest
     [JsonPropertyName("model")]
     public string? Model { get; set; }
 
+    [JsonPropertyName("servers")]
+    public List<string> Servers { get; set; } = [];
+
     [JsonPropertyName("messages")]
     public List<ResearchMessage> Messages { get; set; } = [];
 }
