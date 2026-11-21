@@ -51,7 +51,7 @@ assert.match(
 );
 assert.match(source, /environment: "remote"/);
 assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
-assert.match(source, /النموذج المحدد في إعدادات الذكاء الاصطناعي العامة مباشرةً/);
+assert.match(source, /يستخدم Gemini النموذج المحدد في الإعدادات العامة/);
 assert.match(source, /function callGeminiResearch[\s\S]*?postGeminiInteractionStream\([\s\S]*?tools: getGeminiTools\(selectedServerIds\)/);
 assert.match(source, /function callGroqResearch[\s\S]*?postCloudJson\(/);
 
