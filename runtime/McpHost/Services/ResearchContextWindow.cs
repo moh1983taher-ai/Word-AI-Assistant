@@ -29,7 +29,9 @@ internal static class ResearchContextWindow
 
         if (pinnedMessageIndex >= 0 && pinnedMessageIndex < messages.Count)
         {
-            var pinned = LimitMessage(messages[pinnedMessageIndex], maxMessageCharacters);
+            var pinned = LimitMessage(
+                messages[pinnedMessageIndex],
+                Math.Min(maxMessageCharacters, maxConversationCharacters));
             selected.Add((pinnedMessageIndex, pinned));
             usedCharacters = pinned.Content?.Length ?? 0;
         }
