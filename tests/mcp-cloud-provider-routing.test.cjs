@@ -30,6 +30,13 @@ assert.match(source, /GROQ_REMOTE_MCP_MODELS\.indexOf\(settings\.model\)/);
 assert.match(source, /https:\/\/generativelanguage\.googleapis\.com\/v1beta\/interactions/);
 assert.match(source, /antigravity-preview-09-2026/);
 assert.match(source, /gemini-4-hydrogen/);
+assert.match(source, /GEMINI_API_REVISION = ["\x27]2026-05-20/);
+assert.match(source, /Accept: "text\/event-stream"/);
+assert.match(source, /background: true,[\s\S]*?stream: true/);
+assert.match(source, /last_event_id=/);
+assert.match(source, /function parseGeminiSseFrame\(frame\)/);
+assert.match(source, /function applyGeminiStreamEvent\(state, event\)/);
+assert.match(source, /async function postGeminiInteractionStream\(requestBody, apiKey\)/);
 assert.match(source, /type: "mcp_server"/);
 assert.match(source, /name: server\.id/);
 assert.match(source, /url: server\.url/);
@@ -41,7 +48,8 @@ assert.match(source, /environment: "remote"/);
 assert.match(source, /Antigravity managed agents reject store:false/);
 assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
 assert.match(source, /يتطلب مسار Gemini حفظ التفاعل لدى Google/);
-assert.match(source, /function callGeminiResearch[\s\S]*?tools: getGeminiTools\(\)/);
+assert.match(source, /function callGeminiResearch[\s\S]*?postGeminiInteractionStream\([\s\S]*?tools: getGeminiTools\(\)/);
+assert.match(source, /function callGroqResearch[\s\S]*?postCloudJson\(/);
 
 assert.match(source, /function getGeminiInteraction\(payload\)/);
 assert.match(source, /function getGeminiSteps\(payload\)/);
@@ -53,7 +61,7 @@ const helperStart = source.indexOf("  function getGeminiInteraction(payload) {")
 const helperEnd = source.indexOf("  function extractGroqToolCalls(payload) {", helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, "Gemini response helpers must be testable");
 const helperSource = source.slice(helperStart, helperEnd) +
-  "\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse };";
+  "\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse, parseGeminiSseFrame, createGeminiStreamState, applyGeminiStreamEvent, buildGeminiStreamPayload, extractGeminiToolCalls };";
 const helperContext = {};
 vm.runInNewContext(helperSource, helperContext);
 const responseHelpers = helperContext.__geminiResponseHelpers;
@@ -86,6 +94,66 @@ assert.equal(responseHelpers.extractGeminiAnswer(noFinalOutput), "");
 const diagnostic = responseHelpers.describeGeminiResponse(noFinalOutput);
 assert.match(diagnostic, /الحالة=completed/);
 assert.match(diagnostic, /mcp_server_tool_call, mcp_server_tool_result/);
+
+const parsedSse = responseHelpers.parseGeminiSseFrame(
+  'id: event-7\r\nevent: step.start\r\ndata: {"event_type":"step.start","index":0,"step":{"type":"model_output","content":[]}}\r\n\r\n'
+);
+assert.equal(parsedSse.event_type, "step.start");
+assert.equal(parsedSse.event_id, "event-7");
+assert.equal(parsedSse.index, 0);
+
+const streamState = responseHelpers.createGeminiStreamState();
+responseHelpers.applyGeminiStreamEvent(streamState, {
+  event_type: "interaction.created",
+  event_id: "evt-created",
+  interaction: { id: "interaction-stream-1", status: "in_progress" }
+});
+responseHelpers.applyGeminiStreamEvent(streamState, {
+  event_type: "step.start",
+  index: 0,
+  step: { type: "model_output", content: [] }
+});
+responseHelpers.applyGeminiStreamEvent(streamState, {
+  event_type: "step.delta",
+  index: 0,
+  delta: { type: "text", text: "إجابة من التدفق" }
+});
+responseHelpers.applyGeminiStreamEvent(streamState, {
+  event_type: "step.start",
+  index: 1,
+  step: {
+    type: "mcp_server_tool_call",
+    id: "call-stream-1",
+    name: "search",
+    server_name: "aljam3",
+    arguments: { query: "الفقه" }
+  }
+});
+responseHelpers.applyGeminiStreamEvent(streamState, {
+  event_type: "step.start",
+  index: 2,
+  step: {
+    type: "mcp_server_tool_result",
+    call_id: "call-stream-1",
+    name: "search",
+    server_name: "aljam3",
+    result: [{ type: "text", text: "نتيجة البحث" }]
+  }
+});
+responseHelpers.applyGeminiStreamEvent(streamState, {
+  event_type: "interaction.completed",
+  event_id: "evt-completed",
+  interaction: { id: "interaction-stream-1", status: "completed" }
+});
+const streamedPayload = responseHelpers.buildGeminiStreamPayload(streamState);
+assert.equal(streamedPayload.status, "completed");
+assert.equal(responseHelpers.extractGeminiAnswer(streamedPayload), "إجابة من التدفق");
+const streamedCalls = responseHelpers.extractGeminiToolCalls(streamedPayload);
+assert.equal(streamedCalls.length, 1);
+assert.equal(streamedCalls[0].server, "aljam3");
+assert.equal(streamedCalls[0].tool, "search");
+assert.equal(streamState.lastEventId, "evt-completed");
+
 
 assert.match(source, /https:\/\/aljam3\.com\/mcp/);
 assert.match(source, /https:\/\/mcp\.shamela\.ws/);
