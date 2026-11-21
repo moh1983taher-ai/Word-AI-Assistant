@@ -10,14 +10,14 @@ public sealed class ResearchSourceSelectionTests
     {
         var selected = ResearchSourceSelection.Normalize(["shamela", "aljam3", "shamela"]);
 
-        Assert.Equal(["aljam3", "shamela"], selected);
+        Assert.Equal(new[] { "aljam3", "shamela" }, selected);
     }
 
     [Fact]
     public void NormalizeAllowsSelectingEitherSingleSource()
     {
-        Assert.Equal(["aljam3"], ResearchSourceSelection.Normalize(["aljam3"]));
-        Assert.Equal(["shamela"], ResearchSourceSelection.Normalize(["shamela"]));
+        Assert.Equal(new[] { "aljam3" }, ResearchSourceSelection.Normalize(["aljam3"]));
+        Assert.Equal(new[] { "shamela" }, ResearchSourceSelection.Normalize(["shamela"]));
     }
 
     [Fact]
@@ -34,6 +34,6 @@ public sealed class ResearchSourceSelectionTests
             ["aljam3", "shamela"],
             ["aljam3"]);
 
-        Assert.Equal(["shamela"], missing);
+        Assert.Equal(new[] { "shamela" }, missing);
     }
 }
