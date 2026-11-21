@@ -43,7 +43,7 @@ assert.doesNotMatch(
   "The local MCP route must not create a second key or provider-settings store."
 );
 assert.match(uiSource, /const AI_SETTINGS_KEY = ["']AI_SETTINGS["']/);
-assert.match(uiSource, /const LOCAL_MCP_HOST_URL = ["']http:\\/\\/127\\.0\\.0\\.1:18081["']/);
+assert.match(uiSource, /const LOCAL_MCP_HOST_URL = ["']http:\/\/127\.0\.0\.1:18081["']/);
 assert.match(uiSource, /function callSelectedResearch/);
 assert.match(uiSource, /servers: selected/);
 assert.match(uiSource, /const RESEARCH_ENGINE_KEY = ["']AR_MCP_RESEARCH_ENGINE["']/);
