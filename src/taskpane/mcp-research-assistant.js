@@ -223,7 +223,7 @@
 
     const note = document.createElement("p");
     note.className = "mcp-note";
-    note.textContent = "تستخدم هذه الميزة المزود والمفتاح والنموذج المحفوظة في إعدادات الذكاء الاصطناعي العامة؛ لا يوجد مفتاح ثانٍ أو خادم محلي. يدعم Groq الاتصال المباشر بخادمي MCP، ويستخدم Gemini وكيل Antigravity المُدار. تقتصر الأدوات المتاحة على البحث والقراءة.";
+    note.textContent = "تستخدم هذه الميزة المزود والمفتاح والنموذج المحفوظة في إعدادات الذكاء الاصطناعي العامة؛ لا يوجد مفتاح ثانٍ أو خادم محلي. يدعم Groq الاتصال المباشر بخادمي MCP، ويستخدم Gemini وكيل Antigravity المُدار. يتطلب مسار Gemini حفظ التفاعل لدى Google وفق مدة الاحتفاظ وإعدادات المشروع. تقتصر الأدوات المتاحة على البحث والقراءة.";
     panel.appendChild(note);
 
     const health = document.createElement("div");
@@ -628,7 +628,7 @@
         agent: GEMINI_MCP_AGENT,
         input: buildResearchInput(messages),
         environment: "remote",
-        store: false,
+        // Antigravity managed agents reject store:false; omission uses the API default (stored interaction).
         agent_config: {
           type: "antigravity",
           model: GEMINI_MCP_MODEL
