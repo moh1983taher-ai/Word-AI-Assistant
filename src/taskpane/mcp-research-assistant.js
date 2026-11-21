@@ -1022,6 +1022,7 @@
     const payload = await postGeminiInteractionStream({
       model: settings.model,
       input: buildResearchInput(messages),
+      environment: "remote",
       tools: getGeminiTools()
     }, settings.key);
 
