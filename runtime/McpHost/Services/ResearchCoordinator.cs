@@ -20,8 +20,8 @@ public sealed class ResearchCoordinator
     private const int MaxConversationMessages = 40;
     private const int MaxToolCalls = 6;
     private const int MaxIterations = 8;
-    private const int MaxMessageCharacters = 25_000;
-    private const int MaxConversationCharacters = 100_000;
+    private const int MaxMessageCharacters = 12_000;
+    private const int MaxConversationCharacters = 20_000;
     private const int MaxCatalogCharacters = 40_000;
 
     private readonly DuckAiClient _duckAi;
@@ -62,18 +62,12 @@ public sealed class ResearchCoordinator
                     Limit(message.GetText().Trim(), MaxMessageCharacters)))
                 .ToList();
 
-            var totalCharacters = 0;
-            for (var index = incoming.Count - 1; index >= 0; index--)
-            {
-                totalCharacters += incoming[index].Content?.Length ?? 0;
-                if (totalCharacters <= MaxConversationCharacters)
-                    continue;
-
-                incoming.RemoveAt(index);
-            }
-
             if (incoming.Count == 0)
                 throw new InvalidOperationException("لا توجد رسائل بحث صالحة.");
+
+            // Keep the latest user request available in every model turn, even when
+            // older history and tool results need to be trimmed to the context budget.
+            var currentUserMessageIndex = incoming.FindLastIndex(message => message.Role == "user");
 
             var selectedServerIds = ResearchSourceSelection.Normalize(request.Servers);
             if (selectedServerIds.Count == 0)
@@ -121,9 +115,33 @@ public sealed class ResearchCoordinator
 
             for (var iteration = 0; iteration < MaxIterations; iteration++)
             {
+                var conversation = ResearchContextWindow.Compact(
+                    messages.Skip(1).ToArray(),
+                    MaxConversationCharacters,
+                    MaxMessageCharacters,
+                    currentUserMessageIndex);
+
+                var requestMessages = new List<DuckChatMessage>(conversation.Count + 1)
+                {
+                    messages[0]
+                };
+                requestMessages.AddRange(conversation);
+
+                var originalContextCharacters = messages.Skip(1)
+                    .Sum(message => message.Content?.Length ?? 0);
+                var boundedContextCharacters = conversation
+                    .Sum(message => message.Content?.Length ?? 0);
+
+                if (boundedContextCharacters < originalContextCharacters ||
+                    conversation.Count < messages.Count - 1)
+                {
+                    _log.Info(
+                        $"Research context bounded: task={taskId}; messages={conversation.Count}/{messages.Count - 1}; characters={boundedContextCharacters}/{originalContextCharacters}; limit={MaxConversationCharacters}.");
+                }
+
                 var completion = await _duckAi.CompleteAsync(
                     model,
-                    messages,
+                    requestMessages,
                     functionTools: null,
                     cancellationToken: timeout.Token);
 
