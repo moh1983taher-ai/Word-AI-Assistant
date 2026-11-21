@@ -31,7 +31,7 @@ assert.match(source, /https:\/\/generativelanguage\.googleapis\.com\/v1beta\/int
 assert.match(source, /antigravity-preview-09-2026/);
 assert.match(source, /gemini-4-hydrogen/);
 assert.match(source, /GEMINI_API_REVISION = ["\x27]2026-05-20/);
-assert.match(source, /Accept: "text\/event-stream"/);
+assert.match(source, /["\x27]Accept["\x27]:\\s*"text\\/event-stream"/);
 assert.match(source, /background: true,[\s\S]*?stream: true,[\s\S]*?store: true/);
 assert.match(source, /last_event_id=/);
 assert.match(source, /function parseGeminiSseFrame\(frame\)/);
