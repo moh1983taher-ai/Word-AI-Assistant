@@ -255,7 +255,7 @@
     if (state.modeStatus) {
       state.modeStatus.textContent = state.busy
         ? "جارٍ البحث"
-        : (state.enabled ? "مفعّل للرسالة التالية" : "غير مفعّل");
+        : (state.enabled ? "مفعّل" : "غير مفعّل");
     }
   }
 
