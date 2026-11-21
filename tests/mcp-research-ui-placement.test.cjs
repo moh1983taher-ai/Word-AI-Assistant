@@ -65,4 +65,45 @@ assert.doesNotMatch(
   "The source-search feature must not retain a separate key store or local DuckAI route."
 );
 
+assert.match(
+  uiSource,
+  /bubble\.className = message\.role === "user"[\s\S]*?"message user-message mcp-research-message"[\s\S]*?"message ai-message mcp-research-message"/,
+  "MCP turns must use the same message classes as the ordinary chat."
+);
+assert.match(
+  uiSource,
+  /function renderFormattedText\(container, value\)[\s\S]*?markdown\.parse\(safeSource, \{ gfm: true \}\)/,
+  "MCP responses must render full Markdown instead of plain text."
+);
+assert.match(
+  uiSource,
+  /function appendSanitizedMarkdownNode[\s\S]*?SAFE_MARKDOWN_TAGS/,
+  "Markdown output must pass through a safe element allow-list."
+);
+assert.match(
+  uiSource,
+  /function normalizeToolCalls\(calls\)[\s\S]*?function formatToolTrace\(payload\)[\s\S]*?المصادر التي جرى الرجوع إليها والأدوات المستخدمة/,
+  "Tool provenance must be represented as readable source details in the chat."
+);
+assert.match(
+  uiSource,
+  /sources: sources,[\s\S]*?provider: result\.provider[\s\S]*?model: result\.model/,
+  "The saved assistant turn must retain its tool sources, provider and model metadata."
+);
+assert.match(
+  uiSource,
+  /function saveThread\(\)[\s\S]*?version: 2,[\s\S]*?messages: state\.messages\.slice\(-60\)/,
+  "The full MCP conversation, including source details, must be persisted."
+);
+assert.match(
+  uiSource,
+  /function showNotice\(text\)[\s\S]*?state\.messages\.push\(message\)[\s\S]*?saveThread\(\)/,
+  "Assistant notices shown in the chat must also be saved."
+);
+assert.match(
+  uiSource,
+  /newChat\.addEventListener\("click", function \(\) \{\s*\/\/ The MCP thread belongs to the same visible chat, even when source mode is off\.\s*window\.setTimeout\(resetThread, 0\);/,
+  "Starting a new ordinary chat must clear the associated MCP thread."
+);
+
 console.log("Cloud MCP research menu and provider integration tests passed.");
