@@ -90,8 +90,10 @@ app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellation
             ready = true,
             version = "1.1.1",
             provider = "DuckAI",
+            endpoint = snapshot.BaseAddress,
             model = snapshot.DefaultModel,
-            models = snapshot.Models
+            models = snapshot.Models,
+            generationCheck = "on-demand"
         }, JsonDefaults.Web);
     }
     catch (Exception exception) when (exception is not OperationCanceledException)
