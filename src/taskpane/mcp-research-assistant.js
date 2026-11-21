@@ -122,15 +122,33 @@
     state.messages = Array.isArray(saved.messages)
       ? saved.messages.filter(function (item) {
           return item && (item.role === "user" || item.role === "assistant") && typeof item.text === "string";
-        }).slice(-40)
+        }).slice(-60).map(function (item) {
+          return {
+            role: item.role,
+            text: item.text,
+            sources: Array.isArray(item.sources) ? item.sources : [],
+            provider: typeof item.provider === "string" ? item.provider : "",
+            model: typeof item.model === "string" ? item.model : "",
+            createdAt: Number(item.createdAt) || 0
+          };
+        })
       : [];
   }
 
   function saveThread() {
-    localStorage.setItem(THREAD_KEY, JSON.stringify({
+    const record = {
+      version: 2,
       enabled: state.enabled,
-      messages: state.messages.slice(-40)
-    }));
+      updatedAt: Date.now(),
+      messages: state.messages.slice(-60)
+    };
+    try {
+      localStorage.setItem(THREAD_KEY, JSON.stringify(record));
+      return true;
+    } catch (error) {
+      console.warn("تعذر حفظ محادثة البحث السحابي:", error);
+      return false;
+    }
   }
 
   function addStyles() {
@@ -165,13 +183,11 @@
       ".mcp-research-panel button.primary{background:#0b5553;color:white;border-color:#0b5553;}",
       ".mcp-research-panel button:disabled{opacity:.55;cursor:wait;}",
       ".mcp-research-health{font-size:11px;line-height:1.6;margin-top:9px;color:#667772;white-space:pre-wrap;}",
-      ".mcp-research-transcript{display:flex;flex-direction:column;gap:12px;padding:12px 14px 24px;max-width:900px;margin:0 auto;direction:rtl;}",
-      ".mcp-research-message{max-width:92%;border-radius:12px;padding:11px 14px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;font-size:14px;}",
-      ".mcp-research-message.user{align-self:flex-start;background:#edf3ef;color:#183e3b;border:1px solid #dce7e0;}",
-      ".mcp-research-message.assistant{align-self:stretch;background:#fffdf8;color:#183e3b;border:1px solid #e7e4d9;}",
-      ".mcp-research-message.status{font-size:12px;color:#6c7c75;background:transparent;border:0;padding:2px 4px;}",
+      ".mcp-research-transcript{display:flex;flex-direction:column;gap:0;padding:0;max-width:100%;margin:0 auto;direction:rtl;}",
+      ".mcp-research-message{white-space:normal;overflow-wrap:anywhere;}",
+      ".mcp-research-message.status{max-width:100%;font-size:12px;color:#6c7c75;background:transparent;border:0;padding:3px 4px;box-shadow:none;}",
       ".mcp-research-message a{color:#08766e;text-decoration:underline;}",
-      ".mcp-research-caption{font-size:10px;color:#7b8981;margin-bottom:3px;}",
+      ".mcp-research-caption{font-size:10px;color:#7b8981;margin-bottom:5px;}",
       ".mcp-research-panel input:focus,.mcp-research-mode:focus-visible,.mcp-research-settings:focus-visible{outline:2px solid #72a49b;outline-offset:1px;}"
     ].join("\n");
     document.head.appendChild(style);
@@ -297,11 +313,75 @@
     }
   }
 
+  const SAFE_MARKDOWN_TAGS = Object.freeze([
+    "a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+    "hr", "li", "ol", "p", "pre", "strong", "sub", "sup", "table", "tbody", "td",
+    "th", "thead", "tr", "ul"
+  ]);
+
+  function appendSanitizedMarkdownNode(parent, node) {
+    if (node.nodeType === 3) {
+      parent.appendChild(document.createTextNode(node.nodeValue || ""));
+      return;
+    }
+    if (node.nodeType !== 1) return;
+
+    const tag = String(node.tagName || "").toLowerCase();
+    if (tag === "img") {
+      const alt = node.getAttribute("alt");
+      if (alt) parent.appendChild(document.createTextNode(alt));
+      return;
+    }
+
+    if (SAFE_MARKDOWN_TAGS.indexOf(tag) < 0) {
+      Array.prototype.slice.call(node.childNodes || []).forEach(function (child) {
+        appendSanitizedMarkdownNode(parent, child);
+      });
+      return;
+    }
+
+    const clean = document.createElement(tag);
+    if (tag === "a") {
+      const href = String(node.getAttribute("href") || "").trim();
+      if (/^https?:\/\//i.test(href)) {
+        clean.setAttribute("href", href);
+        clean.setAttribute("target", "_blank");
+        clean.setAttribute("rel", "noopener noreferrer");
+      }
+    }
+    Array.prototype.slice.call(node.childNodes || []).forEach(function (child) {
+      appendSanitizedMarkdownNode(clean, child);
+    });
+    parent.appendChild(clean);
+  }
+
+  function renderFormattedText(container, value) {
+    const source = String(value || "");
+    const markdown = window.marked;
+    if (!markdown || typeof markdown.parse !== "function") {
+      appendTextWithLinks(container, source);
+      return;
+    }
+
+    // Escape raw HTML before Markdown parsing. Only generated Markdown elements
+    // are then copied to the live DOM through the allow-list above.
+    const safeSource = source.replace(/<\/?[a-z][^>]*>/gi, function (tag) {
+      return tag.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    });
+    const detached = document.createElement("div");
+    detached.innerHTML = markdown.parse(safeSource, { gfm: true });
+    Array.prototype.slice.call(detached.childNodes || []).forEach(function (node) {
+      appendSanitizedMarkdownNode(container, node);
+    });
+  }
+
   function renderMessage(message, append) {
     const turns = ensureTurns();
     if (!turns) return null;
     const bubble = document.createElement("div");
-    bubble.className = "mcp-research-message " + (message.role === "user" ? "user" : "assistant");
+    bubble.className = message.role === "user"
+      ? "message user-message mcp-research-message"
+      : "message ai-message mcp-research-message";
     if (message.status) bubble.className += " status";
     if (message.role === "assistant" && !message.status) {
       const caption = document.createElement("div");
@@ -310,7 +390,9 @@
       bubble.appendChild(caption);
     }
     const body = document.createElement("div");
-    appendTextWithLinks(body, message.text);
+    body.className = "mcp-research-message-body";
+    if (message.status) body.textContent = String(message.text || "");
+    else renderFormattedText(body, message.text);
     bubble.appendChild(body);
     if (append === false) turns.prepend(bubble);
     else turns.appendChild(bubble);
@@ -332,7 +414,15 @@
   }
 
   function showNotice(text) {
-    renderMessage({ role: "assistant", text: text }, true);
+    const message = {
+      role: "assistant",
+      text: String(text || ""),
+      createdAt: Date.now()
+    };
+    state.messages.push(message);
+    state.messages = state.messages.slice(-60);
+    renderMessage(message, true);
+    saveThread();
   }
 
   function updateModeButton() {
@@ -1054,15 +1144,24 @@
     throw new Error("البحث السحابي عبر MCP متاح حالياً مع Groq وGemini فقط.");
   }
 
-  function formatToolTrace(payload) {
-    const calls = Array.isArray(payload.toolCalls) ? payload.toolCalls : [];
-    if (!calls.length) return "";
-    const labels = calls.map(function (call) {
-      const server = call && call.label ? call.label : (call && call.server ? call.server : "مصدر");
-      const tool = call && call.tool ? call.tool : "";
-      return tool ? server + " (" + tool + ")" : server;
+  function normalizeToolCalls(calls) {
+    return (Array.isArray(calls) ? calls : []).map(function (call) {
+      const server = String(call && call.server || "MCP");
+      const label = String(call && call.label ||
+        (server === "aljam3" ? "الجامع" :
+          (server === "shamela" ? "المكتبة الشاملة" : server)));
+      const tool = String(call && call.tool || "أداة بحث");
+      return { server: server, label: label, tool: tool };
     });
-    return "\n\nالمصادر التي جرى الرجوع إليها: " + labels.join("، ");
+  }
+
+  function formatToolTrace(payload) {
+    const calls = normalizeToolCalls(payload && payload.toolCalls);
+    if (!calls.length) return "";
+    const lines = calls.map(function (call) {
+      return "- **" + call.label + "** — الأداة: `" + call.tool + "`";
+    });
+    return "\n\n---\n\n**المصادر التي جرى الرجوع إليها والأدوات المستخدمة:**\n\n" + lines.join("\n");
   }
 
   async function sendMessage(rawText) {
@@ -1087,9 +1186,10 @@
     const welcome = document.querySelector("#chat-area .welcome");
     if (welcome) welcome.style.display = "none";
 
-    state.messages.push({ role: "user", text: prompt });
-    state.messages = state.messages.slice(-40);
-    renderMessage({ role: "user", text: prompt }, true);
+    const userMessage = { role: "user", text: prompt, createdAt: Date.now() };
+    state.messages.push(userMessage);
+    state.messages = state.messages.slice(-60);
+    renderMessage(userMessage, true);
     saveThread();
 
     const providerName = settings.provider === "groq" ? "Groq" : "Gemini";
@@ -1104,18 +1204,34 @@
 
     try {
       const result = await callCloudResearch(state.messages, settings);
+      const sources = normalizeToolCalls(result.toolCalls);
       const answer = result.answer.trim() + formatToolTrace(result);
       if (status && status.parentNode) status.parentNode.removeChild(status);
-      state.messages.push({ role: "assistant", text: answer });
-      state.messages = state.messages.slice(-40);
-      renderMessage({ role: "assistant", text: answer }, true);
+      const assistantMessage = {
+        role: "assistant",
+        text: answer,
+        sources: sources,
+        provider: result.provider || settings.provider,
+        model: result.model || settings.model,
+        createdAt: Date.now()
+      };
+      state.messages.push(assistantMessage);
+      state.messages = state.messages.slice(-60);
+      renderMessage(assistantMessage, true);
       saveThread();
     } catch (error) {
       if (status && status.parentNode) status.parentNode.removeChild(status);
       const message = error && error.message ? error.message : "حدث خطأ غير متوقع أثناء البحث السحابي.";
-      state.messages.push({ role: "assistant", text: message });
-      state.messages = state.messages.slice(-40);
-      renderMessage({ role: "assistant", text: message }, true);
+      const errorMessage = {
+        role: "assistant",
+        text: message,
+        provider: settings.provider,
+        model: settings.model,
+        createdAt: Date.now()
+      };
+      state.messages.push(errorMessage);
+      state.messages = state.messages.slice(-60);
+      renderMessage(errorMessage, true);
       saveThread();
     } finally {
       state.busy = false;
@@ -1255,7 +1371,8 @@
     const newChat = document.getElementById("new-chat-btn");
     if (newChat) {
       newChat.addEventListener("click", function () {
-        if (state.enabled) window.setTimeout(resetThread, 0);
+        // The MCP thread belongs to the same visible chat, even when source mode is off.
+        window.setTimeout(resetThread, 0);
       }, true);
     }
   }
