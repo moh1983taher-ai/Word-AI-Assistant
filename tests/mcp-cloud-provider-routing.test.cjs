@@ -32,7 +32,7 @@ assert.match(source, /antigravity-preview-09-2026/);
 assert.match(source, /gemini-4-hydrogen/);
 assert.match(source, /GEMINI_API_REVISION = ["\x27]2026-05-20/);
 assert.match(source, /Accept: "text\/event-stream"/);
-assert.match(source, /background: true,[\s\S]*?stream: true/);
+assert.match(source, /background: true,[\s\S]*?stream: true,[\s\S]*?store: true/);
 assert.match(source, /last_event_id=/);
 assert.match(source, /function parseGeminiSseFrame\(frame\)/);
 assert.match(source, /function applyGeminiStreamEvent\(state, event\)/);
@@ -142,7 +142,11 @@ responseHelpers.applyGeminiStreamEvent(streamState, {
 responseHelpers.applyGeminiStreamEvent(streamState, {
   event_type: "interaction.completed",
   event_id: "evt-completed",
-  interaction: { id: "interaction-stream-1", status: "completed" }
+  interaction: {
+    id: "interaction-stream-1",
+    status: "completed",
+    steps: [{ type: "model_output", content: [] }]
+  }
 });
 const streamedPayload = responseHelpers.buildGeminiStreamPayload(streamState);
 assert.equal(streamedPayload.status, "completed");
