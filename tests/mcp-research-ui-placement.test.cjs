@@ -107,8 +107,8 @@ assert.match(
 );
 assert.match(
   uiSource,
-  /newChat\.addEventListener\("click", function \(\) \{\s*\/\/ The MCP thread belongs to the same visible chat, even when source mode is off\.\s*window\.setTimeout\(resetThread, 0\);/,
-  "Starting a new ordinary chat must clear the associated MCP thread."
+  /newChat\.addEventListener\("click", function \(event\) \{[\s\S]*?event\.isTrusted !== true[\s\S]*?window\.setTimeout\(resetThread, 0\);/,
+  "Only an explicit user click may clear the associated MCP thread; synthetic startup clicks must preserve it."
 );
 
 console.log("Cloud MCP research menu and provider integration tests passed.");
