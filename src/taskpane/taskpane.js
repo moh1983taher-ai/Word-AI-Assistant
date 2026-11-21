@@ -23307,6 +23307,37 @@ chats.forEach(
 
                         };
 
+                        // Preserve cloud-MCP provenance as ordinary chat-message metadata.
+                        if (Array.isArray(message.mcpSources)) {
+                            normalizedMessage.mcpSources = message.mcpSources
+                                .filter(function (source) {
+                                    return source && typeof source === "object";
+                                })
+                                .map(function (source) {
+                                    return {
+                                        server: String(source.server || ""),
+                                        label: String(source.label || ""),
+                                        tool: String(source.tool || "")
+                                    };
+                                });
+                        }
+
+                        if (message.mcpProvider) {
+                            normalizedMessage.mcpProvider = String(message.mcpProvider);
+                        }
+
+                        if (message.mcpModel) {
+                            normalizedMessage.mcpModel = String(message.mcpModel);
+                        }
+
+                        if (message.mcpError === true) {
+                            normalizedMessage.mcpError = true;
+                        }
+
+                        if (message.createdAt) {
+                            normalizedMessage.createdAt = String(message.createdAt);
+                        }
+
                         if (message.documentRevision && typeof message.documentRevision === "object") {
                             normalizedMessage.documentRevision = {
                                 id: String(message.documentRevision.id || ""),
@@ -56875,6 +56906,226 @@ if (currentChat) {
     renderChat();
 
 }
+
+
+// =====================================================
+// Unified MCP Chat Bridge
+// يربط بحث المصادر بسجل المحادثة العادية نفسه.
+// =====================================================
+
+function findMcpChat(chatId) {
+    const wantedId = String(chatId || "");
+    if (!wantedId) return null;
+
+    if (currentChat && String(currentChat.id) === wantedId) {
+        return currentChat;
+    }
+
+    return chats.find(function (chat) {
+        return chat && String(chat.id) === wantedId;
+    }) || null;
+}
+
+function appendMcpUserMessage(text) {
+    const prompt = String(text || "").trim();
+    if (!prompt) return "";
+
+    if (!currentChat) {
+        createNewChat();
+    }
+
+    if (!currentChat) return "";
+
+    if (currentChat.isTemporary) {
+        finalizeCurrentChat(prompt);
+    }
+
+    addUserMessage(currentChat, prompt);
+    renderChat();
+    renderSidebarChats();
+    renderRecentChats();
+
+    return String(currentChat.id);
+}
+
+function getMcpChatMessages(chatId) {
+    const chat = findMcpChat(chatId);
+    if (!chat || !Array.isArray(chat.messages)) return [];
+
+    return chat.messages
+        .filter(function (message) {
+            return message && typeof message.text === "string";
+        })
+        .map(function (message) {
+            return {
+                role: message.role === "ai" ? "assistant" : "user",
+                text: String(message.text || "")
+            };
+        });
+}
+
+function appendMcpAssistantMessage(chatId, text, metadata) {
+    const chat = findMcpChat(chatId);
+    if (!chat || !Array.isArray(chats) ||
+        !chats.some(function (item) {
+            return item && String(item.id) === String(chat.id);
+        })) {
+        return false;
+    }
+
+    const details = metadata && typeof metadata === "object" ? metadata : {};
+    const sources = Array.isArray(details.sources)
+        ? details.sources.filter(function (source) {
+            return source && typeof source === "object";
+        }).map(function (source) {
+            return {
+                server: String(source.server || ""),
+                label: String(source.label || ""),
+                tool: String(source.tool || "")
+            };
+        })
+        : [];
+
+    chat.messages.push({
+        role: "ai",
+        text: String(text || ""),
+        citationSources: [],
+        mcpSources: sources,
+        mcpProvider: String(details.provider || ""),
+        mcpModel: String(details.model || ""),
+        mcpError: details.isError === true,
+        createdAt: new Date().toISOString()
+    });
+
+    chat.updatedAt = new Date().toISOString();
+    saveChat(chat);
+
+    if (currentChat && String(currentChat.id) === String(chat.id)) {
+        renderChat();
+    }
+
+    renderSidebarChats();
+    renderRecentChats();
+    return true;
+}
+
+function addMcpPendingMessage(chatId, text) {
+    if (!currentChat || String(currentChat.id) !== String(chatId) || !chatArea) {
+        return null;
+    }
+
+    const pending = document.createElement("div");
+    pending.className = "message ai-message mcp-research-pending";
+    pending.textContent = String(text || "جارٍ البحث في المصادر…");
+    chatArea.appendChild(pending);
+    chatArea.scrollTop = chatArea.scrollHeight;
+    return pending;
+}
+
+function removeMcpPendingMessage(pending) {
+    if (pending && pending.parentNode) {
+        pending.parentNode.removeChild(pending);
+    }
+}
+
+async function importLegacyMcpThread(record) {
+    const legacyKey = "AR_MCP_RESEARCH_THREAD";
+    const migrationKey = "AR_MCP_RESEARCH_THREAD_MIGRATED";
+
+    try {
+        if (localStorage.getItem(migrationKey) === "true") {
+            localStorage.removeItem(legacyKey);
+            return true;
+        }
+
+        const messages = record && Array.isArray(record.messages)
+            ? record.messages.filter(function (message) {
+                return message &&
+                    (message.role === "user" || message.role === "assistant") &&
+                    typeof message.text === "string";
+            }).slice(-60)
+            : [];
+
+        if (!messages.length) {
+            localStorage.setItem(migrationKey, "true");
+            localStorage.removeItem(legacyKey);
+            return true;
+        }
+
+        const firstUserMessage = messages.find(function (message) {
+            return message.role === "user";
+        });
+        const now = new Date().toISOString();
+        const legacyChat = {
+            id: "mcp-legacy-source-thread",
+            title: String(firstUserMessage && firstUserMessage.text || "بحث سابق في المصادر").trim().slice(0, 30),
+            messages: messages.map(function (message) {
+                const sources = Array.isArray(message.sources)
+                    ? message.sources.filter(function (source) {
+                        return source && typeof source === "object";
+                    }).map(function (source) {
+                        return {
+                            server: String(source.server || ""),
+                            label: String(source.label || ""),
+                            tool: String(source.tool || "")
+                        };
+                    })
+                    : [];
+
+                return {
+                    role: message.role === "assistant" ? "ai" : "user",
+                    text: String(message.text || ""),
+                    citationSources: [],
+                    mcpSources: sources,
+                    mcpProvider: String(message.provider || ""),
+                    mcpModel: String(message.model || ""),
+                    createdAt: (function () {
+                        const timestamp = Number(message.createdAt) || Date.parse(message.createdAt);
+                        return Number.isFinite(timestamp) && timestamp > 0
+                            ? new Date(timestamp).toISOString()
+                            : now;
+                    })()
+                };
+            }),
+            isTemporary: false,
+            projectId: null,
+            createdAt: now,
+            updatedAt: now
+        };
+
+        const existingIndex = chats.findIndex(function (chat) {
+            return chat && String(chat.id) === legacyChat.id;
+        });
+
+        if (existingIndex >= 0) {
+            chats[existingIndex] = legacyChat;
+        } else {
+            chats.unshift(legacyChat);
+        }
+
+        await saveChatsToIndexedDB(chats);
+        localStorage.setItem(migrationKey, "true");
+        localStorage.removeItem(legacyKey);
+        renderSidebarChats();
+        renderRecentChats();
+        return true;
+    } catch (error) {
+        console.warn("تعذر ترحيل محادثة المصادر القديمة إلى سجل المحادثات:", error);
+        return false;
+    }
+}
+
+window.WordAIChatBridge = Object.freeze({
+    ready: true,
+    appendUserMessage: appendMcpUserMessage,
+    getMessages: getMcpChatMessages,
+    appendAssistantMessage: appendMcpAssistantMessage,
+    addPendingMessage: addMcpPendingMessage,
+    removePendingMessage: removeMcpPendingMessage,
+    importLegacyThread: importLegacyMcpThread
+});
+
+window.dispatchEvent(new Event("word-ai-chat-ready"));
 
 
 // =====================================================

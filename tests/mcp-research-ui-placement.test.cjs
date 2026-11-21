@@ -9,6 +9,10 @@ const uiSource = fs.readFileSync(
   path.join(root, "src/taskpane/mcp-research-assistant.js"),
   "utf8"
 );
+const appSource = fs.readFileSync(
+  path.join(root, "src/taskpane/taskpane.js"),
+  "utf8"
+);
 const taskpaneHtml = fs.readFileSync(
   path.join(root, "src/taskpane/taskpane.html"),
   "utf8"
@@ -21,94 +25,104 @@ assert.match(taskpaneHtml, /class="scope-panel-content"/, "The plus menu content
 assert.match(
   uiSource,
   /document\.querySelector\("#scope-panel \.scope-panel-content"\)/,
-  "The MCP entry must target the existing plus-menu content."
+  "The source-search option must remain inside the existing plus menu."
 );
-assert.match(
-  uiSource,
-  /scopeMenu\.appendChild\(entry\)/,
-  "The source-search option must remain inside the plus menu."
-);
-assert.match(
-  uiSource,
-  /mcp-research-mode-option/,
-  "The source-search option must have a stable, distinct control."
-);
-assert.match(
-  uiSource,
-  /mcp-research-settings-option/,
-  "The provider-status panel must remain reachable from the plus-menu entry."
-);
+assert.match(uiSource, /mcp-research-mode-option/, "The source switch must retain its stable control ID.");
+assert.match(uiSource, /mcp-research-settings-option/, "The provider-status settings must remain reachable.");
 assert.doesNotMatch(
   uiSource,
   /document\.querySelector\("\.input-tools"\)|toolbar\.insertBefore\(controls/,
-  "The MCP UI must not inject controls into the message composer toolbar."
-);
-assert.match(
-  uiSource,
-  /if \(!state\.enabled\) return;\s*const target = event\.target[\s\S]*?closest\("\#send-btn"\)/,
-  "Normal message submission must remain unchanged unless source-search mode is enabled."
+  "MCP controls must not be injected into the message composer toolbar."
 );
 
-assert.match(
-  uiSource,
-  /const AI_SETTINGS_KEY = ["']AI_SETTINGS["']/,
-  "Cloud research must reuse the existing AI_SETTINGS credential store."
-);
-assert.match(
-  uiSource,
-  /localStorage\.getItem\(AI_SETTINGS_KEY\)/,
-  "Cloud research must read the currently saved provider, key and model."
-);
+assert.match(uiSource, /const AI_SETTINGS_KEY = ["']AI_SETTINGS["']/);
+assert.match(uiSource, /localStorage\.getItem\(AI_SETTINGS_KEY\)/);
 assert.doesNotMatch(
   uiSource,
   /AR_MCP_RESEARCH_SETTINGS|BRIDGE_URL|callLocalResearch|127\.0\.0\.1|DuckAI|Duck\.ai/,
-  "The source-search feature must not retain a separate key store or local DuckAI route."
+  "Cloud source search must reuse the existing provider configuration."
 );
 
 assert.match(
   uiSource,
-  /bubble\.className = message\.role === "user"[\s\S]*?"message user-message mcp-research-message"[\s\S]*?"message ai-message mcp-research-message"/,
-  "MCP turns must use the same message classes as the ordinary chat."
+  /const bridge = window\.WordAIChatBridge[\s\S]*?bridge\.appendUserMessage\(prompt\)[\s\S]*?bridge\.getMessages\(chatId\)/,
+  "MCP questions must enter the currently selected ordinary chat and use its conversation history."
 );
 assert.match(
   uiSource,
-  /function renderFormattedText\(container, value\)[\s\S]*?markdown\.parse\(safeSource, \{ gfm: true \}\)/,
-  "MCP responses must render full Markdown instead of plain text."
+  /bridge\.appendAssistantMessage\(chatId, answer,[\s\S]*?sources: sources,[\s\S]*?provider:[\s\S]*?model:/,
+  "MCP answers and tool provenance must be saved as assistant messages in the same chat."
 );
 assert.match(
   uiSource,
-  /const SAFE_MARKDOWN_TAGS = Object\.freeze\(/,
-  "The Markdown renderer must define an explicit safe element allow-list."
+  /bridge\.addPendingMessage\(\s*chatId[\s\S]*?bridge\.removePendingMessage\(pending\)/,
+  "The pending indicator must be rendered in the native chat without creating another transcript."
 );
 assert.match(
   uiSource,
-  /function appendSanitizedMarkdownNode\(parent, node\)[\s\S]*?SAFE_MARKDOWN_TAGS\.indexOf\(tag\)/,
-  "Markdown output must pass through the safe element allow-list."
-);
-assert.match(
-  uiSource,
-  /function normalizeToolCalls\(calls\)[\s\S]*?function formatToolTrace\(payload\)[\s\S]*?المصادر التي جرى الرجوع إليها والأدوات المستخدمة/,
-  "Tool provenance must be represented as readable source details in the chat."
-);
-assert.match(
-  uiSource,
-  /sources: sources,[\s\S]*?provider: result\.provider[\s\S]*?model: result\.model/,
-  "The saved assistant turn must retain its tool sources, provider and model metadata."
-);
-assert.match(
-  uiSource,
-  /function saveThread\(\)[\s\S]*?version: 2,[\s\S]*?messages: state\.messages\.slice\(-60\)/,
-  "The full MCP conversation, including source details, must be persisted."
-);
-assert.match(
-  uiSource,
-  /function showNotice\(text\)[\s\S]*?state\.messages\.push\(message\)[\s\S]*?saveThread\(\)/,
-  "Assistant notices shown in the chat must also be saved."
-);
-assert.match(
-  uiSource,
-  /newChat\.addEventListener\("click", function \(\) \{\s*\/\/ The MCP thread belongs to the same visible chat, even when source mode is off\.\s*window\.setTimeout\(resetThread, 0\);/,
-  "Starting a new ordinary chat must clear the associated MCP thread."
+  /function toggleMode\(\)[\s\S]*?state\.enabled = !state\.enabled;[\s\S]*?updateModeButton\(\);/,
+  "The source switch must only toggle the processing mode."
 );
 
-console.log("Cloud MCP research menu and provider integration tests passed.");
+const toggleMode = uiSource.slice(
+  uiSource.indexOf("function toggleMode()"),
+  uiSource.indexOf("async function initialize()")
+);
+assert.doesNotMatch(
+  toggleMode,
+  /renderChat|renderThread|appendUserMessage|appendAssistantMessage|saveThread|localStorage/,
+  "Toggling sources must not create, open, clear or persist a separate conversation."
+);
+
+assert.match(uiSource, /const LEGACY_THREAD_KEY = ["']AR_MCP_RESEARCH_THREAD["']/);
+assert.match(
+  uiSource,
+  /bridge\.importLegacyThread\(legacyThread\)/,
+  "The old source-only transcript must be migrated into the normal chat history."
+);
+assert.doesNotMatch(
+  uiSource,
+  /function saveThread\(|state\.messages|renderThread\(|mcp-research-transcript|resetThread\(/,
+  "The MCP module must not maintain or render a parallel chat transcript."
+);
+assert.doesNotMatch(
+  uiSource,
+  /newChat\.addEventListener/,
+  "MCP must not override normal new-chat behavior."
+);
+
+assert.match(
+  appSource,
+  /window\.WordAIChatBridge = Object\.freeze\(/,
+  "The main application must expose a single bridge to its native chat model."
+);
+assert.match(
+  appSource,
+  /function appendMcpUserMessage\(text\)[\s\S]*?createNewChat\(\)[\s\S]*?finalizeCurrentChat\(prompt\)[\s\S]*?addUserMessage\(currentChat, prompt\)/,
+  "A source-search question must use the same create/finalize/save path as an ordinary user message."
+);
+assert.match(
+  appSource,
+  /function getMcpChatMessages\(chatId\)[\s\S]*?role: message\.role === "ai" \? "assistant" : "user"/,
+  "The model must receive the selected chat's existing messages in provider-neutral roles."
+);
+assert.match(
+  appSource,
+  /function appendMcpAssistantMessage\(chatId, text, metadata\)[\s\S]*?role: "ai"[\s\S]*?mcpSources: sources[\s\S]*?saveChat\(chat\)/,
+  "MCP answers and source details must be stored in the ordinary chat object."
+);
+assert.match(
+  appSource,
+  /function importLegacyMcpThread\(record\)[\s\S]*?mcp-legacy-source-thread[\s\S]*?saveChatsToIndexedDB\(chats\)/,
+  "The previously separate source thread must be migrated into the ordinary chat list."
+);
+assert.match(appSource, /normalizedMessage\.mcpSources/);
+assert.match(appSource, /normalizedMessage\.mcpProvider/);
+assert.match(appSource, /normalizedMessage\.mcpModel/);
+assert.match(
+  appSource,
+  /window\.dispatchEvent\(new Event\("word-ai-chat-ready"\)\)/,
+  "The MCP control must initialize only after the native chat bridge is ready."
+);
+
+console.log("Unified MCP and native chat history tests passed.");

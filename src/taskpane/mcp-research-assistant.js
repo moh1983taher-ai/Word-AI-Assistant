@@ -3,7 +3,7 @@
   "use strict";
 
   const AI_SETTINGS_KEY = "AI_SETTINGS";
-  const THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
+  const LEGACY_THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
   const DEFAULT_TIMEOUT_MS = 300000;
   const GROQ_RESPONSES_URL = "https://api.groq.com/openai/v1/responses";
   const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
@@ -44,10 +44,10 @@
   const state = {
     enabled: false,
     busy: false,
-    messages: [],
+    initialized: false,
+    initializing: false,
     settings: null,
     panel: null,
-    turns: null,
     modeButton: null,
     modeStatus: null,
     connection: null
@@ -116,41 +116,6 @@
     return settings || loadSettings();
   }
 
-  function loadThread() {
-    const saved = safeJson(localStorage.getItem(THREAD_KEY), {});
-    state.enabled = saved.enabled === true;
-    state.messages = Array.isArray(saved.messages)
-      ? saved.messages.filter(function (item) {
-          return item && (item.role === "user" || item.role === "assistant") && typeof item.text === "string";
-        }).slice(-60).map(function (item) {
-          return {
-            role: item.role,
-            text: item.text,
-            sources: Array.isArray(item.sources) ? item.sources : [],
-            provider: typeof item.provider === "string" ? item.provider : "",
-            model: typeof item.model === "string" ? item.model : "",
-            createdAt: Number(item.createdAt) || 0
-          };
-        })
-      : [];
-  }
-
-  function saveThread() {
-    const record = {
-      version: 2,
-      enabled: state.enabled,
-      updatedAt: Date.now(),
-      messages: state.messages.slice(-60)
-    };
-    try {
-      localStorage.setItem(THREAD_KEY, JSON.stringify(record));
-      return true;
-    } catch (error) {
-      console.warn("تعذر حفظ محادثة البحث السحابي:", error);
-      return false;
-    }
-  }
-
   function addStyles() {
     if (document.getElementById("mcp-research-styles")) return;
     const style = document.createElement("style");
@@ -183,11 +148,7 @@
       ".mcp-research-panel button.primary{background:#0b5553;color:white;border-color:#0b5553;}",
       ".mcp-research-panel button:disabled{opacity:.55;cursor:wait;}",
       ".mcp-research-health{font-size:11px;line-height:1.6;margin-top:9px;color:#667772;white-space:pre-wrap;}",
-      ".mcp-research-transcript{display:flex;flex-direction:column;gap:0;padding:0;max-width:100%;margin:0 auto;direction:rtl;}",
-      ".mcp-research-message{white-space:normal;overflow-wrap:anywhere;}",
-      ".mcp-research-message.status{max-width:100%;font-size:12px;color:#6c7c75;background:transparent;border:0;padding:3px 4px;box-shadow:none;}",
-      ".mcp-research-message a{color:#08766e;text-decoration:underline;}",
-      ".mcp-research-caption{font-size:10px;color:#7b8981;margin-bottom:5px;}",
+      ".mcp-research-pending{white-space:pre-wrap;}",
       ".mcp-research-panel input:focus,.mcp-research-mode:focus-visible,.mcp-research-settings:focus-visible{outline:2px solid #72a49b;outline-offset:1px;}"
     ].join("\n");
     document.head.appendChild(style);
@@ -271,169 +232,30 @@
     renderProviderStatus(health);
   }
 
-  function ensureTurns() {
-    const chatArea = document.getElementById("chat-area");
-    if (!chatArea) return null;
-    let turns = document.getElementById("mcp-research-transcript");
-    if (!turns) {
-      turns = document.createElement("div");
-      turns.id = "mcp-research-transcript";
-      turns.className = "mcp-research-transcript";
-      chatArea.appendChild(turns);
+  function showNotice(message) {
+    const notice = String(message || "");
+    if (state.modeStatus) {
+      state.modeStatus.textContent = "غير جاهز";
     }
-    state.turns = turns;
-    return turns;
-  }
-
-  function appendTextWithLinks(container, value) {
-    const text = String(value || "");
-    const urlPattern = /https?:\/\/[^\s<>"']+/g;
-    let cursor = 0;
-    let match;
-    while ((match = urlPattern.exec(text)) !== null) {
-      const rawUrl = match[0];
-      const trailing = rawUrl.match(/[)\].،؛,:!?]+$/);
-      const url = trailing ? rawUrl.slice(0, -trailing[0].length) : rawUrl;
-      if (match.index > cursor) {
-        container.appendChild(document.createTextNode(text.slice(cursor, match.index)));
-      }
-      if (url) {
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.target = "_blank";
-        anchor.rel = "noopener noreferrer";
-        anchor.textContent = url;
-        container.appendChild(anchor);
-      }
-      if (trailing) container.appendChild(document.createTextNode(trailing[0]));
-      cursor = match.index + rawUrl.length;
+    if (state.modeButton) {
+      state.modeButton.title = notice;
+      state.modeButton.setAttribute("aria-invalid", "true");
     }
-    if (cursor < text.length) {
-      container.appendChild(document.createTextNode(text.slice(cursor)));
-    }
-  }
-
-  const SAFE_MARKDOWN_TAGS = Object.freeze([
-    "a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6",
-    "hr", "li", "ol", "p", "pre", "strong", "sub", "sup", "table", "tbody", "td",
-    "th", "thead", "tr", "ul"
-  ]);
-
-  function appendSanitizedMarkdownNode(parent, node) {
-    if (node.nodeType === 3) {
-      parent.appendChild(document.createTextNode(node.nodeValue || ""));
-      return;
-    }
-    if (node.nodeType !== 1) return;
-
-    const tag = String(node.tagName || "").toLowerCase();
-    if (tag === "img") {
-      const alt = node.getAttribute("alt");
-      if (alt) parent.appendChild(document.createTextNode(alt));
-      return;
-    }
-
-    if (SAFE_MARKDOWN_TAGS.indexOf(tag) < 0) {
-      Array.prototype.slice.call(node.childNodes || []).forEach(function (child) {
-        appendSanitizedMarkdownNode(parent, child);
-      });
-      return;
-    }
-
-    const clean = document.createElement(tag);
-    if (tag === "a") {
-      const href = String(node.getAttribute("href") || "").trim();
-      if (/^https?:\/\//i.test(href)) {
-        clean.setAttribute("href", href);
-        clean.setAttribute("target", "_blank");
-        clean.setAttribute("rel", "noopener noreferrer");
-      }
-    }
-    Array.prototype.slice.call(node.childNodes || []).forEach(function (child) {
-      appendSanitizedMarkdownNode(clean, child);
-    });
-    parent.appendChild(clean);
-  }
-
-  function renderFormattedText(container, value) {
-    const source = String(value || "");
-    const markdown = window.marked;
-    if (!markdown || typeof markdown.parse !== "function") {
-      appendTextWithLinks(container, source);
-      return;
-    }
-
-    // Escape raw HTML before Markdown parsing. Only generated Markdown elements
-    // are then copied to the live DOM through the allow-list above.
-    const safeSource = source.replace(/<\/?[a-z][^>]*>/gi, function (tag) {
-      return tag.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    });
-    const detached = document.createElement("div");
-    detached.innerHTML = markdown.parse(safeSource, { gfm: true });
-    Array.prototype.slice.call(detached.childNodes || []).forEach(function (node) {
-      appendSanitizedMarkdownNode(container, node);
-    });
-  }
-
-  function renderMessage(message, append) {
-    const turns = ensureTurns();
-    if (!turns) return null;
-    const bubble = document.createElement("div");
-    bubble.className = message.role === "user"
-      ? "message user-message mcp-research-message"
-      : "message ai-message mcp-research-message";
-    if (message.status) bubble.className += " status";
-    if (message.role === "assistant" && !message.status) {
-      const caption = document.createElement("div");
-      caption.className = "mcp-research-caption";
-      caption.textContent = "أدوات الباحث · بحث سحابي موثق عبر MCP";
-      bubble.appendChild(caption);
-    }
-    const body = document.createElement("div");
-    body.className = "mcp-research-message-body";
-    if (message.status) body.textContent = String(message.text || "");
-    else renderFormattedText(body, message.text);
-    bubble.appendChild(body);
-    if (append === false) turns.prepend(bubble);
-    else turns.appendChild(bubble);
-    const chatArea = document.getElementById("chat-area");
-    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
-    return bubble;
-  }
-
-  function renderThread() {
-    const turns = ensureTurns();
-    if (!turns) return;
-    turns.textContent = "";
-    const welcome = document.querySelector("#chat-area .welcome");
-    if (state.messages.length && welcome) welcome.style.display = "none";
-    else if (welcome) welcome.style.display = "";
-    state.messages.forEach(function (message) {
-      renderMessage(message, true);
-    });
-  }
-
-  function showNotice(text) {
-    const message = {
-      role: "assistant",
-      text: String(text || ""),
-      createdAt: Date.now()
-    };
-    state.messages.push(message);
-    state.messages = state.messages.slice(-60);
-    renderMessage(message, true);
-    saveThread();
+    console.warn("[MCP research]", notice);
   }
 
   function updateModeButton() {
     if (!state.modeButton) return;
     state.modeButton.setAttribute("aria-pressed", state.enabled ? "true" : "false");
     state.modeButton.disabled = state.busy;
+    state.modeButton.removeAttribute("aria-invalid");
     state.modeButton.title = state.enabled
-      ? "البحث السحابي بالمصادر مفعّل؛ اضغط لإيقافه والعودة إلى المحادثة العادية"
-      : "تفعيل البحث بالمصادر باستخدام Groq أو Gemini";
+      ? "البحث بالمصادر مفعّل للرسالة التالية؛ اضغط لإيقافه"
+      : "استخدم مصادر MCP في الرسالة التالية";
     if (state.modeStatus) {
-      state.modeStatus.textContent = state.enabled ? "مفعّل" : "غير مفعّل";
+      state.modeStatus.textContent = state.busy
+        ? "جارٍ البحث"
+        : (state.enabled ? "مفعّل" : "غير مفعّل");
     }
   }
 
@@ -1168,6 +990,12 @@
     const prompt = String(rawText || "").trim();
     if (!prompt || state.busy) return;
 
+    const bridge = window.WordAIChatBridge;
+    if (!bridge || bridge.ready !== true) {
+      showNotice("تعذر الوصول إلى سجل المحادثات الأصلي في أدوات الباحث. أعد فتح الأداة وحاول مرة أخرى.");
+      return;
+    }
+
     const settings = loadSettings();
     state.settings = settings;
     try {
@@ -1177,62 +1005,48 @@
       return;
     }
 
+    const chatId = bridge.appendUserMessage(prompt);
+    if (!chatId) {
+      showNotice("تعذر إضافة السؤال إلى المحادثة الحالية.");
+      return;
+    }
+
     const input = document.getElementById("user-input");
     if (input) {
       input.value = "";
       input.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
-    const welcome = document.querySelector("#chat-area .welcome");
-    if (welcome) welcome.style.display = "none";
-
-    const userMessage = { role: "user", text: prompt, createdAt: Date.now() };
-    state.messages.push(userMessage);
-    state.messages = state.messages.slice(-60);
-    renderMessage(userMessage, true);
-    saveThread();
-
+    const history = bridge.getMessages(chatId);
     const providerName = settings.provider === "groq" ? "Groq" : "Gemini";
-    const status = renderMessage({
-      role: "assistant",
-      text: "يتصل بـ " + providerName + " وينفذ البحث مباشرة عبر خادمي MCP…",
-      status: true
-    }, true);
+    const pending = bridge.addPendingMessage(
+      chatId,
+      "يتصل بـ " + providerName + " وينفذ البحث مباشرة عبر خادمي MCP…"
+    );
 
     state.busy = true;
     updateModeButton();
 
     try {
-      const result = await callCloudResearch(state.messages, settings);
+      const result = await callCloudResearch(history, settings);
       const sources = normalizeToolCalls(result.toolCalls);
       const answer = result.answer.trim() + formatToolTrace(result);
-      if (status && status.parentNode) status.parentNode.removeChild(status);
-      const assistantMessage = {
-        role: "assistant",
-        text: answer,
+      bridge.removePendingMessage(pending);
+      bridge.appendAssistantMessage(chatId, answer, {
         sources: sources,
         provider: result.provider || settings.provider,
-        model: result.model || settings.model,
-        createdAt: Date.now()
-      };
-      state.messages.push(assistantMessage);
-      state.messages = state.messages.slice(-60);
-      renderMessage(assistantMessage, true);
-      saveThread();
+        model: result.model || settings.model
+      });
     } catch (error) {
-      if (status && status.parentNode) status.parentNode.removeChild(status);
-      const message = error && error.message ? error.message : "حدث خطأ غير متوقع أثناء البحث السحابي.";
-      const errorMessage = {
-        role: "assistant",
-        text: message,
+      bridge.removePendingMessage(pending);
+      const message = error && error.message
+        ? error.message
+        : "حدث خطأ غير متوقع أثناء البحث السحابي.";
+      bridge.appendAssistantMessage(chatId, message, {
         provider: settings.provider,
         model: settings.model,
-        createdAt: Date.now()
-      };
-      state.messages.push(errorMessage);
-      state.messages = state.messages.slice(-60);
-      renderMessage(errorMessage, true);
-      saveThread();
+        isError: true
+      });
     } finally {
       state.busy = false;
       updateModeButton();
@@ -1250,31 +1064,34 @@
       state.settings = settings;
     }
 
+    // The source switch changes only how the next message is processed.
+    // It never creates, opens, clears, or restores a separate conversation.
     state.enabled = !state.enabled;
-    saveThread();
     updateModeButton();
-    if (state.enabled) {
-      renderThread();
-      showNotice("تم تفعيل البحث السحابي بالمصادر. تُستخدم إعدادات المزود والمفتاح المحفوظة في إعدادات الذكاء الاصطناعي العامة، وتُنفذ أدوات البحث عن بُعد دون خادم محلي.");
-    }
   }
 
-  function resetThread() {
-    state.messages = [];
-    saveThread();
-    if (state.turns) state.turns.remove();
-    state.turns = null;
-    const welcome = document.querySelector("#chat-area .welcome");
-    if (welcome) welcome.style.display = "";
-  }
+  async function initialize() {
+    if (state.initialized || state.initializing || document.getElementById("mcp-research-entry")) return;
 
-  function initialize() {
-    if (document.getElementById("mcp-research-entry")) return;
+    const bridge = window.WordAIChatBridge;
+    if (!bridge || bridge.ready !== true) return;
+
     const scopeMenu = document.querySelector("#scope-panel .scope-panel-content");
     const inputArea = document.querySelector(".input-area");
     if (!scopeMenu || !inputArea || !document.getElementById("send-btn")) return;
 
-    loadThread();
+    state.initializing = true;
+    try {
+      const legacyThread = safeJson(localStorage.getItem(LEGACY_THREAD_KEY), null);
+      if (legacyThread) {
+        const migrated = await bridge.importLegacyThread(legacyThread);
+        if (!migrated) {
+          console.warn("سيُعاد لاحقاً ترحيل سجل بحث المصادر القديم إلى المحادثات العادية.");
+        }
+      }
+    } catch (error) {
+      console.warn("تعذر ترحيل سجل المصادر القديم:", error);
+    }
     state.settings = loadSettings();
     addStyles();
 
@@ -1346,7 +1163,8 @@
     });
 
     updateModeButton();
-    if (state.messages.length) renderThread();
+    state.initialized = true;
+    state.initializing = false;
 
     window.addEventListener("click", function (event) {
       if (!state.enabled) return;
@@ -1368,14 +1186,10 @@
       sendMessage(event.target.value);
     }, true);
 
-    const newChat = document.getElementById("new-chat-btn");
-    if (newChat) {
-      newChat.addEventListener("click", function () {
-        // The MCP thread belongs to the same visible chat, even when source mode is off.
-        window.setTimeout(resetThread, 0);
-      }, true);
-    }
   }
+
+  window.addEventListener("word-ai-chat-ready", initialize);
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initialize, { once: true });
   } else {
