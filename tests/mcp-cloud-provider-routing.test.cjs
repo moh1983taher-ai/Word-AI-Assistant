@@ -193,6 +193,7 @@ assert.ok(mcpConfigStart >= 0 && mcpToolsEnd > mcpConfigStart, "MCP selection he
 const selectionHelperSource = [
   'const SELECTED_SERVERS_KEY = "AR_MCP_SELECTED_SERVERS";',
   'const DEFAULT_SELECTED_SERVER_IDS = Object.freeze(["aljam3", "shamela"]);',
+  'function safeJson(value, fallback) { try { return value ? JSON.parse(value) : fallback; } catch (_) { return fallback; } }',
   source.slice(mcpConfigStart, mcpToolsEnd),
   'globalThis.__mcpSelectionHelpers = { normalizeSelectedServerIds, loadSelectedServerIds, saveSelectedServerIds, getSelectedMcpServers, getGroqTools, getGeminiTools };'
 ].join("\n");
