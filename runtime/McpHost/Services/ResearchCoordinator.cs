@@ -85,8 +85,9 @@ public sealed class ResearchCoordinator
             // The installed DuckAI endpoint was verified to return ordinary text even when
             // tool_choice forces a specific function. Use the explicit JSON decision protocol
             // from the first turn rather than mistaking a plain-text answer for an MCP search.
-            var requiresMcpSources = ResearchIntentClassifier.RequiresMcpSources(
-                incoming.LastOrDefault(message => message.Role == "user")?.Content);
+            // This endpoint is invoked only after the user explicitly activates MCP research.
+            // Every selected library must therefore return a successful tool result before final.
+            var requiresMcpSources = selectedServerIds.Count > 0;
             var selectedLabels = selectedServerIds
                 .Select(ResearchSourceSelection.GetLabel);
             var systemPrompt = BuildSystemPrompt(activeTools, warnings) +
