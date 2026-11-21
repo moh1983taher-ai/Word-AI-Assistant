@@ -34,7 +34,7 @@ assert.match(source, /GROQ_REMOTE_MCP_MODELS\.indexOf\(settings\.model\)/);
 
 assert.match(source, /https:\/\/generativelanguage\.googleapis\.com\/v1beta\/interactions/);
 assert.doesNotMatch(source, /antigravity-preview|gemini-4-hydrogen|GEMINI_API_REVISION|Api-Revision/);
-assert.match(source, /model: settings\.model,[\s\S]*?input: buildResearchInput\(messages\)/);
+assert.match(source, /model: settings\.model,[\s\S]*?input: buildResearchInput\(messages, selectedServerIds\)/);
 assert.match(source, /model: settings\.model,[\s\S]*?provider: "gemini"/);
 assert.ok(source.includes('"Accept": "text/event-stream"'));
 assert.match(source, /background: true,[\s\S]*?stream: true,[\s\S]*?store: true/);
