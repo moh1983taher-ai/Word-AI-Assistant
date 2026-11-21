@@ -53,35 +53,10 @@ public sealed class DuckAiClient
             {
                 try
                 {
-                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    timeout.CancelAfter(TimeSpan.FromSeconds(8));
-                    using var response = await _http.GetAsync(
-                        $"{baseAddress}/v1/models",
-                        HttpCompletionOption.ResponseHeadersRead,
-                        timeout.Token);
-                    var body = await response.Content.ReadAsStringAsync(timeout.Token);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        failures.Add($"{baseAddress} HTTP {(int)response.StatusCode}");
-                        continue;
-                    }
-
-                    using var document = JsonDocument.Parse(body);
-                    var models = ReadModels(document.RootElement);
-                    if (models.Count == 0)
-                    {
-                        failures.Add($"{baseAddress} returned an empty model list");
-                        continue;
-                    }
-
-                    var defaultModel = models.FirstOrDefault(model =>
-                        model.Contains("luna", StringComparison.OrdinalIgnoreCase)) ?? models[0];
-
-                    _cachedSnapshot = new DuckAiModelSnapshot(baseAddress, defaultModel, models);
-                    _snapshotExpiresAt = DateTimeOffset.UtcNow.Add(ModelCacheLifetime);
-                    _log.Info($"DuckAI endpoint selected: {baseAddress}; modelCount={models.Count}; default={defaultModel}.");
-                    return _cachedSnapshot;
+                    var snapshot = await DiscoverModelsAtEndpointAsync(baseAddress, cancellationToken);
+                    CacheSnapshot(snapshot);
+                    _log.Info($"DuckAI model endpoint discovered: {baseAddress}; modelCount={snapshot.Models.Count}; default={snapshot.DefaultModel}.");
+                    return snapshot;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -89,7 +64,7 @@ public sealed class DuckAiClient
                 }
                 catch (Exception exception)
                 {
-                    failures.Add($"{baseAddress}: {exception.GetType().Name}");
+                    failures.Add($"{baseAddress}: {exception.GetType().Name}: {exception.Message}");
                 }
             }
 
@@ -102,20 +77,133 @@ public sealed class DuckAiClient
         }
     }
 
+    private async Task<DuckAiModelSnapshot> DiscoverModelsAtEndpointAsync(
+        string baseAddress,
+        CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(8));
+
+        using var response = await _http.GetAsync(
+            $"{baseAddress}/v1/models",
+            HttpCompletionOption.ResponseHeadersRead,
+            timeout.Token);
+        var body = await response.Content.ReadAsStringAsync(timeout.Token);
+
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException(
+                $"DuckAI model-list HTTP {(int)response.StatusCode} at {baseAddress}: {Limit(body, 500)}",
+                null,
+                response.StatusCode);
+
+        using var document = JsonDocument.Parse(body);
+        var models = ReadModels(document.RootElement);
+        if (models.Count == 0)
+            throw new InvalidOperationException($"{baseAddress} returned an empty model list.");
+
+        var defaultModel = models.FirstOrDefault(model =>
+            model.Contains("luna", StringComparison.OrdinalIgnoreCase)) ?? models[0];
+
+        return new DuckAiModelSnapshot(baseAddress, defaultModel, models);
+    }
+
+    private void CacheSnapshot(DuckAiModelSnapshot snapshot)
+    {
+        _cachedSnapshot = snapshot;
+        _snapshotExpiresAt = DateTimeOffset.UtcNow.Add(ModelCacheLifetime);
+    }
+
     public async Task<DuckAiCompletion> CompleteAsync(
         string requestedModel,
         IReadOnlyList<DuckChatMessage> messages,
         IReadOnlyList<DuckFunctionTool>? functionTools,
         CancellationToken cancellationToken)
     {
-        var snapshot = await GetModelsAsync(cancellationToken);
-        var model = string.IsNullOrWhiteSpace(requestedModel)
-            ? snapshot.DefaultModel
-            : requestedModel.Trim();
+        var preferredSnapshot = await GetModelsAsync(cancellationToken);
+        var endpoints = new[] { preferredSnapshot.BaseAddress }
+            .Concat(CandidateBaseAddresses.Where(address =>
+                !string.Equals(address, preferredSnapshot.BaseAddress, StringComparison.OrdinalIgnoreCase)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
-        if (!snapshot.Models.Contains(model, StringComparer.Ordinal))
-            throw new InvalidOperationException($"النموذج غير متاح محلياً: {model}");
+        var failures = new List<string>();
+        foreach (var baseAddress in endpoints)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
 
+            DuckAiModelSnapshot snapshot;
+            try
+            {
+                snapshot = string.Equals(
+                    baseAddress, preferredSnapshot.BaseAddress, StringComparison.OrdinalIgnoreCase)
+                    ? preferredSnapshot
+                    : await DiscoverModelsAtEndpointAsync(baseAddress, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                failures.Add($"{baseAddress} model discovery: {exception.GetType().Name}: {exception.Message}");
+                _log.Warning($"DuckAI model discovery failed at {baseAddress}: {exception.GetType().Name}.");
+                continue;
+            }
+
+            var model = string.IsNullOrWhiteSpace(requestedModel)
+                ? snapshot.DefaultModel
+                : requestedModel.Trim();
+
+            if (!snapshot.Models.Contains(model, StringComparer.Ordinal))
+            {
+                failures.Add($"{baseAddress}: requested model is not listed ({model}).");
+                continue;
+            }
+
+            try
+            {
+                var completion = await CompleteAtEndpointAsync(
+                    snapshot, model, messages, functionTools, cancellationToken);
+
+                CacheSnapshot(snapshot);
+                if (!string.Equals(
+                    snapshot.BaseAddress, preferredSnapshot.BaseAddress, StringComparison.OrdinalIgnoreCase))
+                {
+                    _log.Warning(
+                        $"DuckAI inference endpoint switched from {preferredSnapshot.BaseAddress} to {snapshot.BaseAddress} after the preferred endpoint failed.");
+                }
+
+                return completion;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException exception)
+            {
+                failures.Add($"{baseAddress}: inference timed out after 55 seconds.");
+                _log.Warning($"DuckAI inference timed out at {baseAddress}; trying the next local endpoint.");
+            }
+            catch (HttpRequestException exception) when (IsRetryableEndpointFailure(exception.StatusCode))
+            {
+                var status = exception.StatusCode is null ? "connection failure" : $"HTTP {(int)exception.StatusCode.Value}";
+                failures.Add($"{baseAddress} {status}: {exception.Message}");
+                _log.Warning($"DuckAI inference failed at {baseAddress} ({status}); trying the next local endpoint.");
+            }
+        }
+
+        throw new HttpRequestException(
+            "تعذر توليد الإجابة عبر واجهات DuckAI المحلية. جُرّبت جميع الواجهات المتاحة: " +
+            string.Join(" | ", failures));
+    }
+
+    private async Task<DuckAiCompletion> CompleteAtEndpointAsync(
+        DuckAiModelSnapshot snapshot,
+        string model,
+        IReadOnlyList<DuckChatMessage> messages,
+        IReadOnlyList<DuckFunctionTool>? functionTools,
+        CancellationToken cancellationToken)
+    {
         var payload = new Dictionary<string, object?>
         {
             ["model"] = model,
@@ -133,7 +221,7 @@ public sealed class DuckAiClient
         }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(175));
+        timeout.CancelAfter(TimeSpan.FromSeconds(55));
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post, $"{snapshot.BaseAddress}/v1/chat/completions")
@@ -162,12 +250,26 @@ public sealed class DuckAiClient
             }
 
             throw new HttpRequestException(
-                $"DuckAI HTTP {(int)response.StatusCode}: {Limit(responseBody, 1800)}",
+                $"DuckAI HTTP {(int)response.StatusCode} at {snapshot.BaseAddress}: {Limit(responseBody, 1800)}",
                 null, response.StatusCode);
         }
 
         using var document = JsonDocument.Parse(responseBody);
         return ParseChatCompletion(document.RootElement, model);
+    }
+
+    private static bool IsRetryableEndpointFailure(HttpStatusCode? statusCode)
+    {
+        if (statusCode is null) return true;
+
+        return statusCode is HttpStatusCode.RequestTimeout
+            or HttpStatusCode.InternalServerError
+            or HttpStatusCode.BadGateway
+            or HttpStatusCode.ServiceUnavailable
+            or HttpStatusCode.GatewayTimeout
+            or HttpStatusCode.NotFound
+            or HttpStatusCode.MethodNotAllowed
+            || (int)statusCode.Value == 501;
     }
 
     private async Task<DuckAiCompletion> CompleteWithResponsesApiAsync(
@@ -189,7 +291,7 @@ public sealed class DuckAiClient
         };
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(175));
+        timeout.CancelAfter(TimeSpan.FromSeconds(55));
         using var response = await _http.PostAsJsonAsync(
             $"{snapshot.BaseAddress}/v1/responses", payload, JsonDefaults.Web, timeout.Token);
         var body = await response.Content.ReadAsStringAsync(timeout.Token);
