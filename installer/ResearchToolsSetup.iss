@@ -1,5 +1,5 @@
 #define AppName "ResearchTools Setup"
-#define AppVersion "1.1.2"
+#define AppVersion "1.1.3"
 
 [Setup]
 AppId={{6F31C2B4-8D31-4C81-97A9-4B9E7932C8C1}
