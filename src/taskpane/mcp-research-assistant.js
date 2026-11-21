@@ -1370,8 +1370,10 @@
 
     const newChat = document.getElementById("new-chat-btn");
     if (newChat) {
-      newChat.addEventListener("click", function () {
-        // The MCP thread belongs to the same visible chat, even when source mode is off.
+      newChat.addEventListener("click", function (event) {
+        // Clear the MCP transcript only for an explicit user action. The main
+        // chat may dispatch a synthetic click while initializing on page load.
+        if (!event || event.isTrusted !== true) return;
         window.setTimeout(resetThread, 0);
       }, true);
     }
