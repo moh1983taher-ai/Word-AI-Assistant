@@ -7,9 +7,6 @@
   const DEFAULT_TIMEOUT_MS = 300000;
   const GROQ_RESPONSES_URL = "https://api.groq.com/openai/v1/responses";
   const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
-  const GEMINI_MCP_AGENT = "antigravity-preview-09-2026";
-  const GEMINI_MCP_MODEL = "gemini-4-hydrogen";
-  const GEMINI_API_REVISION = "2026-05-20";
   const GEMINI_STREAM_TIMEOUT_MS = 20 * 60 * 1000;
   const GEMINI_STREAM_RECONNECT_LIMIT = 3;
 
@@ -97,10 +94,13 @@
       return { ready: true, title: "Groq جاهز للبحث السحابي عبر MCP", detail: "النموذج: " + current.model };
     }
     if (current.provider === "gemini") {
+      if (!current.model) {
+        return { ready: false, title: "لم يُحدد نموذج Gemini", detail: "اختر نموذج Gemini من قائمة النماذج في إعدادات الذكاء الاصطناعي العامة." };
+      }
       return {
         ready: true,
         title: "Gemini جاهز للبحث السحابي عبر MCP",
-        detail: "يستخدم هذا المسار وكيل Antigravity المُدار بنموذج Gemini 4 Hydrogen، ولا يغيّر نموذج المحادثة العادية."
+        detail: "النموذج المختار من إعدادات الذكاء الاصطناعي العامة: " + current.model
       };
     }
     return {
@@ -226,7 +226,7 @@
 
     const note = document.createElement("p");
     note.className = "mcp-note";
-    note.textContent = "تستخدم هذه الميزة المزود والمفتاح والنموذج المحفوظة في إعدادات الذكاء الاصطناعي العامة؛ لا يوجد مفتاح ثانٍ أو خادم محلي. يدعم Groq الاتصال المباشر بخادمي MCP، ويستخدم Gemini وكيل Antigravity المُدار. يتطلب مسار Gemini حفظ التفاعل لدى Google وفق مدة الاحتفاظ وإعدادات المشروع. تقتصر الأدوات المتاحة على البحث والقراءة.";
+    note.textContent = "تستخدم هذه الميزة المزود والمفتاح والنموذج المحفوظة في إعدادات الذكاء الاصطناعي العامة؛ لا يوجد مفتاح ثانٍ أو خادم محلي. يدعم Groq الاتصال المباشر بخادمي MCP، ويستخدم Gemini النموذج المحدد في إعدادات الذكاء الاصطناعي العامة مباشرةً، دون فرض وكيل أو نموذج ثابت. يتطلب مسار Gemini حفظ التفاعل لدى Google وفق مدة الاحتفاظ وإعدادات المشروع. تقتصر الأدوات المتاحة على البحث والقراءة.";
     panel.appendChild(note);
 
     const health = document.createElement("div");
@@ -811,8 +811,7 @@
     const headers = {
       "Content-Type": "application/json",
       "Accept": "text/event-stream",
-      "x-goog-api-key": apiKey,
-      "Api-Revision": GEMINI_API_REVISION
+      "x-goog-api-key": apiKey
     };
 
     const requestOptions = {
@@ -876,8 +875,7 @@
               credentials: "omit",
               headers: {
                 "Accept": "text/event-stream",
-                "x-goog-api-key": apiKey,
-                "Api-Revision": GEMINI_API_REVISION
+                "x-goog-api-key": apiKey
               },
               signal: controller ? controller.signal : undefined
             });
@@ -1022,15 +1020,8 @@
 
   async function callGeminiResearch(messages, settings) {
     const payload = await postGeminiInteractionStream({
-      agent: GEMINI_MCP_AGENT,
+      model: settings.model,
       input: buildResearchInput(messages),
-      environment: "remote",
-      // Keep the managed-agent SSE stream open through interaction.completed.
-      // This avoids the stalled background-polling path reproduced with the September Antigravity agent.
-      agent_config: {
-        type: "antigravity",
-        model: GEMINI_MCP_MODEL
-      },
       tools: getGeminiTools()
     }, settings.key);
 
@@ -1050,7 +1041,7 @@
     return {
       answer: validated.answer,
       toolCalls: validated.toolCalls,
-      model: GEMINI_MCP_MODEL,
+      model: settings.model,
       provider: "gemini"
     };
   }
