@@ -9,6 +9,9 @@
   const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
   const GEMINI_MCP_AGENT = "antigravity-preview-09-2026";
   const GEMINI_MCP_MODEL = "gemini-4-hydrogen";
+  const GEMINI_API_REVISION = "2026-05-20";
+  const GEMINI_STREAM_TIMEOUT_MS = 20 * 60 * 1000;
+  const GEMINI_STREAM_RECONNECT_LIMIT = 3;
 
   const GROQ_REMOTE_MCP_MODELS = Object.freeze([
     "openai/gpt-oss-20b",
@@ -589,6 +592,333 @@
       (errors.length ? "؛ أخطاء الوكيل=" + errors.join(" | ") : "");
   }
 
+  function parseGeminiSseFrame(frame) {
+    const lines = String(frame || "").split(/\r\n|\n|\r/);
+    let eventName = "";
+    let eventId = "";
+    const dataLines = [];
+
+    lines.forEach(function (line) {
+      if (!line || line.charAt(0) === ":") return;
+      const separator = line.indexOf(":");
+      const field = separator < 0 ? line : line.slice(0, separator);
+      let value = separator < 0 ? "" : line.slice(separator + 1);
+      if (value.charAt(0) === " ") value = value.slice(1);
+      if (field === "event") eventName = value;
+      else if (field === "id") eventId = value;
+      else if (field === "data") dataLines.push(value);
+    });
+
+    if (!dataLines.length) return null;
+    const data = dataLines.join("\n");
+    if (data === "[DONE]") return { event_type: "stream.done", event_id: eventId };
+
+    let parsed;
+    try {
+      parsed = JSON.parse(data);
+    } catch (_) {
+      return null;
+    }
+    if (!parsed || typeof parsed !== "object") return null;
+    if (!parsed.event_type && eventName) parsed.event_type = eventName;
+    if (!parsed.event_id && eventId) parsed.event_id = eventId;
+    return parsed;
+  }
+
+  function createGeminiStreamState() {
+    return {
+      interaction: {},
+      stepsByIndex: {},
+      lastEventId: "",
+      completed: false,
+      error: null
+    };
+  }
+
+  function mergeGeminiStreamStep(state, index, delta) {
+    if (index === undefined || index === null || !delta || typeof delta !== "object") return;
+    const key = String(index);
+    const step = state.stepsByIndex[key] || {};
+    const type = delta.type || "";
+
+    if (type === "text") {
+      if (!step.type) step.type = "model_output";
+      if (step.type === "model_output") {
+        const content = Array.isArray(step.content) ? step.content : [];
+        let textPart = null;
+        for (let i = 0; i < content.length; i += 1) {
+          if (content[i] && content[i].type === "text") {
+            textPart = content[i];
+            break;
+          }
+        }
+        if (!textPart) {
+          textPart = { type: "text", text: "" };
+          content.push(textPart);
+        }
+        textPart.text = String(textPart.text || "") + String(delta.text || "");
+        step.content = content;
+      }
+    } else if (type === "mcp_server_tool_call") {
+      step.type = "mcp_server_tool_call";
+      ["id", "name", "server_name"].forEach(function (field) {
+        if (delta[field] !== undefined) step[field] = delta[field];
+      });
+      if (delta.arguments && typeof delta.arguments === "object") {
+        step.arguments = Object.assign({}, step.arguments || {}, delta.arguments);
+      }
+    } else if (type === "mcp_server_tool_result") {
+      step.type = "mcp_server_tool_result";
+      ["call_id", "name", "server_name", "result"].forEach(function (field) {
+        if (delta[field] !== undefined) step[field] = delta[field];
+      });
+    } else if (type) {
+      if (!step.type) step.type = type;
+      Object.keys(delta).forEach(function (field) {
+        if (field !== "type" && delta[field] !== undefined) step[field] = delta[field];
+      });
+    }
+
+    state.stepsByIndex[key] = step;
+  }
+
+  function applyGeminiStreamEvent(state, event) {
+    if (!event || typeof event !== "object") return state;
+    if (event.event_id) state.lastEventId = String(event.event_id);
+
+    const eventType = event.event_type || event.type || "";
+    if (eventType === "interaction.created") {
+      state.interaction = Object.assign({}, state.interaction, event.interaction || {});
+    } else if (eventType === "interaction.status_update") {
+      if (event.interaction_id && !state.interaction.id) {
+        state.interaction.id = event.interaction_id;
+      }
+      if (event.status) state.interaction.status = event.status;
+    } else if (eventType === "step.start") {
+      if (event.index !== undefined && event.step && typeof event.step === "object") {
+        state.stepsByIndex[String(event.index)] = event.step;
+      }
+    } else if (eventType === "step.delta") {
+      mergeGeminiStreamStep(state, event.index, event.delta);
+    } else if (eventType === "interaction.completed") {
+      state.interaction = Object.assign({}, state.interaction, event.interaction || {});
+      if (event.interaction && Array.isArray(event.interaction.steps)) {
+        state.interaction.steps = event.interaction.steps;
+      }
+      state.completed = true;
+      if (!state.interaction.status) state.interaction.status = "completed";
+    } else if (eventType === "error") {
+      state.error = event.error || event;
+      state.completed = true;
+      state.interaction.status = "failed";
+    }
+    return state;
+  }
+
+  function buildGeminiStreamPayload(state) {
+    const interaction = Object.assign({}, state.interaction || {});
+    const indexes = Object.keys(state.stepsByIndex).sort(function (a, b) {
+      return Number(a) - Number(b);
+    });
+    const streamedSteps = indexes.map(function (index) {
+      return state.stepsByIndex[index];
+    });
+    if (streamedSteps.length) {
+      interaction.steps = streamedSteps;
+    } else if (!Array.isArray(interaction.steps)) {
+      interaction.steps = [];
+    }
+    if (state.error && !interaction.error) interaction.error = state.error;
+    return interaction;
+  }
+
+  async function consumeGeminiSseResponse(response, state) {
+    if (!response.body || typeof response.body.getReader !== "function") {
+      throw new Error("استجابة Gemini لا توفر تدفق SSE قابلاً للقراءة في هذا المتصفح.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let eventCount = 0;
+
+    function processFrame(frame) {
+      const event = parseGeminiSseFrame(frame);
+      if (!event || event.event_type === "stream.done") return;
+      eventCount += 1;
+      applyGeminiStreamEvent(state, event);
+    }
+
+    function processAvailableFrames() {
+      let match = /\r\n\r\n|\n\n|\r\r/.exec(buffer);
+      while (match) {
+        const frame = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
+        processFrame(frame);
+        if (state.completed) return;
+        match = /\r\n\r\n|\n\n|\r\r/.exec(buffer);
+      }
+    }
+
+    try {
+      while (!state.completed) {
+        const chunk = await reader.read();
+        if (chunk.done) {
+          buffer += decoder.decode();
+          processAvailableFrames();
+          if (!state.completed && buffer.trim()) processFrame(buffer);
+          buffer = "";
+          break;
+        }
+        buffer += decoder.decode(chunk.value, { stream: true });
+        processAvailableFrames();
+      }
+    } finally {
+      if (state.completed) {
+        try { await reader.cancel("Gemini interaction completed"); } catch (_) { /* stream already closed */ }
+      }
+      try { reader.releaseLock(); } catch (_) { /* reader already released */ }
+    }
+
+    return { eventCount: eventCount, completed: state.completed };
+  }
+
+  async function readGeminiHttpError(response, method) {
+    let responseText = "";
+    try { responseText = await response.text(); } catch (_) { /* retain HTTP status */ }
+    let details = responseText;
+    try {
+      const parsed = responseText ? JSON.parse(responseText) : {};
+      const error = parsed && parsed.error ? parsed.error : parsed;
+      details = error && (error.message || error.status || error.code)
+        ? [error.message, error.status, error.code].filter(Boolean).join(" | ")
+        : responseText;
+    } catch (_) { /* response body may not be JSON */ }
+    return new Error("Gemini " + method + " أعاد HTTP " + response.status + ": " +
+      String(details || "تعذر تنفيذ الطلب.").slice(0, 1200));
+  }
+
+  async function postGeminiInteractionStream(requestBody, apiKey) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    let timer = null;
+    const state = createGeminiStreamState();
+    let lastStreamError = "";
+
+    if (controller) {
+      timer = window.setTimeout(function () { controller.abort(); }, GEMINI_STREAM_TIMEOUT_MS);
+    }
+
+    const headers = {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream",
+      "x-goog-api-key": apiKey,
+      "Api-Revision": GEMINI_API_REVISION
+    };
+
+    const requestOptions = {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      credentials: "omit",
+      headers: headers,
+      body: JSON.stringify(Object.assign({}, requestBody, {
+        background: true,
+        stream: true,
+        store: true
+      }))
+    };
+    if (controller) requestOptions.signal = controller.signal;
+
+    try {
+      const response = await fetch(GEMINI_INTERACTIONS_URL, requestOptions);
+      if (!response.ok) throw await readGeminiHttpError(response, "POST");
+
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (contentType.indexOf("text/event-stream") >= 0) {
+        try {
+          await consumeGeminiSseResponse(response, state);
+        } catch (streamError) {
+          lastStreamError = streamError && streamError.message ? streamError.message : String(streamError);
+        }
+      } else {
+        let payload = {};
+        try { payload = await response.json(); } catch (_) { /* diagnose empty/non-JSON response below */ }
+        const interaction = getGeminiInteraction(payload);
+        state.interaction = Object.assign({}, state.interaction, interaction);
+        if (Array.isArray(interaction.steps)) {
+          interaction.steps.forEach(function (step, index) {
+            state.stepsByIndex[String(index)] = step;
+          });
+        }
+        if (interaction.status === "completed" && Array.isArray(interaction.steps) && interaction.steps.length) {
+          return interaction;
+        }
+      }
+
+      const interactionId = state.interaction.id;
+      if (!state.completed && interactionId) {
+        for (let attempt = 0; attempt < GEMINI_STREAM_RECONNECT_LIMIT && !state.completed; attempt += 1) {
+          await new Promise(function (resolve) {
+            window.setTimeout(resolve, 500 * (attempt + 1));
+          });
+
+          const query = "stream=true" + (state.lastEventId
+            ? "&last_event_id=" + encodeURIComponent(state.lastEventId)
+            : "");
+          const reconnectUrl = GEMINI_INTERACTIONS_URL + "/" +
+            encodeURIComponent(interactionId) + "?" + query;
+
+          try {
+            const reconnectResponse = await fetch(reconnectUrl, {
+              method: "GET",
+              mode: "cors",
+              cache: "no-store",
+              credentials: "omit",
+              headers: {
+                "Accept": "text/event-stream",
+                "x-goog-api-key": apiKey,
+                "Api-Revision": GEMINI_API_REVISION
+              },
+              signal: controller ? controller.signal : undefined
+            });
+            if (!reconnectResponse.ok) {
+              throw await readGeminiHttpError(reconnectResponse, "GET stream");
+            }
+            await consumeGeminiSseResponse(reconnectResponse, state);
+          } catch (reconnectError) {
+            lastStreamError = reconnectError && reconnectError.message
+              ? reconnectError.message
+              : String(reconnectError);
+          }
+        }
+      }
+
+      const finalPayload = buildGeminiStreamPayload(state);
+      if (state.error) {
+        const errorMessage = state.error.message || state.error.code || JSON.stringify(state.error);
+        throw new Error("فشل تنفيذ تفاعل Gemini: " + String(errorMessage).slice(0, 1000));
+      }
+      if (!state.completed && finalPayload.status !== "completed") {
+        throw new Error("لم يكتمل تدفق Gemini عبر SSE؛ الحالة=" +
+          (finalPayload.status || "غير محددة") +
+          "؛ معرّف التفاعل=" + (finalPayload.id || "غير متاح") +
+          "؛ عدد الخطوات=" + (Array.isArray(finalPayload.steps) ? finalPayload.steps.length : 0) +
+          (lastStreamError ? "؛ آخر خطأ في التدفق=" + lastStreamError : ""));
+      }
+      return finalPayload;
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        throw new Error("انتهت مهلة تدفق Gemini بعد 20 دقيقة قبل اكتمال التفاعل.");
+      }
+      if (error instanceof TypeError) {
+        throw new Error("تعذر الاتصال بتدفق Gemini. تحقق من اتصال الإنترنت وإتاحة واجهة Interactions API.");
+      }
+      throw error;
+    } finally {
+      if (timer !== null) window.clearTimeout(timer);
+    }
+  }
+
   function extractGroqToolCalls(payload) {
     const output = Array.isArray(payload && payload.output) ? payload.output : [];
     return output.filter(function (item) {
@@ -691,22 +1021,18 @@
   }
 
   async function callGeminiResearch(messages, settings) {
-    const payload = await postCloudJson(
-      GEMINI_INTERACTIONS_URL,
-      { "x-goog-api-key": settings.key },
-      {
-        agent: GEMINI_MCP_AGENT,
-        input: buildResearchInput(messages),
-        environment: "remote",
-        // Antigravity managed agents reject store:false; omission uses the API default (stored interaction).
-        agent_config: {
-          type: "antigravity",
-          model: GEMINI_MCP_MODEL
-        },
-        tools: getGeminiTools()
+    const payload = await postGeminiInteractionStream({
+      agent: GEMINI_MCP_AGENT,
+      input: buildResearchInput(messages),
+      environment: "remote",
+      // Keep the managed-agent SSE stream open through interaction.completed.
+      // This avoids the stalled background-polling path reproduced with the September Antigravity agent.
+      agent_config: {
+        type: "antigravity",
+        model: GEMINI_MCP_MODEL
       },
-      "Gemini"
-    );
+      tools: getGeminiTools()
+    }, settings.key);
 
     const interaction = getGeminiInteraction(payload);
     const interactionStatus = interaction.status || payload.status;
