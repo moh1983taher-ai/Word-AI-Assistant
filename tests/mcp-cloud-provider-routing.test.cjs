@@ -57,7 +57,7 @@ assert.match(source, /interactionStatus = interaction\.status \|\| payload\.stat
 assert.match(source, /Gemini لم يُرجع إجابة نهائية\. \" \+ describeGeminiResponse\(payload\)/);
 
 const helperStart = source.indexOf("  function getGeminiInteraction(payload) {");
-const helperEnd = source.indexOf("  function extractGroqToolCalls(payload) {", helperStart);
+const helperEnd = source.indexOf("  function validateResearchResult(providerLabel, answer, toolCalls) {", helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, "Gemini response helpers must be testable");
 const helperSource = source.slice(helperStart, helperEnd) +
   "\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse, parseGeminiSseFrame, createGeminiStreamState, applyGeminiStreamEvent, buildGeminiStreamPayload, extractGeminiToolCalls };";
