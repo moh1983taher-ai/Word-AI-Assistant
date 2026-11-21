@@ -723,8 +723,10 @@
     const streamedSteps = indexes.map(function (index) {
       return state.stepsByIndex[index];
     });
-    if (!Array.isArray(interaction.steps) || interaction.steps.length === 0) {
+    if (streamedSteps.length) {
       interaction.steps = streamedSteps;
+    } else if (!Array.isArray(interaction.steps)) {
+      interaction.steps = [];
     }
     if (state.error && !interaction.error) interaction.error = state.error;
     return interaction;
@@ -821,7 +823,8 @@
       headers: headers,
       body: JSON.stringify(Object.assign({}, requestBody, {
         background: true,
-        stream: true
+        stream: true,
+        store: true
       }))
     };
     if (controller) requestOptions.signal = controller.signal;
