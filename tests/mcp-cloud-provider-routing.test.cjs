@@ -181,10 +181,15 @@ assert.match(source, /resultCallId !== callId/);
 assert.match(source, /function validateResearchResult[\s\S]*?toolCalls\.length === 0[\s\S]*?المكتبات التي اخترتها/);
 assert.match(
   source,
-  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callCloudResearch\(history, settings, selectedServerIds\)/,
+  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callSelectedResearch\(history, settings, selectedServerIds\)/,
   "MCP must use the active ordinary chat history rather than an independent source transcript."
 );
-assert.doesNotMatch(source, /127\.0\.0\.1|DuckAI|Duck\.ai|callLocalResearch|BRIDGE_URL/);
+assert.match(source, /const LOCAL_MCP_HOST_URL = ["']http:\/\/127\.0\.0\.1:18081["']/);
+assert.match(source, /servers: selected/);
+assert.match(source, /function callLocalResearch[\s\S]*?validateResearchResult/);
+assert.match(source, /function callSelectedResearch[\s\S]*?callLocalResearch[\s\S]*?callCloudResearch/);
+assert.match(source, /const RESEARCH_ENGINE_KEY = ["']AR_MCP_RESEARCH_ENGINE["']/);
+assert.match(source, /targetAddressSpace = "loopback"/);
 
 
 const mcpConfigStart = source.indexOf("  const MCP_SERVERS = Object.freeze([");

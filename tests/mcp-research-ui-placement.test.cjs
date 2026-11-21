@@ -39,9 +39,14 @@ assert.match(uiSource, /const AI_SETTINGS_KEY = ["']AI_SETTINGS["']/);
 assert.match(uiSource, /localStorage\.getItem\(AI_SETTINGS_KEY\)/);
 assert.doesNotMatch(
   uiSource,
-  /AR_MCP_RESEARCH_SETTINGS|BRIDGE_URL|callLocalResearch|127\.0\.0\.1|DuckAI|Duck\.ai/,
-  "Cloud source search must reuse the existing provider configuration."
+  /AR_MCP_RESEARCH_SETTINGS|AR_MCP_RESEARCH_THREAD.*key/,
+  "The local MCP route must not create a second key or provider-settings store."
 );
+assert.match(uiSource, /const AI_SETTINGS_KEY = ["']AI_SETTINGS["']/);
+assert.match(uiSource, /const LOCAL_MCP_HOST_URL = ["']http:\/\/127\.0\.0\.1:18081["']/);
+assert.match(uiSource, /function callSelectedResearch/);
+assert.match(uiSource, /servers: selected/);
+assert.match(uiSource, /const RESEARCH_ENGINE_KEY = ["']AR_MCP_RESEARCH_ENGINE["']/);
 
 assert.match(
   uiSource,
