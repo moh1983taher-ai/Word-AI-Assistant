@@ -1,7 +1,8 @@
 ﻿[CmdletBinding()]
 param(
     [string]$Question = 'ابحث في الجامع عن كتب تتناول مقاصد الشريعة، واذكر أسماء الكتب ومؤلفيها مع توثيق ما يتاح من بيانات.',
-    [string]$Model = ''
+    [string]$Model = '',
+    [string[]]$Servers = @('aljam3', 'shamela')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,8 +28,10 @@ if ($sources.connected -ne 2 -or $sources.totalTools -lt 11) {
 }
 
 Write-Host ([Environment]::NewLine + '4/4 - تنفيذ بحث حقيقي عبر DuckAI وMCP...')
+Write-Host ('المكتبات المختارة: ' + ($Servers -join ' + '))
 $payload = @{
     client = 'word-addin'
+    servers = @($Servers)
     model = $Model
     messages = @(
         @{ role = 'user'; text = $Question }
@@ -72,6 +75,17 @@ if (@($result.toolCalls).Count -eq 0) {
     throw 'أعاد DuckAI إجابة دون تنفيذ أداة MCP بنجاح؛ فشل اختبار البحث الفعلي، ولا تُعد هذه الإجابة بحثاً موثقاً.'
 }
 $result.toolCalls | Format-Table server, label, tool -AutoSize
+$unexpectedServers = @($result.toolCalls | Where-Object { $Servers -notcontains $_.server })
+if ($unexpectedServers.Count -gt 0) {
+    throw 'The host invoked a source that the user did not select.'
+}
+$missingServers = @($Servers | Where-Object {
+    $selectedServer = $_
+    -not (@($result.toolCalls | Where-Object { $_.server -eq $selectedServer }).Count -gt 0)
+})
+if ($missingServers.Count -gt 0) {
+    throw ('The host did not complete a successful tool call in every selected source: ' + ($missingServers -join ', '))
+}
 if (@($result.connectionWarnings).Count -gt 0) {
     Write-Warning ($result.connectionWarnings -join '; ')
 }
