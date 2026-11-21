@@ -172,7 +172,11 @@ assert.match(source, /mcp_server_tool_call/);
 assert.match(source, /mcp_server_tool_result/);
 assert.match(source, /resultCallId !== callId/);
 assert.match(source, /function validateResearchResult[\s\S]*?toolCalls\.length === 0[\s\S]*?أدوات MCP/);
-assert.match(source, /async function sendMessage[\s\S]*?callCloudResearch\(state\.messages, settings\)/);
+assert.match(
+  source,
+  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callCloudResearch\(history, settings\)/,
+  "MCP must use the active ordinary chat history rather than an independent source transcript."
+);
 assert.doesNotMatch(source, /127\.0\.0\.1|DuckAI|Duck\.ai|callLocalResearch|BRIDGE_URL/);
 
 console.log("Cloud MCP provider routing tests passed.");
