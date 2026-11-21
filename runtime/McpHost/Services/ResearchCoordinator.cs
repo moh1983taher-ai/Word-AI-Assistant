@@ -75,7 +75,11 @@ public sealed class ResearchCoordinator
             if (incoming.Count == 0)
                 throw new InvalidOperationException("لا توجد رسائل بحث صالحة.");
 
-            var discovery = await _sources.DiscoverAllAsync(timeout.Token);
+            var selectedServerIds = ResearchSourceSelection.Normalize(request.Servers);
+            if (selectedServerIds.Count == 0)
+                throw new InvalidOperationException("يجب تحديد الجامع أو المكتبة الشاملة أو كليهما قبل البحث.");
+
+            var discovery = await _sources.DiscoverSelectedAsync(selectedServerIds, timeout.Token);
             var warnings = discovery.Warnings.ToList();
             var activeTools = LimitTools(discovery.Tools);
             // The installed DuckAI endpoint was verified to return ordinary text even when
@@ -83,7 +87,14 @@ public sealed class ResearchCoordinator
             // from the first turn rather than mistaking a plain-text answer for an MCP search.
             var requiresMcpSources = ResearchIntentClassifier.RequiresMcpSources(
                 incoming.LastOrDefault(message => message.Role == "user")?.Content);
-            var systemPrompt = BuildSystemPrompt(activeTools, warnings);
+            var selectedLabels = selectedServerIds
+                .Select(ResearchSourceSelection.GetLabel);
+            var systemPrompt = BuildSystemPrompt(activeTools, warnings) +
+                Environment.NewLine + Environment.NewLine +
+                "المكتبات التي اختارها المستخدم حصراً لهذه المهمة: " +
+                string.Join("، ", selectedLabels) + "." +
+                Environment.NewLine +
+                "لا تستخدم أي مكتبة أخرى. وعند طلب بحث أو توثيق، نفّذ بحثاً ناجحاً في كل مكتبة اختارها المستخدم قبل الإجابة النهائية.");
             if (requiresMcpSources)
             {
                 systemPrompt += """
@@ -136,17 +147,26 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
-                    if (requiresMcpSources && trace.Count == 0)
+                    var missingSelectedServers = ResearchSourceSelection.Missing(
+                        selectedServerIds,
+                        trace.Select(call => call.Server));
+                    if (requiresMcpSources && missingSelectedServers.Count > 0)
                     {
+                        var missingLabels = missingSelectedServers
+                            .Select(ResearchSourceSelection.GetLabel);
                         if (sourceRequirementRetryAttempted)
                             throw new InvalidOperationException(
-                                "لم ينفذ النموذج أداة MCP بنجاح رغم أن الطلب يتطلب مصادر؛ أُوقفت الإجابة منعاً لاختلاق المراجع.");
+                                "لم يكتمل البحث في جميع المكتبات التي اختارها المستخدم. لم تصل نتيجة ناجحة من: " +
+                                string.Join("، ", missingLabels) +
+                                ". أوقفت الإجابة منعاً لاختلاق نتائج أو مراجع.");
 
                         sourceRequirementRetryAttempted = true;
                         messages.Add(new DuckChatMessage("assistant", decision.Raw));
                         messages.Add(new DuckChatMessage(
                             "user",
-                            "لا تقدم إجابة نهائية بعد. هذه المهمة تتطلب مصادر فعلية. اختر أداة قراءة مناسبة من فهرس MCP، وأخرج قرار tool_call بصيغة JSON الصحيحة. لا تذكر مراجع من الذاكرة."));
+                            "لا تقدم إجابة نهائية بعد. لم تنفذ بحثاً ناجحاً في هذه المكتبات المختارة: " +
+                            string.Join("، ", missingLabels) +
+                            ". استخدم أدوات القراءة المسموح بها لكل مكتبة متبقية، ثم أخرج الإجابة النهائية. لا تذكر مراجع من الذاكرة."));
                         continue;
                     }
 
