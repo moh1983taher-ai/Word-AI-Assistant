@@ -204,6 +204,19 @@ app.MapPost("/v1/research", async (
 
     try
     {
+        request.Servers = ResearchSourceSelection.Normalize(request.Servers).ToList();
+        if (request.Servers.Count == 0)
+            return Results.Json(new { error = "اختر الجامع أو المكتبة الشاملة أو كليهما قبل البحث." },
+                JsonDefaults.Web, statusCode: StatusCodes.Status400BadRequest);
+    }
+    catch (ArgumentException exception)
+    {
+        return Results.Json(new { error = exception.Message }, JsonDefaults.Web,
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    try
+    {
         var result = await coordinator.RunAsync(request, context.RequestAborted);
         return Results.Json(result, JsonDefaults.Web);
     }
