@@ -1,7 +1,8 @@
 ﻿[CmdletBinding()]
 param(
     [string]$Question = 'ابحث في الجامع عن كتب تتناول مقاصد الشريعة، واذكر أسماء الكتب ومؤلفيها مع توثيق ما يتاح من بيانات.',
-    [string]$Model = ''
+    [string]$Model = '',
+    [string[]]$Servers = @('aljam3', 'shamela')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,7 +65,7 @@ try {
     }
 
     Write-Host 'بدأ المضيف بنجاح. تنفيذ اختبارات DuckAI وMCP والبحث وتزامن /ping...'
-    & $testPath -Question $Question -Model $Model
+    & $testPath -Question $Question -Model $Model -Servers $Servers
 }
 finally {
     if ($hostProcess -and -not $hostProcess.HasExited) {
