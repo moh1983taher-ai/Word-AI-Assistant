@@ -236,11 +236,6 @@
     heading.textContent = "البحث السحابي بالمصادر المتصلة";
     panel.appendChild(heading);
 
-    const note = document.createElement("p");
-    note.className = "mcp-note";
-    note.textContent = "تستخدم هذه الميزة المزود والمفتاح والنموذج المحفوظة في إعدادات الذكاء الاصطناعي العامة؛ لا يوجد مفتاح ثانٍ أو خادم محلي. اختر بنفسك المكتبة التي تريد البحث فيها؛ ولا يُتاح للنموذج إلا الخادم أو الخوادم التي تحددها. يدعم Groq الاتصال المباشر بخوادم MCP، ويستخدم Gemini النموذج المحدد في الإعدادات العامة. تقتصر الأدوات المتاحة على البحث والقراءة.";
-    panel.appendChild(note);
-
     const sourceSelection = document.createElement("div");
     sourceSelection.className = "mcp-source-selection";
     const sourceTitle = document.createElement("div");
@@ -250,7 +245,7 @@
 
     const sourceHelp = document.createElement("div");
     sourceHelp.className = "mcp-source-selection-note";
-    sourceHelp.textContent = "حدد المكتبة التي تريد البحث فيها، أو اختر المكتبتين معاً. لن يُتاح للنموذج استخدام مكتبة لم تحددها.";
+    sourceHelp.textContent = "اختر مكتبة واحدة أو كلتيهما.";
     sourceSelection.appendChild(sourceHelp);
 
     MCP_SERVERS.forEach(function (server) {
@@ -1248,6 +1243,7 @@
       "إعدادات البحث بالمصادر"
     );
     settingsButton.setAttribute("aria-label", "إعدادات البحث بالمصادر");
+    settingsButton.title = "اختر الجامع أو الشاملة أو كليهما.";
     settingsButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 0 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3.1a2 2 0 0 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5v-.2a2 2 0 0 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.2a2 2 0 0 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>';
 
     entry.appendChild(modeButton);
