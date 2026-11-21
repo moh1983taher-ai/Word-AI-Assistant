@@ -65,9 +65,9 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          gh release download duckai-runtime-v1.0.9 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip" --dir dist
+          gh release download duckai-runtime-v1.0.6 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip" --dir dist
           if ($LASTEXITCODE -ne 0) { throw 'Runtime download failed.' }
-          gh release download duckai-runtime-v1.0.9 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip.sha256" --dir dist
+          gh release download duckai-runtime-v1.0.6 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip.sha256" --dir dist
           if ($LASTEXITCODE -ne 0) { throw 'Runtime checksum download failed.' }
           $sidecar = Get-Content 'dist/DuckAI-Runtime-release.zip.sha256' -Raw
           if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+DuckAI-Runtime-release\.zip\s*$') { throw 'Invalid runtime checksum file.' }
