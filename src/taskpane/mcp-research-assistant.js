@@ -372,7 +372,9 @@
       try {
         const result = await checkLocalHost();
         state.connection = result;
-        health.textContent = "DuckAI المحلي متصل · النموذج: " + result.model +
+        health.textContent = "DuckAI المحلي متصل · عنوان التوليد: " + result.endpoint +
+          "\nالنموذج الافتراضي: " + result.model +
+          "\nفحص التوليد الفعلي يتم عند تنفيذ البحث، لا بمجرد عرض قائمة النماذج." +
           "\nالنماذج المتاحة: " + (result.models || []).join("، ");
       } catch (error) {
         health.textContent = "تعذر الاتصال المحلي: " +
@@ -1192,6 +1194,7 @@
       throw new Error(health && health.error ? health.error : "DuckAI المحلي غير جاهز.");
     }
     return {
+      endpoint: String(health.endpoint || "غير محدد"),
       model: String(health.model || "غير محدد"),
       models: Array.isArray(health.models) ? health.models.map(String) : []
     };
