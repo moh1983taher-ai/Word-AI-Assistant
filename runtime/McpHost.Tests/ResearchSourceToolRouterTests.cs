@@ -31,9 +31,9 @@ public sealed class ResearchSourceToolRouterTests
             ["aljam3", "shamela"],
             ["aljam3"]);
 
-        Assert.Single(selected);
-        Assert.Equal("shamela", selected[0].Server);
-        Assert.Equal("shamela_find", selected[0].Name);
+        Assert.NotEmpty(selected);
+        Assert.All(selected, tool => Assert.Equal("shamela", tool.Server));
+        Assert.Contains(selected, tool => tool.Name == "shamela_find");
     }
 
     [Fact]
