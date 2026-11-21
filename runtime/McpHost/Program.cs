@@ -32,6 +32,7 @@ builder.Services.AddSingleton<ResearchCoordinator>();
 
 var app = builder.Build();
 var log = app.Services.GetRequiredService<HostLog>();
+var hostVersion = typeof(ResearchCoordinator).Assembly.GetName().Version?.ToString(3) ?? "unknown";
 
 app.Use(async (context, next) =>
 {
@@ -77,7 +78,7 @@ app.MapGet("/ping", () => Results.Json(new
 {
     service = "ResearchTools.McpHost",
     listening = true,
-    version = "1.1.2"
+    version = hostVersion
 }, JsonDefaults.Web));
 
 app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellationToken) =>
@@ -88,7 +89,7 @@ app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellation
         return Results.Json(new
         {
             ready = true,
-            version = "1.1.2",
+            version = hostVersion,
             provider = "DuckAI",
             endpoint = snapshot.BaseAddress,
             model = snapshot.DefaultModel,
@@ -101,7 +102,7 @@ app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellation
         return Results.Json(new
         {
             ready = false,
-            version = "1.1.2",
+            version = hostVersion,
             error = exception.Message
         }, JsonDefaults.Web, statusCode: StatusCodes.Status503ServiceUnavailable);
     }

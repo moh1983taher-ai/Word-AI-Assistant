@@ -184,9 +184,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.1.5'
-          $title = 'ResearchTools Unified Setup v1.1.5'
-          $notes = 'Unified one-file x64 installer v1.1.5: self-contained .NET 10 MCP host v1.1.3 with a bounded 20,000-character conversation window applied before every DuckAI generation turn. The latest user request is retained while older history and oversized tool results are trimmed only from the model request; the original Word conversation is not modified. Each individual conversation message is capped at 12,000 characters. Includes the verified DuckAI runtime seed, automatic stable-runtime update, and persistent background launcher. DuckAI inference endpoint failover and user-selected MCP library enforcement remain intact. Existing Groq/Gemini remote MCP remains available as an explicit cloud route or automatic fallback when configured. SHA-256 verification, staged installation and rollback backup. Does not modify C:\\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.1.6'
+          $title = 'ResearchTools Unified Setup v1.1.6'
+          $notes = 'Unified one-file x64 installer v1.1.6: self-contained .NET 10 MCP host v1.1.4 with a bounded 20,000-character conversation window applied before every DuckAI generation turn. The latest user request is retained while older history and oversized tool results are trimmed only from the model request; the original Word conversation is not modified. Each individual conversation message is capped at 12,000 characters. Includes the verified DuckAI runtime seed, automatic stable-runtime update, and persistent background launcher. DuckAI inference endpoint failover and user-selected MCP library enforcement remain intact. Existing Groq/Gemini remote MCP remains available as an explicit cloud route or automatic fallback when configured. SHA-256 verification, staged installation and rollback backup. Does not modify C:\\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
