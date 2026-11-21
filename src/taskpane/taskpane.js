@@ -57079,9 +57079,12 @@ async function importLegacyMcpThread(record) {
                     mcpSources: sources,
                     mcpProvider: String(message.provider || ""),
                     mcpModel: String(message.model || ""),
-                    createdAt: message.createdAt
-                        ? new Date(Number(message.createdAt) || Date.parse(message.createdAt)).toISOString()
-                        : now
+                    createdAt: (function () {
+                        const timestamp = Number(message.createdAt) || Date.parse(message.createdAt);
+                        return Number.isFinite(timestamp) && timestamp > 0
+                            ? new Date(timestamp).toISOString()
+                            : now;
+                    })()
                 };
             }),
             isTemporary: false,
