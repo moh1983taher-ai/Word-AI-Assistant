@@ -191,7 +191,7 @@ function Install-DurableLauncher {
         # launcher pin to that verified bootstrap, then verify the edit.
         $replacement = 'Const BOOTSTRAP_SHA256 = "' + $bootstrapHash + '"'
         $content = [regex]::Replace($content,$pinPattern,$replacement,1)
-        $encoding = [System.Text.UTF8Encoding]::new($false)
+        $encoding = [System.Text.UTF8Encoding]::new($true)
         [IO.File]::WriteAllText($LauncherFile,$content,$encoding)
         Log ('Unified launcher pin synchronized with verified DuckAI bootstrap. Previous=' + $declaredHash + '; Current=' + $bootstrapHash)
     }
