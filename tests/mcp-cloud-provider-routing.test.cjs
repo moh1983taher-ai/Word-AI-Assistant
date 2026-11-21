@@ -28,9 +28,9 @@ assert.match(source, /function callGroqResearch[\s\S]*?tools: getGroqTools\(\)/)
 assert.match(source, /GROQ_REMOTE_MCP_MODELS\.indexOf\(settings\.model\)/);
 
 assert.match(source, /https:\/\/generativelanguage\.googleapis\.com\/v1beta\/interactions/);
-assert.match(source, /antigravity-preview-09-2026/);
-assert.match(source, /gemini-4-hydrogen/);
-assert.match(source, /GEMINI_API_REVISION = ["\x27]2026-05-20/);
+assert.doesNotMatch(source, /antigravity-preview|gemini-4-hydrogen|GEMINI_API_REVISION|Api-Revision/);
+assert.match(source, /model: settings\.model,[\s\S]*?input: buildResearchInput\(messages\)/);
+assert.match(source, /model: settings\.model,[\s\S]*?provider: "gemini"/);
 assert.ok(source.includes('"Accept": "text/event-stream"'));
 assert.match(source, /background: true,[\s\S]*?stream: true,[\s\S]*?store: true/);
 assert.match(source, /last_event_id=/);
@@ -46,7 +46,7 @@ assert.match(
 );
 assert.match(source, /environment: "remote"/);
 assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
-assert.match(source, /يتطلب مسار Gemini حفظ التفاعل لدى Google/);
+assert.match(source, /النموذج المحدد في إعدادات الذكاء الاصطناعي العامة مباشرةً/);
 assert.match(source, /function callGeminiResearch[\s\S]*?postGeminiInteractionStream\([\s\S]*?tools: getGeminiTools\(\)/);
 assert.match(source, /function callGroqResearch[\s\S]*?postCloudJson\(/);
 
