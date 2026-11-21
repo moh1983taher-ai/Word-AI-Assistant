@@ -2,7 +2,7 @@ name: Build and publish ResearchTools Setup
 
 on:
   push:
-    branches: [main, feature/mcp-host-dotnet10]
+    branches: [main, feature/mcp-host-dotnet10, feat/unified-local-mcp-host-20261121]
     paths:
       - 'installer/**'
       - 'runtime/McpHost/**'
@@ -65,9 +65,9 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          gh release download duckai-runtime-v1.0.6 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip" --dir dist
+          gh release download duckai-runtime-v1.0.9 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip" --dir dist
           if ($LASTEXITCODE -ne 0) { throw 'Runtime download failed.' }
-          gh release download duckai-runtime-v1.0.6 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip.sha256" --dir dist
+          gh release download duckai-runtime-v1.0.9 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip.sha256" --dir dist
           if ($LASTEXITCODE -ne 0) { throw 'Runtime checksum download failed.' }
           $sidecar = Get-Content 'dist/DuckAI-Runtime-release.zip.sha256' -Raw
           if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+DuckAI-Runtime-release\.zip\s*$') { throw 'Invalid runtime checksum file.' }
@@ -184,8 +184,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.1.2'
-          $title = 'ResearchTools Unified Setup v1.1.2'
+          $tag = 'researchtools-setup-v1.1.3'
+          $title = 'ResearchTools Unified Setup v1.1.3'
           $notes = 'Unified one-file x64 installer v1.1.2: verified DuckAI runtime, direct DuckAI backend preferred on 127.0.0.1:18080 with five-minute endpoint stability, self-contained .NET 10 MCP host using the official SDK, background launcher, Word trusted shared catalog and Arabic Word ribbon add-in. SHA-256 checks, staged MCP installation and rollback backup. Does not modify C:\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
