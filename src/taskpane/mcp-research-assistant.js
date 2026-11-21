@@ -478,6 +478,29 @@
     }
   }
 
+  function getGeminiInteraction(payload) {
+    if (!payload || typeof payload !== "object") return {};
+    const candidates = [payload.interaction, payload.data, payload.result, payload.response];
+    for (let i = 0; i < candidates.length; i += 1) {
+      const candidate = candidates[i];
+      if (candidate && typeof candidate === "object" &&
+          (Array.isArray(candidate.steps) ||
+           typeof candidate.status === "string" ||
+           typeof candidate.output_text === "string" ||
+           typeof candidate.outputText === "string")) {
+        return candidate;
+      }
+    }
+    return payload;
+  }
+
+  function getGeminiSteps(payload) {
+    const interaction = getGeminiInteraction(payload);
+    if (Array.isArray(interaction.steps)) return interaction.steps;
+    if (payload && Array.isArray(payload.steps)) return payload.steps;
+    return [];
+  }
+
   function extractText(value) {
     if (!value) return "";
     if (typeof value === "string") return value;
@@ -486,9 +509,14 @@
     }
     if (typeof value === "object") {
       if (typeof value.text === "string") return value.text;
-      if (value.content) return extractText(value.content);
-      if (value.model_output) return extractText(value.model_output);
-      if (value.output_text) return extractText(value.output_text);
+      const nestedKeys = ["content", "parts", "model_output", "output_text", "outputText", "output", "value"];
+      for (let i = 0; i < nestedKeys.length; i += 1) {
+        const nested = value[nestedKeys[i]];
+        if (nested !== undefined && nested !== null) {
+          const text = extractText(nested);
+          if (text) return text;
+        }
+      }
     }
     return "";
   }
@@ -507,16 +535,58 @@
   }
 
   function extractGeminiAnswer(payload) {
-    if (payload && typeof payload.output_text === "string" && payload.output_text.trim()) {
-      return payload.output_text.trim();
+    const interaction = getGeminiInteraction(payload);
+    const directValues = [
+      interaction.output_text,
+      interaction.outputText,
+      payload && payload.output_text,
+      payload && payload.outputText
+    ];
+    for (let i = 0; i < directValues.length; i += 1) {
+      if (typeof directValues[i] === "string" && directValues[i].trim()) {
+        return directValues[i].trim();
+      }
     }
-    const steps = Array.isArray(payload && payload.steps) ? payload.steps : [];
-    const outputs = steps.filter(function (step) {
-      return step && (step.type === "model_output" || step.type === "message" || step.type === "output_text");
+
+    const outputs = getGeminiSteps(payload).filter(function (step) {
+      return step && (step.type === "model_output" ||
+        step.type === "message" || step.type === "output_text");
     });
     return outputs.map(function (step) {
-      return extractText(step.content || step.text || step.model_output || step);
+      return extractText(step.content) ||
+        extractText(step.text) ||
+        extractText(step.model_output) ||
+        extractText(step.output_text) ||
+        extractText(step.output) ||
+        extractText(step);
     }).filter(Boolean).join("\n").trim();
+  }
+
+  function describeGeminiResponse(payload) {
+    const interaction = getGeminiInteraction(payload);
+    const steps = getGeminiSteps(payload);
+    const status = interaction.status || (payload && payload.status) || "غير محددة";
+    const stepTypes = steps.map(function (step) {
+      return step && (step.type || (step.step && step.step.type)) || "نوع غير محدد";
+    });
+    const outputShapes = steps.filter(function (step) {
+      return step && (step.type === "model_output" || step.type === "message" || step.type === "output_text");
+    }).map(function (step) {
+      const content = step.content;
+      if (Array.isArray(content)) {
+        return content.map(function (part) { return part && part.type || typeof part; }).join(",");
+      }
+      return content === undefined ? "لا يوجد content" : typeof content;
+    });
+    const errors = Array.isArray(interaction.errors) ? interaction.errors.map(function (item) {
+      return item && (item.message || item.code || item.status) || "خطأ غير مفصل";
+    }).filter(Boolean).slice(0, 3) : [];
+    const keys = Object.keys(interaction).slice(0, 16);
+    return "تشخيص Gemini: الحالة=" + status +
+      "؛ حقول الاستجابة=" + (keys.join(", ") || "لا توجد") +
+      "؛ أنواع الخطوات=" + (stepTypes.join(", ") || "لم تُرسل خطوات") +
+      "؛ بنية مخرجات النص=" + (outputShapes.join(" | ") || "لا توجد خطوة إخراج نصي") +
+      (errors.length ? "؛ أخطاء الوكيل=" + errors.join(" | ") : "");
   }
 
   function extractGroqToolCalls(payload) {
@@ -535,7 +605,7 @@
   }
 
   function extractGeminiToolCalls(payload) {
-    const steps = Array.isArray(payload && payload.steps) ? payload.steps : [];
+    const steps = getGeminiSteps(payload);
     const calls = steps.filter(function (step) {
       return step && step.type === "mcp_server_tool_call";
     });
@@ -638,11 +708,17 @@
       "Gemini"
     );
 
-    if (payload.status && payload.status !== "completed") {
-      throw new Error("لم تكتمل مهمة Gemini عبر MCP. الحالة: " + payload.status);
+    const interaction = getGeminiInteraction(payload);
+    const interactionStatus = interaction.status || payload.status;
+    if (interactionStatus && interactionStatus !== "completed") {
+      throw new Error("لم تكتمل مهمة Gemini عبر MCP. الحالة: " + interactionStatus +
+        ". " + describeGeminiResponse(payload));
     }
 
     const answer = extractGeminiAnswer(payload);
+    if (!answer) {
+      throw new Error("Gemini لم يُرجع إجابة نهائية. " + describeGeminiResponse(payload));
+    }
     const toolCalls = extractGeminiToolCalls(payload);
     const validated = validateResearchResult("Gemini", answer, toolCalls);
     return {

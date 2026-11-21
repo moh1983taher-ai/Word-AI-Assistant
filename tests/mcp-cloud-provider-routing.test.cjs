@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
 const source = fs.readFileSync(
@@ -41,6 +42,50 @@ assert.match(source, /Antigravity managed agents reject store:false/);
 assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
 assert.match(source, /يتطلب مسار Gemini حفظ التفاعل لدى Google/);
 assert.match(source, /function callGeminiResearch[\s\S]*?tools: getGeminiTools\(\)/);
+
+assert.match(source, /function getGeminiInteraction\(payload\)/);
+assert.match(source, /function getGeminiSteps\(payload\)/);
+assert.match(source, /function describeGeminiResponse\(payload\)/);
+assert.match(source, /interactionStatus = interaction\.status \|\| payload\.status/);
+assert.match(source, /Gemini لم يُرجع إجابة نهائية\. \" \+ describeGeminiResponse\(payload\)/);
+
+const helperStart = source.indexOf("  function getGeminiInteraction(payload) {");
+const helperEnd = source.indexOf("  function extractGroqToolCalls(payload) {", helperStart);
+assert.ok(helperStart >= 0 && helperEnd > helperStart, "Gemini response helpers must be testable");
+const helperSource = source.slice(helperStart, helperEnd) +
+  "\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse };";
+const helperContext = {};
+vm.runInNewContext(helperSource, helperContext);
+const responseHelpers = helperContext.__geminiResponseHelpers;
+
+const directInteraction = {
+  status: "completed",
+  steps: [{ type: "model_output", content: [{ type: "text", text: "الإجابة المباشرة" }] }]
+};
+assert.equal(responseHelpers.extractGeminiAnswer(directInteraction), "الإجابة المباشرة");
+assert.equal(responseHelpers.extractGeminiAnswer({
+  interaction: {
+    status: "completed",
+    steps: [{ type: "model_output", content: [{ type: "text", text: "الإجابة داخل interaction" }] }]
+  }
+}), "الإجابة داخل interaction");
+assert.equal(responseHelpers.extractGeminiAnswer({
+  interaction: { status: "completed", outputText: "نص الإخراج بصيغة camelCase" }
+}), "نص الإخراج بصيغة camelCase");
+
+const noFinalOutput = {
+  interaction: {
+    status: "completed",
+    steps: [
+      { type: "mcp_server_tool_call", name: "search", id: "call_1" },
+      { type: "mcp_server_tool_result", name: "search", call_id: "call_1", result: [{ type: "text", text: "نتيجة" }] }
+    ]
+  }
+};
+assert.equal(responseHelpers.extractGeminiAnswer(noFinalOutput), "");
+const diagnostic = responseHelpers.describeGeminiResponse(noFinalOutput);
+assert.match(diagnostic, /الحالة=completed/);
+assert.match(diagnostic, /mcp_server_tool_call, mcp_server_tool_result/);
 
 assert.match(source, /https:\/\/aljam3\.com\/mcp/);
 assert.match(source, /https:\/\/mcp\.shamela\.ws/);
