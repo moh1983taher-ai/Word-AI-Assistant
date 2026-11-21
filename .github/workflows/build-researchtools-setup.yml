@@ -186,7 +186,7 @@ jobs:
         run: |
           $tag = 'researchtools-setup-v1.1.3'
           $title = 'ResearchTools Unified Setup v1.1.3'
-          $notes = 'Unified one-file x64 installer v1.1.2: verified DuckAI runtime, direct DuckAI backend preferred on 127.0.0.1:18080 with five-minute endpoint stability, self-contained .NET 10 MCP host using the official SDK, background launcher, Word trusted shared catalog and Arabic Word ribbon add-in. SHA-256 checks, staged MCP installation and rollback backup. Does not modify C:\Word AI Assistant v2.'
+          $notes = 'Unified one-file x64 installer v1.1.3: verified DuckAI runtime seed with automatic stable-runtime update, self-contained .NET 10 MCP host using the official SDK, persistent background launcher, and Word add-in integration. Local research uses only the libraries selected by the user and enforces successful results from every selected library. Existing Groq/Gemini Remote MCP remains available as an automatic fallback or explicit cloud-only route. Unified Word conversation history is preserved. SHA-256 checks, staged installation and rollback backup. Does not modify C:\\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
