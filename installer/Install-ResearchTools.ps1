@@ -205,7 +205,8 @@ function Install-DurableLauncher {
     }
     Copy-Item -LiteralPath $LauncherFile -Destination $Launcher -Force
     Log 'Unified DuckAI and MCP background launcher installed and bootstrap pin verified.'
-}function Get-PowerShell {
+}
+function Get-PowerShell {
     $p = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if ($env:PROCESSOR_ARCHITEW6432) {
         $native = Join-Path $env:SystemRoot 'Sysnative\WindowsPowerShell\v1.0\powershell.exe'
