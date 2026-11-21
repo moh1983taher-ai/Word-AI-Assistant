@@ -53,7 +53,7 @@ const helperStart = source.indexOf("  function getGeminiInteraction(payload) {")
 const helperEnd = source.indexOf("  function extractGroqToolCalls(payload) {", helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, "Gemini response helpers must be testable");
 const helperSource = source.slice(helperStart, helperEnd) +
-  "\\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse };";
+  "\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse };";
 const helperContext = {};
 vm.runInNewContext(helperSource, helperContext);
 const responseHelpers = helperContext.__geminiResponseHelpers;
