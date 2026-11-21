@@ -77,7 +77,7 @@ app.MapGet("/ping", () => Results.Json(new
 {
     service = "ResearchTools.McpHost",
     listening = true,
-    version = "1.1.1"
+    version = "1.1.2"
 }, JsonDefaults.Web));
 
 app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellationToken) =>
@@ -88,7 +88,7 @@ app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellation
         return Results.Json(new
         {
             ready = true,
-            version = "1.1.1",
+            version = "1.1.2",
             provider = "DuckAI",
             endpoint = snapshot.BaseAddress,
             model = snapshot.DefaultModel,
@@ -101,7 +101,7 @@ app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellation
         return Results.Json(new
         {
             ready = false,
-            version = "1.1.1",
+            version = "1.1.2",
             error = exception.Message
         }, JsonDefaults.Web, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
