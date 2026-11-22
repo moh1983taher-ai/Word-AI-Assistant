@@ -1,4 +1,5 @@
 using System.Text;
+using ResearchTools.McpHost.Infrastructure;
 using ResearchTools.McpHost.Models;
 
 namespace ResearchTools.McpHost.Services;
