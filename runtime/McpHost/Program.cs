@@ -4,6 +4,9 @@ using ResearchTools.McpHost.Infrastructure;
 using ResearchTools.McpHost.Models;
 using ResearchTools.McpHost.Security;
 using ResearchTools.McpHost.Services;
+using ResearchTools.McpHost.Mcp;
+using ModelContextProtocol.AspNetCore;
+using ModelContextProtocol.Server;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,6 +32,33 @@ builder.Services.AddSingleton<HostLog>();
 builder.Services.AddSingleton<DuckAiClient>();
 builder.Services.AddSingleton<McpSourceRegistry>();
 builder.Services.AddSingleton<ResearchCoordinator>();
+builder.Services.AddMcpServer()
+    .WithHttpTransport(options =>
+    {
+        options.SessionMode = HttpServerSessionMode.Stateless;
+        options.ConfigureSessionOptions = async (httpContext, serverOptions, cancellationToken) =>
+        {
+            var sources = httpContext.RequestServices.GetRequiredService<McpSourceRegistry>();
+            var discovery = await sources.DiscoverAllAsync(cancellationToken);
+            var tools = new McpServerPrimitiveCollection<McpServerTool>();
+
+            foreach (var descriptor in discovery.Tools)
+            {
+                var proxy = new UpstreamMcpServerTool(sources, descriptor);
+                if (!tools.TryAdd(proxy))
+                {
+                    throw new InvalidOperationException(
+                        $"Duplicate local MCP tool name: {proxy.ProtocolTool.Name}");
+                }
+            }
+
+            serverOptions.ToolCollection = tools;
+            serverOptions.ServerInstructions =
+                "أدوات الباحث يتيح أدوات قراءة فقط من الجامع والمكتبة الشاملة. " +
+                "اختر الأدوات وكرر البحث أو استخدم أدوات القراءة وفق تقديرك. " +
+                "كل اسم أداة يبدأ بمعرّف المكتبة، ولا تستخدم أدوات للكتابة أو التعديل أو الحذف.";
+        };
+    });
 
 var app = builder.Build();
 var log = app.Services.GetRequiredService<HostLog>();
@@ -47,25 +77,30 @@ app.Use(async (context, next) =>
     }
 
     var origin = context.Request.Headers["Origin"].ToString();
-    if (!string.IsNullOrEmpty(origin) && !LoopbackSecurity.IsAllowedOrigin(origin))
+    var isMcpEndpoint = context.Request.Path.StartsWithSegments("/mcp");
+    var originAllowed = isMcpEndpoint
+        ? LoopbackSecurity.IsAllowedMcpOrigin(origin, port)
+        : LoopbackSecurity.IsAllowedOrigin(origin);
+
+    if (!string.IsNullOrEmpty(origin) && !originAllowed)
     {
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         await context.Response.WriteAsJsonAsync(new { error = "Origin is not allowed." });
         return;
     }
 
-    if (LoopbackSecurity.IsAllowedOrigin(origin))
+    if (!string.IsNullOrEmpty(origin) && originAllowed)
     {
         context.Response.Headers["Access-Control-Allow-Origin"] = origin;
         context.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
-        context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type";
+        context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version";
         context.Response.Headers["Access-Control-Allow-Private-Network"] = "true";
         context.Response.Headers["Vary"] = "Origin";
     }
 
     if (HttpMethods.IsOptions(context.Request.Method))
     {
-        context.Response.StatusCode = LoopbackSecurity.IsAllowedOrigin(origin)
+        context.Response.StatusCode = originAllowed
             ? StatusCodes.Status204NoContent
             : StatusCodes.Status403Forbidden;
         return;
@@ -125,6 +160,11 @@ app.MapGet("/v1/models", async (DuckAiClient duckAi, CancellationToken cancellat
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
+
+// Standards-compliant local MCP endpoint. The tool catalog is refreshed per stateless
+// MCP request from the two configured upstream libraries, with read-only filtering
+// enforced by McpSourceRegistry before tools are exposed or invoked.
+app.MapMcp("/mcp");
 
 // Explicit diagnostic endpoint: it discovers both source catalogs and reports their read-only tools.
 // It does not invoke DuckAI or execute a research query.
