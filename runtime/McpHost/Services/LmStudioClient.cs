@@ -359,10 +359,11 @@ public sealed class LmStudioClient
         if (string.IsNullOrWhiteSpace(answer))
             answer = streamedMessage.ToString().Trim();
 
+        var responseId = ReadString(final, "response_id");
         return new LmStudioChatResult(
             finalModel,
             answer,
-            ReadString(final, "response_id"),
+            string.IsNullOrWhiteSpace(responseId) ? null : responseId,
             warnings,
             IsComplete: true);
     }
