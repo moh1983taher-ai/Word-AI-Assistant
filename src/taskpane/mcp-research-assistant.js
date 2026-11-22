@@ -157,8 +157,8 @@
     if (engine === "local") {
       return {
         ready: true,
-        title: "DuckAI المحلي هو محرك البحث",
-        detail: "يُنفّذ البحث على الجهاز عبر مضيف MCP المحلي، دون الحاجة إلى مفتاح API."
+        title: "DuckAI المحلي",
+        detail: "بحث محلي عبر مضيف MCP."
       };
     }
     if (engine === "auto") {
@@ -203,6 +203,7 @@
       ".mcp-research-panel h3{font-size:14px;margin:0 0 10px;font-weight:650;}",
       ".mcp-research-panel label{display:block;font-size:12px;margin:9px 0 4px;color:#405b58;}",
       ".mcp-research-panel input{box-sizing:border-box;width:100%;height:34px;border:1px solid #ccd7d1;border-radius:7px;padding:6px 9px;background:#fff;color:#183c3b;direction:ltr;text-align:left;}",
+      ".mcp-research-panel select,.mcp-research-panel select option{font-family:inherit;font-size:12px;line-height:1.4;}",
       ".mcp-source-selection{margin:12px 0;padding:10px 11px;border:1px solid #e0e7df;border-radius:9px;background:#fbfcf8;}",
       ".mcp-source-selection-title{font-size:12px;font-weight:650;color:#244b48;margin-bottom:3px;}",
       ".mcp-source-selection-note{font-size:10.5px;line-height:1.55;color:#718078;margin-bottom:6px;}",
@@ -253,18 +254,16 @@
     const status = getProviderStatus(settings);
     const engine = loadResearchEngine();
     const engineNames = {
-      auto: "تلقائي (DuckAI المحلي ثم Groq/Gemini)",
+      auto: "تلقائي",
       local: "DuckAI المحلي",
-      cloud: "المزود السحابي من إعدادات الذكاء الاصطناعي"
+      cloud: "سحابي"
     };
     const selectedNames = getSelectedMcpServers(loadSelectedServerIds()).map(function (server) {
       return server.label;
     });
-    health.textContent = "مسار التنفيذ: " + engineNames[engine] +
-      "\nالمزود السحابي المحفوظ: " + (settings.provider || "غير محدد") +
-      (settings.model ? "\nالنموذج السحابي المحدد: " + settings.model : "") +
-      "\nالمكتبات التي اخترتها: " + (selectedNames.length ? selectedNames.join(" + ") : "لم تختر أي مكتبة") +
-      "\n" + status.title + "\n" + status.detail;
+    health.textContent = "طريقة التنفيذ: " + engineNames[engine] +
+      "\nالمصادر: " + (selectedNames.length ? selectedNames.join(" + ") : "لم تُحدد") +
+      "\n" + status.title;
   }
 
   function buildSettingsPanel(parent) {
@@ -275,7 +274,7 @@
     panel.setAttribute("aria-label", "إعدادات مصادر البحث");
 
     const heading = document.createElement("h3");
-    heading.textContent = "إعدادات البحث بالمصادر المتصلة";
+    heading.textContent = "إعدادات البحث";
     panel.appendChild(heading);
 
     const engineLabel = document.createElement("label");
@@ -290,10 +289,12 @@
     engineSelect.style.padding = "6px 9px";
     engineSelect.style.background = "#fff";
     engineSelect.style.color = "#183c3b";
+    engineSelect.style.fontSize = "12px";
+    engineSelect.style.fontFamily = "inherit";
     [
-      { value: "auto", text: "تلقائي: DuckAI المحلي أولاً، ثم Groq/Gemini عند الحاجة" },
-      { value: "local", text: "DuckAI المحلي فقط" },
-      { value: "cloud", text: "Groq أو Gemini من إعدادات الذكاء الاصطناعي" }
+      { value: "auto", text: "تلقائي (المحلي أولاً)" },
+      { value: "local", text: "DuckAI المحلي" },
+      { value: "cloud", text: "سحابي (Groq / Gemini)" }
     ].forEach(function (option) {
       const item = document.createElement("option");
       item.value = option.value;
@@ -308,12 +309,12 @@
     sourceSelection.className = "mcp-source-selection";
     const sourceTitle = document.createElement("div");
     sourceTitle.className = "mcp-source-selection-title";
-    sourceTitle.textContent = "المكتبات التي سيبحث فيها النموذج";
+    sourceTitle.textContent = "مصادر البحث";
     sourceSelection.appendChild(sourceTitle);
 
     const sourceHelp = document.createElement("div");
     sourceHelp.className = "mcp-source-selection-note";
-    sourceHelp.textContent = "اختر مكتبة واحدة أو كلتيهما.";
+    sourceHelp.textContent = "اختر الجامع أو الشاملة أو كليهما.";
     sourceSelection.appendChild(sourceHelp);
 
     MCP_SERVERS.forEach(function (server) {
@@ -353,8 +354,8 @@
 
     const actions = document.createElement("div");
     actions.className = "mcp-actions";
-    const refresh = createButton("تحديث الإعدادات", "mcp-research-refresh-settings", "");
-    const testLocal = createButton("اختبار DuckAI المحلي", "mcp-research-test-local", "");
+    const refresh = createButton("تحديث", "mcp-research-refresh-settings", "");
+    const testLocal = createButton("فحص الاتصال المحلي", "mcp-research-test-local", "");
     const close = createButton("إغلاق", "mcp-research-close-settings", "");
     actions.appendChild(refresh);
     actions.appendChild(testLocal);
@@ -372,10 +373,9 @@
       try {
         const result = await checkLocalHost();
         state.connection = result;
-        health.textContent = "DuckAI المحلي متصل · عنوان التوليد: " + result.endpoint +
-          "\nالنموذج الافتراضي: " + result.model +
-          "\nفحص التوليد الفعلي يتم عند تنفيذ البحث، لا بمجرد عرض قائمة النماذج." +
-          "\nالنماذج المتاحة: " + (result.models || []).join("، ");
+        health.textContent = "DuckAI متصل." +
+          "\nالنموذج: " + result.model +
+          "\nالعنوان: " + result.endpoint;
       } catch (error) {
         health.textContent = "تعذر الاتصال المحلي: " +
           (error && error.message ? error.message : String(error));
