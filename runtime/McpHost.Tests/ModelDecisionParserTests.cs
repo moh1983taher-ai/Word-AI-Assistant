@@ -30,7 +30,7 @@ public sealed class ModelDecisionParserTests
     [Fact]
     public void ParsesToolCallAndItsExplicitTaskScopeBinding()
     {
-        const string json = "{\\"type\\":\\"tool_call\\",\\"server\\":\\"aljam3\\",\\"tool\\":\\"search\\",\\"scope_item\\":\\"S2\\",\\"arguments\\":{\\"q\\":\\"الأمر\\\"}}";
+        const string json = "{\"type\":\"tool_call\",\"server\":\"aljam3\",\"tool\":\"search\",\"scope_item\":\"S2\",\"arguments\":{\"q\":\"الأمر\"}}";
 
         Assert.True(ModelDecisionParser.TryParse(json, out var decision));
         Assert.Equal("S2", decision.ScopeItem);
