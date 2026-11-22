@@ -11,7 +11,7 @@ public sealed class ResearchTaskPlannerTests
     {
         const string response = """
             {
-              "scope_items": ["تعريف الأمر الوارد بعد الحظر", "أقوال الأصوليين في دلالته"],
+              "scope_items": ["الأمر الوارد بعد الحظر", "أقوال الأصوليين في دلالته"],
               "constraints": ["الاعتماد على المكتبتين المختارتين"],
               "exclusions": ["عدم التوسع في تاريخ علم الأصول"]
             }
@@ -25,7 +25,7 @@ public sealed class ResearchTaskPlannerTests
             out var exclusions));
 
         Assert.Equal(2, scope.Count);
-        Assert.Equal("تعريف الأمر الوارد بعد الحظر", scope[0]);
+        Assert.Equal("الأمر الوارد بعد الحظر", scope[0]);
         Assert.Single(constraints);
         Assert.Single(exclusions);
     }
