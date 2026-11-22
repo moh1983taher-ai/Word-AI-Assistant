@@ -48,4 +48,14 @@ public sealed class ResearchToolResultClassifierTests
 
         Assert.Equal(expected, ResearchToolResultClassifier.IsSearchTool(descriptor));
     }
+    
+    [Theory]
+    [InlineData("aljam3", "get_page", true)]
+    [InlineData("shamela", "shamela_open", true)]
+    [InlineData("shamela", "shamela_find", false)]
+    public void RecognizesToolsThatOpenSourceLocations(string server, string name, bool expected)
+    {
+        Assert.Equal(expected, ResearchToolResultClassifier.IsVerificationTool(server, name));
+    }
+
 }
