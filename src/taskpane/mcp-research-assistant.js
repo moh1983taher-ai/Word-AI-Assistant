@@ -448,7 +448,7 @@
       "المكتبات التي حددها المستخدم بنفسه لهذه المهمة هي: " + selectedLabels.join("، ") + ".",
       "لا تستدع أي خادم أو مكتبة غير محددة في اختيار المستخدم؛ قائمة أدوات MCP المتاحة لك مقصورة على هذه المكتبات.",
       selectedServers.length > 1
-        ? "حدد المستخدم المكتبتين معاً؛ لذلك نفذ بحثاً فعلياً في كل مكتبة محددة، ولا تكتف باستخدام واحدة منهما."
+        ? "اختار المستخدم المكتبتين، ولك حرية استخدام إحداهما أو كلتيهما وفق حاجة البحث؛ لا يلزمك البحث في كلتيهما."
         : "اقتصر في البحث على المكتبة الوحيدة التي حددها المستخدم.",
       "اعتمد عند نسبة المعلومات إلى المصادر على النصوص والبيانات التي تعيدها المكتبة أو المكتبات المحددة فقط.",
       "اذكر اسم الكتاب والمؤلف والجزء والصفحة متى أعادت الأداة هذه البيانات. لا تخترع بيانات ببليوغرافية ولا أرقام صفحات ولا اقتباسات.",
@@ -1069,13 +1069,6 @@
     });
     if (completed.length === 0) {
       throw new Error(providerLabel + " لم يُرجع نتيجة ناجحة من المكتبات التي اخترتها.");
-    }
-    const missingServers = allowedServers.filter(function (serverId) {
-      return !completed.some(function (call) { return call.server === serverId; });
-    });
-    if (missingServers.length) {
-      const missingLabels = getSelectedMcpServers(missingServers).map(function (server) { return server.label; });
-      throw new Error(providerLabel + " لم يستكمل البحث في جميع المكتبات التي اخترتها. لم تصل نتيجة بحث ناجحة من: " + missingLabels.join("، ") + ". أعد المحاولة أو غيّر اختيار المكتبات.");
     }
     return { answer: answer, toolCalls: completed };
   }
