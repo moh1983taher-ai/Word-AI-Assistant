@@ -15,10 +15,10 @@ $ping = Invoke-RestMethod -Uri ($base + '/ping') -TimeoutSec 5
 if ($ping.listening -ne $true) { throw 'MCP host did not report listening=true.' }
 Write-Host "OK: $($ping.service) v$($ping.version)"
 
-Write-Host ([Environment]::NewLine + '2/4 - اختبار DuckAI المحلي...')
+Write-Host ([Environment]::NewLine + '2/4 - اختبار مزود الذكاء الاصطناعي المحلي...')
 $health = Invoke-RestMethod -Uri ($base + '/health') -TimeoutSec 15
 if ($health.ready -ne $true) { throw "DuckAI is not ready: $($health.error)" }
-Write-Host "OK: provider=$($health.provider); model=$($health.model)"
+Write-Host "OK: provider=$($health.provider); model=$($health.model); endpoint=$($health.endpoint)"
 
 Write-Host ([Environment]::NewLine + '3/4 - اكتشاف أدوات MCP من المضيف نفسه...')
 $sources = Invoke-RestMethod -Uri ($base + '/v1/mcp/sources') -TimeoutSec 120
@@ -35,7 +35,7 @@ if ($unavailableSelectedSources.Count -gt 0) {
 }
 Write-Host ('OK: أدوات المكتبات المختارة متاحة: ' + ($Servers -join ' + '))
 
-Write-Host ([Environment]::NewLine + '4/4 - تنفيذ بحث حقيقي عبر DuckAI وMCP...')
+Write-Host ([Environment]::NewLine + '4/4 - تنفيذ بحث فعلي عبر محرك الذكاء الاصطناعي وMCP...')
 Write-Host ('المكتبات المختارة: ' + ($Servers -join ' + '))
 $payload = @{
     client = 'word-addin'
@@ -76,7 +76,7 @@ if ([string]::IsNullOrWhiteSpace([string]$result.answer)) {
 }
 
 Write-Host ([Environment]::NewLine + '========== نتيجة الاختبار ==========')
-Write-Host "نجح البحث عبر النموذج: $($result.model)"
+Write-Host "نجح البحث عبر المزود: $($health.provider); النموذج: $($result.model)"
 Write-Host "عدد فحوص /ping أثناء البحث: $pingCount"
 Write-Host ([Environment]::NewLine + 'الأدوات التي استُدعيت:')
 if (@($result.toolCalls).Count -eq 0) {
