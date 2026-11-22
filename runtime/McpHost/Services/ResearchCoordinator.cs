@@ -320,7 +320,9 @@ public sealed class ResearchCoordinator
             _log.Warning($"Research search window elapsed: task={taskId}; toolCalls={trace.Count}.");
             warnings.Add("انتهت مهلة البحث البالغة خمس دقائق؛ أُوقف البحث الجديد وانتقل النظام إلى عرض ما جُمع حتى لحظة التوقف.");
 
-            var pendingSources = ResearchSourceSelection.Missing(searchableServerIds, sourceCoverage);
+            var pendingSources = searchableServerIds.Length == 0
+                ? selectedServerIds
+                : ResearchSourceSelection.Missing(searchableServerIds, sourceCoverage);
             var partial = await FinalizeTimedOutResearchAsync(
                 model,
                 messages,
@@ -473,8 +475,12 @@ public sealed class ResearchCoordinator
 
         builder.AppendLine("انتهت مهلة البحث، ولذلك لم يكتمل الاستقصاء. فيما يأتي ما أمكن جمعه قبل التوقف، دون إسقاط النتائج المتاحة:");
 
+        const int maxFallbackCharacters = 20_000;
         foreach (var server in selectedServerIds)
         {
+            if (builder.Length >= maxFallbackCharacters)
+                break;
+
             var sourceEntries = entries
                 .Where(entry => string.Equals(entry.Server, server, StringComparison.Ordinal))
                 .ToArray();
@@ -490,12 +496,27 @@ public sealed class ResearchCoordinator
 
             foreach (var entry in sourceEntries)
             {
+                if (builder.Length >= maxFallbackCharacters)
+                    break;
+
                 if (!entry.Succeeded)
                     builder.AppendLine("ملاحظة: لم تُصنّف استجابة الأداة على أنها نتيجة صالحة.");
 
-                builder.AppendLine(Limit(entry.Content, 4_000));
+                var remaining = maxFallbackCharacters - builder.Length;
+                var contentLimit = Math.Max(0, Math.Min(4_000, remaining - 80));
+                if (contentLimit == 0)
+                    break;
+
+                var content = entry.Content ?? string.Empty;
+                if (content.Length > contentLimit)
+                    content = content[..contentLimit] + " [اقتُطع حجم العرض، مع بقاء الأصل في سجل المهمة]";
+
+                builder.AppendLine(content);
             }
         }
+
+        if (builder.Length >= maxFallbackCharacters)
+            builder.AppendLine("اقتُطع العرض الاحتياطي عند الحد الآمن لطول الإجابة؛ ظلت بقية المواد محفوظة في سجل المهمة.");
 
         if (pendingSourceIds.Count > 0)
         {
