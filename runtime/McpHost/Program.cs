@@ -130,7 +130,7 @@ app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellation
         {
             ready = true,
             version = hostVersion,
-            provider = "DuckAI",
+            provider = duckAi.GetProviderLabel(snapshot.BaseAddress),
             endpoint = snapshot.BaseAddress,
             model = snapshot.DefaultModel,
             models = snapshot.Models,
