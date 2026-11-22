@@ -48,6 +48,14 @@ public sealed class ResearchCoordinator
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
         timeout.CancelAfter(TimeSpan.FromSeconds(300));
 
+        var selectedServerIds = ResearchSourceSelection.Normalize(request.Servers);
+        var warnings = new List<string>();
+        var messages = new List<DuckChatMessage>();
+        var trace = new List<ToolCallTrace>();
+        var sourceCoverage = new HashSet<string>(StringComparer.Ordinal);
+        var evidenceLedger = new ResearchEvidenceLedger();
+        var model = request.Model ?? string.Empty;
+
         try
         {
             var incoming = (request.Messages ?? [])
@@ -67,13 +75,12 @@ public sealed class ResearchCoordinator
             // Keep the latest user request available in every model turn, even when
             // older history and tool results need to be trimmed to the context budget.
             var currentUserMessageIndex = incoming.FindLastIndex(message => message.Role == "user");
-
-            var selectedServerIds = ResearchSourceSelection.Normalize(request.Servers);
+            messages.AddRange(incoming);
             if (selectedServerIds.Count == 0)
                 throw new InvalidOperationException("يجب تحديد الجامع أو المكتبة الشاملة أو كليهما قبل البحث.");
 
             var discovery = await _sources.DiscoverSelectedAsync(selectedServerIds, timeout.Token);
-            var warnings = discovery.Warnings.ToList();
+            warnings.AddRange(discovery.Warnings);
             var activeTools = LimitTools(discovery.Tools);
             var unavailableSources = selectedServerIds
                 .Where(server => !activeTools.Any(tool => tool.Server == server))
@@ -87,8 +94,8 @@ public sealed class ResearchCoordinator
                     ". افحص اتصال هذه المكتبات واكتشاف أدواتها قبل إعادة البحث.");
             }
 
-            // Require a successful tool result from every selected library. Subsequent
-            // model turns are restricted to the selected sources that are still pending.
+            // Require one successfully completed search operation per selected library.
+            // An empty/no-match search is complete; a connection or tool error is not.
             var requiresMcpSources = selectedServerIds.Count > 0;
             var selectedLabels = selectedServerIds
                 .Select(ResearchSourceSelection.GetLabel)
@@ -96,15 +103,9 @@ public sealed class ResearchCoordinator
 
             // Chat history contains user and assistant decision messages. MCP results
             // are stored separately so context compaction cannot discard prior evidence.
-            var messages = new List<DuckChatMessage>(incoming);
-
-            var trace = new List<ToolCallTrace>();
-            var sourceCoverage = new HashSet<string>(StringComparer.Ordinal);
-            var evidenceLedger = new ResearchEvidenceLedger();
             var repairAttempted = false;
             var sourceRequirementRetryAttempted = false;
             var toolCallsAttempted = 0;
-            var model = request.Model ?? string.Empty;
 
             while (true)
             {
@@ -134,7 +135,7 @@ public sealed class ResearchCoordinator
                 else
                 {
                     turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                        "وصلت نتيجة بحث غير فارغة من جميع المكتبات المختارة، لكن ذلك لا يعني بالضرورة أن النتائج وثيقة الصلة أو كافية. قيّم صلة كل مقتطف بالسؤال وقوة دلالته واستقلال مصادره. إذا كانت النتائج بعيدة عن المسألة أو ناقصة فحسّن عبارة البحث واستدع أداة أخرى من المكتبات المختارة، ولا تنتقل إلى final قبل كفاية الأدلة. عند إعداد الإجابة اجمع الأدلة المحفوظة في سجل المهمة، وافتح المواضع اللازمة للتحقق من الإحالات عند الحاجة.";
+                        "أُجري بحث في جميع المكتبات المختارة دون خطأ في تنفيذ أدوات البحث، وقد تكون النتائج غنية أو محدودة أو خالية من المطابقات. قيّم ما عاد من نتائج بحسب صلته بالسؤال وقوة دلالته واستقلال مصادره. لك أن تحسّن عبارات البحث أو تستخدم أدوات قراءة أخرى متى رأيت أن ذلك يضيف قيمة، ولك أن تنتقل إلى الإجابة عندما تتوافر مادة كافية. لا تجعل خلو نتيجة مكتبة من المطابقات سبباً آلياً لتعطيل الإجابة. عند الصياغة استفد من الأدلة المحفوظة في سجل المهمة، وافتح المواضع اللازمة للتحقق من الإحالات عند الحاجة.";
                 }
 
                 turnSystemPrompt += Environment.NewLine + Environment.NewLine +
@@ -291,8 +292,28 @@ public sealed class ResearchCoordinator
         }
         catch (OperationCanceledException) when (!requestCancellation.IsCancellationRequested)
         {
-            _log.Warning($"Research timed out: task={taskId}.");
-            throw new TimeoutException("انتهت المهلة المحددة لتنفيذ البحث المحلي.");
+            _log.Warning($"Research search window elapsed: task={taskId}; toolCalls={trace.Count}.");
+            warnings.Add("انتهت مهلة البحث البالغة خمس دقائق؛ أُوقف البحث الجديد وانتقل النظام إلى عرض ما جُمع حتى لحظة التوقف.");
+
+            var pendingSources = ResearchSourceSelection.Missing(selectedServerIds, sourceCoverage);
+            var partial = await FinalizeTimedOutResearchAsync(
+                model,
+                messages,
+                evidenceLedger,
+                selectedServerIds,
+                pendingSources,
+                warnings,
+                requestCancellation,
+                taskId);
+
+            _log.Info(
+                $"Research returned partial result after timeout: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; model={partial.Model}.");
+
+            return new ResearchResponse(
+                partial.Answer,
+                partial.Model,
+                trace.ToArray(),
+                warnings.ToArray());
         }
         catch (Exception exception)
         {
@@ -303,6 +324,163 @@ public sealed class ResearchCoordinator
         {
             _concurrency.Release();
         }
+    }
+
+
+    private async Task<(string Answer, string Model)> FinalizeTimedOutResearchAsync(
+        string model,
+        IReadOnlyList<DuckChatMessage> messages,
+        ResearchEvidenceLedger evidenceLedger,
+        IReadOnlyList<string> selectedServerIds,
+        IReadOnlyList<string> pendingSourceIds,
+        List<string> warnings,
+        CancellationToken requestCancellation,
+        string taskId)
+    {
+        const string systemPrompt = """
+أنت مساعد بحث علمي في «أدوات الباحث».
+انتهت مهلة البحث المقررة، وهذه دورة إغلاق نهائية وليست دورة بحث جديدة.
+لا تستدع أي أداة ولا تحاول متابعة البحث. أعد الآن إجابة مفيدة اعتماداً حصراً على سجل الأدلة المتاح وسياق سؤال المستخدم.
+إذا كانت بعض النتائج متاحة، فاعرضها وحلل صلتها بالسؤال بقدر ما تسمح به، وبيّن أن الإجابة جزئية وأن البحث توقف بانتهاء المهلة. لا تُسقط نتيجة حصلت عليها لمجرد أن البحث لم يكتمل.
+إذا أعادت مكتبة رسالة صريحة تفيد بعدم وجود نتائج، فاذكر أن البحث فيها لم يسفر عن نتائج تخدم المسألة. لا تعمم النفي على المكتبات الأخرى أو على مجموع المصادر.
+إذا لم يتوفر أي محتوى من النتائج، فصرّح بأن البحث لم يتمكن من الوصول إلى نتائج متاحة خلال المهلة، ولا تدّعِ أن الموضوع خالٍ من المصادر.
+ميّز بين عدم وجود نتائج، وبين تعذر الاتصال أو فشل تنفيذ الأداة. ولا تختلق معلومات أو مراجع أو أرقام صفحات أو روابط.
+لا تستخدم أي معرفة من الذاكرة أو مصادر خارج المكتبات التي اختارها المستخدم.
+اعرض الإحالات وفق البيانات الواردة فعلاً في النتائج: [اسم المرجع، جـ (الجزء إن وجد)، صـ (الصفحة إن وجدت)]. اجعل الإحالة رابطاً فقط إذا ورد رابط مباشر في نتيجة المصدر، وضعها بجوار المعلومة التي تسندها.
+أخرج كائن JSON واحداً فقط وفق المخطط الصارم: type="final"، وanswer نص الإجابة، وserver وtool نصان فارغان، وarguments قيمة null.
+اكتب بالعربية ما لم يطلب المستخدم لغة أخرى.
+""";
+
+        try
+        {
+            using var finalizationTimeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
+            finalizationTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+
+            var evidenceContext = evidenceLedger.BuildContext(
+                selectedServerIds,
+                pendingSourceIds,
+                MaxEvidenceContextCharacters);
+
+            var historyBudget = Math.Max(1, MaxConversationCharacters - evidenceContext.Length);
+            var currentUserMessageIndex = messages.ToList()
+                .FindLastIndex(message => message.Role == "user");
+            var conversation = messages.Count == 0
+                ? Array.Empty<DuckChatMessage>()
+                : ResearchContextWindow.Compact(
+                    messages.ToArray(),
+                    historyBudget,
+                    MaxMessageCharacters,
+                    currentUserMessageIndex);
+
+            var requestMessages = new List<DuckChatMessage>(conversation.Count + 2)
+            {
+                new("system", systemPrompt +
+                    Environment.NewLine + Environment.NewLine +
+                    "المكتبات التي اختارها المستخدم: " +
+                    string.Join("، ", selectedServerIds.Select(ResearchSourceSelection.GetLabel)) + "." +
+                    Environment.NewLine +
+                    "المكتبات التي لم يكتمل فيها استدعاء بحث صالح: " +
+                    (pendingSourceIds.Count == 0
+                        ? "لا يوجد."
+                        : string.Join("، ", pendingSourceIds.Select(ResearchSourceSelection.GetLabel))) +
+                    Environment.NewLine +
+                    "ملاحظات الاتصال والتنفيذ: " +
+                    (warnings.Count == 0 ? "لا توجد." : string.Join(" | ", warnings)))
+            };
+            requestMessages.AddRange(conversation);
+            if (!string.IsNullOrWhiteSpace(evidenceContext))
+                requestMessages.Add(new DuckChatMessage("user", evidenceContext));
+
+            var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
+                Array.Empty<ToolDescriptor>(),
+                allowFinal: true,
+                allowToolCalls: false);
+
+            var completion = await _duckAi.CompleteAsync(
+                model,
+                requestMessages,
+                functionTools: null,
+                cancellationToken: finalizationTimeout.Token,
+                responseFormat: responseFormat);
+
+            if (ModelDecisionParser.TryParse(completion.Text, out var decision) &&
+                decision.Type == "final" &&
+                !string.IsNullOrWhiteSpace(decision.Answer))
+            {
+                return (decision.Answer, completion.Model);
+            }
+
+            _log.Warning(
+                $"Research timeout finalization returned an invalid final decision: task={taskId}; characters={completion.Text.Length}.");
+        }
+        catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _log.Warning(
+                $"Research timeout finalization failed: task={taskId}; {exception.GetType().Name}: {exception.Message}");
+        }
+
+        return (BuildTimeoutFallback(
+            evidenceLedger,
+            selectedServerIds,
+            pendingSourceIds), model);
+    }
+
+    private static string BuildTimeoutFallback(
+        ResearchEvidenceLedger evidenceLedger,
+        IReadOnlyList<string> selectedServerIds,
+        IReadOnlyList<string> pendingSourceIds)
+    {
+        var entries = evidenceLedger.Entries;
+        var builder = new System.Text.StringBuilder();
+
+        if (entries.Count == 0)
+        {
+            builder.Append("انتهت مهلة البحث قبل الحصول على محتوى يمكن عرضه من المكتبات المختارة: ")
+                .Append(string.Join("، ", selectedServerIds.Select(ResearchSourceSelection.GetLabel)))
+                .AppendLine(".");
+            builder.Append("لم ترد نتائج موثقة يمكن الاستناد إليها خلال مدة البحث. وهذا لا يثبت عدم وجود مصادر للمسألة، وإنما يعني أن البحث لم يتمكن من الوصول إلى نتائج متاحة قبل انتهاء المهلة.");
+            return builder.ToString();
+        }
+
+        builder.AppendLine("انتهت مهلة البحث، ولذلك لم يكتمل الاستقصاء. فيما يأتي ما أمكن جمعه قبل التوقف، دون إسقاط النتائج المتاحة:");
+
+        foreach (var server in selectedServerIds)
+        {
+            var sourceEntries = entries
+                .Where(entry => string.Equals(entry.Server, server, StringComparison.Ordinal))
+                .ToArray();
+
+            builder.AppendLine();
+            builder.Append("### ").AppendLine(ResearchSourceSelection.GetLabel(server));
+
+            if (sourceEntries.Length == 0)
+            {
+                builder.AppendLine("لم تصل من هذه المكتبة نتيجة بحث قبل انتهاء المهلة.");
+                continue;
+            }
+
+            foreach (var entry in sourceEntries)
+            {
+                if (!entry.Succeeded)
+                    builder.AppendLine("ملاحظة: لم تُصنّف استجابة الأداة على أنها نتيجة صالحة.");
+
+                builder.AppendLine(Limit(entry.Content, 4_000));
+            }
+        }
+
+        if (pendingSourceIds.Count > 0)
+        {
+            builder.AppendLine();
+            builder.Append("لم يكتمل البحث في: ")
+                .Append(string.Join("، ", pendingSourceIds.Select(ResearchSourceSelection.GetLabel)))
+                .Append('.');
+        }
+
+        return builder.ToString();
     }
 
     private async Task<ToolExecutionResult> ExecuteToolAsync(
@@ -329,6 +507,15 @@ public sealed class ResearchCoordinator
 
             if (!ResearchToolResultClassifier.HasUsableContent(result))
             {
+                if (ResearchToolResultClassifier.IsCompletedSearch(descriptor, result.IsError == true))
+                {
+                    // A successful search with zero matches is still a completed search.
+                    // Keep its explicit no-result/empty response in the evidence ledger
+                    // and do not force the model to repeat that source indefinitely.
+                    warnings.Add($"{descriptor.Server}/{descriptor.Name}: search completed without usable matches");
+                    return new ToolExecutionResult(formattedResult, true);
+                }
+
                 warnings.Add($"{descriptor.Server}/{descriptor.Name}: MCP returned no usable content");
                 return new ToolExecutionResult(formattedResult, false);
             }
