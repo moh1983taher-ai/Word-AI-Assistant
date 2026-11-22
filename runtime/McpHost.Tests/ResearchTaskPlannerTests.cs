@@ -86,7 +86,7 @@ public sealed class ResearchTaskPlannerTests
             selectedSourceCount: 2);
 
         Assert.True(expanded.MaxToolCalls > focused.MaxToolCalls);
-        Assert.Equal(24, deep.MaxToolCalls);
+        Assert.Equal(32, deep.MaxToolCalls);
         Assert.InRange(focused.TimeoutSeconds, 180, 300);
         Assert.Equal(300, deep.TimeoutSeconds);
     }
@@ -123,6 +123,30 @@ public sealed class ResearchTaskPlannerTests
         Assert.Contains("التحقق من المواضع الأصلية", instructions);
         Assert.Contains("S2: العنصر الثاني", instructions);
         Assert.DoesNotContain("S1: العنصر الأول؛", instructions);
+    }
+
+    [Fact]
+    public void CompletedCoverageStillAllowsAnEvidenceSufficiencyReview()
+    {
+        var plan = ResearchTaskPlan.Create(
+            "ابحث عن مفهوم الاجتهاد",
+            ["مفهوم الاجتهاد"],
+            [],
+            [],
+            selectedSourceCount: 1);
+
+        var instructions = plan.BuildProgressInstructions(
+            new HashSet<string>(["S1"]),
+            [],
+            2,
+            0,
+            verificationRequired: false,
+            verifiedScopeItemIds: new HashSet<string>(),
+            verificationToolsAvailable: false);
+
+        Assert.Contains("اكتملت التغطية الأولية", instructions);
+        Assert.Contains("راجع الآن كفاية الأدلة", instructions);
+        Assert.Contains("لا تضف عناصر جديدة", instructions);
     }
 
     [Fact]
