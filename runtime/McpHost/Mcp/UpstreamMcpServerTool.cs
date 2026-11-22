@@ -69,14 +69,17 @@ public sealed class UpstreamMcpServerTool : McpServerTool
                     ? character
                     : '_').ToArray());
 
-        var name = $"mcp_{Safe(server)}__{Safe(tool)}";
-        if (name.Length <= 64)
+        var rawName = $"mcp_{server}__{tool}";
+        var name = Safe(rawName);
+        if (name.Length <= 64 && string.Equals(name, rawName, StringComparison.Ordinal))
             return name;
 
+        // Include a stable hash whenever sanitization is lossy or the provider's
+        // function-name limit is exceeded, preventing collisions such as "a/b" and "a b".
         var suffix = Convert.ToHexString(
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes($"{server}/{tool}")))[..8].ToLowerInvariant();
-        var prefixLength = 64 - suffix.Length - 1;
+        var prefixLength = Math.Min(name.Length, 64 - suffix.Length - 1);
         return name[..prefixLength] + "_" + suffix;
     }
 }
