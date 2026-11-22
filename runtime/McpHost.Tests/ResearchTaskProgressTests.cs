@@ -8,19 +8,33 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class ResearchTaskProgressTests
 {
     [Fact]
-    public void PreventsTheSameSearchFromBeingExecutedAgainEvenIfPaginationChanges()
+    public void PreventsAnExactDuplicateSearchCall()
     {
         using var schema = JsonDocument.Parse("""{"type":"object"}""");
         var tool = new ToolDescriptor(
             "aljam3", "الجامع", "search", "بحث", schema.RootElement.Clone());
         using var first = JsonDocument.Parse("""{"q":"الأمر الوارد بعد الحظر","per_page":10}""");
-        using var second = JsonDocument.Parse("""{"per_page":50,"q":"الأمر الوارد بعد الحظر"}""");
+        using var second = JsonDocument.Parse("""{"per_page":10,"q":"الأمر الوارد بعد الحظر"}""");
         var progress = new ResearchTaskProgress(["S1"]);
 
         Assert.True(progress.TryRegisterToolCall("S1", tool, first.RootElement, out _));
         Assert.False(progress.TryRegisterToolCall("S1", tool, second.RootElement, out var reason));
         Assert.Contains("يكرر", reason);
         Assert.Equal(1, progress.DuplicateToolCalls);
+    }
+
+    [Fact]
+    public void AllowsDistinctPaginationWhenAResultSetMayContainAdditionalEvidence()
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object"}""");
+        var tool = new ToolDescriptor(
+            "aljam3", "الجامع", "search", "بحث", schema.RootElement.Clone());
+        using var first = JsonDocument.Parse("""{"q":"الأمر الوارد بعد الحظر","page":1}""");
+        using var second = JsonDocument.Parse("""{"q":"الأمر الوارد بعد الحظر","page":2}""");
+        var progress = new ResearchTaskProgress(["S1"]);
+
+        Assert.True(progress.TryRegisterToolCall("S1", tool, first.RootElement, out _));
+        Assert.True(progress.TryRegisterToolCall("S1", tool, second.RootElement, out _));
     }
 
     [Fact]
