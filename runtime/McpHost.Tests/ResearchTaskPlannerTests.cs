@@ -107,7 +107,7 @@ public sealed class ResearchTaskPlannerTests
             0,
             0,
             verificationRequired: false,
-            verificationCompleted: true,
+            verifiedScopeItemIds: new HashSet<string>(),
             verificationToolsAvailable: false);
 
         Assert.Contains("لا تبحث ولا تشرح ولا تضف محوراً", instructions);
