@@ -143,12 +143,13 @@ public sealed class ResearchCoordinator
                 var verificationCompleted = !verificationRequired ||
                     !verificationToolsAvailable ||
                     taskPlan.ScopeItems.All(item => verifiedScopeItemIds.Contains(item.Id));
-                var taskComplete = pendingSourceIds.Count == 0 &&
+                var baselineCoverageComplete = pendingSourceIds.Count == 0 &&
                     missingScopeItemIds.Count == 0 &&
                     verificationCompleted;
+                var verificationUnavailable = verificationRequired && !verificationToolsAvailable;
                 var toolBudgetReached = toolCallsAttempted >= taskPlan.MaxToolCalls;
                 var noProgressStop = progress.ConsecutiveNoProgress >= 3;
-                var stopToolCalls = taskComplete || toolBudgetReached || noProgressStop;
+                var stopToolCalls = toolBudgetReached || noProgressStop;
                 IReadOnlyList<ToolDescriptor> turnTools = stopToolCalls
                     ? Array.Empty<ToolDescriptor>()
                     : ResearchSourceToolRouter.SelectForTurn(
@@ -197,15 +198,15 @@ public sealed class ResearchCoordinator
                     turnSystemPrompt += Environment.NewLine +
                         "توقفت المتابعة لأن ثلاث محاولات متتابعة لم تضف دليلاً أو تقدماً جديداً. لا تستدع أداة أخرى؛ أخرج نتيجة جزئية مع بيان النقص بدقة.";
                 }
-                else if (taskComplete && verificationRequired && !verificationToolsAvailable)
+                else if (baselineCoverageComplete && verificationUnavailable)
                 {
                     turnSystemPrompt += Environment.NewLine +
-                        "اكتملت تغطية عناصر السؤال والمكتبات، لكن لم تتوفر أداة لفتح المواضع الأصلية. أخرج الإجابة مع التصريح بهذا القيد، ولا تدّع أنك تحققت من النصوص الأصلية.";
+                        "اكتملت التغطية الأولية، لكن تعذر التحقق من المواضع الأصلية لعدم إتاحة أداة قراءة. قيّم كفاية ما توفر؛ إن كان كافياً فأخرج الإجابة مع التصريح بهذا القيد، وإن بقي نقص محدد فاطلب دليلاً إضافياً داخل عناصر النطاق القائمة فقط.";
                 }
-                else if (taskComplete)
+                else if (baselineCoverageComplete)
                 {
                     turnSystemPrompt += Environment.NewLine +
-                        "اكتملت عناصر النطاق وتغطية المصادر والتحقق المطلوب. لا تستدع أداة أخرى؛ أخرج الإجابة النهائية فقط.";
+                        "اكتملت التغطية الأولية. قيّم الآن كفاية الأدلة لكل عنصر. إن كانت كافية فأخرج القرار النهائي؛ وإن بقي نقص مؤثر ومحدد، فيجوز لك استدعاء بحث أو قراءة إضافية مرتبطة بأحد عناصر النطاق القائمة فقط. لا تنشئ محاور جديدة.";
                 }
 
                 turnSystemPrompt += Environment.NewLine + Environment.NewLine +
@@ -245,7 +246,7 @@ public sealed class ResearchCoordinator
 
                 var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
                     turnTools,
-                    allowFinal: taskComplete || toolBudgetReached || noProgressStop,
+                    allowFinal: baselineCoverageComplete || toolBudgetReached || noProgressStop,
                     allowToolCalls: !stopToolCalls,
                     scopeItemIds: taskPlan.ScopeItems.Select(item => item.Id).ToArray());
 
@@ -291,7 +292,7 @@ public sealed class ResearchCoordinator
                         .Select(item => item.Description)
                         .ToArray();
                     var verificationUnavailable = verificationRequired && !verificationToolsAvailable;
-                    var isPartial = !taskComplete || verificationUnavailable;
+                    var isPartial = !baselineCoverageComplete || verificationUnavailable;
 
                     if (isPartial && !stopToolCalls)
                     {
@@ -325,7 +326,7 @@ public sealed class ResearchCoordinator
                             limitationText + ".\n\n" + finalAnswer;
                     }
 
-                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; budget={taskPlan.MaxToolCalls}; coveredSources={string.Join(",", sourceCoverage)}; coveredScope={string.Join(",", progress.CoveredScopeItemIds)}; partial={isPartial}; mode=task-scoped-json-schema; model={model}.");
+                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; budget={taskPlan.MaxToolCalls}; coveredSources={string.Join(",", sourceCoverage)}; coveredScope={string.Join(",", progress.CoveredScopeItemIds)}; baselineComplete={baselineCoverageComplete}; partial={isPartial}; mode=task-scoped-json-schema; model={model}.");
                     return new ResearchResponse(
                         finalAnswer,
                         model,
