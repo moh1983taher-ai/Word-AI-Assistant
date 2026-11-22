@@ -127,6 +127,7 @@ public sealed class LmStudioClientTests
             CancellationToken.None);
 
         Assert.Equal("الجواب النهائي", result.Answer);
+        Assert.True(result.IsComplete);
         Assert.Equal("research-model", result.Model);
         Assert.Null(result.ResponseId);
 
@@ -190,10 +191,55 @@ public sealed class LmStudioClientTests
             CancellationToken.None);
 
         Assert.Equal("الجواب النهائي", result.Answer);
+        Assert.True(result.IsComplete);
         var tool = Assert.Single(captured);
         Assert.Equal("shamela", tool.ServerLabel);
         Assert.Equal("shamela_find", tool.Tool);
         Assert.Equal("نتائج الشاملة", tool.Output);
+    }
+
+    [Fact]
+    public async Task MarksStreamWithoutChatEndAsIncompleteButPreservesToolOutput()
+    {
+        var handler = new StubHandler(request =>
+        {
+            if (request.Method == HttpMethod.Get)
+            {
+                return Json(HttpStatusCode.OK, """
+                    {"models":[{"type":"llm","key":"model-1","display_name":"Model","capabilities":{"trained_for_tool_use":true},"loaded_instances":[]}]}
+                    """);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                    event: tool_call.success
+                    data: {"type":"tool_call.success","tool":"search","output":"نتيجة محفوظة","provider_info":{"type":"ephemeral_mcp","server_label":"aljam3"}}
+
+                    event: message.delta
+                    data: {"type":"message.delta","content":"جزء من الإجابة"}
+
+                    """, Encoding.UTF8, "text/event-stream")
+            };
+        });
+
+        var client = new LmStudioClient(
+            new StubHttpClientFactory(handler),
+            TestOptions(),
+            new HostLog());
+        var captured = new List<LmStudioToolResult>();
+
+        var result = await client.ChatAsync(
+            "model-1",
+            "تعليمات",
+            "سؤال",
+            [new LmStudioIntegration("aljam3", "https://aljam3.com/mcp", ["search"])],
+            tool => { captured.Add(tool); return Task.CompletedTask; },
+            CancellationToken.None);
+
+        Assert.False(result.IsComplete);
+        Assert.Equal("جزء من الإجابة", result.Answer);
+        Assert.Equal("نتيجة محفوظة", Assert.Single(captured).Output);
     }
 
     [Fact]
@@ -234,6 +280,7 @@ public sealed class LmStudioClientTests
             CancellationToken.None);
 
         Assert.Equal("صياغة جزئية", result.Answer);
+        Assert.True(result.IsComplete);
         Assert.NotNull(capturedPayload);
         using var payload = JsonDocument.Parse(capturedPayload!);
         Assert.False(payload.RootElement.TryGetProperty("integrations", out _));
