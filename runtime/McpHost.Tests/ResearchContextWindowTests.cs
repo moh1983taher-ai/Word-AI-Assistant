@@ -71,6 +71,69 @@ public sealed class ResearchContextWindowTests
     }
 
     [Fact]
+    public void CompactKeepsNativeToolCallAndEveryMatchingToolResultTogether()
+    {
+        var messages = new[]
+        {
+            new DuckChatMessage("user", "السؤال الحالي"),
+            new DuckChatMessage(
+                "assistant",
+                null,
+                ToolCalls:
+                [
+                    new DuckChatToolCall("call_1", "function",
+                        new DuckChatFunction("mcp_aljam3__search", "{\"query\":\"مصطلح أصولي\"}")),
+                    new DuckChatToolCall("call_2", "function",
+                        new DuckChatFunction("mcp_shamela__shamela_find", "{\"keywords\":[\"أصول الفقه\"]}"))
+                ]),
+            new DuckChatMessage("tool", "نتيجة الجامع", ToolCallId: "call_1"),
+            new DuckChatMessage("tool", "نتيجة الشاملة", ToolCallId: "call_2")
+        };
+
+        var compacted = ResearchContextWindow.Compact(
+            messages,
+            maxConversationCharacters: 2_000,
+            maxMessageCharacters: 1_000,
+            pinnedMessageIndex: 0);
+
+        Assert.Equal(new[] { "user", "assistant", "tool", "tool" },
+            compacted.Select(message => message.Role).ToArray());
+        Assert.Equal(new[] { "call_1", "call_2" },
+            compacted[1].ToolCalls!.Select(call => call.Id).ToArray());
+        Assert.Equal("call_1", compacted[2].ToolCallId);
+        Assert.Equal("call_2", compacted[3].ToolCallId);
+    }
+
+    [Fact]
+    public void CompactDropsAnOversizedNativeToolHistoryGroupWithoutOrphaningResults()
+    {
+        var messages = new[]
+        {
+            new DuckChatMessage("user", "السؤال"),
+            new DuckChatMessage(
+                "assistant",
+                null,
+                ToolCalls:
+                [
+                    new DuckChatToolCall("call_1", "function",
+                        new DuckChatFunction("mcp_aljam3__search", "{\"query\":\"بحث طويل\"}"))
+                ]),
+            new DuckChatMessage("tool", new string('r', 100), ToolCallId: "call_1")
+        };
+
+        var compacted = ResearchContextWindow.Compact(
+            messages,
+            maxConversationCharacters: 30,
+            maxMessageCharacters: 30,
+            pinnedMessageIndex: 0);
+
+        Assert.Single(compacted);
+        Assert.Equal("السؤال", compacted[0].Content);
+        Assert.DoesNotContain(compacted, message => message.Role == "tool");
+        Assert.DoesNotContain(compacted, message => message.ToolCalls is { Count: > 0 });
+    }
+
+    [Fact]
     public void CompactLeavesMessagesUnchangedWhenTheyFitTheBudget()
     {
         var messages = new[]
