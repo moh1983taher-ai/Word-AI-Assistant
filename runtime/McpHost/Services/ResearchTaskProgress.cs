@@ -12,11 +12,6 @@ namespace ResearchTools.McpHost.Services;
 /// </summary>
 internal sealed class ResearchTaskProgress
 {
-    private static readonly HashSet<string> PaginationProperties = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "page", "per_page", "page_size", "limit", "offset", "skip", "cursor"
-    };
-
     private readonly HashSet<string> _scopeItemIds;
     private readonly HashSet<string> _coveredScopeItems = new(StringComparer.Ordinal);
     private readonly HashSet<string> _toolCallSignatures = new(StringComparer.Ordinal);
@@ -54,9 +49,7 @@ internal sealed class ResearchTaskProgress
             return false;
         }
 
-        var canonicalArguments = ResearchToolResultClassifier.IsSearchTool(descriptor)
-            ? Canonicalize(arguments, omitPagination: true)
-            : Canonicalize(arguments, omitPagination: false);
+        var canonicalArguments = Canonicalize(arguments);
         var signature = Hash(
             scopeItemId + "|" + descriptor.Server + "|" + descriptor.Name + "|" + canonicalArguments);
 
@@ -98,17 +91,16 @@ internal sealed class ResearchTaskProgress
 
     internal void RecordRejectedDecision() => ConsecutiveNoProgress++;
 
-    private static string Canonicalize(JsonElement element, bool omitPagination)
+    private static string Canonicalize(JsonElement element)
     {
         return element.ValueKind switch
         {
             JsonValueKind.Object => "{" + string.Join(",", element.EnumerateObject()
-                .Where(property => !omitPagination || !PaginationProperties.Contains(property.Name))
                 .OrderBy(property => property.Name, StringComparer.Ordinal)
                 .Select(property => JsonSerializer.Serialize(property.Name) + ":" +
-                                    Canonicalize(property.Value, omitPagination))) + "}",
+                                    Canonicalize(property.Value))) + "}",
             JsonValueKind.Array => "[" + string.Join(",", element.EnumerateArray()
-                .Select(item => Canonicalize(item, omitPagination))) + "]",
+                .Select(item => Canonicalize(item))) + "]",
             JsonValueKind.String => JsonSerializer.Serialize(NormalizeText(element.GetString() ?? string.Empty)),
             JsonValueKind.Number => element.GetRawText(),
             JsonValueKind.True => "true",
