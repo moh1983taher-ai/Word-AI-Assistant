@@ -293,7 +293,7 @@ public sealed class ResearchCoordinator
                         .ToArray();
                     var isPartial = !baselineCoverageComplete || verificationUnavailable;
 
-                    if (isPartial && !stopToolCalls)
+                    if (!baselineCoverageComplete && !stopToolCalls)
                     {
                         messages.Add(new DuckChatMessage("assistant", decision.Raw));
                         messages.Add(new DuckChatMessage(
