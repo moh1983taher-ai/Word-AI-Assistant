@@ -15,8 +15,7 @@ internal static class ModelDecisionSchemaBuilder
     internal static JsonElement BuildResponseFormat(
         IReadOnlyList<ToolDescriptor> tools,
         bool allowFinal,
-        bool allowToolCalls = true,
-        IReadOnlyList<string>? scopeItemIds = null)
+        bool allowToolCalls = true)
     {
         ArgumentNullException.ThrowIfNull(tools);
 
@@ -56,20 +55,6 @@ internal static class ModelDecisionSchemaBuilder
         properties["server"] = StringEnum(serverValues);
         properties["tool"] = StringEnum(toolValues);
 
-        if (scopeItemIds is not null)
-        {
-            var scopeValues = new List<string>();
-            if (allowFinal)
-                scopeValues.Add(string.Empty);
-            if (allowToolCalls)
-            {
-                scopeValues.AddRange(scopeItemIds
-                    .Where(value => !string.IsNullOrWhiteSpace(value))
-                    .Distinct(StringComparer.Ordinal));
-            }
-            properties["scope_item"] = StringEnum(scopeValues);
-        }
-
         var argumentVariants = new JsonArray();
         if (allowToolCalls)
         {
@@ -100,8 +85,6 @@ internal static class ModelDecisionSchemaBuilder
 
         foreach (var name in new[] { "type", "server", "tool", "arguments", "answer" })
             required.Add(name);
-        if (scopeItemIds is not null)
-            required.Add("scope_item");
 
         var schema = new JsonObject
         {
