@@ -60,6 +60,17 @@ public sealed class NativeMcpToolMappingTests
     }
 
     [Fact]
+    public void AddsStableDisambiguatorWhenSanitizationWouldCollide()
+    {
+        var slashName = UpstreamMcpServerTool.BuildToolName("aljam3", "read/page");
+        var spaceName = UpstreamMcpServerTool.BuildToolName("aljam3", "read page");
+
+        Assert.NotEqual(slashName, spaceName);
+        Assert.True(slashName.Length <= 64);
+        Assert.True(spaceName.Length <= 64);
+    }
+
+    [Fact]
     public void QualifiedToolNamesAreSafeAndRemainWithinProviderNameLimit()
     {
         var name = UpstreamMcpServerTool.BuildToolName(
