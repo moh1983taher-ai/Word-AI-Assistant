@@ -127,7 +127,7 @@ public sealed class ResearchCoordinator
             var verificationRequired = taskPlan.RequiresVerification;
             var verificationToolsAvailable = activeTools.Any(ResearchToolResultClassifier.IsVerificationTool);
             if (verificationRequired && !verificationToolsAvailable)
-                warnings.Add("طلب المستخدم بحثاً معمقاً، لكن المكتبات المختارة لا تتيح أداة مناسبة لفتح المواضع الأصلية؛ سيُذكر هذا القيد في الإجابة.");
+                warnings.Add("طلب المستخدم التحقق من المواضع الأصلية، لكن المكتبات المختارة لا تتيح أداة مناسبة للقراءة؛ سيُذكر هذا القيد في الإجابة.");
 
             for (var iteration = 0; iteration < maxIterations; iteration++)
             {
@@ -196,6 +196,11 @@ public sealed class ResearchCoordinator
                 {
                     turnSystemPrompt += Environment.NewLine +
                         "توقفت المتابعة لأن ثلاث محاولات متتابعة لم تضف دليلاً أو تقدماً جديداً. لا تستدع أداة أخرى؛ أخرج نتيجة جزئية مع بيان النقص بدقة.";
+                }
+                else if (taskComplete && verificationRequired && !verificationToolsAvailable)
+                {
+                    turnSystemPrompt += Environment.NewLine +
+                        "اكتملت تغطية عناصر السؤال والمكتبات، لكن لم تتوفر أداة لفتح المواضع الأصلية. أخرج الإجابة مع التصريح بهذا القيد، ولا تدّع أنك تحققت من النصوص الأصلية.";
                 }
                 else if (taskComplete)
                 {
