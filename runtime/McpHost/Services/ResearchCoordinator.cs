@@ -306,7 +306,7 @@ public sealed class ResearchCoordinator
             Environment.NewLine + Environment.NewLine +
             "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. اعرض ما تسمح به الأدلة المتاحة ووضّح أن البحث لم يكتمل." +
             Environment.NewLine +
-            "أخرج JSON واحداً وفق المخطط: type=final، وanswer نص الإجابة، وserver وtool فارغان، وarguments=null."
+            "أخرج JSON واحداً وفق المخطط: type=final، وanswer نص الإجابة، وserver وtool فارغان، وarguments=null.";
 
         try
         {
