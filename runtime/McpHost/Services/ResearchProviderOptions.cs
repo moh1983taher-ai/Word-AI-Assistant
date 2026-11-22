@@ -1,5 +1,3 @@
-using System.Net;
-
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
@@ -17,7 +15,7 @@ public sealed class ResearchProviderOptions
     public Uri LmStudioBaseUri { get; }
     public string? LmStudioApiToken { get; }
 
-    private ResearchProviderOptions(string provider, Uri baseUri, string? apiToken)
+    internal ResearchProviderOptions(string provider, Uri baseUri, string? apiToken)
     {
         Provider = provider;
         LmStudioBaseUri = baseUri;
