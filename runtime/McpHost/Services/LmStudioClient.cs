@@ -31,7 +31,8 @@ public sealed record LmStudioChatResult(
     string Model,
     string Answer,
     string? ResponseId,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    bool IsComplete);
 
 /// <summary>
 /// Client for LM Studio's native v1 API. LM Studio owns the MCP agent loop: it
@@ -306,7 +307,12 @@ public sealed class LmStudioClient
                     "انتهى بث LM Studio دون حدث chat.end أو أي محتوى جزئي قابل للاستعادة.");
 
             warnings.Add("انتهى بث LM Studio قبل الحدث الختامي؛ حُفظت نتائج الأدوات التي وصلت قبل الانقطاع.");
-            return new LmStudioChatResult(model, streamedMessage.ToString().Trim(), null, warnings);
+            return new LmStudioChatResult(
+                model,
+                streamedMessage.ToString().Trim(),
+                null,
+                warnings,
+                IsComplete: false);
         }
 
         var final = finalResult.Value;
@@ -357,7 +363,8 @@ public sealed class LmStudioClient
             finalModel,
             answer,
             ReadString(final, "response_id"),
-            warnings);
+            warnings,
+            IsComplete: true);
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativePath)
