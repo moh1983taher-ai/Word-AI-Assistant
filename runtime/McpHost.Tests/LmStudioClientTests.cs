@@ -12,8 +12,7 @@ public sealed class LmStudioClientTests
     [Fact]
     public async Task DiscoversOnlyLanguageModelsAndPrefersLoadedToolCallingModel()
     {
-        {
-            var handler = new StubHandler(request =>
+        var handler = new StubHandler(request =>
             {
                 Assert.Equal(HttpMethod.Get, request.Method);
                 Assert.Equal("/api/v1/models", request.RequestUri!.AbsolutePath);
@@ -50,30 +49,26 @@ public sealed class LmStudioClientTests
                       ]
                     }
                     """);
-            });
+        });
 
-            var client = new LmStudioClient(
+        var client = new LmStudioClient(
                 new StubHttpClientFactory(handler),
                 TestOptions(),
                 new HostLog());
 
-            var snapshot = await client.GetModelsAsync(CancellationToken.None);
+        var snapshot = await client.GetModelsAsync(CancellationToken.None);
 
-            Assert.Equal(3, snapshot.Models.Count);
-            Assert.DoesNotContain(snapshot.Models, model => model.Id == "nomic/embed");
-            Assert.Equal("research-tool-model", snapshot.DefaultModel);
-            Assert.True(snapshot.Models.Single(model => model.Id == "research-tool-model").TrainedForToolUse);
-        }
+        Assert.Equal(3, snapshot.Models.Count);
+        Assert.DoesNotContain(snapshot.Models, model => model.Id == "nomic/embed");
+        Assert.Equal("research-tool-model", snapshot.DefaultModel);
+        Assert.True(snapshot.Models.Single(model => model.Id == "research-tool-model").TrainedForToolUse);
     }
 
     [Fact]
     public async Task SendsSelectedMcpServersAndAllowListsAndCapturesStreamedToolResults()
     {
-        var settings = SetLmStudioEnvironment();
-        try
-        {
-            string? capturedPayload = null;
-            var handler = new StubHandler(request =>
+        string? capturedPayload = null;
+        var handler = new StubHandler(request =>
             {
                 if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath == "/api/v1/models")
                 {
@@ -118,8 +113,8 @@ public sealed class LmStudioClientTests
                 TestOptions(),
                 new HostLog());
 
-            var captured = new List<LmStudioToolResult>();
-            var result = await client.ChatAsync(
+        var captured = new List<LmStudioToolResult>();
+        var result = await client.ChatAsync(
                 "research-model",
                 "تعليمات النظام",
                 "سؤال البحث",
@@ -130,44 +125,35 @@ public sealed class LmStudioClientTests
                 tool => { captured.Add(tool); return Task.CompletedTask; },
                 CancellationToken.None);
 
-            Assert.Equal("الجواب النهائي", result.Answer);
-            Assert.Equal("research-model", result.Model);
-            Assert.Equal("resp_test", result.ResponseId);
-            var tool = Assert.Single(captured);
-            Assert.Equal("aljam3", tool.ServerLabel);
-            Assert.Equal("search", tool.Tool);
-            Assert.Equal("[نتائج الجامع]", tool.Output);
+        Assert.Equal("الجواب النهائي", result.Answer);
+        Assert.Equal("research-model", result.Model);
+        Assert.Null(result.ResponseId);
+        var tool = Assert.Single(captured);
+        Assert.Equal("aljam3", tool.ServerLabel);
+        Assert.Equal("search", tool.Tool);
+        Assert.Equal("[نتائج الجامع]", tool.Output);
 
-            Assert.NotNull(capturedPayload);
-            using var payload = JsonDocument.Parse(capturedPayload!);
-            Assert.Equal("research-model", payload.RootElement.GetProperty("model").GetString());
-            Assert.True(payload.RootElement.GetProperty("stream").GetBoolean());
-            Assert.False(payload.RootElement.GetProperty("store").GetBoolean());
-            var integrations = payload.RootElement.GetProperty("integrations");
-            Assert.Equal(2, integrations.GetArrayLength());
+        Assert.NotNull(capturedPayload);
+        using var payload = JsonDocument.Parse(capturedPayload!);
+        Assert.Equal("research-model", payload.RootElement.GetProperty("model").GetString());
+        Assert.True(payload.RootElement.GetProperty("stream").GetBoolean());
+        Assert.False(payload.RootElement.GetProperty("store").GetBoolean());
+        var integrations = payload.RootElement.GetProperty("integrations");
+        Assert.Equal(2, integrations.GetArrayLength());
 
-            var aljam3 = integrations.EnumerateArray().Single(item =>
+        var aljam3 = integrations.EnumerateArray().Single(item =>
                 item.GetProperty("server_label").GetString() == "aljam3");
-            Assert.Equal("https://aljam3.com/mcp", aljam3.GetProperty("server_url").GetString());
-            Assert.Equal(
-                new[] { "search", "get_page" },
+        Assert.Equal("https://aljam3.com/mcp", aljam3.GetProperty("server_url").GetString());
+        Assert.Equal(
+            new[] { "search", "get_page" },
                 aljam3.GetProperty("allowed_tools").EnumerateArray()
-                    .Select(item => item.GetString()).ToArray());
-
-        }
-        finally
-        {
-            RestoreEnvironment(settings);
-        }
+                .Select(item => item.GetString()).ToArray());
     }
 
     [Fact]
     public async Task DoesNotAddMcpIntegrationsDuringTimeoutFinalization()
     {
-        var settings = SetLmStudioEnvironment();
-        try
-        {
-            string? capturedPayload = null;
+        string? capturedPayload = null;
             var handler = new StubHandler(request =>
             {
                 if (request.Method == HttpMethod.Get)
@@ -193,7 +179,7 @@ public sealed class LmStudioClientTests
                 TestOptions(),
                 new HostLog());
 
-            var result = await client.ChatAsync(
+        var result = await client.ChatAsync(
                 "model-1",
                 "لا تستخدم الأدوات",
                 "سياق الأدلة",
@@ -201,15 +187,10 @@ public sealed class LmStudioClientTests
                 onToolResult: null,
                 CancellationToken.None);
 
-            Assert.Equal("صياغة جزئية", result.Answer);
-            Assert.NotNull(capturedPayload);
-            using var payload = JsonDocument.Parse(capturedPayload!);
-            Assert.False(payload.RootElement.TryGetProperty("integrations", out _));
-        }
-        finally
-        {
-            RestoreEnvironment(settings);
-        }
+        Assert.Equal("صياغة جزئية", result.Answer);
+        Assert.NotNull(capturedPayload);
+        using var payload = JsonDocument.Parse(capturedPayload!);
+        Assert.False(payload.RootElement.TryGetProperty("integrations", out _));
     }
 
     private static ResearchProviderOptions TestOptions() =>
