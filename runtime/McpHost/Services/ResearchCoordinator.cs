@@ -129,11 +129,14 @@ public sealed class ResearchCoordinator
                     selectedServerIds,
                     sourceCoverage);
                 var missingScopeItemIds = taskPlan.MissingScopeItems(progress.CoveredScopeItemIds);
+                var verifiedScopeItemIds = evidenceLedger.Entries
+                    .Where(entry => entry.Succeeded &&
+                        ResearchToolResultClassifier.IsVerificationTool(entry.Server, entry.Tool))
+                    .Select(entry => entry.ScopeItemId)
+                    .ToHashSet(StringComparer.Ordinal);
                 var verificationCompleted = !verificationRequired ||
                     !verificationToolsAvailable ||
-                    evidenceLedger.Entries.Any(entry =>
-                        entry.Succeeded &&
-                        ResearchToolResultClassifier.IsVerificationTool(entry.Server, entry.Tool));
+                    taskPlan.ScopeItems.All(item => verifiedScopeItemIds.Contains(item.Id));
                 var taskComplete = pendingSourceIds.Count == 0 &&
                     missingScopeItemIds.Count == 0 &&
                     verificationCompleted;
@@ -146,6 +149,22 @@ public sealed class ResearchCoordinator
                         activeTools,
                         selectedServerIds,
                         sourceCoverage);
+
+                if (!stopToolCalls && (pendingSourceIds.Count > 0 || missingScopeItemIds.Count > 0))
+                {
+                    // Discovery and gap-filling phases may call search tools only.
+                    turnTools = turnTools
+                        .Where(ResearchToolResultClassifier.IsSearchTool)
+                        .ToArray();
+                }
+                else if (!stopToolCalls && verificationRequired && !verificationCompleted)
+                {
+                    // Verification phase is read-only and location-specific; it cannot
+                    // drift into another broad thematic search.
+                    turnTools = turnTools
+                        .Where(ResearchToolResultClassifier.IsVerificationTool)
+                        .ToArray();
+                }
                 var turnSystemPrompt = BuildSystemPrompt(turnTools, warnings) +
                     Environment.NewLine + Environment.NewLine +
                     "المكتبات التي اختارها المستخدم حصراً لهذه المهمة: " +
@@ -159,7 +178,7 @@ public sealed class ResearchCoordinator
                         toolCallsAttempted,
                         progress.ConsecutiveNoProgress,
                         verificationRequired,
-                        verificationCompleted,
+                        verifiedScopeItemIds,
                         verificationToolsAvailable);
 
                 if (toolBudgetReached)
