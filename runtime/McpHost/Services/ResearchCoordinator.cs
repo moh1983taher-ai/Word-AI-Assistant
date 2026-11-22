@@ -117,7 +117,6 @@ public sealed class ResearchCoordinator
             {
                 var evidenceContext = evidenceLedger.BuildContext(
                     selectedServerIds,
-                    Array.Empty<string>(),
                     MaxEvidenceContextCharacters);
                 var historyBudget = Math.Max(1, MaxConversationCharacters - evidenceContext.Length);
                 var conversation = ResearchContextWindow.Compact(
@@ -192,12 +191,10 @@ public sealed class ResearchCoordinator
                         continue;
                     }
 
-                    // Native-capable providers may return a direct answer when no tool
-                    // is needed. For explicit source/research requests, a plain response
-                    // from a provider that did not emit tool_calls is treated as a
-                    // protocol-compatibility signal, then retried through DuckAI's
-                    // structured JSON decision path. That path still leaves every
-                    // available tool and the final decision open to the model.
+                    // No native tool call means this endpoint did not demonstrate
+                    // native function-calling behavior. Retry through the existing JSON
+                    // compatibility protocol, which exposes the same full tool catalog
+                    // and still lets the model choose a tool or final answer.
                     nativeToolCalling = false;
                     _log.Warning(
                         $"The provider returned no native tool_calls; switching to the JSON compatibility protocol. task={taskId}.");
@@ -381,7 +378,6 @@ public sealed class ResearchCoordinator
 
             var evidenceContext = evidenceLedger.BuildContext(
                 selectedServerIds,
-                pendingSourceIds,
                 MaxEvidenceContextCharacters);
 
             var historyBudget = Math.Max(1, MaxConversationCharacters - evidenceContext.Length);
