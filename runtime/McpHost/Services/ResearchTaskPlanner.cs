@@ -41,17 +41,21 @@ internal static class ResearchTaskPlanner
         ArgumentNullException.ThrowIfNull(duckAi);
         ArgumentNullException.ThrowIfNull(conversation);
 
-        var goal = currentUserMessageIndex >= 0 &&
-                   currentUserMessageIndex < conversation.Count
-            ? conversation[currentUserMessageIndex].Content?.Trim() ?? string.Empty
-            : conversation.LastOrDefault(message => message.Role == "user")?.Content?.Trim() ?? string.Empty;
+        var activeUserIndex = currentUserMessageIndex >= 0 &&
+                              currentUserMessageIndex < conversation.Count
+            ? currentUserMessageIndex
+            : conversation.ToList().FindLastIndex(message => message.Role == "user");
+        if (activeUserIndex < 0)
+            throw new InvalidOperationException("لا توجد رسالة مستخدم حالية يمكن بناء نطاق البحث عليها.");
+
+        var goal = conversation[activeUserIndex].Content?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(goal))
             throw new InvalidOperationException("تعذر تحديد طلب المستخدم الحالي بوصفه نطاقاً للمهمة.");
 
         try
         {
-            var context = BuildContext(conversation, currentUserMessageIndex);
+            var context = BuildContext(conversation, activeUserIndex);
             var response = await duckAi.CompleteAsync(
                 requestedModel,
                 [
