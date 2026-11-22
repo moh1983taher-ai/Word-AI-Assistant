@@ -155,10 +155,55 @@ app.MapGet("/v1/mcp/sources", async (
         };
     }).ToArray();
 
+    var strictSchemaWarnings = new List<string>();
+    foreach (var sourceId in ids)
+    {
+        var sourceTools = discovery.Tools
+            .Where(tool => tool.Server == sourceId)
+            .ToArray();
+        if (sourceTools.Length == 0)
+            continue;
+
+        foreach (var tool in sourceTools)
+        {
+            try
+            {
+                _ = ModelDecisionSchemaBuilder.BuildResponseFormat(
+                    [tool],
+                    allowFinal: false);
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException or InvalidOperationException)
+            {
+                strictSchemaWarnings.Add(
+                    $"{sourceId}/{tool.Name}: {exception.GetType().Name}: {exception.Message}; inputSchema={tool.InputSchema.GetRawText()}");
+            }
+        }
+
+        try
+        {
+            _ = ModelDecisionSchemaBuilder.BuildResponseFormat(
+                sourceTools,
+                allowFinal: false);
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidOperationException)
+        {
+            strictSchemaWarnings.Add(
+                $"{sourceId}/catalog: {exception.GetType().Name}: {exception.Message}");
+        }
+    }
+
+    var strictOutputReady =
+        status.All(source => source.connected && source.toolCount > 0) &&
+        strictSchemaWarnings.Count == 0;
+
     return Results.Json(new
     {
         connected = status.Count(source => source.connected),
         totalTools = status.Sum(source => source.toolCount),
+        strictOutputReady,
+        strictSchemaWarnings,
         sources = status,
         connectionWarnings = discovery.Warnings
     }, JsonDefaults.Web);

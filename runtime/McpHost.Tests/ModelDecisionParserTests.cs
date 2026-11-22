@@ -48,6 +48,15 @@ public sealed class ModelDecisionParserTests
     }
 
     [Theory]
+    [InlineData("{\"type\":\"tool_call\",\"server\":\"aljam3\",\"tool\":\"search\"}")]
+    [InlineData("{\"type\":\"tool_call\",\"server\":\"aljam3\",\"tool\":\"search\",\"arguments\":null}")]
+    [InlineData("{\"type\":\"tool_call\",\"server\":\"aljam3\",\"tool\":\"search\",\"arguments\":\"{}\"}")]
+    public void RejectsToolCallsWithoutObjectArguments(string response)
+    {
+        Assert.False(ModelDecisionParser.TryParse(response, out _));
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("لا يوجد JSON هنا")]
     [InlineData("{\"type\":\"tool_call\",\"server\":\"aljam3\"}")]

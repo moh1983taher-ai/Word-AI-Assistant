@@ -97,6 +97,11 @@ jobs:
             $diagnostics = Invoke-RestMethod -Uri 'http://127.0.0.1:18082/v1/mcp/sources' -TimeoutSec 180
             $diagnostics | ConvertTo-Json -Depth 8 | Write-Host
 
+            if ($diagnostics.strictOutputReady -ne $true) {
+              $diagnostics.strictSchemaWarnings | ForEach-Object { Write-Error $_ }
+              throw 'One or more live MCP input schemas cannot be represented as strict DuckAI JSON Schema.'
+            }
+
             $aljam3 = $diagnostics.sources | Where-Object { $_.id -eq 'aljam3' }
             $shamela = $diagnostics.sources | Where-Object { $_.id -eq 'shamela' }
             if (-not $aljam3 -or -not $shamela) { throw 'The diagnostic response omitted an MCP source.' }

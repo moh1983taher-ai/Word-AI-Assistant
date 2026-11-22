@@ -8,10 +8,9 @@ using ResearchTools.McpHost.Models;
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Adapter for DuckAI's local OpenAI-compatible HTTP API. It can parse standard
-/// Chat Completions tool calls, while the research coordinator currently uses
-/// schema-described JSON decisions because the installed endpoint did not honor
-/// forced function calling during Windows integration tests.
+/// Adapter for DuckAI's local OpenAI-compatible HTTP API. Research decisions use
+/// per-turn strict JSON Schema response formats; native tool calls remain supported
+/// for other callers.
 /// </summary>
 public sealed class DuckAiClient
 {
@@ -117,7 +116,8 @@ public sealed class DuckAiClient
         string requestedModel,
         IReadOnlyList<DuckChatMessage> messages,
         IReadOnlyList<DuckFunctionTool>? functionTools,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        JsonElement? responseFormat = null)
     {
         var preferredSnapshot = await GetModelsAsync(cancellationToken);
         var endpoints = new[] { preferredSnapshot.BaseAddress }
@@ -163,7 +163,7 @@ public sealed class DuckAiClient
             try
             {
                 var completion = await CompleteAtEndpointAsync(
-                    snapshot, model, messages, functionTools, cancellationToken);
+                    snapshot, model, messages, functionTools, responseFormat, cancellationToken);
 
                 CacheSnapshot(snapshot);
                 if (!string.Equals(
@@ -179,7 +179,7 @@ public sealed class DuckAiClient
             {
                 throw;
             }
-            catch (OperationCanceledException exception)
+            catch (OperationCanceledException)
             {
                 failures.Add($"{baseAddress}: inference timed out after 55 seconds.");
                 _log.Warning($"DuckAI inference timed out at {baseAddress}; trying the next local endpoint.");
@@ -202,13 +202,15 @@ public sealed class DuckAiClient
         string model,
         IReadOnlyList<DuckChatMessage> messages,
         IReadOnlyList<DuckFunctionTool>? functionTools,
-        CancellationToken cancellationToken)
+        JsonElement? responseFormat,
+        CancellationToken cancellationToken,
+        bool allowJsonObjectFallback = true)
     {
         var payload = new Dictionary<string, object?>
         {
             ["model"] = model,
             ["messages"] = messages,
-            ["temperature"] = 0.1,
+            ["temperature"] = 0.0,
             ["max_tokens"] = 5000,
             ["stream"] = false
         };
@@ -219,6 +221,9 @@ public sealed class DuckAiClient
             payload["tools"] = functionTools;
             payload["tool_choice"] = "auto";
         }
+
+        if (responseFormat is { } format)
+            payload["response_format"] = format;
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(55));
@@ -235,6 +240,25 @@ public sealed class DuckAiClient
 
         if (!response.IsSuccessStatusCode)
         {
+            if (responseFormat is not null &&
+                allowJsonObjectFallback &&
+                (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity) &&
+                IsResponseFormatRejection(responseBody))
+            {
+                _log.Warning(
+                    $"DuckAI endpoint {snapshot.BaseAddress} rejected strict JSON Schema output; retrying this turn with JSON-object mode.");
+
+                using var jsonObjectFormat = JsonDocument.Parse("""{"type":"json_object"}""");
+                return await CompleteAtEndpointAsync(
+                    snapshot,
+                    model,
+                    messages,
+                    functionTools,
+                    jsonObjectFormat.RootElement.Clone(),
+                    cancellationToken,
+                    allowJsonObjectFallback: false);
+            }
+
             if (hasFunctionTools && IsFunctionCallingUnsupportedStatus(response.StatusCode))
             {
                 throw new NativeToolCallingNotSupportedException(
@@ -246,7 +270,7 @@ public sealed class DuckAiClient
                  (int)response.StatusCode == 501))
             {
                 return await CompleteWithResponsesApiAsync(
-                    snapshot, model, messages, cancellationToken);
+                    snapshot, model, messages, responseFormat, cancellationToken);
             }
 
             throw new HttpRequestException(
@@ -262,7 +286,9 @@ public sealed class DuckAiClient
     {
         if (statusCode is null) return true;
 
-        return statusCode is HttpStatusCode.RequestTimeout
+        return statusCode is HttpStatusCode.BadRequest
+            or HttpStatusCode.UnprocessableEntity
+            or HttpStatusCode.RequestTimeout
             or HttpStatusCode.InternalServerError
             or HttpStatusCode.BadGateway
             or HttpStatusCode.ServiceUnavailable
@@ -276,19 +302,47 @@ public sealed class DuckAiClient
         DuckAiModelSnapshot snapshot,
         string model,
         IReadOnlyList<DuckChatMessage> messages,
+        JsonElement? responseFormat,
         CancellationToken cancellationToken)
     {
-        var payload = new
+        var payload = new Dictionary<string, object?>
         {
-            model,
-            input = messages.Select(message => new
+            ["model"] = model,
+            ["input"] = messages.Select(message => new
             {
                 role = message.Role,
                 content = message.Content
             }),
-            stream = false,
-            max_output_tokens = 5000
+            ["stream"] = false,
+            ["max_output_tokens"] = 5000
         };
+
+        if (responseFormat is { } chatFormat &&
+            TryProperty(chatFormat, "type", out var formatType) &&
+            formatType.ValueKind == JsonValueKind.String)
+        {
+            if (string.Equals(formatType.GetString(), "json_schema", StringComparison.Ordinal) &&
+                TryProperty(chatFormat, "json_schema", out var jsonSchema))
+            {
+                payload["text"] = new
+                {
+                    format = new
+                    {
+                        type = "json_schema",
+                        name = ReadString(jsonSchema, "name"),
+                        strict = TryProperty(jsonSchema, "strict", out var strict) &&
+                                 strict.ValueKind == JsonValueKind.True,
+                        schema = TryProperty(jsonSchema, "schema", out var schema)
+                            ? schema
+                            : default
+                    }
+                };
+            }
+            else if (string.Equals(formatType.GetString(), "json_object", StringComparison.Ordinal))
+            {
+                payload["text"] = new { format = new { type = "json_object" } };
+            }
+        }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(55));
@@ -314,6 +368,15 @@ public sealed class DuckAiClient
             HttpStatusCode.NotImplemented or HttpStatusCode.NotFound or
             HttpStatusCode.MethodNotAllowed ||
         (int)statusCode == 501;
+
+    private static bool IsResponseFormatRejection(string responseBody)
+    {
+        var body = responseBody.ToLowerInvariant();
+        return body.Contains("response_format", StringComparison.Ordinal) ||
+               body.Contains("json_schema", StringComparison.Ordinal) ||
+               body.Contains("structured output", StringComparison.Ordinal) ||
+               body.Contains("schema", StringComparison.Ordinal);
+    }
 
     internal static DuckAiCompletion ParseChatCompletion(JsonElement root, string model)
     {
