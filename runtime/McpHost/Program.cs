@@ -234,6 +234,22 @@ app.MapGet("/v1/mcp/sources", async (
         }
     }
 
+    // Validate the actual combined catalog used by a two-library DuckAI fallback.
+    // The model must be able to call either source or return a final answer on turn one.
+    try
+    {
+        _ = ModelDecisionSchemaBuilder.BuildResponseFormat(
+            discovery.Tools,
+            allowFinal: true,
+            allowToolCalls: true);
+    }
+    catch (Exception exception) when (
+        exception is ArgumentException or InvalidOperationException)
+    {
+        strictSchemaWarnings.Add(
+            $"combined-selected-catalog: {exception.GetType().Name}: {exception.Message}");
+    }
+
     var strictOutputReady =
         status.All(source => source.connected && source.toolCount > 0) &&
         strictSchemaWarnings.Count == 0;
