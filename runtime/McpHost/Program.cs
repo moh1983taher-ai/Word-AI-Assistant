@@ -20,13 +20,22 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 builder.Logging.ClearProviders();
+var providerOptions = ResearchProviderOptions.FromEnvironment();
 builder.Services.AddHttpClient("DuckAI", client =>
 {
     client.Timeout = Timeout.InfiniteTimeSpan;
     client.DefaultRequestHeaders.UserAgent.ParseAdd("ResearchTools-McpHost/1.1");
 });
+builder.Services.AddHttpClient("LMStudio", client =>
+{
+    client.Timeout = Timeout.InfiniteTimeSpan;
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("ResearchTools-McpHost/1.1");
+});
+builder.Services.AddSingleton(providerOptions);
 builder.Services.AddSingleton<HostLog>();
 builder.Services.AddSingleton<DuckAiClient>();
+builder.Services.AddSingleton<LmStudioClient>();
+builder.Services.AddSingleton<LmStudioResearchAgent>();
 builder.Services.AddSingleton<McpSourceRegistry>();
 builder.Services.AddSingleton<ResearchCoordinator>();
 
@@ -81,19 +90,39 @@ app.MapGet("/ping", () => Results.Json(new
     version = hostVersion
 }, JsonDefaults.Web));
 
-app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellationToken) =>
+app.MapGet("/health", async (
+    DuckAiClient duckAi,
+    LmStudioClient lmStudio,
+    ResearchProviderOptions provider,
+    CancellationToken cancellationToken) =>
 {
     try
     {
-        var snapshot = await duckAi.GetModelsAsync(cancellationToken);
+        if (provider.UseLmStudio)
+        {
+            var snapshot = await lmStudio.GetModelsAsync(cancellationToken);
+            return Results.Json(new
+            {
+                ready = true,
+                version = hostVersion,
+                provider = "LM Studio",
+                endpoint = provider.LmStudioBaseUri.ToString().TrimEnd('/'),
+                model = snapshot.DefaultModel,
+                models = snapshot.Models.Select(model => model.Id).ToArray(),
+                generationCheck = "on-demand",
+                mcpMode = "native-per-request"
+            }, JsonDefaults.Web);
+        }
+
+        var duckSnapshot = await duckAi.GetModelsAsync(cancellationToken);
         return Results.Json(new
         {
             ready = true,
             version = hostVersion,
             provider = "DuckAI",
-            endpoint = snapshot.BaseAddress,
-            model = snapshot.DefaultModel,
-            models = snapshot.Models,
+            endpoint = duckSnapshot.BaseAddress,
+            model = duckSnapshot.DefaultModel,
+            models = duckSnapshot.Models,
             generationCheck = "on-demand"
         }, JsonDefaults.Web);
     }
@@ -103,20 +132,39 @@ app.MapGet("/health", async (DuckAiClient duckAi, CancellationToken cancellation
         {
             ready = false,
             version = hostVersion,
+            provider = provider.Provider,
             error = exception.Message
         }, JsonDefaults.Web, statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
 
-app.MapGet("/v1/models", async (DuckAiClient duckAi, CancellationToken cancellationToken) =>
+app.MapGet("/v1/models", async (
+    DuckAiClient duckAi,
+    LmStudioClient lmStudio,
+    ResearchProviderOptions provider,
+    CancellationToken cancellationToken) =>
 {
     try
     {
-        var snapshot = await duckAi.GetModelsAsync(cancellationToken);
+        if (provider.UseLmStudio)
+        {
+            var snapshot = await lmStudio.GetModelsAsync(cancellationToken);
+            var modelIds = snapshot.Models.Select(model => model.Id).ToArray();
+            return Results.Json(new
+            {
+                data = modelIds.Select(model => new { id = model, @object = "model" }),
+                models = modelIds,
+                provider = "lmstudio",
+                defaultModel = snapshot.DefaultModel
+            }, JsonDefaults.Web);
+        }
+
+        var duckSnapshot = await duckAi.GetModelsAsync(cancellationToken);
         return Results.Json(new
         {
-            data = snapshot.Models.Select(model => new { id = model, @object = "model" }),
-            models = snapshot.Models
+            data = duckSnapshot.Models.Select(model => new { id = model, @object = "model" }),
+            models = duckSnapshot.Models,
+            provider = "duckai"
         }, JsonDefaults.Web);
     }
     catch (Exception exception) when (exception is not OperationCanceledException)
@@ -293,7 +341,7 @@ app.MapPost("/v1/research", async (
 });
 
 app.Lifetime.ApplicationStarted.Register(() =>
-    log.Info($"MCP host started on 127.0.0.1:{port}; runtime=.NET 10; MCP transport=official SDK AutoDetect."));
+    log.Info($"MCP host started on 127.0.0.1:{port}; runtime=.NET 10; MCP transport=official SDK AutoDetect; agentProvider={providerOptions.Provider}."));
 app.Lifetime.ApplicationStopping.Register(() =>
     log.Info("MCP host is stopping."));
 
