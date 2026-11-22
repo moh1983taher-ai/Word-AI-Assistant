@@ -125,6 +125,7 @@ public sealed class LmStudioClient
 
             _cachedModels = new LmStudioModelSnapshot(models, defaultModel);
             _modelsExpireAt = DateTimeOffset.UtcNow.AddSeconds(30);
+            _log.Info($"LM Studio model catalog discovered: models={models.Count}; default={defaultModel}; endpoint={_options.LmStudioBaseUri}.");
             return _cachedModels;
         }
         finally
@@ -299,8 +300,14 @@ public sealed class LmStudioClient
         await DispatchEventAsync();
 
         if (finalResult is null)
-            throw new InvalidOperationException(
-                "انتهى بث LM Studio دون حدث chat.end؛ لا يمكن التحقق من اكتمال الإجابة.");
+        {
+            if (toolResults.Count == 0 && streamedMessage.Length == 0)
+                throw new InvalidOperationException(
+                    "انتهى بث LM Studio دون حدث chat.end أو أي محتوى جزئي قابل للاستعادة.");
+
+            warnings.Add("انتهى بث LM Studio قبل الحدث الختامي؛ حُفظت نتائج الأدوات التي وصلت قبل الانقطاع.");
+            return new LmStudioChatResult(model, streamedMessage.ToString().Trim(), null, warnings);
+        }
 
         var final = finalResult.Value;
         var finalModel = ReadString(final, "model_instance_id");
