@@ -112,6 +112,64 @@ jobs:
               throw 'Official SDK did not discover the expected read-only Shamela catalog.'
             }
             Write-Host 'Official MCP SDK discovered both upstream sources and all expected read-only tools.'
+
+            Write-Host 'Testing the local standards-compliant MCP Streamable HTTP endpoint...'
+            $mcpHeaders = @{ Accept = 'application/json, text/event-stream' }
+            $initializePayload = @{
+              jsonrpc = '2.0'
+              id = 1
+              method = 'initialize'
+              params = @{
+                protocolVersion = '2025-11-25'
+                capabilities = @{}
+                clientInfo = @{ name = 'ResearchTools-CI'; version = '1.0.0' }
+              }
+            } | ConvertTo-Json -Depth 10 -Compress
+
+            $initializeResponse = Invoke-WebRequest -Uri 'http://127.0.0.1:18082/mcp' -Method Post -Headers $mcpHeaders -ContentType 'application/json' -Body $initializePayload -TimeoutSec 180
+            if ($initializeResponse.StatusCode -ne 200) { throw 'Local MCP initialize did not return HTTP 200.' }
+
+            $initializeJson = $initializeResponse.Content
+            if ($initializeResponse.Headers['Content-Type'] -match 'text/event-stream') {
+              $dataLine = $initializeJson -split "`r?`n" | Where-Object { $_ -like 'data: *' } | Select-Object -Last 1
+              if (-not $dataLine) { throw 'Local MCP initialize response contained no JSON event.' }
+              $initializeJson = $dataLine.Substring(5).Trim()
+            }
+            $initializeResult = $initializeJson | ConvertFrom-Json
+            if (-not $initializeResult.result.serverInfo.name) { throw 'Local MCP initialize response omitted serverInfo.' }
+
+            $notificationPayload = @{
+              jsonrpc = '2.0'
+              method = 'notifications/initialized'
+            } | ConvertTo-Json -Depth 5 -Compress
+            $null = Invoke-WebRequest -Uri 'http://127.0.0.1:18082/mcp' -Method Post -Headers $mcpHeaders -ContentType 'application/json' -Body $notificationPayload -TimeoutSec 30
+
+            $mcpHeaders['MCP-Protocol-Version'] = '2025-11-25'
+            $toolsPayload = @{
+              jsonrpc = '2.0'
+              id = 2
+              method = 'tools/list'
+              params = @{}
+            } | ConvertTo-Json -Depth 5 -Compress
+            $toolsResponse = Invoke-WebRequest -Uri 'http://127.0.0.1:18082/mcp' -Method Post -Headers $mcpHeaders -ContentType 'application/json' -Body $toolsPayload -TimeoutSec 180
+            if ($toolsResponse.StatusCode -ne 200) { throw 'Local MCP tools/list did not return HTTP 200.' }
+
+            $toolsJson = $toolsResponse.Content
+            if ($toolsResponse.Headers['Content-Type'] -match 'text/event-stream') {
+              $dataLine = $toolsJson -split "`r?`n" | Where-Object { $_ -like 'data: *' } | Select-Object -Last 1
+              if (-not $dataLine) { throw 'Local MCP tools/list response contained no JSON event.' }
+              $toolsJson = $dataLine.Substring(5).Trim()
+            }
+            $toolsResult = $toolsJson | ConvertFrom-Json
+            $localToolNames = @($toolsResult.result.tools | ForEach-Object { $_.name })
+            if ($localToolNames.Count -lt 11) {
+              throw "Local MCP endpoint exposed only $($localToolNames.Count) tools; expected at least 11."
+            }
+            if (-not ($localToolNames -contains 'mcp_aljam3__search') -or
+                -not ($localToolNames -contains 'mcp_shamela__shamela_find')) {
+              throw 'Local MCP endpoint did not expose namespaced tools from both upstream libraries.'
+            }
+            Write-Host "Local MCP Streamable HTTP endpoint exposed $($localToolNames.Count) read-only tools."
           }
           finally {
             if ($hostProcess -and -not $hostProcess.HasExited) {
