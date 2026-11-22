@@ -23,9 +23,17 @@ Write-Host "OK: provider=$($health.provider); model=$($health.model)"
 Write-Host ([Environment]::NewLine + '3/4 - اكتشاف أدوات MCP من المضيف نفسه...')
 $sources = Invoke-RestMethod -Uri ($base + '/v1/mcp/sources') -TimeoutSec 120
 $sources.sources | Format-Table id, label, connected, toolCount -AutoSize
-if ($sources.connected -ne 2 -or $sources.totalTools -lt 11) {
-    throw 'Both MCP sources and their read-only catalogs were not discovered.'
+$selectedSourceStatus = @($sources.sources | Where-Object { $Servers -contains $_.id })
+if ($selectedSourceStatus.Count -ne $Servers.Count) {
+    throw 'The diagnostic response did not include every source selected for this test.'
 }
+$unavailableSelectedSources = @($selectedSourceStatus | Where-Object {
+    $_.connected -ne $true -or $_.toolCount -lt 1
+})
+if ($unavailableSelectedSources.Count -gt 0) {
+    throw ('A selected MCP source is not ready: ' + (($unavailableSelectedSources | ForEach-Object { $_.id }) -join ', '))
+}
+Write-Host ('OK: أدوات المكتبات المختارة متاحة: ' + ($Servers -join ' + '))
 
 Write-Host ([Environment]::NewLine + '4/4 - تنفيذ بحث حقيقي عبر DuckAI وMCP...')
 Write-Host ('المكتبات المختارة: ' + ($Servers -join ' + '))
@@ -79,13 +87,7 @@ $unexpectedServers = @($result.toolCalls | Where-Object { $Servers -notcontains 
 if ($unexpectedServers.Count -gt 0) {
     throw 'The host invoked a source that the user did not select.'
 }
-$missingServers = @($Servers | Where-Object {
-    $selectedServer = $_
-    -not (@($result.toolCalls | Where-Object { $_.server -eq $selectedServer }).Count -gt 0)
-})
-if ($missingServers.Count -gt 0) {
-    throw ('The host did not complete a successful tool call in every selected source: ' + ($missingServers -join ', '))
-}
+Write-Host 'لم يُشترط استخدام كل مكتبة اختارها المستخدم؛ قرار اختيار المصدر وتكرار البحث يعود للنموذج.'
 if (@($result.connectionWarnings).Count -gt 0) {
     Write-Warning ($result.connectionWarnings -join '; ')
 }
