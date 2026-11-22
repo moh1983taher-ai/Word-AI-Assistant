@@ -95,6 +95,7 @@ public sealed class ResearchTaskPlannerTests
     [InlineData("وثق هذه الفكرة من المصادر الأصلية", true)]
     [InlineData("دقق الإحالات والاقتباسات", true)]
     [InlineData("ما تعريف الاجتهاد؟", false)]
+    [InlineData("أجر بحثاً معمّقاً في المسألة", true)]
     public void RequiresSourceVerificationOnlyWhenRequestedOrDeep(string goal, bool expected)
     {
         var plan = ResearchTaskPlan.Create(goal, [goal], [], [], selectedSourceCount: 1);
