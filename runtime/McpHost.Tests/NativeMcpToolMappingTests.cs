@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ResearchTools.McpHost.Infrastructure;
 using ResearchTools.McpHost.Mcp;
 using ResearchTools.McpHost.Models;
 using ResearchTools.McpHost.Services;
@@ -46,6 +47,34 @@ public sealed class NativeMcpToolMappingTests
 
         var find = definitions.Single(item => item.Function.Name == "mcp_shamela__shamela_find");
         Assert.True(find.Function.Parameters.GetProperty("properties").TryGetProperty("keywords", out _));
+    }
+
+    [Fact]
+    public async Task LocalMcpProxyPreservesInputSchemaAndAdvertisesReadOnlyHints()
+    {
+        await using var sources = new McpSourceRegistry(new HostLog());
+        var descriptor = Tool(
+            "aljam3",
+            "الجامع",
+            "search",
+            """
+            {
+              "type": "object",
+              "properties": { "query": { "type": "string" } },
+              "required": ["query"],
+              "additionalProperties": false
+            }
+            """);
+
+        var proxy = new UpstreamMcpServerTool(sources, descriptor);
+        var protocolTool = proxy.ProtocolTool;
+
+        Assert.Equal("mcp_aljam3__search", protocolTool.Name);
+        Assert.Equal("object", protocolTool.InputSchema.GetProperty("type").GetString());
+        Assert.True(protocolTool.InputSchema.GetProperty("properties").TryGetProperty("query", out _));
+        Assert.Equal(true, protocolTool.Annotations?.ReadOnlyHint);
+        Assert.Equal(false, protocolTool.Annotations?.DestructiveHint);
+        Assert.Equal(true, protocolTool.Annotations?.IdempotentHint);
     }
 
     [Fact]
