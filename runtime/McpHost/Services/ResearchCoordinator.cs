@@ -18,8 +18,6 @@ public sealed class ResearchBusyException : Exception
 public sealed class ResearchCoordinator
 {
     private const int MaxConversationMessages = 40;
-    private const int MaxToolCalls = 48;
-    private const int MaxIterations = MaxToolCalls * 2 + 2;
     private const int MaxMessageCharacters = 12_000;
     private const int MaxConversationCharacters = 20_000;
     private const int MaxEvidenceContextCharacters = 10_000;
@@ -108,33 +106,22 @@ public sealed class ResearchCoordinator
             var toolCallsAttempted = 0;
             var model = request.Model ?? string.Empty;
 
-            for (var iteration = 0; iteration < MaxIterations; iteration++)
+            while (true)
             {
                 var pendingSourceIds = ResearchSourceSelection.Missing(
                     selectedServerIds,
                     sourceCoverage);
-                var toolBudgetReached = toolCallsAttempted >= MaxToolCalls;
-                IReadOnlyList<ToolDescriptor> turnTools = toolBudgetReached
-                    ? Array.Empty<ToolDescriptor>()
-                    : ResearchSourceToolRouter.SelectForTurn(
-                        activeTools,
-                        selectedServerIds,
-                        sourceCoverage);
+                IReadOnlyList<ToolDescriptor> turnTools = ResearchSourceToolRouter.SelectForTurn(
+                    activeTools,
+                    selectedServerIds,
+                    sourceCoverage);
                 var turnSystemPrompt = BuildSystemPrompt(turnTools, warnings) +
                     Environment.NewLine + Environment.NewLine +
                     "المكتبات التي اختارها المستخدم حصراً لهذه المهمة: " +
                     string.Join("، ", selectedLabels) + "." +
                     Environment.NewLine +
                     "لا تستخدم أي مكتبة أخرى.";
-                if (toolBudgetReached)
-                {
-                    var budgetInstruction = pendingSourceIds.Count > 0
-                        ? $"بلغت المهمة حد تنفيذ الأدوات ({MaxToolCalls}) قبل وصول نتائج بحث صالحة من جميع المكتبات. لا تستدع أداة أخرى. أخرج إجابة جزئية تستند حصراً إلى الأدلة المتراكمة، وصرّح بوضوح بالمكتبات التي لم تصل منها نتيجة بحث صالحة."
-                        : $"بلغت المهمة حد تنفيذ الأدوات ({MaxToolCalls})، لكن وردت نتيجة بحث غير فارغة من كل مكتبة مختارة. لا تستدع أداة أخرى. أخرج إجابة موثقة، وصرّح بحدود التحقق الإضافي الذي لم يتسن تنفيذه.";
-                    turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                        budgetInstruction + " لا تختلق مراجع أو نتائج.";
-                }
-                else if (pendingSourceIds.Count > 0)
+                if (pendingSourceIds.Count > 0)
                 {
                     var pendingLabels = pendingSourceIds
                         .Select(ResearchSourceSelection.GetLabel);
@@ -187,8 +174,8 @@ public sealed class ResearchCoordinator
 
                 var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
                     turnTools,
-                    allowFinal: pendingSourceIds.Count == 0 || toolBudgetReached,
-                    allowToolCalls: !toolBudgetReached);
+                    allowFinal: pendingSourceIds.Count == 0,
+                    allowToolCalls: true);
 
                 var completion = await _duckAi.CompleteAsync(
                     model,
@@ -206,7 +193,7 @@ public sealed class ResearchCoordinator
                 if (!ModelDecisionParser.TryParse(completion.Text, out var decision))
                 {
                     _log.Warning(
-                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; toolBudgetReached={toolBudgetReached}; responseFormat=json_schema.");
+                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; responseFormat=json_schema.");
 
                     if (repairAttempted)
                         throw new InvalidOperationException("تعذر التحقق من استجابة النموذج وفق مخطط JSON الصارم بعد محاولة الإصلاح.");
@@ -231,32 +218,20 @@ public sealed class ResearchCoordinator
                     {
                         var missingLabels = missingSelectedServers
                             .Select(ResearchSourceSelection.GetLabel);
-                        if (toolBudgetReached)
-                        {
-                            var missingText = string.Join("، ", missingLabels);
-                            warnings.Add("اكتمل البحث بصورة جزئية؛ لم تصل نتيجة بحث صالحة من: " + missingText + ".");
-                            finalAnswer =
-                                "تنبيه: هذه نتيجة بحث جزئية؛ لم تصل نتيجة بحث صالحة من: " +
-                                missingText + ". لا تمثل هذه الإجابة تغطية لجميع المكتبات المختارة.\n\n" +
-                                finalAnswer;
-                        }
-                        else
-                        {
-                            if (sourceRequirementRetryAttempted)
-                                throw new InvalidOperationException(
-                                    "لم يكتمل البحث في جميع المكتبات التي اختارها المستخدم. لم تصل نتيجة بحث صالحة من: " +
-                                    string.Join("، ", missingLabels) +
-                                    ". أوقفت الإجابة منعاً لاختلاق نتائج أو مراجع.");
-
-                            sourceRequirementRetryAttempted = true;
-                            messages.Add(new DuckChatMessage("assistant", decision.Raw));
-                            messages.Add(new DuckChatMessage(
-                                "user",
-                                "لا تقدم إجابة نهائية بعد. لم تنفذ بحثاً ذا محتوى صالح في هذه المكتبات المختارة: " +
+                        if (sourceRequirementRetryAttempted)
+                            throw new InvalidOperationException(
+                                "لم يكتمل البحث في جميع المكتبات التي اختارها المستخدم. لم تصل نتيجة بحث صالحة من: " +
                                 string.Join("، ", missingLabels) +
-                                ". استخدم أداة بحث مناسبة لكل مكتبة متبقية، ثم أخرج الإجابة النهائية. لا تذكر مراجع من الذاكرة."));
-                            continue;
-                        }
+                                ". أوقفت الإجابة منعاً لاختلاق نتائج أو مراجع.");
+
+                        sourceRequirementRetryAttempted = true;
+                        messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                        messages.Add(new DuckChatMessage(
+                            "user",
+                            "لا تقدم إجابة نهائية بعد. لم تنفذ بحثاً ذا محتوى صالح في هذه المكتبات المختارة: " +
+                            string.Join("، ", missingLabels) +
+                            ". استخدم أداة بحث مناسبة لكل مكتبة متبقية، ثم أخرج الإجابة النهائية. لا تذكر مراجع من الذاكرة."));
+                        continue;
                     }
 
                     _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; coveredSources={string.Join(",", sourceCoverage)}; partial={missingSelectedServers.Count > 0}; mode=json-schema; model={model}.");
@@ -283,12 +258,8 @@ public sealed class ResearchCoordinator
                 }
 
                 toolCallsAttempted++;
-                if (toolCallsAttempted > MaxToolCalls)
-                    throw new InvalidOperationException(
-                        $"بلغت المهمة الحد الآمن لعدد استدعاءات الأدوات ({MaxToolCalls}).");
-
                 _log.Info(
-                    $"Research tool decision: task={taskId}; attempt={toolCallsAttempted}/{MaxToolCalls}; source={decision.Server}; tool={decision.Tool}; pending={string.Join(",", pendingSourceIds)}.");
+                    $"Research tool decision: task={taskId}; call={toolCallsAttempted}; source={decision.Server}; tool={decision.Tool}; pending={string.Join(",", pendingSourceIds)}.");
 
                 var execution = await ExecuteToolAsync(
                     descriptorForJson,
@@ -317,7 +288,6 @@ public sealed class ResearchCoordinator
                     $"Research tool result: task={taskId}; source={decision.Server}; tool={decision.Tool}; success={execution.Succeeded}; searchCoverage={sourceSearchSucceeded}; completed={string.Join(",", sourceCoverage)}; pending={string.Join(",", pendingAfterCall)}.");
             }
 
-            throw new InvalidOperationException("انتهت دورات تنسيق الأدوات دون إجابة نهائية.");
         }
         catch (OperationCanceledException) when (!requestCancellation.IsCancellationRequested)
         {
