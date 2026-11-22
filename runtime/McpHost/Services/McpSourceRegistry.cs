@@ -32,6 +32,14 @@ public sealed class McpSourceRegistry : IAsyncDisposable
             _states.TryAdd(definition.Id, new SourceState(definition));
     }
 
+    public string GetServerEndpoint(string sourceId)
+    {
+        if (!_states.TryGetValue(sourceId, out var state))
+            throw new InvalidOperationException($"MCP source is not configured: {sourceId}");
+
+        return state.Definition.Endpoint;
+    }
+
     public Task<SourceDiscovery> DiscoverAllAsync(CancellationToken cancellationToken) =>
         DiscoverSelectedAsync(ResearchSourceSelection.AllSourceIds, cancellationToken);
 
