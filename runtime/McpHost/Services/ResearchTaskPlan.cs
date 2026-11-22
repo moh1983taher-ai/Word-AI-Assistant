@@ -36,6 +36,13 @@ internal sealed class ResearchTaskPlan
     internal IReadOnlyList<string> Constraints { get; }
     internal IReadOnlyList<string> Exclusions { get; }
     internal ResearchDepth Depth { get; }
+    internal bool RequiresVerification =>
+        Depth == ResearchDepth.Deep ||
+        new[]
+        {
+            "تحقق", "دقق", "تدقيق", "توثيق", "وثّق", "وثق",
+            "تخريج", "راجع الإحالات", "تأكد من صحة", "اقتباسات موثقة"
+        }.Any(indicator => Goal.Contains(indicator, StringComparison.OrdinalIgnoreCase));
     internal int MaxToolCalls { get; }
     internal int TimeoutSeconds { get; }
 
@@ -170,13 +177,14 @@ internal sealed class ResearchTaskPlan
             builder.AppendLine("أولوية المرحلة: اقرأ المواضع الأصلية لكل عنصر لم يُتحقق منه، ولا تنشئ بحثاً موضوعياً جديداً.");
             builder.AppendLine("عناصر النطاق التي ما زالت تحتاج إلى تحقق: " + string.Join("؛ ", pendingVerification));
         }
+        else if (verificationRequired && !verificationToolsAvailable)
+        {
+            builder.AppendLine("اكتملت تغطية عناصر السؤال والمكتبات، لكن تعذر التحقق من المواضع الأصلية لعدم إتاحة أدوات قراءة مناسبة؛ أخرج الإجابة مع بيان هذا القيد صراحة.");
+        }
         else
         {
             builder.AppendLine("اكتملت المتطلبات الإلزامية؛ أخرج الإجابة النهائية ولا تستدع أداة أخرى.");
         }
-
-        if (verificationRequired && !verificationToolsAvailable)
-            builder.AppendLine("تعذر التحقق من المواضع الأصلية لعدم إتاحة أدوات قراءة مناسبة؛ يجب التصريح بهذا القيد بدلاً من ادعاء التحقق.");
 
         if (noProgressStreak >= 2)
             builder.AppendLine("لم يحرز آخر استدعاءين تقدماً جديداً. لا تكرر نمط البحث نفسه؛ إن لم توجد خطوة مختلفة ومباشرة تسد نقصاً محدداً، أنهِ البحث بنتيجة جزئية واذكر حدودها.");
