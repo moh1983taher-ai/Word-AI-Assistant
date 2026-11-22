@@ -45,19 +45,15 @@ internal static class ResearchToolResultClassifier
         };
     }
 
-    internal static bool IsVerificationTool(ToolDescriptor descriptor)
+    /// <summary>
+    /// A non-error response from a search operation completes source coverage even
+    /// when the search found no matches or returned an empty result set.
+    /// </summary>
+    internal static bool IsCompletedSearch(ToolDescriptor descriptor, bool isError)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        return IsVerificationTool(descriptor.Server, descriptor.Name);
+        return !isError && IsSearchTool(descriptor);
     }
-
-    internal static bool IsVerificationTool(string server, string name) =>
-        server switch
-        {
-            "aljam3" => name is "get_page" or "read_page" or "open_page" or "get_book_page",
-            "shamela" => name is "shamela_open" or "shamela_read" or "shamela_get_page" or "shamela_open_page",
-            _ => false
-        };
 
     internal static bool HasMeaningfulText(string? text)
     {

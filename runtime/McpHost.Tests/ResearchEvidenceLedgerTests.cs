@@ -34,6 +34,25 @@ public sealed class ResearchEvidenceLedgerTests
     }
 
     [Fact]
+    public void PreservesExplicitNoMatchResponsesForTheFinalAnswer()
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
+        var descriptor = new ToolDescriptor(
+            "aljam3", "الجامع", "search", "", schema.RootElement.Clone());
+
+        var ledger = new ResearchEvidenceLedger();
+        ledger.Add(descriptor, "لا توجد نتائج مطابقة لعبارة البحث في هذه المكتبة.", succeeded: true);
+
+        var context = ledger.BuildContext(
+            ["aljam3"],
+            Array.Empty<string>(),
+            maxCharacters: 2_000);
+
+        Assert.Contains("لا توجد نتائج مطابقة", context);
+        Assert.True(Assert.Single(ledger.Entries).Succeeded);
+    }
+
+    [Fact]
     public void KeepsFullToolResultsInMemoryWhenModelContextUsesExcerpts()
     {
         using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
