@@ -9,6 +9,7 @@ using ModelContextProtocol.AspNetCore;
 using ModelContextProtocol.Server;
 
 var builder = WebApplication.CreateBuilder(args);
+var hostVersion = typeof(ResearchCoordinator).Assembly.GetName().Version?.ToString(3) ?? "unknown";
 
 var configuredPort = Environment.GetEnvironmentVariable("RESEARCHTOOLS_MCP_PORT");
 var port = int.TryParse(configuredPort, out var parsedPort) && parsedPort is > 1024 and < 65536
@@ -67,7 +68,6 @@ builder.Services.AddMcpServer()
 
 var app = builder.Build();
 var log = app.Services.GetRequiredService<HostLog>();
-var hostVersion = typeof(ResearchCoordinator).Assembly.GetName().Version?.ToString(3) ?? "unknown";
 
 app.Use(async (context, next) =>
 {
