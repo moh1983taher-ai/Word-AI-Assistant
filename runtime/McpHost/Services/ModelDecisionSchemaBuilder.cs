@@ -58,12 +58,15 @@ internal static class ModelDecisionSchemaBuilder
 
         if (scopeItemIds is not null)
         {
-            var scopeValues = scopeItemIds
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
+            var scopeValues = new List<string>();
             if (allowFinal)
-                scopeValues.Insert(0, string.Empty);
+                scopeValues.Add(string.Empty);
+            if (allowToolCalls)
+            {
+                scopeValues.AddRange(scopeItemIds
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.Ordinal));
+            }
             properties["scope_item"] = StringEnum(scopeValues);
         }
 
