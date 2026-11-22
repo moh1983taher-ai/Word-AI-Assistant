@@ -127,6 +127,7 @@ public sealed class DuckAiClient
             .ToArray();
 
         var failures = new List<string>();
+        var nativeToolCallingRejected = false;
         foreach (var baseAddress in endpoints)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -179,6 +180,13 @@ public sealed class DuckAiClient
             {
                 throw;
             }
+            catch (NativeToolCallingNotSupportedException exception)
+            {
+                nativeToolCallingRejected = true;
+                failures.Add($"{baseAddress}: native tool calling unsupported: {exception.Message}");
+                _log.Warning(
+                    $"DuckAI native tool calling is unsupported at {baseAddress}; trying the next local endpoint.");
+            }
             catch (OperationCanceledException)
             {
                 failures.Add($"{baseAddress}: inference timed out after 55 seconds.");
@@ -190,6 +198,13 @@ public sealed class DuckAiClient
                 failures.Add($"{baseAddress} {status}: {exception.Message}");
                 _log.Warning($"DuckAI inference failed at {baseAddress} ({status}); trying the next local endpoint.");
             }
+        }
+
+        if (nativeToolCallingRejected && functionTools is { Count: > 0 })
+        {
+            throw new NativeToolCallingNotSupportedException(
+                "لم تقبل أي من واجهات DuckAI المحلية استدعاءات الأدوات الأصلية. " +
+                string.Join(" | ", failures));
         }
 
         throw new HttpRequestException(
