@@ -25,7 +25,15 @@ public sealed class UpstreamMcpServerTool : McpServerTool
             Name = BuildToolName(descriptor.Server, descriptor.Name),
             Title = $"{descriptor.ServerLabel}: {descriptor.Name}",
             Description = $"{descriptor.ServerLabel} — {descriptor.Description}",
-            InputSchema = descriptor.InputSchema.Clone()
+            InputSchema = descriptor.InputSchema.Clone(),
+            Annotations = new ToolAnnotations
+            {
+                Title = $"{descriptor.ServerLabel}: {descriptor.Name}",
+                ReadOnlyHint = true,
+                DestructiveHint = false,
+                IdempotentHint = true,
+                OpenWorldHint = true
+            }
         };
     }
 
