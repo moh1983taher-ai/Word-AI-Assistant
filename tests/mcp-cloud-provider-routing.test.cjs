@@ -20,10 +20,12 @@ assert.match(source, /https:\/\/api\.groq\.com\/openai\/v1\/responses/);
 assert.match(source, /const SELECTED_SERVERS_KEY = ["']AR_MCP_SELECTED_SERVERS["']/);
 assert.match(source, /function loadSelectedServerIds\(\)[\s\S]*?DEFAULT_SELECTED_SERVER_IDS\.slice\(\)/);
 assert.match(source, /function getGroqTools\(selectedServerIds\)[\s\S]*?getSelectedMcpServers\(selectedServerIds\)/);
-assert.match(source, /لا تستدع أي خادم أو مكتبة غير محددة في اختيار المستخدم/);
-assert.doesNotMatch(source, /لم يستكمل البحث في جميع المكتبات التي اخترتها/);
-assert.match(source, /لك حرية استخدام إحداهما أو كلتيهما وفق حاجة البحث/);
-assert.match(source, /لا يلزمك البحث في كلتيهما/);
+assert.match(source, /تعرّف على الأدوات من أسمائها وأوصافها ومخططات معاملاتها/);
+assert.match(source, /أدر استخدام الأدوات بنفسك/);
+assert.match(source, /المكتبات المتاحة لهذه المهمة وفق اختيار المستخدم/);
+assert.doesNotMatch(source, /لك حرية استخدام إحداهما أو كلتيهما/);
+assert.doesNotMatch(source, /لا يلزمك البحث في كلتيهما/);
+assert.doesNotMatch(source, /slice\(0, 16000\)/);
 
 const validatorStart = source.indexOf("  function validateResearchResult(");
 const validatorEnd = source.indexOf("\n  async function callGroqResearch", validatorStart);
