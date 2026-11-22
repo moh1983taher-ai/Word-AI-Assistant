@@ -117,18 +117,33 @@ public sealed class ResearchCoordinator
             var trace = new List<ToolCallTrace>();
             var sourceCoverage = new HashSet<string>(StringComparer.Ordinal);
             var evidenceLedger = new ResearchEvidenceLedger();
+            var progress = new ResearchTaskProgress(taskPlan.ScopeItems.Select(item => item.Id));
             var repairAttempted = false;
-            var sourceRequirementRetryAttempted = false;
             var toolCallsAttempted = 0;
-            var model = request.Model ?? string.Empty;
+            var maxIterations = taskPlan.MaxToolCalls * 2 + 12;
+            var verificationRequired = taskPlan.Depth == ResearchDepth.Deep;
+            var verificationToolsAvailable = activeTools.Any(ResearchToolResultClassifier.IsVerificationTool);
+            if (verificationRequired && !verificationToolsAvailable)
+                warnings.Add("طلب المستخدم بحثاً معمقاً، لكن المكتبات المختارة لا تتيح أداة مناسبة لفتح المواضع الأصلية؛ سيُذكر هذا القيد في الإجابة.");
 
-            for (var iteration = 0; iteration < MaxIterations; iteration++)
+            for (var iteration = 0; iteration < maxIterations; iteration++)
             {
                 var pendingSourceIds = ResearchSourceSelection.Missing(
                     selectedServerIds,
                     sourceCoverage);
-                var toolBudgetReached = toolCallsAttempted >= MaxToolCalls;
-                IReadOnlyList<ToolDescriptor> turnTools = toolBudgetReached
+                var missingScopeItemIds = taskPlan.MissingScopeItems(progress.CoveredScopeItemIds);
+                var verificationCompleted = !verificationRequired ||
+                    !verificationToolsAvailable ||
+                    evidenceLedger.Entries.Any(entry =>
+                        entry.Succeeded &&
+                        ResearchToolResultClassifier.IsVerificationTool(entry.Server, entry.Tool));
+                var taskComplete = pendingSourceIds.Count == 0 &&
+                    missingScopeItemIds.Count == 0 &&
+                    verificationCompleted;
+                var toolBudgetReached = toolCallsAttempted >= taskPlan.MaxToolCalls;
+                var noProgressStop = progress.ConsecutiveNoProgress >= 3;
+                var stopToolCalls = taskComplete || toolBudgetReached || noProgressStop;
+                IReadOnlyList<ToolDescriptor> turnTools = stopToolCalls
                     ? Array.Empty<ToolDescriptor>()
                     : ResearchSourceToolRouter.SelectForTurn(
                         activeTools,
@@ -140,32 +155,34 @@ public sealed class ResearchCoordinator
                     string.Join("، ", selectedLabels) + "." +
                     Environment.NewLine +
                     "لا تستخدم أي مكتبة أخرى.";
+                turnSystemPrompt += Environment.NewLine + Environment.NewLine +
+                    taskPlan.BuildProgressInstructions(
+                        progress.CoveredScopeItemIds,
+                        pendingSourceIds,
+                        toolCallsAttempted,
+                        progress.ConsecutiveNoProgress,
+                        verificationRequired,
+                        verificationCompleted,
+                        verificationToolsAvailable);
+
                 if (toolBudgetReached)
                 {
-                    var budgetInstruction = pendingSourceIds.Count > 0
-                        ? $"بلغت المهمة حد تنفيذ الأدوات ({MaxToolCalls}) قبل وصول نتائج بحث صالحة من جميع المكتبات. لا تستدع أداة أخرى. أخرج إجابة جزئية تستند حصراً إلى الأدلة المتراكمة، وصرّح بوضوح بالمكتبات التي لم تصل منها نتيجة بحث صالحة."
-                        : $"بلغت المهمة حد تنفيذ الأدوات ({MaxToolCalls})، لكن وردت نتيجة بحث غير فارغة من كل مكتبة مختارة. لا تستدع أداة أخرى. أخرج إجابة موثقة، وصرّح بحدود التحقق الإضافي الذي لم يتسن تنفيذه.";
-                    turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                        budgetInstruction + " لا تختلق مراجع أو نتائج.";
+                    turnSystemPrompt += Environment.NewLine +
+                        $"بلغت ميزانية الأمان الخاصة بهذه المهمة ({taskPlan.MaxToolCalls} استدعاءً)؛ لا تستدع أداة أخرى. أخرج نتيجة جزئية فقط، واذكر عناصر النطاق أو المكتبات أو خطوات التحقق التي لم تكتمل.";
                 }
-                else if (pendingSourceIds.Count > 0)
+                else if (noProgressStop)
                 {
-                    var pendingLabels = pendingSourceIds
-                        .Select(ResearchSourceSelection.GetLabel);
-                    turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                        "أولوية هذه الدورة إلزامية: لم يكتمل البحث بعد في: " +
-                        string.Join("، ", pendingLabels) + "." +
-                        Environment.NewLine +
-                        "فهرس الأدوات في هذه الدورة محصور بهذه المكتبات المتبقية. اختر أداة بحث من هذه المكتبات لإجراء بحث يعيد محتوى صالحاً. لا تستدع أدوات مكتبة سبق أن أعادت نتيجة بحث صالحة ما دامت هناك مكتبة مختارة لم تُبحث بعد. أخرج قرار tool_call واحداً فقط.";
+                    turnSystemPrompt += Environment.NewLine +
+                        "توقفت المتابعة لأن ثلاث محاولات متتابعة لم تضف دليلاً أو تقدماً جديداً. لا تستدع أداة أخرى؛ أخرج نتيجة جزئية مع بيان النقص بدقة.";
                 }
-                else
+                else if (taskComplete)
                 {
-                    turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                        "وصلت نتيجة بحث غير فارغة من جميع المكتبات المختارة، لكن ذلك لا يعني بالضرورة أن النتائج وثيقة الصلة أو كافية. قيّم صلة كل مقتطف بالسؤال وقوة دلالته واستقلال مصادره. إذا كانت النتائج بعيدة عن المسألة أو ناقصة فحسّن عبارة البحث واستدع أداة أخرى من المكتبات المختارة، ولا تنتقل إلى final قبل كفاية الأدلة. عند إعداد الإجابة اجمع الأدلة المحفوظة في سجل المهمة، وافتح المواضع اللازمة للتحقق من الإحالات عند الحاجة.";
+                    turnSystemPrompt += Environment.NewLine +
+                        "اكتملت عناصر النطاق وتغطية المصادر والتحقق المطلوب. لا تستدع أداة أخرى؛ أخرج الإجابة النهائية فقط.";
                 }
 
                 turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                    "التزم بمخطط JSON الصارم المرفق. جميع حقول الغلاف مطلوبة: في قرار tool_call اجعل answer نصاً فارغاً، وفي قرار final اجعل server وtool نصين فارغين وarguments قيمة null.";
+                    "التزم بمخطط JSON الصارم المرفق. جميع الحقول مطلوبة: في tool_call املأ scope_item بمعرف العنصر الذي يخدمه الاستدعاء، واترك answer فارغاً. في final اجعل server وtool فارغين وarguments null وscope_item فارغاً.";
 
                 var evidenceContext = evidenceLedger.BuildContext(
                     selectedServerIds,
@@ -201,8 +218,9 @@ public sealed class ResearchCoordinator
 
                 var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
                     turnTools,
-                    allowFinal: pendingSourceIds.Count == 0 || toolBudgetReached,
-                    allowToolCalls: !toolBudgetReached);
+                    allowFinal: taskComplete || toolBudgetReached || noProgressStop,
+                    allowToolCalls: !stopToolCalls,
+                    scopeItemIds: taskPlan.ScopeItems.Select(item => item.Id).ToArray());
 
                 var completion = await _duckAi.CompleteAsync(
                     model,
