@@ -28,6 +28,31 @@ public sealed class ResearchToolResultClassifierTests
     }
 
     [Theory]
+    [InlineData("aljam3", "search", false, true)]
+    [InlineData("aljam3", "search", true, false)]
+    [InlineData("shamela", "shamela_find", false, true)]
+    [InlineData("shamela", "shamela_find_scoped", false, true)]
+    [InlineData("shamela", "shamela_open", false, false)]
+    public void EmptyOrNoMatchSearchResponsesCompleteCoverageButErrorsDoNot(
+        string server,
+        string name,
+        bool isError,
+        bool expected)
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
+        var descriptor = new ToolDescriptor(
+            server,
+            server == "aljam3" ? "الجامع" : "المكتبة الشاملة",
+            name,
+            "",
+            schema.RootElement.Clone());
+
+        Assert.Equal(
+            expected,
+            ResearchToolResultClassifier.IsCompletedSearch(descriptor, isError));
+    }
+
+    [Theory]
     [InlineData("aljam3", "search", true)]
     [InlineData("aljam3", "get_page", false)]
     [InlineData("shamela", "shamela_find", true)]
