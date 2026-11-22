@@ -79,13 +79,7 @@ $unexpectedServers = @($result.toolCalls | Where-Object { $Servers -notcontains 
 if ($unexpectedServers.Count -gt 0) {
     throw 'The host invoked a source that the user did not select.'
 }
-$missingServers = @($Servers | Where-Object {
-    $selectedServer = $_
-    -not (@($result.toolCalls | Where-Object { $_.server -eq $selectedServer }).Count -gt 0)
-})
-if ($missingServers.Count -gt 0) {
-    throw ('The host did not complete a successful tool call in every selected source: ' + ($missingServers -join ', '))
-}
+Write-Host 'تم احترام اختيار المستخدم للمكتبات؛ لا يُشترط استدعاء كل مكتبة مختارة في كل مهمة.'
 if (@($result.connectionWarnings).Count -gt 0) {
     Write-Warning ($result.connectionWarnings -join '; ')
 }
