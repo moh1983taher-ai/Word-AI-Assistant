@@ -18,8 +18,7 @@ public sealed class ResearchBusyException : Exception
 public sealed class ResearchCoordinator
 {
     private const int MaxConversationMessages = 40;
-    private const int MaxToolCalls = 6;
-    private const int MaxIterations = MaxToolCalls * 2 + 2;
+    private const int MaxAbsoluteToolCalls = 24;
     private const int MaxMessageCharacters = 12_000;
     private const int MaxConversationCharacters = 20_000;
     private const int MaxEvidenceContextCharacters = 10_000;
@@ -48,7 +47,7 @@ public sealed class ResearchCoordinator
         _log.Info($"Research started: task={taskId}.");
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
-        timeout.CancelAfter(TimeSpan.FromSeconds(170));
+        timeout.CancelAfter(TimeSpan.FromSeconds(300));
 
         try
         {
@@ -74,8 +73,23 @@ public sealed class ResearchCoordinator
             if (selectedServerIds.Count == 0)
                 throw new InvalidOperationException("يجب تحديد الجامع أو المكتبة الشاملة أو كليهما قبل البحث.");
 
+            var planning = await ResearchTaskPlanner.CreateAsync(
+                _duckAi,
+                incoming,
+                currentUserMessageIndex,
+                request.Model ?? string.Empty,
+                selectedServerIds.Count,
+                timeout.Token);
+            var taskPlan = planning.Plan;
+            var model = planning.Model;
+            timeout.CancelAfter(TimeSpan.FromSeconds(taskPlan.TimeoutSeconds));
+
+            var warnings = new List<string>();
+            if (!string.IsNullOrWhiteSpace(planning.Warning))
+                warnings.Add(planning.Warning);
+
             var discovery = await _sources.DiscoverSelectedAsync(selectedServerIds, timeout.Token);
-            var warnings = discovery.Warnings.ToList();
+            warnings.AddRange(discovery.Warnings);
             var activeTools = LimitTools(discovery.Tools);
             var unavailableSources = selectedServerIds
                 .Where(server => !activeTools.Any(tool => tool.Server == server))
