@@ -259,39 +259,43 @@ public sealed class ResearchCoordinator
                         selectedServerIds,
                         sourceCoverage);
                     var finalAnswer = decision.Answer;
-                    if (requiresMcpSources && missingSelectedServers.Count > 0)
-                    {
-                        var missingLabels = missingSelectedServers
-                            .Select(ResearchSourceSelection.GetLabel);
-                        if (toolBudgetReached)
-                        {
-                            var missingText = string.Join("، ", missingLabels);
-                            warnings.Add("اكتمل البحث بصورة جزئية؛ لم تصل نتيجة بحث صالحة من: " + missingText + ".");
-                            finalAnswer =
-                                "تنبيه: هذه نتيجة بحث جزئية؛ لم تصل نتيجة بحث صالحة من: " +
-                                missingText + ". لا تمثل هذه الإجابة تغطية لجميع المكتبات المختارة.\n\n" +
-                                finalAnswer;
-                        }
-                        else
-                        {
-                            if (sourceRequirementRetryAttempted)
-                                throw new InvalidOperationException(
-                                    "لم يكتمل البحث في جميع المكتبات التي اختارها المستخدم. لم تصل نتيجة بحث صالحة من: " +
-                                    string.Join("، ", missingLabels) +
-                                    ". أوقفت الإجابة منعاً لاختلاق نتائج أو مراجع.");
+                    var missingScopeDescriptions = taskPlan.ScopeItems
+                        .Where(item => missingScopeItemIds.Contains(item.Id, StringComparer.Ordinal))
+                        .Select(item => item.Description)
+                        .ToArray();
+                    var isPartial = !taskComplete;
 
-                            sourceRequirementRetryAttempted = true;
-                            messages.Add(new DuckChatMessage("assistant", decision.Raw));
-                            messages.Add(new DuckChatMessage(
-                                "user",
-                                "لا تقدم إجابة نهائية بعد. لم تنفذ بحثاً ذا محتوى صالح في هذه المكتبات المختارة: " +
-                                string.Join("، ", missingLabels) +
-                                ". استخدم أداة بحث مناسبة لكل مكتبة متبقية، ثم أخرج الإجابة النهائية. لا تذكر مراجع من الذاكرة."));
-                            continue;
-                        }
+                    if (isPartial && !stopToolCalls)
+                    {
+                        messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                        messages.Add(new DuckChatMessage(
+                            "user",
+                            "لا تقدم إجابة نهائية بعد؛ ما زالت متطلبات المهمة غير مستوفاة. استكمل العناصر أو المكتبات أو التحقق المبينة في بطاقة المهمة، ولا تضف موضوعات جديدة."));
+                        continue;
                     }
 
-                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; coveredSources={string.Join(",", sourceCoverage)}; partial={missingSelectedServers.Count > 0}; mode=json-schema; model={model}.");
+                    if (isPartial)
+                    {
+                        var limitations = new List<string>();
+                        if (missingSelectedServers.Count > 0)
+                            limitations.Add("لم تصل نتيجة بحث صالحة من: " +
+                                string.Join("، ", missingSelectedServers.Select(ResearchSourceSelection.GetLabel)));
+                        if (missingScopeDescriptions.Length > 0)
+                            limitations.Add("لم تُغطَّ عناصر النطاق التالية: " +
+                                string.Join("؛ ", missingScopeDescriptions));
+                        if (verificationRequired && !verificationCompleted)
+                            limitations.Add("لم يكتمل فتح المواضع الأصلية والتحقق منها");
+                        if (limitations.Count == 0)
+                            limitations.Add("توقفت المتابعة قبل استكمال جميع خطوات المراجعة");
+
+                        var limitationText = string.Join("؛ ", limitations);
+                        warnings.Add("نتيجة جزئية: " + limitationText + ".");
+                        finalAnswer =
+                            "تنبيه منهجي: هذه نتيجة جزئية، ولم يكتمل البحث في المتطلبات الآتية: " +
+                            limitationText + ".\n\n" + finalAnswer;
+                    }
+
+                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; budget={taskPlan.MaxToolCalls}; coveredSources={string.Join(",", sourceCoverage)}; coveredScope={string.Join(",", progress.CoveredScopeItemIds)}; partial={isPartial}; mode=task-scoped-json-schema; model={model}.");
                     return new ResearchResponse(
                         finalAnswer,
                         model,
@@ -306,21 +310,32 @@ public sealed class ResearchCoordinator
 
                 if (descriptorForJson is null)
                 {
+                    progress.RecordRejectedDecision();
                     _log.Warning(
                         $"Research tool rejected: task={taskId}; source={decision.Server}; tool={decision.Tool}; reason=not-in-current-source-window.");
                     messages.Add(new DuckChatMessage(
                         "user",
-                        "الأداة التي اخترتها غير موجودة في فهرس هذه الدورة. استخدم أداة من فهرس MCP المرفق فقط، ولا تخترع أسماء أدوات أو مصادر."));
+                        "الأداة التي اخترتها غير متاحة في فهرس هذه الدورة. استخدم أداة من الفهرس الحالي ومكتبة اختارها المستخدم فقط."));
+                    continue;
+                }
+
+                if (!progress.TryRegisterToolCall(
+                    decision.ScopeItem,
+                    descriptorForJson,
+                    decision.Arguments,
+                    out var rejectionReason))
+                {
+                    _log.Warning(
+                        $"Research tool blocked: task={taskId}; source={decision.Server}; tool={decision.Tool}; scopeItem={decision.ScopeItem}; reason={rejectionReason}");
+                    messages.Add(new DuckChatMessage(
+                        "user",
+                        rejectionReason + " لا تكرر الاستدعاء. اختر خطوة مختلفة تخدم عنصراً غير مكتمل من بطاقة المهمة، أو أنهِ البحث إذا لم توجد خطوة مفيدة."));
                     continue;
                 }
 
                 toolCallsAttempted++;
-                if (toolCallsAttempted > MaxToolCalls)
-                    throw new InvalidOperationException(
-                        $"بلغت المهمة الحد الآمن لعدد استدعاءات الأدوات ({MaxToolCalls}).");
-
                 _log.Info(
-                    $"Research tool decision: task={taskId}; attempt={toolCallsAttempted}/{MaxToolCalls}; source={decision.Server}; tool={decision.Tool}; pending={string.Join(",", pendingSourceIds)}.");
+                    $"Research tool decision: task={taskId}; attempt={toolCallsAttempted}/{taskPlan.MaxToolCalls}; scopeItem={decision.ScopeItem}; source={decision.Server}; tool={decision.Tool}; pendingSources={string.Join(",", pendingSourceIds)}.");
 
                 var execution = await ExecuteToolAsync(
                     descriptorForJson,
@@ -329,7 +344,11 @@ public sealed class ResearchCoordinator
                     taskId,
                     timeout.Token);
 
-                evidenceLedger.Add(descriptorForJson, execution.Content, execution.Succeeded);
+                evidenceLedger.Add(
+                    descriptorForJson,
+                    execution.Content,
+                    execution.Succeeded,
+                    decision.ScopeItem);
 
                 if (execution.Succeeded)
                     trace.Add(new ToolCallTrace(
@@ -339,14 +358,20 @@ public sealed class ResearchCoordinator
 
                 var sourceSearchSucceeded = execution.Succeeded &&
                     ResearchToolResultClassifier.IsSearchTool(descriptorForJson);
-                if (sourceSearchSucceeded)
+                var newlyCoveredSource = sourceSearchSucceeded &&
                     sourceCoverage.Add(descriptorForJson.Server);
+                var madeProgress = progress.RecordToolResult(
+                    decision.ScopeItem,
+                    descriptorForJson,
+                    execution.Content,
+                    execution.Succeeded,
+                    newlyCoveredSource);
 
                 var pendingAfterCall = ResearchSourceSelection.Missing(
                     selectedServerIds,
                     sourceCoverage);
                 _log.Info(
-                    $"Research tool result: task={taskId}; source={decision.Server}; tool={decision.Tool}; success={execution.Succeeded}; searchCoverage={sourceSearchSucceeded}; completed={string.Join(",", sourceCoverage)}; pending={string.Join(",", pendingAfterCall)}.");
+                    $"Research tool result: task={taskId}; source={decision.Server}; tool={decision.Tool}; scopeItem={decision.ScopeItem}; success={execution.Succeeded}; searchCoverage={sourceSearchSucceeded}; newProgress={madeProgress}; noProgressStreak={progress.ConsecutiveNoProgress}; completedSources={string.Join(",", sourceCoverage)}; pendingSources={string.Join(",", pendingAfterCall)}.");
             }
 
             throw new InvalidOperationException("انتهت دورات تنسيق الأدوات دون إجابة نهائية.");
