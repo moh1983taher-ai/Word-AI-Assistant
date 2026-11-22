@@ -12,9 +12,8 @@ public sealed class ResearchBusyException : Exception
 }
 
 /// <summary>
-/// Orchestrates JSON-decision turns against official MCP clients. The installed DuckAI
-/// endpoint returns plain text instead of tool_calls even when a function is forced, so
-/// the host uses the explicit JSON protocol from the first model turn.
+/// Orchestrates model-led MCP research. Native OpenAI-compatible tool calls are preferred;
+/// DuckAI's structured JSON decision protocol remains the compatibility fallback.
 /// </summary>
 public sealed class ResearchCoordinator
 {
@@ -76,9 +75,6 @@ public sealed class ResearchCoordinator
                 throw new InvalidOperationException("لا توجد رسائل بحث صالحة.");
 
             var currentUserMessageIndex = incoming.FindLastIndex(message => message.Role == "user");
-            var currentUserText = currentUserMessageIndex >= 0
-                ? incoming[currentUserMessageIndex].Content ?? string.Empty
-                : string.Empty;
             messages.AddRange(incoming);
 
             if (selectedServerIds.Count == 0)
@@ -202,21 +198,9 @@ public sealed class ResearchCoordinator
                     // protocol-compatibility signal, then retried through DuckAI's
                     // structured JSON decision path. That path still leaves every
                     // available tool and the final decision open to the model.
-                    if (!string.IsNullOrWhiteSpace(completion.Text) &&
-                        !ResearchIntentClassifier.RequiresMcpSources(currentUserText))
-                    {
-                        _log.Info(
-                            $"Research completed without MCP invocation: task={taskId}; mode=native-tool-calling; toolCalls={trace.Count}; model={model}.");
-                        return new ResearchResponse(
-                            completion.Text.Trim(),
-                            model,
-                            trace.ToArray(),
-                            warnings.ToArray());
-                    }
-
                     nativeToolCalling = false;
                     _log.Warning(
-                        $"No native tool call was returned for a source-oriented request; falling back to the JSON decision protocol. task={taskId}.");
+                        $"The provider returned no native tool_calls; switching to the JSON compatibility protocol. task={taskId}.");
                     continue;
                 }
 
