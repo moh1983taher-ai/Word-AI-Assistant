@@ -66,6 +66,21 @@ public sealed class DuckAiClient
         _log = log;
     }
 
+    public string GetProviderLabel(string baseAddress)
+    {
+        var configured = Environment.GetEnvironmentVariable(ConfiguredModelEndpointVariable);
+        if (!string.IsNullOrWhiteSpace(configured) &&
+            string.Equals(
+                GetCandidateBaseAddresses(configured)[0],
+                baseAddress,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Local OpenAI-compatible model server";
+        }
+
+        return "DuckAI local fallback";
+    }
+
     public async Task<DuckAiModelSnapshot> GetModelsAsync(CancellationToken cancellationToken)
     {
         if (_cachedSnapshot is not null && _snapshotExpiresAt > DateTimeOffset.UtcNow)
