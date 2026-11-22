@@ -45,6 +45,16 @@ internal static class ResearchToolResultClassifier
         };
     }
 
+    /// <summary>
+    /// A non-error response from a search operation completes source coverage even
+    /// when the search found no matches or returned an empty result set.
+    /// </summary>
+    internal static bool IsCompletedSearch(ToolDescriptor descriptor, bool isError)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        return !isError && IsSearchTool(descriptor);
+    }
+
     internal static bool HasMeaningfulText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
