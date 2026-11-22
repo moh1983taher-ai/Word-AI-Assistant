@@ -21,12 +21,12 @@ internal static class ResearchTaskPlanner
     private const string SystemPrompt = """
 أنت مخطط مهمة بحثية في «أدوات الباحث». لا تنفذ البحث ولا تجب عن السؤال.
 اقرأ الطلب الحالي، واستعن بالرسائل السابقة فقط لفهم الإحالات والضمائر والأسماء التي يشير إليها الطلب الحالي.
-استخرج عناصر العمل التي طلبها المستخدم صراحة أو التي لا يمكن إنجاز المطلوب دونها مباشرة.
-إذا كان الطلب سؤالاً واحداً محدداً، فأنشئ عنصراً واحداً فقط. لا تقسّم السؤال إلى خلفية وسياق وتاريخ ونتائج وتطبيقات إلا إذا طلب المستخدم هذه الجوانب.
-في الطلبات متعددة الأجزاء، افصل الأجزاء المطلوبة فعلاً، بحد أقصى ستة عناصر.
+استخرج عناصر العمل التي طلبها المستخدم صراحة من الطلب الحالي.
+كل عنصر في scope_items يجب أن يكون اقتباساً حرفياً متصلاً من نص الطلب الحالي، لا إعادة صياغة ولا استنتاجاً ولا عنواناً مقترحاً. إذا تعذر التعبير عن عنصر بعبارة حرفية من الطلب، فلا تنشئ له عنصراً مستقلاً.
+إذا كان الطلب سؤالاً واحداً محدداً، فأنشئ عنصراً واحداً فقط. لا تقسّم السؤال إلى خلفية وسياق وتاريخ ونتائج وتطبيقات إلا إذا ذكر المستخدم هذه الجوانب نصاً.
+في الطلبات متعددة الأجزاء، افصل الأجزاء المذكورة حرفياً، بحد أقصى ستة عناصر.
 لا تضف موضوعات مجاورة أو اقتراحات بحثية أو توسعات أكاديمية لم يطلبها المستخدم.
-القيود لا تتضمن إلا ما صرّح به المستخدم، مثل الفترة الزمنية أو نوع المصدر أو النطاق أو مستوى التفصيل.
-الموضوعات المستبعدة لا تتضمن إلا ما استبعده المستخدم صراحة.
+القيود والاستبعادات يجب أن تكون بدورها عبارات حرفية من الطلب الحالي؛ لا تستنتج قيداً أو استبعاداً من السياق السابق.
 أعد JSON فقط وفق المخطط الصارم. اجعل القوائم فارغة إذا لم يذكر المستخدم قيوداً أو استبعادات صريحة.
 """;
 
@@ -66,7 +66,7 @@ internal static class ResearchTaskPlanner
                 cancellationToken: cancellationToken,
                 responseFormat: BuildResponseFormat());
 
-            if (!TryParse(response.Text, out var scopeItems, out var constraints, out var exclusions))
+            if (!TryParse(response.Text, goal, out var scopeItems, out var constraints, out var exclusions))
             {
                 var fallback = ResearchTaskPlan.Create(goal, [goal], [], [], selectedSourceCount);
                 return new ResearchTaskPlanningResult(
@@ -139,6 +139,7 @@ internal static class ResearchTaskPlanner
 
     internal static bool TryParse(
         string? response,
+        string taskGoal,
         out IReadOnlyList<string> scopeItems,
         out IReadOnlyList<string> constraints,
         out IReadOnlyList<string> exclusions)
@@ -147,7 +148,7 @@ internal static class ResearchTaskPlanner
         constraints = [];
         exclusions = [];
 
-        if (string.IsNullOrWhiteSpace(response))
+        if (string.IsNullOrWhiteSpace(taskGoal) || string.IsNullOrWhiteSpace(response))
             return false;
 
         var candidate = response.Trim();
@@ -166,8 +167,18 @@ internal static class ResearchTaskPlanner
                 !TryReadArray(root, "exclusions", out exclusions))
                 return false;
 
-            if (scopeItems.Count == 0)
+            if (scopeItems.Count == 0 ||
+                scopeItems.Any(item => !taskGoal.Contains(item, StringComparison.Ordinal)))
                 return false;
+
+            // A constraint or exclusion is retained only when it appears verbatim
+            // in the current user request. Model-inferred limits are discarded.
+            constraints = constraints
+                .Where(item => taskGoal.Contains(item, StringComparison.Ordinal))
+                .ToArray();
+            exclusions = exclusions
+                .Where(item => taskGoal.Contains(item, StringComparison.Ordinal))
+                .ToArray();
 
             return true;
         }
