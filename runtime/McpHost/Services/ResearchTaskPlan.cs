@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using ResearchTools.McpHost.Models;
 
 namespace ResearchTools.McpHost.Services;
@@ -40,9 +42,12 @@ internal sealed class ResearchTaskPlan
         Depth == ResearchDepth.Deep ||
         new[]
         {
-            "تحقق", "دقق", "تدقيق", "توثيق", "وثّق", "وثق",
-            "تخريج", "راجع الإحالات", "تأكد من صحة", "اقتباسات موثقة"
-        }.Any(indicator => Goal.Contains(indicator, StringComparison.OrdinalIgnoreCase));
+            "تحقق", "دقق", "تدقيق", "توثيق", "وثق",
+            "تخريج", "راجع الاحالات", "تاكد من صحة", "اقتباسات موثقة",
+            "المصادر الاصلية", "النص الاصلي"
+        }.Any(indicator => NormalizeForMatching(Goal).Contains(
+            indicator,
+            StringComparison.OrdinalIgnoreCase));
     internal int MaxToolCalls { get; }
     internal int TimeoutSeconds { get; }
 
@@ -155,7 +160,7 @@ internal sealed class ResearchTaskPlan
         builder.AppendLine("- يجب أن يحمل كل قرار tool_call قيمة scope_item واحدة من المعرفات المعروضة، وأن تكون معاملات البحث موجهة إلى وصف ذلك العنصر تحديداً.");
         builder.AppendLine("- لا توسّع البحث إلى خلفيات تاريخية أو تراجم أو موضوعات مجاورة إلا إذا كان ذلك لازماً مباشرة للإجابة أو طلبه المستخدم.");
         builder.AppendLine("- لا تعتبر كثرة النتائج دليلاً على الكفاية؛ افحص صلتها بالسؤال، ولا تكرر استعلاماً أو نتيجة سبق الحصول عليها.");
-        builder.AppendLine("- لا تنتقل إلى الصياغة النهائية قبل جمع دليل لكل عنصر مطلوب، وتغطية كل مكتبة اختارها المستخدم، وتنفيذ التحقق المطلوب إن كانت المهمة معمّقة.");
+        builder.AppendLine("- لا تنتقل إلى الصياغة النهائية قبل جمع دليل لكل عنصر مطلوب، وتغطية كل مكتبة اختارها المستخدم، وتنفيذ التحقق إذا طلبه المستخدم أو اقتضته درجة العمق.");
         builder.AppendLine("- عند اكتمال عناصر النطاق والتحقق اللازم، توقف عن البحث وصغ الإجابة؛ لا تستمر لتحصيل معلومات إضافية لا تغيّر الإجابة.");
         
         if (pendingSourceIds.Count > 0)
@@ -204,13 +209,12 @@ internal sealed class ResearchTaskPlan
 
     private static ResearchDepth InferDepth(string goal)
     {
-        var text = goal.ToLowerInvariant();
+        var text = NormalizeForMatching(goal);
         string[] deepIndicators =
         [
-            "بحث معمق", "بحث معمّق", "استقصائي", "استقصاء", "استقراء",
-            "دراسة مقارنة", "مقارنة بين", "قارن بين", "مقارنة",
-            "من جميع جوانبه", "بالتفصيل", "بحث شامل", "دراسة شاملة",
-            "تحليل نقدي", "تتبع الأقوال", "in-depth", "comprehensive", "comparative"
+            "معمق", "استقصا", "استقراء", "مقارن", "مقارنة",
+            "من جميع جوانبه", "تفصيل", "شامل",
+            "تحليل نقدي", "تتبع الاقوال", "in-depth", "comprehensive", "comparative"
         ];
 
         if (deepIndicators.Any(indicator => text.Contains(indicator, StringComparison.Ordinal)))
@@ -219,10 +223,29 @@ internal sealed class ResearchTaskPlan
         if (ResearchIntentClassifier.RequiresMcpSources(goal) ||
             text.Contains("حلل", StringComparison.Ordinal) ||
             text.Contains("ناقش", StringComparison.Ordinal) ||
-            text.Contains("أثر", StringComparison.Ordinal))
+            text.Contains("اثر", StringComparison.Ordinal))
             return ResearchDepth.Standard;
 
         return ResearchDepth.Focused;
+    }
+
+    private static string NormalizeForMatching(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value.Normalize(NormalizationForm.FormKC))
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(character);
+            if (category is UnicodeCategory.NonSpacingMark or
+                UnicodeCategory.SpacingCombiningMark or
+                UnicodeCategory.EnclosingMark)
+                continue;
+
+            builder.Append(char.ToLowerInvariant(character));
+        }
+
+        return System.Text.RegularExpressions.Regex
+            .Replace(builder.ToString(), @"\s+", " ")
+            .Trim();
     }
 
     private static List<string> NormalizeList(
