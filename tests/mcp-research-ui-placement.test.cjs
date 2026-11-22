@@ -47,6 +47,13 @@ assert.match(uiSource, /const LOCAL_MCP_HOST_URL = ["']http:\/\/127\.0\.0\.1:180
 assert.match(uiSource, /function callSelectedResearch/);
 assert.match(uiSource, /servers: selected/);
 assert.match(uiSource, /const RESEARCH_ENGINE_KEY = ["']AR_MCP_RESEARCH_ENGINE["']/);
+assert.match(uiSource, /heading\.textContent = "إعدادات البحث"/);
+assert.match(uiSource, /sourceTitle\.textContent = "مصادر البحث"/);
+assert.match(uiSource, /fontSize = "12px"/);
+assert.match(uiSource, /mcp-research-panel select,\.mcp-research-panel select option|mcp-research-panel select,\.mcp-research-panel select option/);
+assert.match(uiSource, /تلقائي \(المحلي أولاً\)/);
+assert.doesNotMatch(uiSource, /المكتبات التي سيبحث فيها النموذج|فحص التوليد الفعلي يتم عند تنفيذ البحث/);
+
 
 assert.match(
   uiSource,
