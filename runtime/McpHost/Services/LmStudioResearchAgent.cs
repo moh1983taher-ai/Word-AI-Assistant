@@ -163,6 +163,31 @@ public sealed class LmStudioResearchAgent
                 timeout.Token);
 
             warnings.AddRange(completion.Warnings);
+            if (!completion.IsComplete)
+            {
+                warnings.Add("انقطع اتصال بث LM Studio قبل الحدث الختامي؛ لا تُعد الرسالة الجزئية إجابة مكتملة.");
+                if (evidenceLedger.Entries.Count > 0)
+                {
+                    var partial = await FinalizeAfterTimeoutAsync(
+                        completion.Model,
+                        messages,
+                        evidenceLedger,
+                        selectedServerIds,
+                        warnings,
+                        requestCancellation,
+                        taskId);
+                    return new ResearchResponse(partial.Answer, partial.Model, trace, warnings);
+                }
+
+                return new ResearchResponse(
+                    string.IsNullOrWhiteSpace(completion.Answer)
+                        ? "انقطع اتصال LM Studio قبل إكمال الإجابة، ولم تصل نتائج أدوات يمكن عرضها."
+                        : "إجابة غير مكتملة بسبب انقطاع البث قبل الإنهاء:" + Environment.NewLine + completion.Answer,
+                    completion.Model,
+                    trace,
+                    warnings);
+            }
+
             if (string.IsNullOrWhiteSpace(completion.Answer))
             {
                 if (evidenceLedger.Entries.Count > 0)
