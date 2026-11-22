@@ -39,7 +39,7 @@ const validatorSource = [
   "function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? ids : []; }",
   source.slice(validatorStart, validatorEnd),
   "globalThis.__validateResearchResult = validateResearchResult;"
-].join("\\n");
+].join("\n");
 vm.runInNewContext(validatorSource, validatorContext);
 const validateResearchResult = validatorContext.__validateResearchResult;
 const oneOfTwoLibraries = validateResearchResult(
