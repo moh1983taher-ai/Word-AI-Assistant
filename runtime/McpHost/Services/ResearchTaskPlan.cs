@@ -75,13 +75,13 @@ internal sealed class ResearchTaskPlan
         {
             ResearchDepth.Focused => 0,
             ResearchDepth.Standard => 2,
-            ResearchDepth.Deep => 6,
+            ResearchDepth.Deep => 10,
             _ => 0
         };
 
         var sourceCount = Math.Clamp(selectedSourceCount, 1, 2);
         var callAllowance = 6 + (items.Length * 2) + (sourceCount * 2) + depthAllowance;
-        var maxToolCalls = Math.Clamp(callAllowance, 8, 24);
+        var maxToolCalls = Math.Clamp(callAllowance, 10, 32);
 
         var timeAllowance = 150 + (items.Length * 15) + (sourceCount * 20) +
                             (depth == ResearchDepth.Deep ? 60 :
@@ -183,7 +183,9 @@ internal sealed class ResearchTaskPlan
         }
         else
         {
-            builder.AppendLine("اكتملت المتطلبات الإلزامية؛ أخرج الإجابة النهائية ولا تستدع أداة أخرى.");
+            builder.AppendLine("اكتملت التغطية الأولية لجميع عناصر السؤال والمكتبات المختارة.");
+            builder.AppendLine("راجع الآن كفاية الأدلة لكل عنصر: إن كانت كافية فأخرج الإجابة النهائية؛ وإن بقي نقص محدد يؤثر مباشرة في جواب عنصر موجود، فاستدع أداة أخرى مرتبطة بذلك العنصر نفسه.");
+            builder.AppendLine("لا تضف عناصر جديدة ولا تفتح موضوعات مجاورة. لا تواصل البحث لمجرد العثور على مزيد من النتائج؛ أوقفه عندما لا تضيف الأدلة المتوقعة قيمة لازمة للإجابة.");
         }
 
         if (noProgressStreak >= 2)
