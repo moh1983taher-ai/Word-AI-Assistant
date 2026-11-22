@@ -103,14 +103,15 @@ internal sealed class ResearchTaskPlan
         int toolCallsUsed,
         int noProgressStreak,
         bool verificationRequired,
-        bool verificationCompleted,
+        IReadOnlySet<string> verifiedScopeItemIds,
         bool verificationToolsAvailable)
     {
         var phase = pendingSourceIds.Count > 0
             ? "الاستكشاف وتغطية المكتبات المختارة"
             : MissingScopeItems(coveredScopeItemIds).Count > 0
                 ? "استكمال عناصر النطاق التي لم تحصل على أدلة"
-                : verificationRequired && verificationToolsAvailable && !verificationCompleted
+                : verificationRequired && verificationToolsAvailable &&
+                  ScopeItems.Any(item => !verifiedScopeItemIds.Contains(item.Id))
                     ? "التحقق من المواضع الأصلية والنقول"
                     : "تركيب الأدلة ومراجعة كفايتها";
 
@@ -160,9 +161,14 @@ internal sealed class ResearchTaskPlan
             builder.AppendLine("أولوية المرحلة: اختر عنصراً غير مغطى من القائمة، وابحث عنه دون إعادة فتح عناصر مكتملة إلا إذا كان التحقق منها ضرورياً.");
             builder.AppendLine("العناصر التي لم تصلها أدلة: " + string.Join("، ", MissingScopeItems(coveredScopeItemIds)));
         }
-        else if (verificationRequired && verificationToolsAvailable && !verificationCompleted)
+        else if (verificationRequired && verificationToolsAvailable &&
+                 ScopeItems.Any(item => !verifiedScopeItemIds.Contains(item.Id)))
         {
-            builder.AppendLine("أولوية المرحلة: اقرأ المواضع الأصلية أو افتح النصوص التي تسند النتائج، ولا تنشئ بحثاً موضوعياً جديداً.");
+            var pendingVerification = ScopeItems
+                .Where(item => !verifiedScopeItemIds.Contains(item.Id))
+                .Select(item => item.Id + ": " + item.Description);
+            builder.AppendLine("أولوية المرحلة: اقرأ المواضع الأصلية لكل عنصر لم يُتحقق منه، ولا تنشئ بحثاً موضوعياً جديداً.");
+            builder.AppendLine("عناصر النطاق التي ما زالت تحتاج إلى تحقق: " + string.Join("؛ ", pendingVerification));
         }
         else
         {
