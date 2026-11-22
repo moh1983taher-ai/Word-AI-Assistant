@@ -211,7 +211,7 @@ public sealed class DuckAiClient
             ["model"] = model,
             ["messages"] = messages,
             ["temperature"] = 0.0,
-            ["max_tokens"] = 5000,
+            ["max_tokens"] = ResearchContextBudget.Load().MaxOutputTokens,
             ["stream"] = false
         };
 
