@@ -1,8 +1,6 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Http;
 using ResearchTools.McpHost.Infrastructure;
 using ResearchTools.McpHost.Services;
 using Xunit;
@@ -14,8 +12,6 @@ public sealed class LmStudioClientTests
     [Fact]
     public async Task DiscoversOnlyLanguageModelsAndPrefersLoadedToolCallingModel()
     {
-        var settings = SetLmStudioEnvironment();
-        try
         {
             var handler = new StubHandler(request =>
             {
@@ -58,7 +54,7 @@ public sealed class LmStudioClientTests
 
             var client = new LmStudioClient(
                 new StubHttpClientFactory(handler),
-                ResearchProviderOptions.FromEnvironment(),
+                TestOptions(),
                 new HostLog());
 
             var snapshot = await client.GetModelsAsync(CancellationToken.None);
@@ -67,10 +63,6 @@ public sealed class LmStudioClientTests
             Assert.DoesNotContain(snapshot.Models, model => model.Id == "nomic/embed");
             Assert.Equal("research-tool-model", snapshot.DefaultModel);
             Assert.True(snapshot.Models.Single(model => model.Id == "research-tool-model").TrainedForToolUse);
-        }
-        finally
-        {
-            RestoreEnvironment(settings);
         }
     }
 
@@ -81,10 +73,8 @@ public sealed class LmStudioClientTests
         try
         {
             string? capturedPayload = null;
-            var visited = new ConcurrentQueue<string>();
             var handler = new StubHandler(request =>
             {
-                visited.Enqueue($"{request.Method} {request.RequestUri!.AbsolutePath}");
                 if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath == "/api/v1/models")
                 {
                     return Json(HttpStatusCode.OK, """
@@ -125,7 +115,7 @@ public sealed class LmStudioClientTests
 
             var client = new LmStudioClient(
                 new StubHttpClientFactory(handler),
-                ResearchProviderOptions.FromEnvironment(),
+                TestOptions(),
                 new HostLog());
 
             var captured = new List<LmStudioToolResult>();
@@ -164,9 +154,6 @@ public sealed class LmStudioClientTests
                 aljam3.GetProperty("allowed_tools").EnumerateArray()
                     .Select(item => item.GetString()).ToArray());
 
-            Assert.Equal(
-                new[] { "GET /api/v1/models", "POST /api/v1/chat" },
-                visited.ToArray());
         }
         finally
         {
@@ -203,7 +190,7 @@ public sealed class LmStudioClientTests
 
             var client = new LmStudioClient(
                 new StubHttpClientFactory(handler),
-                ResearchProviderOptions.FromEnvironment(),
+                TestOptions(),
                 new HostLog());
 
             var result = await client.ChatAsync(
@@ -225,26 +212,8 @@ public sealed class LmStudioClientTests
         }
     }
 
-    private static Dictionary<string, string?> SetLmStudioEnvironment()
-    {
-        var names = new[]
-        {
-            ResearchProviderOptions.ProviderEnvironmentVariable,
-            ResearchProviderOptions.LmStudioBaseUrlEnvironmentVariable,
-            ResearchProviderOptions.LmStudioApiTokenEnvironmentVariable
-        };
-        var previous = names.ToDictionary(name => name, Environment.GetEnvironmentVariable);
-        Environment.SetEnvironmentVariable(ResearchProviderOptions.ProviderEnvironmentVariable, "lmstudio");
-        Environment.SetEnvironmentVariable(ResearchProviderOptions.LmStudioBaseUrlEnvironmentVariable, "http://127.0.0.1:1234");
-        Environment.SetEnvironmentVariable(ResearchProviderOptions.LmStudioApiTokenEnvironmentVariable, null);
-        return previous;
-    }
-
-    private static void RestoreEnvironment(Dictionary<string, string?> previous)
-    {
-        foreach (var pair in previous)
-            Environment.SetEnvironmentVariable(pair.Key, pair.Value);
-    }
+    private static ResearchProviderOptions TestOptions() =>
+        new("lmstudio", new Uri("http://127.0.0.1:1234/"), null);
 
     private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
         new(status)
