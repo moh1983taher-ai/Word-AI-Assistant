@@ -19,7 +19,7 @@ public sealed class ResearchTaskPlannerTests
 
         Assert.True(ResearchTaskPlanner.TryParse(
             response,
-            "الأمر الوارد بعد الحظر وأقوال الأصوليين في دلالته",
+            "الأمر الوارد بعد الحظر وأقوال الأصوليين في دلالته مع الاعتماد على المكتبتين المختارتين وعدم التوسع في تاريخ علم الأصول",
             out var scope,
             out var constraints,
             out var exclusions));
