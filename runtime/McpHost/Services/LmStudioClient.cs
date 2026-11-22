@@ -191,6 +191,7 @@ public sealed class LmStudioClient
         }
 
         var toolResults = new List<LmStudioToolResult>();
+        var streamedToolResultCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var warnings = new List<string>();
         var streamedMessage = new StringBuilder();
         JsonElement? finalResult = null;
@@ -268,10 +269,9 @@ public sealed class LmStudioClient
                 return;
             }
 
-            var key = serverLabel + "\n" + tool + "\n" + output;
-            if (toolResults.Any(existing =>
-                string.Equals(existing.ServerLabel + "\n" + existing.Tool + "\n" + existing.Output, key, StringComparison.Ordinal)))
-                return;
+            var key = BuildToolResultKey(serverLabel, tool, output);
+            streamedToolResultCounts.TryGetValue(key, out var previousCount);
+            streamedToolResultCounts[key] = previousCount + 1;
 
             var result = new LmStudioToolResult(serverLabel, tool, output, succeeded);
             toolResults.Add(result);
@@ -310,6 +310,41 @@ public sealed class LmStudioClient
         }
 
         var final = finalResult.Value;
+
+        // chat.end is the authoritative aggregate. Reconcile it with streamed success
+        // events so a dropped SSE event cannot silently omit evidence, while repeated
+        // identical calls remain distinct executions.
+        if (TryGet(final, "output", out var finalOutput) &&
+            finalOutput.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in finalOutput.EnumerateArray())
+            {
+                if (!string.Equals(ReadString(item, "type"), "tool_call", StringComparison.Ordinal))
+                    continue;
+
+                var serverLabel = string.Empty;
+                if (TryGet(item, "provider_info", out var providerInfo))
+                    serverLabel = ReadString(providerInfo, "server_label");
+
+                var tool = ReadString(item, "tool");
+                var output = ReadString(item, "output");
+                if (string.IsNullOrWhiteSpace(serverLabel) || string.IsNullOrWhiteSpace(tool))
+                    continue;
+
+                var key = BuildToolResultKey(serverLabel, tool, output);
+                if (streamedToolResultCounts.TryGetValue(key, out var streamedCount) && streamedCount > 0)
+                {
+                    streamedToolResultCounts[key] = streamedCount - 1;
+                    continue;
+                }
+
+                var aggregateOnlyResult = new LmStudioToolResult(serverLabel, tool, output, Succeeded: true);
+                toolResults.Add(aggregateOnlyResult);
+                if (onToolResult is not null)
+                    await onToolResult(aggregateOnlyResult);
+            }
+        }
+
         var finalModel = ReadString(final, "model_instance_id");
         if (string.IsNullOrWhiteSpace(finalModel))
             finalModel = model;
@@ -344,6 +379,9 @@ public sealed class LmStudioClient
                 null,
                 response.StatusCode);
     }
+
+    private static string BuildToolResultKey(string serverLabel, string tool, string output) =>
+        serverLabel + "\n" + tool + "\n" + output;
 
     private static string ExtractFinalMessage(JsonElement result)
     {
