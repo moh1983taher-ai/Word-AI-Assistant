@@ -131,7 +131,7 @@ jobs:
 
             $initializeJson = $initializeResponse.Content
             if ($initializeResponse.Headers['Content-Type'] -match 'text/event-stream') {
-              $dataLine = $initializeJson -split "`r?`n" | Where-Object { $_ -like 'data: *' } | Select-Object -Last 1
+              $dataLine = $initializeJson -split '\r?\n' | Where-Object { $_ -like 'data: *' } | Select-Object -Last 1
               if (-not $dataLine) { throw 'Local MCP initialize response contained no JSON event.' }
               $initializeJson = $dataLine.Substring(5).Trim()
             }
@@ -156,7 +156,7 @@ jobs:
 
             $toolsJson = $toolsResponse.Content
             if ($toolsResponse.Headers['Content-Type'] -match 'text/event-stream') {
-              $dataLine = $toolsJson -split "`r?`n" | Where-Object { $_ -like 'data: *' } | Select-Object -Last 1
+              $dataLine = $toolsJson -split '\r?\n' | Where-Object { $_ -like 'data: *' } | Select-Object -Last 1
               if (-not $dataLine) { throw 'Local MCP tools/list response contained no JSON event.' }
               $toolsJson = $dataLine.Substring(5).Trim()
             }
