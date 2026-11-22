@@ -91,6 +91,40 @@ public sealed class ResearchTaskPlannerTests
         Assert.Equal(300, deep.TimeoutSeconds);
     }
 
+    [Theory]
+    [InlineData("وثق هذه الفكرة من المصادر الأصلية", true)]
+    [InlineData("دقق الإحالات والاقتباسات", true)]
+    [InlineData("ما تعريف الاجتهاد؟", false)]
+    public void RequiresSourceVerificationOnlyWhenRequestedOrDeep(string goal, bool expected)
+    {
+        var plan = ResearchTaskPlan.Create(goal, [goal], [], [], selectedSourceCount: 1);
+        Assert.Equal(expected, plan.RequiresVerification);
+    }
+
+    [Fact]
+    public void DeepVerificationTracksEveryRequestedScopeItem()
+    {
+        var plan = ResearchTaskPlan.Create(
+            "أجر بحثاً معمقاً في المسألة",
+            ["العنصر الأول", "العنصر الثاني"],
+            [],
+            [],
+            selectedSourceCount: 1);
+
+        var instructions = plan.BuildProgressInstructions(
+            new HashSet<string>(["S1", "S2"]),
+            [],
+            4,
+            0,
+            verificationRequired: true,
+            verifiedScopeItemIds: new HashSet<string>(["S1"]),
+            verificationToolsAvailable: true);
+
+        Assert.Contains("التحقق من المواضع الأصلية", instructions);
+        Assert.Contains("S2: العنصر الثاني", instructions);
+        Assert.DoesNotContain("S1: العنصر الأول؛", instructions);
+    }
+
     [Fact]
     public void ProgressInstructionsExplicitlyForbidAdjacentTopicExpansion()
     {
