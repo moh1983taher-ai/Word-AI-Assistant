@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using ResearchTools.McpHost.Infrastructure;
 using ResearchTools.McpHost.Models;
@@ -42,6 +43,7 @@ public sealed class ResearchCoordinator
         if (!await _concurrency.WaitAsync(0, requestCancellation))
             throw new ResearchBusyException();
 
+        var taskStartedAt = Stopwatch.GetTimestamp();
         var taskId = Guid.NewGuid().ToString("N")[..10];
         _log.Info($"Research started: task={taskId}.");
 
@@ -81,7 +83,11 @@ public sealed class ResearchCoordinator
                 timeout.Token);
             var taskPlan = planning.Plan;
             var model = planning.Model;
-            timeout.CancelAfter(TimeSpan.FromSeconds(taskPlan.TimeoutSeconds));
+            var remainingTaskTime =
+                TimeSpan.FromSeconds(taskPlan.TimeoutSeconds) - Stopwatch.GetElapsedTime(taskStartedAt);
+            if (remainingTaskTime <= TimeSpan.Zero)
+                throw new TimeoutException("استُنفدت المهلة الإجمالية للمهمة أثناء إعداد خطة البحث.");
+            timeout.CancelAfter(remainingTaskTime);
 
             var warnings = new List<string>();
             if (!string.IsNullOrWhiteSpace(planning.Warning))
@@ -118,7 +124,7 @@ public sealed class ResearchCoordinator
             var repairAttempted = false;
             var toolCallsAttempted = 0;
             var maxIterations = taskPlan.MaxToolCalls * 2 + 12;
-            var verificationRequired = taskPlan.Depth == ResearchDepth.Deep;
+            var verificationRequired = taskPlan.RequiresVerification;
             var verificationToolsAvailable = activeTools.Any(ResearchToolResultClassifier.IsVerificationTool);
             if (verificationRequired && !verificationToolsAvailable)
                 warnings.Add("طلب المستخدم بحثاً معمقاً، لكن المكتبات المختارة لا تتيح أداة مناسبة لفتح المواضع الأصلية؛ سيُذكر هذا القيد في الإجابة.");
@@ -279,7 +285,8 @@ public sealed class ResearchCoordinator
                         .Where(item => missingScopeItemIds.Contains(item.Id, StringComparer.Ordinal))
                         .Select(item => item.Description)
                         .ToArray();
-                    var isPartial = !taskComplete;
+                    var verificationUnavailable = verificationRequired && !verificationToolsAvailable;
+                    var isPartial = !taskComplete || verificationUnavailable;
 
                     if (isPartial && !stopToolCalls)
                     {
@@ -299,8 +306,10 @@ public sealed class ResearchCoordinator
                         if (missingScopeDescriptions.Length > 0)
                             limitations.Add("لم تُغطَّ عناصر النطاق التالية: " +
                                 string.Join("؛ ", missingScopeDescriptions));
-                        if (verificationRequired && !verificationCompleted)
-                            limitations.Add("لم يكتمل فتح المواضع الأصلية والتحقق منها");
+                        if (verificationRequired && (!verificationCompleted || verificationUnavailable))
+                            limitations.Add(verificationToolsAvailable
+                                ? "لم يكتمل فتح المواضع الأصلية والتحقق من جميع عناصر النطاق"
+                                : "تعذر فتح المواضع الأصلية والتحقق منها لأن المكتبات المختارة لا تتيح أداة قراءة مناسبة");
                         if (limitations.Count == 0)
                             limitations.Add("توقفت المتابعة قبل استكمال جميع خطوات المراجعة");
 
