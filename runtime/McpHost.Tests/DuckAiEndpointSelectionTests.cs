@@ -11,6 +11,28 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class DuckAiEndpointSelectionTests
 {
     [Fact]
+    public void ConfiguredLocalModelEndpointTakesPriorityOverDuckAi()
+    {
+        var addresses = DuckAiClient.GetCandidateBaseAddresses("http://127.0.0.1:1234/");
+
+        Assert.Equal("http://127.0.0.1:1234", addresses[0]);
+        Assert.Equal("http://127.0.0.1:18080", addresses[1]);
+        Assert.Equal("http://127.0.0.1:8080", addresses[2]);
+    }
+
+    [Theory]
+    [InlineData("https://example.com")]
+    [InlineData("http://192.168.1.20:1234")]
+    [InlineData("http://127.0.0.1:1234/v1")]
+    [InlineData("http://user:password@127.0.0.1:1234")]
+    [InlineData("not-a-url")]
+    public void RejectsNonLoopbackOrNonRootModelEndpoints(string endpoint)
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => DuckAiClient.GetCandidateBaseAddresses(endpoint));
+    }
+
+    [Fact]
     public void PrefersDirectBackendBeforeLocalAgentProxyForInitialDiscovery()
     {
         Assert.Equal("http://127.0.0.1:18080", DuckAiClient.CandidateBaseAddresses[0]);
