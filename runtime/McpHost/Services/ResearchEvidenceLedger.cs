@@ -14,7 +14,7 @@ internal sealed class ResearchEvidenceLedger
 
     internal IReadOnlyList<ResearchEvidenceEntry> Entries => _entries;
 
-    internal void Add(ToolDescriptor source, string content, bool succeeded)
+    internal void Add(ToolDescriptor source, string content, bool succeeded, string scopeItemId = "S1")
     {
         ArgumentNullException.ThrowIfNull(source);
         _entries.Add(new ResearchEvidenceEntry(
@@ -23,6 +23,7 @@ internal sealed class ResearchEvidenceLedger
             source.Name,
             content ?? string.Empty,
             succeeded,
+            scopeItemId,
             _entries.Count + 1));
     }
 
@@ -82,7 +83,7 @@ internal sealed class ResearchEvidenceLedger
 
                 var remainingEntries = group.Entries.Length - entryIndex;
                 var entry = group.Entries[entryIndex];
-                var entryHeader = $"[{entry.Index}] الأداة: {entry.Tool}; نتيجة التنفيذ: {(entry.Succeeded ? "محتوى مستلم" : "لم تنتج محتوى صالحاً")}{Environment.NewLine}";
+                var entryHeader = $"[{entry.Index}] عنصر النطاق: {entry.ScopeItemId}; الأداة: {entry.Tool}; نتيجة التنفيذ: {(entry.Succeeded ? "محتوى مستلم" : "لم تنتج محتوى صالحاً")}{Environment.NewLine}";
                 var sectionLimit = Math.Min(maxCharacters, sectionStart + sectionBudget);
                 if (builder.Length + entryHeader.Length >= sectionLimit)
                     break;
@@ -141,4 +142,5 @@ internal sealed record ResearchEvidenceEntry(
     string Tool,
     string Content,
     bool Succeeded,
+    string ScopeItemId,
     int Index);
