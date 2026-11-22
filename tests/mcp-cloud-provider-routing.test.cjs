@@ -21,7 +21,54 @@ assert.match(source, /const SELECTED_SERVERS_KEY = ["']AR_MCP_SELECTED_SERVERS["
 assert.match(source, /function loadSelectedServerIds\(\)[\s\S]*?DEFAULT_SELECTED_SERVER_IDS\.slice\(\)/);
 assert.match(source, /function getGroqTools\(selectedServerIds\)[\s\S]*?getSelectedMcpServers\(selectedServerIds\)/);
 assert.match(source, /لا تستدع أي خادم أو مكتبة غير محددة في اختيار المستخدم/);
-assert.match(source, /لم يستكمل البحث في جميع المكتبات التي اخترتها/);
+assert.doesNotMatch(source, /لم يستكمل البحث في جميع المكتبات التي اخترتها/);
+assert.match(source, /لك حرية استخدام إحداهما أو كلتيهما وفق حاجة البحث/);
+assert.match(source, /لا يلزمك البحث في كلتيهما/);
+
+const validatorStart = source.indexOf("  function validateResearchResult(");
+const validatorEnd = source.indexOf("\n  async function callGroqResearch", validatorStart);
+assert.ok(validatorStart >= 0 && validatorEnd > validatorStart, "Research result validator must be testable");
+const validatorContext = {
+  getSelectedMcpServers: function (ids) {
+    return ids.map(function (id) {
+      return { id: id, label: id === "aljam3" ? "الجامع" : "المكتبة الشاملة" };
+    });
+  }
+};
+const validatorSource = [
+  "function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? ids : []; }",
+  source.slice(validatorStart, validatorEnd),
+  "globalThis.__validateResearchResult = validateResearchResult;"
+].join("\\n");
+vm.runInNewContext(validatorSource, validatorContext);
+const validateResearchResult = validatorContext.__validateResearchResult;
+const oneOfTwoLibraries = validateResearchResult(
+  "DuckAI المحلي",
+  "إجابة مستندة إلى البحث",
+  [{ server: "shamela", tool: "shamela_find", completed: true }],
+  ["aljam3", "shamela"]
+);
+assert.equal(oneOfTwoLibraries.answer, "إجابة مستندة إلى البحث");
+assert.equal(oneOfTwoLibraries.toolCalls.length, 1);
+assert.equal(oneOfTwoLibraries.toolCalls[0].server, "shamela");
+assert.throws(
+  function () {
+    validateResearchResult("DuckAI المحلي", "إجابة", [], ["aljam3", "shamela"]);
+  },
+  /لم يُظهر أي استدعاء فعلي/
+);
+assert.throws(
+  function () {
+    validateResearchResult(
+      "DuckAI المحلي",
+      "إجابة",
+      [{ server: "unselected", tool: "search", completed: true }],
+      ["aljam3", "shamela"]
+    );
+  },
+  /لم يُرجع نتيجة ناجحة/
+);
+
 assert.match(source, /type: "mcp"/);
 assert.match(source, /server_label: server\.id/);
 assert.match(source, /server_url: server\.url/);
