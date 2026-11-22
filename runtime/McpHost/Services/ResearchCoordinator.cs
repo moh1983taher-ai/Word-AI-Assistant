@@ -21,7 +21,6 @@ public sealed class ResearchCoordinator
     private const int MaxMessageCharacters = 12_000;
     private const int MaxConversationCharacters = 20_000;
     private const int MaxEvidenceContextCharacters = 10_000;
-    private const int MaxCatalogCharacters = 40_000;
 
     private readonly DuckAiClient _duckAi;
     private readonly McpSourceRegistry _sources;
@@ -49,13 +48,15 @@ public sealed class ResearchCoordinator
         timeout.CancelAfter(TimeSpan.FromSeconds(300));
 
         var selectedServerIds = ResearchSourceSelection.Normalize(request.Servers);
-        var searchableServerIds = Array.Empty<string>();
         var warnings = new List<string>();
         var messages = new List<DuckChatMessage>();
         var trace = new List<ToolCallTrace>();
         var sourceCoverage = new HashSet<string>(StringComparer.Ordinal);
         var evidenceLedger = new ResearchEvidenceLedger();
         var model = request.Model ?? string.Empty;
+        var nativeToolCalling = true;
+        var repairAttempted = false;
+        var toolCallsAttempted = 0;
 
         try
         {
@@ -73,95 +74,53 @@ public sealed class ResearchCoordinator
             if (incoming.Count == 0)
                 throw new InvalidOperationException("لا توجد رسائل بحث صالحة.");
 
-            // Keep the latest user request available in every model turn, even when
-            // older history and tool results need to be trimmed to the context budget.
             var currentUserMessageIndex = incoming.FindLastIndex(message => message.Role == "user");
+            var currentUserText = currentUserMessageIndex >= 0
+                ? incoming[currentUserMessageIndex].Content ?? string.Empty
+                : string.Empty;
             messages.AddRange(incoming);
+
             if (selectedServerIds.Count == 0)
                 throw new InvalidOperationException("يجب تحديد الجامع أو المكتبة الشاملة أو كليهما قبل البحث.");
 
             var discovery = await _sources.DiscoverSelectedAsync(selectedServerIds, timeout.Token);
             warnings.AddRange(discovery.Warnings);
-            var activeTools = LimitTools(discovery.Tools);
+
+            // Never hide tools because another source has or has not been searched.
+            // The user's source selection is the only discovery boundary.
+            IReadOnlyList<ToolDescriptor> activeTools = discovery.Tools;
             var unavailableSources = selectedServerIds
-                .Where(server => !activeTools.Any(tool =>
-                    tool.Server == server && ResearchToolResultClassifier.IsSearchTool(tool)))
-                .ToArray();
-            searchableServerIds = selectedServerIds
-                .Where(server => activeTools.Any(tool =>
-                    tool.Server == server && ResearchToolResultClassifier.IsSearchTool(tool)))
+                .Where(server => !activeTools.Any(tool => tool.Server == server))
                 .ToArray();
 
             if (unavailableSources.Length > 0)
             {
-                var unavailableLabels = unavailableSources.Select(ResearchSourceSelection.GetLabel);
                 warnings.Add(
-                    "تعذر تجهيز أداة بحث في المكتبات المختارة الآتية: " +
-                    string.Join("، ", unavailableLabels) +
-                    ". ستُعرض نتائج المكتبات المتاحة، مع التصريح بأن البحث في هذه المكتبات لم يكتمل.");
+                    "تعذر اكتشاف أدوات في المكتبات المختارة الآتية: " +
+                    string.Join("، ", unavailableSources.Select(ResearchSourceSelection.GetLabel)) +
+                    ". ستظل الأدوات المتاحة من المكتبات الأخرى قابلة للاستخدام.");
             }
 
-            if (searchableServerIds.Length == 0)
+            if (activeTools.Count == 0)
             {
-                var unavailableLabels = selectedServerIds.Select(ResearchSourceSelection.GetLabel);
                 var answer =
-                    "تعذر بدء البحث؛ لم تتوفر أدوات بحث عاملة في المكتبات التي اخترتها: " +
-                    string.Join("، ", unavailableLabels) +
+                    "تعذر بدء البحث؛ لم تتوفر أدوات MCP عاملة في المكتبات التي اخترتها: " +
+                    string.Join("، ", selectedServerIds.Select(ResearchSourceSelection.GetLabel)) +
                     ". لم يُنفذ بحث يمكن الاستناد إلى نتائجه، ولذلك لا يصح استنتاج عدم وجود مصادر للمسألة.";
                 return new ResearchResponse(answer, model, trace.ToArray(), warnings.ToArray());
             }
 
-            // Require one completed search operation for each selected library that
-            // actually exposes a search tool. Empty/no-match results complete coverage;
-            // connection and tool errors remain visible as incomplete coverage.
-            var requiresMcpSources = searchableServerIds.Length > 0;
+            var nativeToolBindings = new Dictionary<string, ToolDescriptor>(StringComparer.Ordinal);
+            var nativeFunctionTools = BuildNativeFunctionTools(activeTools, nativeToolBindings);
             var selectedLabels = selectedServerIds
                 .Select(ResearchSourceSelection.GetLabel)
                 .ToArray();
 
-            // Chat history contains user and assistant decision messages. MCP results
-            // are stored separately so context compaction cannot discard prior evidence.
-            var repairAttempted = false;
-            var sourceRequirementRetryAttempted = false;
-            var toolCallsAttempted = 0;
-
             while (true)
             {
-                var pendingSourceIds = ResearchSourceSelection.Missing(
-                    searchableServerIds,
-                    sourceCoverage);
-                IReadOnlyList<ToolDescriptor> turnTools = ResearchSourceToolRouter.SelectForTurn(
-                    activeTools,
-                    searchableServerIds,
-                    sourceCoverage);
-                var turnSystemPrompt = BuildSystemPrompt(turnTools, warnings) +
-                    Environment.NewLine + Environment.NewLine +
-                    "المكتبات التي اختارها المستخدم حصراً لهذه المهمة: " +
-                    string.Join("، ", selectedLabels) + "." +
-                    Environment.NewLine +
-                    "لا تستخدم أي مكتبة أخرى.";
-                if (pendingSourceIds.Count > 0)
-                {
-                    var pendingLabels = pendingSourceIds
-                        .Select(ResearchSourceSelection.GetLabel);
-                    turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                        "أولوية هذه الدورة إلزامية: لم يكتمل البحث بعد في: " +
-                        string.Join("، ", pendingLabels) + "." +
-                        Environment.NewLine +
-                        "فهرس الأدوات في هذه الدورة محصور بهذه المكتبات المتبقية. اختر أداة بحث من هذه المكتبات لإجراء بحث يعيد محتوى صالحاً. لا تستدع أدوات مكتبة سبق أن أعادت نتيجة بحث صالحة ما دامت هناك مكتبة مختارة لم تُبحث بعد. أخرج قرار tool_call واحداً فقط.";
-                }
-                else
-                {
-                    turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                        "أُجري بحث في جميع المكتبات المختارة دون خطأ في تنفيذ أدوات البحث، وقد تكون النتائج غنية أو محدودة أو خالية من المطابقات. قيّم ما عاد من نتائج بحسب صلته بالسؤال وقوة دلالته واستقلال مصادره. لك أن تحسّن عبارات البحث أو تستخدم أدوات قراءة أخرى متى رأيت أن ذلك يضيف قيمة، ولك أن تنتقل إلى الإجابة عندما تتوافر مادة كافية. لا تجعل خلو نتيجة مكتبة من المطابقات سبباً آلياً لتعطيل الإجابة. عند الصياغة استفد من الأدلة المحفوظة في سجل المهمة، وافتح المواضع اللازمة للتحقق من الإحالات عند الحاجة.";
-                }
-
-                turnSystemPrompt += Environment.NewLine + Environment.NewLine +
-                    "التزم بمخطط JSON الصارم المرفق. جميع حقول الغلاف مطلوبة: في قرار tool_call اجعل answer نصاً فارغاً، وفي قرار final اجعل server وtool نصين فارغين وarguments قيمة null.";
-
                 var evidenceContext = evidenceLedger.BuildContext(
                     selectedServerIds,
-                    pendingSourceIds,
+                    Array.Empty<string>(),
                     MaxEvidenceContextCharacters);
                 var historyBudget = Math.Max(1, MaxConversationCharacters - evidenceContext.Length);
                 var conversation = ResearchContextWindow.Compact(
@@ -172,7 +131,13 @@ public sealed class ResearchCoordinator
 
                 var requestMessages = new List<DuckChatMessage>(conversation.Count + 2)
                 {
-                    new("system", turnSystemPrompt)
+                    new(
+                        "system",
+                        BuildSystemPrompt(
+                            activeTools,
+                            warnings,
+                            selectedLabels,
+                            useNativeToolCalling: nativeToolCalling))
                 };
                 requestMessages.AddRange(conversation);
                 if (!string.IsNullOrWhiteSpace(evidenceContext))
@@ -191,12 +156,75 @@ public sealed class ResearchCoordinator
                         $"Research context bounded: task={taskId}; messages={conversation.Count}/{messages.Count - 1}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; limit={MaxConversationCharacters}.");
                 }
 
+                DuckAiCompletion completion;
+                if (nativeToolCalling)
+                {
+                    try
+                    {
+                        completion = await _duckAi.CompleteAsync(
+                            model,
+                            requestMessages,
+                            functionTools: nativeFunctionTools,
+                            cancellationToken: timeout.Token);
+                    }
+                    catch (NativeToolCallingNotSupportedException exception)
+                    {
+                        nativeToolCalling = false;
+                        _log.Warning(
+                            $"Native tool calling is not supported by the current DuckAI endpoint; switching to the JSON compatibility protocol. {exception.Message}");
+                        continue;
+                    }
+
+                    model = completion.Model;
+
+                    if (completion.ToolCalls.Count > 0)
+                    {
+                        await ExecuteNativeToolCallsAsync(
+                            completion.ToolCalls,
+                            completion.Text,
+                            nativeToolBindings,
+                            messages,
+                            evidenceLedger,
+                            trace,
+                            warnings,
+                            sourceCoverage,
+                            taskId,
+                            timeout.Token);
+                        toolCallsAttempted += completion.ToolCalls.Count;
+                        repairAttempted = false;
+                        continue;
+                    }
+
+                    // Native-capable providers may return a direct answer when no tool
+                    // is needed. For explicit source/research requests, a plain response
+                    // from a provider that did not emit tool_calls is treated as a
+                    // protocol-compatibility signal, then retried through DuckAI's
+                    // structured JSON decision path. That path still leaves every
+                    // available tool and the final decision open to the model.
+                    if (!string.IsNullOrWhiteSpace(completion.Text) &&
+                        !ResearchIntentClassifier.RequiresMcpSources(currentUserText))
+                    {
+                        _log.Info(
+                            $"Research completed without MCP invocation: task={taskId}; mode=native-tool-calling; toolCalls={trace.Count}; model={model}.");
+                        return new ResearchResponse(
+                            completion.Text.Trim(),
+                            model,
+                            trace.ToArray(),
+                            warnings.ToArray());
+                    }
+
+                    nativeToolCalling = false;
+                    _log.Warning(
+                        $"No native tool call was returned for a source-oriented request; falling back to the JSON decision protocol. task={taskId}.");
+                    continue;
+                }
+
                 var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
-                    turnTools,
-                    allowFinal: pendingSourceIds.Count == 0,
+                    activeTools,
+                    allowFinal: true,
                     allowToolCalls: true);
 
-                var completion = await _duckAi.CompleteAsync(
+                completion = await _duckAi.CompleteAsync(
                     model,
                     requestMessages,
                     functionTools: null,
@@ -205,14 +233,31 @@ public sealed class ResearchCoordinator
 
                 model = completion.Model;
 
+                // Some OpenAI-compatible adapters expose native calls even when the
+                // structured-output fallback was requested. Accept valid calls rather
+                // than rejecting a provider's native response.
                 if (completion.ToolCalls.Count > 0)
-                    throw new InvalidOperationException(
-                        "أعاد DuckAI استدعاءات وظائف غير مطلوبة؛ تم رفضها لأن المضيف يستخدم بروتوكول قرارات JSON.");
+                {
+                    await ExecuteNativeToolCallsAsync(
+                        completion.ToolCalls,
+                        completion.Text,
+                        nativeToolBindings,
+                        messages,
+                        evidenceLedger,
+                        trace,
+                        warnings,
+                        sourceCoverage,
+                        taskId,
+                        timeout.Token);
+                    toolCallsAttempted += completion.ToolCalls.Count;
+                    repairAttempted = false;
+                    continue;
+                }
 
                 if (!ModelDecisionParser.TryParse(completion.Text, out var decision))
                 {
                     _log.Warning(
-                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; responseFormat=json_schema.");
+                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; responseFormat=json-schema.");
 
                     if (repairAttempted)
                         throw new InvalidOperationException("تعذر التحقق من استجابة النموذج وفق مخطط JSON الصارم بعد محاولة الإصلاح.");
@@ -221,7 +266,7 @@ public sealed class ResearchCoordinator
                     messages.Add(new DuckChatMessage("assistant", completion.Text));
                     messages.Add(new DuckChatMessage(
                         "user",
-                        "لم تطابق استجابتك مخطط JSON الصارم. أعد القرار وفق المخطط المرفق حرفياً، دون أي شرح أو Markdown. لا تغيّر نوع القرار أو المكتبة أو الأداة المسموح بها."));
+                        "لم تطابق استجابتك مخطط JSON الصارم. أعد القرار وفق المخطط المرفق حرفياً، دون أي شرح أو Markdown. جميع أدوات المكتبات المختارة متاحة، ولك أن تختار أي أداة أو تصدر الإجابة النهائية متى رأيت ذلك مناسباً."));
                     continue;
                 }
 
@@ -229,91 +274,57 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
-                    var missingSelectedServers = ResearchSourceSelection.Missing(
-                        searchableServerIds,
-                        sourceCoverage);
-                    var finalAnswer = decision.Answer;
-                    if (requiresMcpSources && missingSelectedServers.Count > 0)
-                    {
-                        var missingLabels = missingSelectedServers
-                            .Select(ResearchSourceSelection.GetLabel);
-                        if (sourceRequirementRetryAttempted)
-                        {
-                            var incompleteSourceWarning =
-                                "تعذر استكمال البحث في المكتبات المختارة الآتية: " +
-                                string.Join("، ", missingLabels) +
-                                ". لا تتوافر منها نتائج يمكن الحكم على صلتها؛ لذلك تقتصر الإجابة على الأدلة التي وصلت فعلاً، ولا يُعد ذلك دليلاً على خلو تلك المكتبات من المصادر.";
-                            warnings.Add(incompleteSourceWarning);
-                            finalAnswer += Environment.NewLine + Environment.NewLine +
-                                "تنبيه بشأن حدود البحث: " + incompleteSourceWarning;
-                        }
-                        else
-                        {
-                            sourceRequirementRetryAttempted = true;
-                            messages.Add(new DuckChatMessage("assistant", decision.Raw));
-                            messages.Add(new DuckChatMessage(
-                                "user",
-                                "حاول استكمال البحث في المكتبات المختارة التي لم يصل منها رد بحث صالح: " +
-                                string.Join("، ", missingLabels) +
-                                ". إذا تعذر تنفيذ البحث فيها بعد المحاولة، فلا تسقط النتائج المتاحة؛ أجب بما ثبت لديك وصرّح بوضوح بالمكتبات التي تعذر استكمال البحث فيها. لا تذكر مراجع من الذاكرة."));
-                            continue;
-                        }
-                    }
-
-                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; coveredSources={string.Join(",", sourceCoverage)}; partial={missingSelectedServers.Count > 0}; mode=json-schema; model={model}.");
+                    _log.Info(
+                        $"Research completed: task={taskId}; toolCalls={trace.Count}; searchedSources={string.Join(",", sourceCoverage)}; mode=json-compatibility; model={model}.");
                     return new ResearchResponse(
-                        finalAnswer,
+                        decision.Answer,
                         model,
                         trace.ToArray(),
                         warnings.ToArray());
                 }
 
-                var descriptorForJson = turnTools.FirstOrDefault(tool =>
+                var descriptor = activeTools.FirstOrDefault(tool =>
                     tool.Server == decision.Server && tool.Name == decision.Tool);
 
                 messages.Add(new DuckChatMessage("assistant", decision.Raw));
 
-                if (descriptorForJson is null)
+                if (descriptor is null)
                 {
                     _log.Warning(
-                        $"Research tool rejected: task={taskId}; source={decision.Server}; tool={decision.Tool}; reason=not-in-current-source-window.");
+                        $"Research tool rejected: task={taskId}; source={decision.Server}; tool={decision.Tool}; reason=not-in-selected-catalog.");
                     messages.Add(new DuckChatMessage(
                         "user",
-                        "الأداة التي اخترتها غير موجودة في فهرس هذه الدورة. استخدم أداة من فهرس MCP المرفق فقط، ولا تخترع أسماء أدوات أو مصادر."));
+                        "الأداة التي اخترتها غير موجودة في فهرس المكتبات التي اختارها المستخدم. استخدم أداة من الفهرس المرفق فقط، أو أصدر الإجابة النهائية."));
                     continue;
                 }
 
                 toolCallsAttempted++;
                 _log.Info(
-                    $"Research tool decision: task={taskId}; call={toolCallsAttempted}; source={decision.Server}; tool={decision.Tool}; pending={string.Join(",", pendingSourceIds)}.");
+                    $"Research tool decision: task={taskId}; call={toolCallsAttempted}; source={decision.Server}; tool={decision.Tool}.");
 
                 var execution = await ExecuteToolAsync(
-                    descriptorForJson,
+                    descriptor,
                     ToArguments(decision.Arguments),
                     warnings,
                     taskId,
                     timeout.Token);
 
-                evidenceLedger.Add(descriptorForJson, execution.Content, execution.Succeeded);
+                evidenceLedger.Add(descriptor, execution.Content, execution.Succeeded);
 
                 if (execution.Succeeded)
+                {
                     trace.Add(new ToolCallTrace(
-                        descriptorForJson.Server,
-                        descriptorForJson.ServerLabel,
-                        descriptorForJson.Name));
+                        descriptor.Server,
+                        descriptor.ServerLabel,
+                        descriptor.Name));
 
-                var sourceSearchSucceeded = execution.Succeeded &&
-                    ResearchToolResultClassifier.IsSearchTool(descriptorForJson);
-                if (sourceSearchSucceeded)
-                    sourceCoverage.Add(descriptorForJson.Server);
+                    if (ResearchToolResultClassifier.IsSearchTool(descriptor))
+                        sourceCoverage.Add(descriptor.Server);
+                }
 
-                var pendingAfterCall = ResearchSourceSelection.Missing(
-                    searchableServerIds,
-                    sourceCoverage);
-                _log.Info(
-                    $"Research tool result: task={taskId}; source={decision.Server}; tool={decision.Tool}; success={execution.Succeeded}; searchCoverage={sourceSearchSucceeded}; completed={string.Join(",", sourceCoverage)}; pending={string.Join(",", pendingAfterCall)}.");
+                messages.Add(new DuckChatMessage("user",
+                    $"نتيجة الأداة {descriptor.Server}/{descriptor.Name}:\n{execution.Content}"));
             }
-
         }
         catch (OperationCanceledException) when (!requestCancellation.IsCancellationRequested)
         {
