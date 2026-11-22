@@ -49,6 +49,7 @@ public sealed class ResearchCoordinator
         timeout.CancelAfter(TimeSpan.FromSeconds(300));
 
         var selectedServerIds = ResearchSourceSelection.Normalize(request.Servers);
+        var searchableServerIds = Array.Empty<string>();
         var warnings = new List<string>();
         var messages = new List<DuckChatMessage>();
         var trace = new List<ToolCallTrace>();
@@ -83,20 +84,37 @@ public sealed class ResearchCoordinator
             warnings.AddRange(discovery.Warnings);
             var activeTools = LimitTools(discovery.Tools);
             var unavailableSources = selectedServerIds
-                .Where(server => !activeTools.Any(tool => tool.Server == server))
+                .Where(server => !activeTools.Any(tool =>
+                    tool.Server == server && ResearchToolResultClassifier.IsSearchTool(tool)))
                 .ToArray();
+            searchableServerIds = selectedServerIds
+                .Where(server => activeTools.Any(tool =>
+                    tool.Server == server && ResearchToolResultClassifier.IsSearchTool(tool)))
+                .ToArray();
+
             if (unavailableSources.Length > 0)
             {
                 var unavailableLabels = unavailableSources.Select(ResearchSourceSelection.GetLabel);
-                throw new InvalidOperationException(
-                    "تعذر تجهيز أدوات القراءة للمكتبات المختارة: " +
+                warnings.Add(
+                    "تعذر تجهيز أداة بحث في المكتبات المختارة الآتية: " +
                     string.Join("، ", unavailableLabels) +
-                    ". افحص اتصال هذه المكتبات واكتشاف أدواتها قبل إعادة البحث.");
+                    ". ستُعرض نتائج المكتبات المتاحة، مع التصريح بأن البحث في هذه المكتبات لم يكتمل.");
             }
 
-            // Require one successfully completed search operation per selected library.
-            // An empty/no-match search is complete; a connection or tool error is not.
-            var requiresMcpSources = selectedServerIds.Count > 0;
+            if (searchableServerIds.Length == 0)
+            {
+                var unavailableLabels = selectedServerIds.Select(ResearchSourceSelection.GetLabel);
+                var answer =
+                    "تعذر بدء البحث؛ لم تتوفر أدوات بحث عاملة في المكتبات التي اخترتها: " +
+                    string.Join("، ", unavailableLabels) +
+                    ". لم يُنفذ بحث يمكن الاستناد إلى نتائجه، ولذلك لا يصح استنتاج عدم وجود مصادر للمسألة.";
+                return new ResearchResponse(answer, model, trace.ToArray(), warnings.ToArray());
+            }
+
+            // Require one completed search operation for each selected library that
+            // actually exposes a search tool. Empty/no-match results complete coverage;
+            // connection and tool errors remain visible as incomplete coverage.
+            var requiresMcpSources = searchableServerIds.Length > 0;
             var selectedLabels = selectedServerIds
                 .Select(ResearchSourceSelection.GetLabel)
                 .ToArray();
@@ -110,11 +128,11 @@ public sealed class ResearchCoordinator
             while (true)
             {
                 var pendingSourceIds = ResearchSourceSelection.Missing(
-                    selectedServerIds,
+                    searchableServerIds,
                     sourceCoverage);
                 IReadOnlyList<ToolDescriptor> turnTools = ResearchSourceToolRouter.SelectForTurn(
                     activeTools,
-                    selectedServerIds,
+                    searchableServerIds,
                     sourceCoverage);
                 var turnSystemPrompt = BuildSystemPrompt(turnTools, warnings) +
                     Environment.NewLine + Environment.NewLine +
@@ -212,7 +230,7 @@ public sealed class ResearchCoordinator
                 if (decision.Type == "final")
                 {
                     var missingSelectedServers = ResearchSourceSelection.Missing(
-                        selectedServerIds,
+                        searchableServerIds,
                         sourceCoverage);
                     var finalAnswer = decision.Answer;
                     if (requiresMcpSources && missingSelectedServers.Count > 0)
@@ -290,7 +308,7 @@ public sealed class ResearchCoordinator
                     sourceCoverage.Add(descriptorForJson.Server);
 
                 var pendingAfterCall = ResearchSourceSelection.Missing(
-                    selectedServerIds,
+                    searchableServerIds,
                     sourceCoverage);
                 _log.Info(
                     $"Research tool result: task={taskId}; source={decision.Server}; tool={decision.Tool}; success={execution.Succeeded}; searchCoverage={sourceSearchSucceeded}; completed={string.Join(",", sourceCoverage)}; pending={string.Join(",", pendingAfterCall)}.");
@@ -302,7 +320,7 @@ public sealed class ResearchCoordinator
             _log.Warning($"Research search window elapsed: task={taskId}; toolCalls={trace.Count}.");
             warnings.Add("انتهت مهلة البحث البالغة خمس دقائق؛ أُوقف البحث الجديد وانتقل النظام إلى عرض ما جُمع حتى لحظة التوقف.");
 
-            var pendingSources = ResearchSourceSelection.Missing(selectedServerIds, sourceCoverage);
+            var pendingSources = ResearchSourceSelection.Missing(searchableServerIds, sourceCoverage);
             var partial = await FinalizeTimedOutResearchAsync(
                 model,
                 messages,
