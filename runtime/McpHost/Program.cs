@@ -52,6 +52,11 @@ builder.Services.AddMcpServer()
                 }
             }
 
+            serverOptions.ServerInfo = new()
+            {
+                Name = "ResearchTools.McpHost",
+                Version = hostVersion
+            };
             serverOptions.ToolCollection = tools;
             serverOptions.ServerInstructions =
                 "أدوات الباحث يتيح أدوات قراءة فقط من الجامع والمكتبة الشاملة. " +
