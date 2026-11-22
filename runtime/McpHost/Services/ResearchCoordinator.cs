@@ -585,7 +585,7 @@ public sealed class ResearchCoordinator
         }
     }
 
-    private static IReadOnlyList<DuckFunctionTool> BuildNativeFunctionTools(
+    internal static IReadOnlyList<DuckFunctionTool> BuildNativeFunctionTools(
         IReadOnlyList<ToolDescriptor> tools,
         IDictionary<string, ToolDescriptor> bindings)
     {
