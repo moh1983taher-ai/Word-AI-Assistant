@@ -19,6 +19,7 @@ public sealed class ResearchTaskPlannerTests
 
         Assert.True(ResearchTaskPlanner.TryParse(
             response,
+            "الأمر الوارد بعد الحظر وأقوال الأصوليين في دلالته",
             out var scope,
             out var constraints,
             out var exclusions));
@@ -38,9 +39,51 @@ public sealed class ResearchTaskPlannerTests
     {
         Assert.False(ResearchTaskPlanner.TryParse(
             response,
+            "موضوع البحث الحالي",
             out _,
             out _,
             out _));
+    }
+
+    [Fact]
+    public void RejectsAPlannedTopicThatIsNotAnExactExcerptFromTheUserRequest()
+    {
+        const string response = """
+            {
+              "scope_items": ["تاريخ علم أصول الفقه"],
+              "constraints": [],
+              "exclusions": []
+            }
+            """;
+
+        Assert.False(ResearchTaskPlanner.TryParse(
+            response,
+            "ما دلالة الأمر الوارد بعد الحظر؟",
+            out _,
+            out _,
+            out _));
+    }
+
+    [Fact]
+    public void DiscardsConstraintsAndExclusionsThatWereNotExplicitlyStated()
+    {
+        const string response = """
+            {
+              "scope_items": ["دلالة الأمر الوارد بعد الحظر"],
+              "constraints": ["الاعتماد على مصادر مطبوعة فقط"],
+              "exclusions": ["لا تتناول الخلاف الأصولي"]
+            }
+            """;
+
+        Assert.True(ResearchTaskPlanner.TryParse(
+            response,
+            "دلالة الأمر الوارد بعد الحظر",
+            out _,
+            out var constraints,
+            out var exclusions));
+
+        Assert.Empty(constraints);
+        Assert.Empty(exclusions);
     }
 
     [Fact]
