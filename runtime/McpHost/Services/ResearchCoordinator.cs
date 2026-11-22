@@ -291,7 +291,6 @@ public sealed class ResearchCoordinator
                         .Where(item => missingScopeItemIds.Contains(item.Id, StringComparer.Ordinal))
                         .Select(item => item.Description)
                         .ToArray();
-                    var verificationUnavailable = verificationRequired && !verificationToolsAvailable;
                     var isPartial = !baselineCoverageComplete || verificationUnavailable;
 
                     if (isPartial && !stopToolCalls)
