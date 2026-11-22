@@ -220,19 +220,26 @@ public sealed class ResearchCoordinator
                         var missingLabels = missingSelectedServers
                             .Select(ResearchSourceSelection.GetLabel);
                         if (sourceRequirementRetryAttempted)
-                            throw new InvalidOperationException(
-                                "لم يكتمل البحث في جميع المكتبات التي اختارها المستخدم. لم تصل نتيجة بحث صالحة من: " +
+                        {
+                            var incompleteSourceWarning =
+                                "تعذر استكمال البحث في المكتبات المختارة الآتية: " +
                                 string.Join("، ", missingLabels) +
-                                ". أوقفت الإجابة منعاً لاختلاق نتائج أو مراجع.");
-
-                        sourceRequirementRetryAttempted = true;
-                        messages.Add(new DuckChatMessage("assistant", decision.Raw));
-                        messages.Add(new DuckChatMessage(
-                            "user",
-                            "لا تقدم إجابة نهائية بعد. لم تنفذ بحثاً ذا محتوى صالح في هذه المكتبات المختارة: " +
-                            string.Join("، ", missingLabels) +
-                            ". استخدم أداة بحث مناسبة لكل مكتبة متبقية، ثم أخرج الإجابة النهائية. لا تذكر مراجع من الذاكرة."));
-                        continue;
+                                ". لا تتوافر منها نتائج يمكن الحكم على صلتها؛ لذلك تقتصر الإجابة على الأدلة التي وصلت فعلاً، ولا يُعد ذلك دليلاً على خلو تلك المكتبات من المصادر.";
+                            warnings.Add(incompleteSourceWarning);
+                            finalAnswer += Environment.NewLine + Environment.NewLine +
+                                "تنبيه بشأن حدود البحث: " + incompleteSourceWarning;
+                        }
+                        else
+                        {
+                            sourceRequirementRetryAttempted = true;
+                            messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                            messages.Add(new DuckChatMessage(
+                                "user",
+                                "حاول استكمال البحث في المكتبات المختارة التي لم يصل منها رد بحث صالح: " +
+                                string.Join("، ", missingLabels) +
+                                ". إذا تعذر تنفيذ البحث فيها بعد المحاولة، فلا تسقط النتائج المتاحة؛ أجب بما ثبت لديك وصرّح بوضوح بالمكتبات التي تعذر استكمال البحث فيها. لا تذكر مراجع من الذاكرة."));
+                            continue;
+                        }
                     }
 
                     _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; coveredSources={string.Join(",", sourceCoverage)}; partial={missingSelectedServers.Count > 0}; mode=json-schema; model={model}.");
