@@ -48,12 +48,16 @@ public static class ModelDecisionParser
             if (TryGet(root, "tool_call", out var nested) && nested.ValueKind == JsonValueKind.Object)
             {
                 root = nested;
+                if (!TryGet(root, "arguments", out var nestedArguments) ||
+                    nestedArguments.ValueKind != JsonValueKind.Object)
+                    return false;
+
                 decision = new ModelDecision(
                     "tool_call",
                     string.Empty,
                     ReadString(root, "server"),
                     ReadString(root, "tool", "name"),
-                    ReadObject(root, "arguments"),
+                    nestedArguments.Clone(),
                     response);
                 return !string.IsNullOrWhiteSpace(decision.Server) &&
                        !string.IsNullOrWhiteSpace(decision.Tool);
@@ -72,12 +76,16 @@ public static class ModelDecisionParser
 
             if (type == "tool_call")
             {
+                if (!TryGet(root, "arguments", out var arguments) ||
+                    arguments.ValueKind != JsonValueKind.Object)
+                    return false;
+
                 decision = new ModelDecision(
                     "tool_call",
                     string.Empty,
                     ReadString(root, "server"),
                     ReadString(root, "tool", "name"),
-                    ReadObject(root, "arguments"),
+                    arguments.Clone(),
                     response);
                 return !string.IsNullOrWhiteSpace(decision.Server) &&
                        !string.IsNullOrWhiteSpace(decision.Tool);
@@ -102,15 +110,6 @@ public static class ModelDecisionParser
             return value.GetString() ?? string.Empty;
 
         return string.Empty;
-    }
-
-    private static JsonElement ReadObject(JsonElement element, string name)
-    {
-        if (TryGet(element, name, out var value) && value.ValueKind == JsonValueKind.Object)
-            return value.Clone();
-
-        using var empty = JsonDocument.Parse("{}");
-        return empty.RootElement.Clone();
     }
 
     private static bool TryGet(JsonElement element, string name, out JsonElement value)
