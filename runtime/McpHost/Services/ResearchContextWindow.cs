@@ -29,7 +29,7 @@ internal static class ResearchContextWindow
         var usedCharacters = 0;
 
         var pinnedGroup = pinnedMessageIndex >= 0 && pinnedMessageIndex < messages.Count
-            ? groups.FirstOrDefault(group => group.Any(item => item.Index == pinnedMessageIndex))
+            ? groups.FirstOrDefault(group => group.Items.Any(item => item.Index == pinnedMessageIndex))
             : null;
 
         if (pinnedGroup is not null)
@@ -45,41 +45,41 @@ internal static class ResearchContextWindow
         for (var groupIndex = groups.Count - 1; groupIndex >= 0; groupIndex--)
         {
             var group = groups[groupIndex];
-            if (ReferenceEquals(group, pinnedGroup))
+            if (ReferenceEquals(group, pinnedGroup) || !group.IsComplete)
                 continue;
 
             var remaining = maxConversationCharacters - usedCharacters;
             if (remaining <= 0)
                 break;
 
-            var groupCharacters = group.Sum(item => GetMessageCharacterCount(item.Message));
+            var groupCharacters = group.Items.Sum(item => GetMessageCharacterCount(item.Message));
             if (groupCharacters <= remaining &&
-                group.All(item => (item.Message.Content?.Length ?? 0) <= maxMessageCharacters))
+                group.Items.All(item => (item.Message.Content?.Length ?? 0) <= maxMessageCharacters))
             {
-                selected.AddRange(group);
+                selected.AddRange(group.Items);
                 usedCharacters += groupCharacters;
                 continue;
             }
 
             // Never clip a native tool-call/result group: doing so can orphan
-            // tool_call_id entries or change the function arguments. Older groups
+            // tool_call_id entries or change function arguments. Older groups
             // can be omitted because the independent evidence ledger retains results.
-            if (group.Count > 1 ||
-                group[0].Message.ToolCalls is { Count: > 0 })
+            if (group.Items.Count > 1 ||
+                group.Items[0].Message.ToolCalls is { Count: > 0 })
                 continue;
 
-            var message = group[0].Message;
+            var message = group.Items[0].Message;
             var content = message.Content ?? string.Empty;
             var messageLimit = Math.Min(maxMessageCharacters, remaining);
             if (content.Length > messageLimit)
             {
                 var clipped = LimitMessage(message, messageLimit);
-                selected.Add((group[0].Index, clipped));
+                selected.Add((group.Items[0].Index, clipped));
                 usedCharacters += GetMessageCharacterCount(clipped);
                 break;
             }
 
-            selected.Add(group[0]);
+            selected.Add(group.Items[0]);
             usedCharacters += GetMessageCharacterCount(message);
         }
 
@@ -108,47 +108,44 @@ internal static class ResearchContextWindow
         return count;
     }
 
-    private static List<List<(int Index, DuckChatMessage Message)>> BuildGroups(
-        IReadOnlyList<DuckChatMessage> messages)
+    private static List<MessageGroup> BuildGroups(IReadOnlyList<DuckChatMessage> messages)
     {
-        var groups = new List<List<(int Index, DuckChatMessage Message)>>();
+        var groups = new List<MessageGroup>();
         var index = 0;
 
         while (index < messages.Count)
         {
-            var group = new List<(int Index, DuckChatMessage Message)>
+            var items = new List<(int Index, DuckChatMessage Message)>
             {
                 (index, messages[index])
             };
 
             if (messages[index].Role == "assistant" &&
-                messages[index].ToolCalls is { Count: > 0 })
+                messages[index].ToolCalls is { Count: > 0 } calls)
             {
-                var expectedIds = messages[index].ToolCalls
-                    .Select(call => call.Id)
+                var expectedIds = calls.Select(call => call.Id)
                     .ToHashSet(StringComparer.Ordinal);
 
                 var next = index + 1;
-                while (next < messages.Count &&
-                       messages[next].Role == "tool" &&
-                       messages[next].ToolCallId is { } callId &&
-                       expectedIds.Contains(callId))
+                while (next < messages.Count && messages[next].Role == "tool")
                 {
-                    group.Add((next, messages[next]));
-                    expectedIds.Remove(callId);
+                    items.Add((next, messages[next]));
+                    if (messages[next].ToolCallId is { } callId)
+                        expectedIds.Remove(callId);
+
                     next++;
                     if (expectedIds.Count == 0)
                         break;
                 }
 
+                groups.Add(new MessageGroup(items, expectedIds.Count == 0));
                 index = next;
             }
             else
             {
+                groups.Add(new MessageGroup(items, true));
                 index++;
             }
-
-            groups.Add(group);
         }
 
         return groups;
@@ -172,4 +169,8 @@ internal static class ResearchContextWindow
 
         return content[..(maximum - marker.Length)] + marker;
     }
+
+    private sealed record MessageGroup(
+        List<(int Index, DuckChatMessage Message)> Items,
+        bool IsComplete);
 }
