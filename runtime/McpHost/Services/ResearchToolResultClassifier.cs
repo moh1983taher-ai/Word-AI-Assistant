@@ -45,6 +45,20 @@ internal static class ResearchToolResultClassifier
         };
     }
 
+    internal static bool IsVerificationTool(ToolDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        return IsVerificationTool(descriptor.Server, descriptor.Name);
+    }
+
+    internal static bool IsVerificationTool(string server, string name) =>
+        server switch
+        {
+            "aljam3" => name is "get_page" or "read_page" or "open_page" or "get_book_page",
+            "shamela" => name is "shamela_open" or "shamela_read" or "shamela_get_page" or "shamela_open_page",
+            _ => false
+        };
+
     internal static bool HasMeaningfulText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))

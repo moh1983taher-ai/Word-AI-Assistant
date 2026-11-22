@@ -8,7 +8,8 @@ public sealed record ModelDecision(
     string Server,
     string Tool,
     JsonElement Arguments,
-    string Raw);
+    string Raw,
+    string ScopeItem = "");
 
 public static class ModelDecisionParser
 {
@@ -58,7 +59,8 @@ public static class ModelDecisionParser
                     ReadString(root, "server"),
                     ReadString(root, "tool", "name"),
                     nestedArguments.Clone(),
-                    response);
+                    response,
+                    ReadString(root, "scope_item"));
                 return !string.IsNullOrWhiteSpace(decision.Server) &&
                        !string.IsNullOrWhiteSpace(decision.Tool);
             }
@@ -86,7 +88,8 @@ public static class ModelDecisionParser
                     ReadString(root, "server"),
                     ReadString(root, "tool", "name"),
                     arguments.Clone(),
-                    response);
+                    response,
+                    ReadString(root, "scope_item"));
                 return !string.IsNullOrWhiteSpace(decision.Server) &&
                        !string.IsNullOrWhiteSpace(decision.Tool);
             }
