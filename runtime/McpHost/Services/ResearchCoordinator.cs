@@ -140,9 +140,9 @@ public sealed class ResearchCoordinator
                     requestMessages.Add(new DuckChatMessage("user", evidenceContext));
 
                 var originalContextCharacters = messages
-                    .Sum(message => message.Content?.Length ?? 0);
+                    .Sum(ResearchContextWindow.GetMessageCharacterCount);
                 var boundedContextCharacters = conversation
-                    .Sum(message => message.Content?.Length ?? 0);
+                    .Sum(ResearchContextWindow.GetMessageCharacterCount);
 
                 if (boundedContextCharacters < originalContextCharacters ||
                     conversation.Count < messages.Count - 1 ||
@@ -398,7 +398,7 @@ public sealed class ResearchCoordinator
                     "المكتبات التي اختارها المستخدم: " +
                     string.Join("، ", selectedServerIds.Select(ResearchSourceSelection.GetLabel)) + "." +
                     Environment.NewLine +
-                    "المكتبات التي لم يكتمل فيها استدعاء بحث صالح: " +
+                    "المكتبات التي لم تصل منها أدلة ناجحة: " +
                     (pendingSourceIds.Count == 0
                         ? "لا يوجد."
                         : string.Join("، ", pendingSourceIds.Select(ResearchSourceSelection.GetLabel))) +
@@ -518,7 +518,7 @@ public sealed class ResearchCoordinator
         if (pendingSourceIds.Count > 0)
         {
             builder.AppendLine();
-            builder.Append("لم يكتمل البحث في: ")
+            builder.Append("لم تصل أدلة ناجحة من المكتبات الآتية قبل انتهاء المهلة: ")
                 .Append(string.Join("، ", pendingSourceIds.Select(ResearchSourceSelection.GetLabel)))
                 .Append('.');
         }
