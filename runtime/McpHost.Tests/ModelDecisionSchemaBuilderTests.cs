@@ -127,6 +127,65 @@ public sealed class ModelDecisionSchemaBuilderTests
     }
 
     [Fact]
+    public void FirstDecisionSchemaExposesBothSelectedLibrariesAndAllowsFinalImmediately()
+    {
+        var tools = new[]
+        {
+            Tool("aljam3", "search", """
+                {
+                  "type": "object",
+                  "properties": { "query": { "type": "string" } },
+                  "required": ["query"],
+                  "additionalProperties": false
+                }
+                """),
+            Tool("shamela", "shamela_find", """
+                {
+                  "type": "object",
+                  "properties": { "keywords": { "type": "array", "items": { "type": "string" } } },
+                  "required": ["keywords"],
+                  "additionalProperties": false
+                }
+                """)
+        };
+
+        using var format = JsonDocument.Parse(
+            ModelDecisionSchemaBuilder.BuildResponseFormat(
+                tools,
+                allowFinal: true,
+                allowToolCalls: true).GetRawText());
+
+        var properties = format.RootElement
+            .GetProperty("json_schema")
+            .GetProperty("schema")
+            .GetProperty("properties");
+
+        Assert.Equal(
+            new[] { "tool_call", "final" },
+            properties.GetProperty("type").GetProperty("enum")
+                .EnumerateArray().Select(item => item.GetString()).ToArray());
+        Assert.Equal(
+            new[] { "aljam3", "shamela" },
+            properties.GetProperty("server").GetProperty("enum")
+                .EnumerateArray().Where(item => item.GetString() != "")
+                .Select(item => item.GetString()).ToArray());
+        Assert.Contains(
+            "search",
+            properties.GetProperty("tool").GetProperty("enum")
+                .EnumerateArray().Select(item => item.GetString()));
+        Assert.Contains(
+            "shamela_find",
+            properties.GetProperty("tool").GetProperty("enum")
+                .EnumerateArray().Select(item => item.GetString()));
+        Assert.Equal("string", properties.GetProperty("answer").GetProperty("type").GetString());
+        Assert.Contains(
+            "null",
+            properties.GetProperty("arguments").GetProperty("anyOf")
+                .EnumerateArray().Select(item =>
+                    item.TryGetProperty("type", out var type) ? type.GetString() : null));
+    }
+
+    [Fact]
     public void FinalOnlySchemaCanBeBuiltWhenToolBudgetIsExhausted()
     {
         using var format = JsonDocument.Parse(

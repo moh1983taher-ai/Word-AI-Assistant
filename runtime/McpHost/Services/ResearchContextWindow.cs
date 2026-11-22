@@ -4,8 +4,8 @@ namespace ResearchTools.McpHost.Services;
 
 /// <summary>
 /// Builds a bounded conversation window for each local model turn.
-/// The current user request is pinned while the newest surrounding messages
-/// are retained in their original chronological order.
+/// Native tool-call messages and their matching tool results are kept as an
+/// indivisible history group so compaction cannot leave invalid OpenAI tool history.
 /// </summary>
 internal static class ResearchContextWindow
 {
@@ -24,46 +24,131 @@ internal static class ResearchContextWindow
         if (messages.Count == 0)
             return [];
 
+        var groups = BuildGroups(messages);
         var selected = new List<(int Index, DuckChatMessage Message)>();
         var usedCharacters = 0;
 
-        if (pinnedMessageIndex >= 0 && pinnedMessageIndex < messages.Count)
+        var pinnedGroup = pinnedMessageIndex >= 0 && pinnedMessageIndex < messages.Count
+            ? groups.FirstOrDefault(group => group.Items.Any(item => item.Index == pinnedMessageIndex))
+            : null;
+
+        if (pinnedGroup is not null)
         {
-            var pinned = LimitMessage(
-                messages[pinnedMessageIndex],
+            var pinned = messages[pinnedMessageIndex];
+            var bounded = LimitMessage(
+                pinned,
                 Math.Min(maxMessageCharacters, maxConversationCharacters));
-            selected.Add((pinnedMessageIndex, pinned));
-            usedCharacters = pinned.Content?.Length ?? 0;
+            selected.Add((pinnedMessageIndex, bounded));
+            usedCharacters = GetMessageCharacterCount(bounded);
         }
 
-        for (var index = messages.Count - 1; index >= 0; index--)
+        for (var groupIndex = groups.Count - 1; groupIndex >= 0; groupIndex--)
         {
-            if (index == pinnedMessageIndex || usedCharacters >= maxConversationCharacters)
+            var group = groups[groupIndex];
+            if (ReferenceEquals(group, pinnedGroup) || !group.IsComplete)
                 continue;
 
             var remaining = maxConversationCharacters - usedCharacters;
-            var messageLimit = Math.Min(maxMessageCharacters, remaining);
-            if (messageLimit <= 0)
+            if (remaining <= 0)
                 break;
 
-            var message = messages[index];
+            var groupCharacters = group.Items.Sum(item => GetMessageCharacterCount(item.Message));
+            if (groupCharacters <= remaining &&
+                group.Items.All(item => (item.Message.Content?.Length ?? 0) <= maxMessageCharacters))
+            {
+                selected.AddRange(group.Items);
+                usedCharacters += groupCharacters;
+                continue;
+            }
+
+            // Never clip a native tool-call/result group: doing so can orphan
+            // tool_call_id entries or change function arguments. Older groups
+            // can be omitted because the independent evidence ledger retains results.
+            if (group.Items.Count > 1 ||
+                group.Items[0].Message.ToolCalls is { Count: > 0 })
+                continue;
+
+            var message = group.Items[0].Message;
             var content = message.Content ?? string.Empty;
+            var messageLimit = Math.Min(maxMessageCharacters, remaining);
             if (content.Length > messageLimit)
             {
-                var clipped = Clip(content, messageLimit);
-                selected.Add((index, message with { Content = clipped }));
-                usedCharacters += clipped.Length;
+                var clipped = LimitMessage(message, messageLimit);
+                selected.Add((group.Items[0].Index, clipped));
+                usedCharacters += GetMessageCharacterCount(clipped);
                 break;
             }
 
-            selected.Add((index, message));
-            usedCharacters += content.Length;
+            selected.Add(group.Items[0]);
+            usedCharacters += GetMessageCharacterCount(message);
         }
 
         return selected
             .OrderBy(item => item.Index)
             .Select(item => item.Message)
             .ToArray();
+    }
+
+    internal static int GetMessageCharacterCount(DuckChatMessage message)
+    {
+        var count = message.Content?.Length ?? 0;
+        count += message.ToolCallId?.Length ?? 0;
+
+        if (message.ToolCalls is not null)
+        {
+            foreach (var call in message.ToolCalls)
+            {
+                count += call.Id.Length;
+                count += call.Type.Length;
+                count += call.Function.Name.Length;
+                count += call.Function.Arguments.Length;
+            }
+        }
+
+        return count;
+    }
+
+    private static List<MessageGroup> BuildGroups(IReadOnlyList<DuckChatMessage> messages)
+    {
+        var groups = new List<MessageGroup>();
+        var index = 0;
+
+        while (index < messages.Count)
+        {
+            var items = new List<(int Index, DuckChatMessage Message)>
+            {
+                (index, messages[index])
+            };
+
+            if (messages[index].Role == "assistant" &&
+                messages[index].ToolCalls is { Count: > 0 } calls)
+            {
+                var expectedIds = calls.Select(call => call.Id)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                var next = index + 1;
+                while (next < messages.Count && messages[next].Role == "tool")
+                {
+                    items.Add((next, messages[next]));
+                    if (messages[next].ToolCallId is { } callId)
+                        expectedIds.Remove(callId);
+
+                    next++;
+                    if (expectedIds.Count == 0)
+                        break;
+                }
+
+                groups.Add(new MessageGroup(items, expectedIds.Count == 0));
+                index = next;
+            }
+            else
+            {
+                groups.Add(new MessageGroup(items, true));
+                index++;
+            }
+        }
+
+        return groups;
     }
 
     private static DuckChatMessage LimitMessage(DuckChatMessage message, int maximum)
@@ -84,4 +169,8 @@ internal static class ResearchContextWindow
 
         return content[..(maximum - marker.Length)] + marker;
     }
+
+    private sealed record MessageGroup(
+        List<(int Index, DuckChatMessage Message)> Items,
+        bool IsComplete);
 }

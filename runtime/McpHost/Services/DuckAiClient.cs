@@ -8,9 +8,9 @@ using ResearchTools.McpHost.Models;
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Adapter for DuckAI's local OpenAI-compatible HTTP API. Research decisions use
-/// per-turn strict JSON Schema response formats; native tool calls remain supported
-/// for other callers.
+/// Adapter for local OpenAI-compatible chat endpoints. An explicitly configured
+/// loopback model endpoint (for example LM Studio) is preferred; DuckAI remains the
+/// automatic fallback. Both native tool calls and strict JSON compatibility are supported.
 /// </summary>
 public sealed class DuckAiClient
 {
@@ -22,8 +22,38 @@ public sealed class DuckAiClient
         "http://127.0.0.1:8080"
     ];
 
+    private const string ConfiguredModelEndpointVariable = "RESEARCHTOOLS_MODEL_BASE_URL";
+
     // Keep the selected endpoint stable throughout a multi-turn MCP research task.
     private static readonly TimeSpan ModelCacheLifetime = TimeSpan.FromMinutes(5);
+
+    internal static IReadOnlyList<string> GetCandidateBaseAddresses(string? configuredBaseAddress)
+    {
+        if (string.IsNullOrWhiteSpace(configuredBaseAddress))
+            return CandidateBaseAddresses;
+
+        var normalized = configuredBaseAddress.Trim().TrimEnd('/');
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+            !uri.IsLoopback ||
+            uri.AbsolutePath != "/" ||
+            !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment) ||
+            !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            throw new InvalidOperationException(
+                $"{ConfiguredModelEndpointVariable} must be an HTTP(S) loopback base URL without a path, query, or credentials.");
+        }
+
+        var primary = uri.GetLeftPart(UriPartial.Authority);
+        return new[] { primary }
+            .Concat(CandidateBaseAddresses.Where(address =>
+                !string.Equals(address, primary, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> GetCandidateBaseAddresses() =>
+        GetCandidateBaseAddresses(Environment.GetEnvironmentVariable(ConfiguredModelEndpointVariable));
     private readonly HttpClient _http;
     private readonly HostLog _log;
     private readonly SemaphoreSlim _discoveryGate = new(1, 1);
@@ -34,6 +64,21 @@ public sealed class DuckAiClient
     {
         _http = factory.CreateClient("DuckAI");
         _log = log;
+    }
+
+    public string GetProviderLabel(string baseAddress)
+    {
+        var configured = Environment.GetEnvironmentVariable(ConfiguredModelEndpointVariable);
+        if (!string.IsNullOrWhiteSpace(configured) &&
+            string.Equals(
+                GetCandidateBaseAddresses(configured)[0],
+                baseAddress,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "Local OpenAI-compatible model server";
+        }
+
+        return "DuckAI local fallback";
     }
 
     public async Task<DuckAiModelSnapshot> GetModelsAsync(CancellationToken cancellationToken)
@@ -48,7 +93,7 @@ public sealed class DuckAiClient
                 return _cachedSnapshot;
 
             var failures = new List<string>();
-            foreach (var baseAddress in CandidateBaseAddresses)
+            foreach (var baseAddress in GetCandidateBaseAddresses())
             {
                 try
                 {
@@ -121,12 +166,13 @@ public sealed class DuckAiClient
     {
         var preferredSnapshot = await GetModelsAsync(cancellationToken);
         var endpoints = new[] { preferredSnapshot.BaseAddress }
-            .Concat(CandidateBaseAddresses.Where(address =>
+            .Concat(GetCandidateBaseAddresses().Where(address =>
                 !string.Equals(address, preferredSnapshot.BaseAddress, StringComparison.OrdinalIgnoreCase)))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         var failures = new List<string>();
+        var nativeToolCallingRejected = false;
         foreach (var baseAddress in endpoints)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -179,6 +225,13 @@ public sealed class DuckAiClient
             {
                 throw;
             }
+            catch (NativeToolCallingNotSupportedException exception)
+            {
+                nativeToolCallingRejected = true;
+                failures.Add($"{baseAddress}: native tool calling unsupported: {exception.Message}");
+                _log.Warning(
+                    $"DuckAI native tool calling is unsupported at {baseAddress}; trying the next local endpoint.");
+            }
             catch (OperationCanceledException)
             {
                 failures.Add($"{baseAddress}: inference timed out after 55 seconds.");
@@ -190,6 +243,13 @@ public sealed class DuckAiClient
                 failures.Add($"{baseAddress} {status}: {exception.Message}");
                 _log.Warning($"DuckAI inference failed at {baseAddress} ({status}); trying the next local endpoint.");
             }
+        }
+
+        if (nativeToolCallingRejected && functionTools is { Count: > 0 })
+        {
+            throw new NativeToolCallingNotSupportedException(
+                "لم تقبل أي من واجهات DuckAI المحلية استدعاءات الأدوات الأصلية. " +
+                string.Join(" | ", failures));
         }
 
         throw new HttpRequestException(

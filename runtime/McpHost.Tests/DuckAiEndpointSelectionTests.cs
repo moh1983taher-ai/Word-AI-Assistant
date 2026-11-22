@@ -11,6 +11,28 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class DuckAiEndpointSelectionTests
 {
     [Fact]
+    public void ConfiguredLocalModelEndpointTakesPriorityOverDuckAi()
+    {
+        var addresses = DuckAiClient.GetCandidateBaseAddresses("http://127.0.0.1:1234/");
+
+        Assert.Equal("http://127.0.0.1:1234", addresses[0]);
+        Assert.Equal("http://127.0.0.1:18080", addresses[1]);
+        Assert.Equal("http://127.0.0.1:8080", addresses[2]);
+    }
+
+    [Theory]
+    [InlineData("https://example.com")]
+    [InlineData("http://192.168.1.20:1234")]
+    [InlineData("http://127.0.0.1:1234/v1")]
+    [InlineData("http://user:password@127.0.0.1:1234")]
+    [InlineData("not-a-url")]
+    public void RejectsNonLoopbackOrNonRootModelEndpoints(string endpoint)
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => DuckAiClient.GetCandidateBaseAddresses(endpoint));
+    }
+
+    [Fact]
     public void PrefersDirectBackendBeforeLocalAgentProxyForInitialDiscovery()
     {
         Assert.Equal("http://127.0.0.1:18080", DuckAiClient.CandidateBaseAddresses[0]);
@@ -66,6 +88,78 @@ public sealed class DuckAiEndpointSelectionTests
 
         var selected = await client.GetModelsAsync(CancellationToken.None);
         Assert.Equal("http://127.0.0.1:8080", selected.BaseAddress);
+    }
+
+    [Fact]
+    public async Task RetriesNativeToolCallingOnAlternateEndpointBeforeFallingBack()
+    {
+        var visited = new ConcurrentQueue<string>();
+        using var schema = System.Text.Json.JsonDocument.Parse("""
+            {
+              "type": "object",
+              "properties": { "query": { "type": "string" } },
+              "required": ["query"],
+              "additionalProperties": false
+            }
+            """);
+        var tools = new[]
+        {
+            new DuckFunctionTool(
+                "function",
+                new DuckFunctionDefinition(
+                    "mcp_aljam3__search",
+                    "Search the library",
+                    schema.RootElement.Clone()))
+        };
+
+        var handler = new StubHandler(request =>
+        {
+            var address = request.RequestUri!.GetLeftPart(UriPartial.Authority);
+            visited.Enqueue($"{request.Method} {address}{request.RequestUri.AbsolutePath}");
+
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath == "/v1/models")
+                return Json(HttpStatusCode.OK, """{"data":[{"id":"luna-test"}]}""");
+
+            if (request.Method == HttpMethod.Post &&
+                request.RequestUri.AbsolutePath == "/v1/chat/completions" &&
+                address == "http://127.0.0.1:18080")
+            {
+                return Json(
+                    HttpStatusCode.BadRequest,
+                    """{"error":"native function tools are not supported"}""");
+            }
+
+            if (request.Method == HttpMethod.Post &&
+                request.RequestUri.AbsolutePath == "/v1/chat/completions" &&
+                address == "http://127.0.0.1:8080")
+            {
+                return Json(
+                    HttpStatusCode.OK,
+                    """{"choices":[{"message":{"content":"","tool_calls":[{"id":"call_alt","type":"function","function":{"name":"mcp_aljam3__search","arguments":"{\"query\":\"الأصول\"}"}}]}}]}""");
+            }
+
+            return Json(HttpStatusCode.NotFound, """{"error":"not found"}""");
+        });
+
+        var client = new DuckAiClient(new StubHttpClientFactory(handler), new HostLog());
+        var completion = await client.CompleteAsync(
+            requestedModel: "",
+            messages: [new DuckChatMessage("user", "ابحث عن الأصول")],
+            functionTools: tools,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Single(completion.ToolCalls);
+        Assert.Equal("mcp_aljam3__search", completion.ToolCalls[0].Name);
+        Assert.Equal("call_alt", completion.ToolCalls[0].Id);
+        Assert.Equal(
+            new[]
+            {
+                "GET http://127.0.0.1:18080/v1/models",
+                "POST http://127.0.0.1:18080/v1/chat/completions",
+                "GET http://127.0.0.1:8080/v1/models",
+                "POST http://127.0.0.1:8080/v1/chat/completions"
+            },
+            visited.ToArray());
     }
 
     [Fact]

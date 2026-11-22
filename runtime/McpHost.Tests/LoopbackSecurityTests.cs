@@ -24,6 +24,33 @@ public sealed class LoopbackSecurityTests
         Assert.False(LoopbackSecurity.IsAllowedOrigin(origin));
     }
 
+    [Fact]
+    public void AllowsLocalMcpClientsWithoutBrowserOrigin()
+    {
+        Assert.True(LoopbackSecurity.IsAllowedMcpOrigin(null));
+        Assert.True(LoopbackSecurity.IsAllowedMcpOrigin(""));
+        Assert.True(LoopbackSecurity.IsAllowedMcpOrigin("http://127.0.0.1:18081"));
+        Assert.True(LoopbackSecurity.IsAllowedMcpOrigin("http://localhost:18081"));
+        Assert.True(LoopbackSecurity.IsAllowedMcpOrigin("https://moh1983taher-ai.github.io"));
+    }
+
+    [Theory]
+    [InlineData("https://attacker.example")]
+    [InlineData("http://127.0.0.1:18082")]
+    [InlineData("http://127.0.0.1.attacker.example:18081")]
+    [InlineData("http://localhost:8080")]
+    public void RejectsUntrustedMcpOrigins(string origin)
+    {
+        Assert.False(LoopbackSecurity.IsAllowedMcpOrigin(origin));
+    }
+
+    [Fact]
+    public void SupportsExplicitAlternateMcpLoopbackPort()
+    {
+        Assert.True(LoopbackSecurity.IsAllowedMcpOrigin("http://127.0.0.1:18082", 18082));
+        Assert.False(LoopbackSecurity.IsAllowedMcpOrigin("http://127.0.0.1:18081", 18082));
+    }
+
     [Theory]
     [InlineData("127.0.0.1:18081")]
     [InlineData("localhost:18081")]

@@ -23,7 +23,6 @@ public sealed class ResearchEvidenceLedgerTests
 
         var context = ledger.BuildContext(
             ["aljam3", "shamela"],
-            Array.Empty<string>(),
             maxCharacters: 1_000);
 
         Assert.InRange(context.Length, 1, 1_000);
@@ -45,7 +44,6 @@ public sealed class ResearchEvidenceLedgerTests
 
         var context = ledger.BuildContext(
             ["aljam3"],
-            Array.Empty<string>(),
             maxCharacters: 2_000);
 
         Assert.Contains("لا توجد نتائج مطابقة", context);
@@ -65,7 +63,6 @@ public sealed class ResearchEvidenceLedgerTests
 
         var context = ledger.BuildContext(
             ["shamela"],
-            Array.Empty<string>(),
             maxCharacters: 2_000);
 
         Assert.True(context.Length <= 2_000);
@@ -74,7 +71,7 @@ public sealed class ResearchEvidenceLedgerTests
     }
 
     [Fact]
-    public void IdentifiesPendingSourcesInTheRebuiltEvidenceContext()
+    public void EvidenceContextDoesNotRequireEverySelectedSourceToHaveBeenSearched()
     {
         using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
         var descriptor = new ToolDescriptor("shamela", "المكتبة الشاملة", "shamela_find", "", schema.RootElement.Clone());
@@ -84,10 +81,10 @@ public sealed class ResearchEvidenceLedgerTests
 
         var context = ledger.BuildContext(
             ["shamela", "aljam3"],
-            ["aljam3"],
             maxCharacters: 2_000);
 
-        Assert.Contains("الجامع", context);
-        Assert.Contains("المكتبة الشاملة", context);
+        Assert.Contains("نتيجة موثقة", context);
+        Assert.DoesNotContain("ما زال يلزم تنفيذ بحث", context);
+        Assert.DoesNotContain("وصلت نتيجة بحث من جميع المكتبات المختارة", context);
     }
 }

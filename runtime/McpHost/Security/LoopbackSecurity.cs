@@ -12,6 +12,27 @@ public static class LoopbackSecurity
     public static bool IsAllowedOrigin(string? origin) =>
         !string.IsNullOrWhiteSpace(origin) && AllowedOrigins.Contains(origin.TrimEnd('/'));
 
+    public static bool IsAllowedMcpOrigin(string? origin, int port = 18081)
+    {
+        if (string.IsNullOrWhiteSpace(origin))
+            return true;
+
+        if (IsAllowedOrigin(origin))
+            return true;
+
+        if (port is < 1025 or > 65535 ||
+            !Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+            return false;
+
+        return uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+               uri.IsLoopback &&
+               uri.Port == port &&
+               uri.AbsolutePath == "/" &&
+               string.IsNullOrEmpty(uri.Query) &&
+               string.IsNullOrEmpty(uri.Fragment) &&
+               string.IsNullOrEmpty(uri.UserInfo);
+    }
+
     public static bool IsAllowedHost(string? host, int port = 18081)
     {
         if (port is < 1025 or > 65535 || string.IsNullOrWhiteSpace(host))
