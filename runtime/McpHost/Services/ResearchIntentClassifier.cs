@@ -46,6 +46,7 @@ public static class ResearchIntentClassifier
         "bibliography",
         "sources",
         "search for",
+        "search in",
         "find studies",
         "research sources"
     ];
