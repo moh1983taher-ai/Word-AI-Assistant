@@ -27,6 +27,44 @@ public sealed class ResearchContextBudgetTests
     }
 
     [Fact]
+    public void DuckAiProfileRestoresKnownCompatibleRequestCeilings()
+    {
+        ClearSettings();
+        try
+        {
+            var budget = ResearchContextBudget.LoadDuckAi();
+
+            Assert.Equal(20_000, budget.MaxContextCharacters);
+            Assert.Equal(5_000, budget.MaxOutputTokens);
+            Assert.Equal(TimeSpan.FromMinutes(10), budget.ResearchTimeout);
+            Assert.Equal(TimeSpan.FromSeconds(120), budget.ModelRequestTimeout);
+        }
+        finally
+        {
+            ClearSettings();
+        }
+    }
+
+    [Fact]
+    public void DuckAiProfileDoesNotInheritUnsafeExpandedInputAndOutputSettings()
+    {
+        try
+        {
+            Environment.SetEnvironmentVariable("RESEARCHTOOLS_CONTEXT_BUDGET_CHARS", "120000");
+            Environment.SetEnvironmentVariable("RESEARCHTOOLS_MAX_OUTPUT_TOKENS", "12000");
+
+            var budget = ResearchContextBudget.LoadDuckAi();
+
+            Assert.Equal(20_000, budget.MaxContextCharacters);
+            Assert.Equal(5_000, budget.MaxOutputTokens);
+        }
+        finally
+        {
+            ClearSettings();
+        }
+    }
+
+    [Fact]
     public void EnvironmentCanRaiseContextOutputAndTimeBudgets()
     {
         try
@@ -88,6 +126,7 @@ public sealed class ResearchContextBudgetTests
 
         Assert.Equal(4_000, budget.GetEvidenceBudget(30_000, 4_000));
         Assert.Equal(20_000, budget.GetEvidenceBudget(30_000, 40_000));
+        Assert.Equal(10_000, budget.GetEvidenceBudget(30_000, 40_000, 10_000));
         Assert.Equal(0, budget.GetEvidenceBudget(30_000, 0));
     }
 
