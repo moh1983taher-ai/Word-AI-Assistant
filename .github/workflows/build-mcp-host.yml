@@ -1,0 +1,138 @@
+name: Build and validate local MCP host
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/McpHost/**'
+      - 'runtime/McpHost.Tests/**'
+      - '.github/workflows/build-mcp-host.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/McpHost/**'
+      - 'runtime/McpHost.Tests/**'
+      - '.github/workflows/build-mcp-host.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore runtime/McpHost.Tests/ResearchTools.McpHost.Tests.csproj
+
+      - name: Build and run unit tests
+        run: dotnet test runtime/McpHost.Tests/ResearchTools.McpHost.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=mcp-host-tests.trx"
+
+      - name: Publish self-contained Windows x64 host
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet publish runtime/McpHost/ResearchTools.McpHost.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false --output dist/mcp-host-win-x64
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed: $LASTEXITCODE" }
+
+          $exePath = 'dist/mcp-host-win-x64/ResearchTools.McpHost.exe'
+          if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
+            throw 'Published MCP host executable was not found.'
+          }
+
+          $hash = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath ($exePath + '.sha256') -Value ($hash + '  ResearchTools.McpHost.exe') -Encoding ASCII
+          Write-Host "Published $exePath ($((Get-Item $exePath).Length) bytes), SHA256=$hash"
+          Copy-Item 'runtime/McpHost/Test-McpHost-Preview.ps1' 'dist/mcp-host-win-x64/Test-McpHost-Preview.ps1'
+          Copy-Item 'runtime/McpHost/Start-McpHost-Preview.ps1' 'dist/mcp-host-win-x64/Start-McpHost-Preview.ps1'
+
+      - name: Validate preview PowerShell script syntax (Windows PowerShell 5.1)
+        shell: powershell
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          foreach ($path in @('runtime/McpHost/Test-McpHost-Preview.ps1', 'runtime/McpHost/Start-McpHost-Preview.ps1')) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $path,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell parse errors in $path."
+            }
+          }
+
+      - name: MCP upstream integration smoke test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:RESEARCHTOOLS_MCP_PORT = '18082'
+          $exePath = (Resolve-Path 'dist/mcp-host-win-x64/ResearchTools.McpHost.exe').Path
+          $hostProcess = Start-Process -FilePath $exePath -PassThru -WindowStyle Hidden
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              try {
+                $ping = Invoke-RestMethod -Uri 'http://127.0.0.1:18082/ping' -TimeoutSec 2
+                if ($ping.listening -eq $true) { $ready = $true; break }
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ready) { throw 'The MCP host did not open its alternate loopback listener.' }
+
+            $diagnostics = Invoke-RestMethod -Uri 'http://127.0.0.1:18082/v1/mcp/sources' -TimeoutSec 180
+            $diagnostics | ConvertTo-Json -Depth 8 | Write-Host
+
+            if ($diagnostics.strictOutputReady -ne $true) {
+              $diagnostics.strictSchemaWarnings | ForEach-Object { Write-Error $_ }
+              throw 'One or more live MCP input schemas cannot be represented as strict DuckAI JSON Schema.'
+            }
+
+            $aljam3 = $diagnostics.sources | Where-Object { $_.id -eq 'aljam3' }
+            $shamela = $diagnostics.sources | Where-Object { $_.id -eq 'shamela' }
+            if (-not $aljam3 -or -not $shamela) { throw 'The diagnostic response omitted an MCP source.' }
+            if (-not $aljam3.connected -or $aljam3.toolCount -lt 7) {
+              throw 'Official SDK did not discover the expected read-only Aljam3 catalog.'
+            }
+            if (-not $shamela.connected -or $shamela.toolCount -lt 4) {
+              throw 'Official SDK did not discover the expected read-only Shamela catalog.'
+            }
+            Write-Host 'Official MCP SDK discovered both upstream sources and all expected read-only tools.'
+          }
+          finally {
+            if ($hostProcess -and -not $hostProcess.HasExited) {
+              Stop-Process -Id $hostProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item Env:RESEARCHTOOLS_MCP_PORT -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload verified build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ResearchTools-MCP-Host-win-x64
+          path: dist/mcp-host-win-x64/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ResearchTools-MCP-Host-TestResults
+          path: '**/TestResults/*.trx'
+          if-no-files-found: ignore
+          retention-days: 14

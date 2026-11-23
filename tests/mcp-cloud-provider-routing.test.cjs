@@ -17,6 +17,60 @@ assert.match(source, /function loadSettings\(\)[\s\S]*?provider:[\s\S]*?key:[\s\
 assert.doesNotMatch(source, /AR_MCP_RESEARCH_SETTINGS|AR_MCP_RESEARCH_THREAD.*key/);
 
 assert.match(source, /https:\/\/api\.groq\.com\/openai\/v1\/responses/);
+assert.match(source, /const SELECTED_SERVERS_KEY = ["']AR_MCP_SELECTED_SERVERS["']/);
+assert.match(source, /function loadSelectedServerIds\(\)[\s\S]*?DEFAULT_SELECTED_SERVER_IDS\.slice\(\)/);
+assert.match(source, /function getGroqTools\(selectedServerIds\)[\s\S]*?getSelectedMcpServers\(selectedServerIds\)/);
+assert.match(source, /تعرّف على الأدوات من أسمائها وأوصافها ومخططات معاملاتها/);
+assert.match(source, /أدر استخدام الأدوات بنفسك/);
+assert.match(source, /المكتبات المتاحة لهذه المهمة وفق اختيار المستخدم/);
+assert.doesNotMatch(source, /لك حرية استخدام إحداهما أو كلتيهما/);
+assert.doesNotMatch(source, /لا يلزمك البحث في كلتيهما/);
+assert.doesNotMatch(source, /slice\(0, 16000\)/);
+
+const validatorStart = source.indexOf("  function validateResearchResult(");
+const validatorEnd = source.indexOf("\n  async function callGroqResearch", validatorStart);
+assert.ok(validatorStart >= 0 && validatorEnd > validatorStart, "Research result validator must be testable");
+const validatorContext = {
+  getSelectedMcpServers: function (ids) {
+    return ids.map(function (id) {
+      return { id: id, label: id === "aljam3" ? "الجامع" : "المكتبة الشاملة" };
+    });
+  }
+};
+const validatorSource = [
+  "function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? ids : []; }",
+  source.slice(validatorStart, validatorEnd),
+  "globalThis.__validateResearchResult = validateResearchResult;"
+].join("\n");
+vm.runInNewContext(validatorSource, validatorContext);
+const validateResearchResult = validatorContext.__validateResearchResult;
+const oneOfTwoLibraries = validateResearchResult(
+  "DuckAI المحلي",
+  "إجابة مستندة إلى البحث",
+  [{ server: "shamela", tool: "shamela_find", completed: true }],
+  ["aljam3", "shamela"]
+);
+assert.equal(oneOfTwoLibraries.answer, "إجابة مستندة إلى البحث");
+assert.equal(oneOfTwoLibraries.toolCalls.length, 1);
+assert.equal(oneOfTwoLibraries.toolCalls[0].server, "shamela");
+assert.throws(
+  function () {
+    validateResearchResult("DuckAI المحلي", "إجابة", [], ["aljam3", "shamela"]);
+  },
+  /لم يُظهر أي استدعاء فعلي/
+);
+assert.throws(
+  function () {
+    validateResearchResult(
+      "DuckAI المحلي",
+      "إجابة",
+      [{ server: "unselected", tool: "search", completed: true }],
+      ["aljam3", "shamela"]
+    );
+  },
+  /لم يُرجع نتيجة ناجحة/
+);
+
 assert.match(source, /type: "mcp"/);
 assert.match(source, /server_label: server\.id/);
 assert.match(source, /server_url: server\.url/);
@@ -24,12 +78,12 @@ assert.match(source, /require_approval: "never"/);
 assert.match(source, /allowed_tools: server\.tools\.slice\(\)/);
 assert.match(source, /openai\/gpt-oss-20b/);
 assert.match(source, /openai\/gpt-oss-120b/);
-assert.match(source, /function callGroqResearch[\s\S]*?tools: getGroqTools\(\)/);
+assert.match(source, /function callGroqResearch[\s\S]*?tools: getGroqTools\(selectedServerIds\)/);
 assert.match(source, /GROQ_REMOTE_MCP_MODELS\.indexOf\(settings\.model\)/);
 
 assert.match(source, /https:\/\/generativelanguage\.googleapis\.com\/v1beta\/interactions/);
 assert.doesNotMatch(source, /antigravity-preview|gemini-4-hydrogen|GEMINI_API_REVISION|Api-Revision/);
-assert.match(source, /model: settings\.model,[\s\S]*?input: buildResearchInput\(messages\)/);
+assert.match(source, /model: settings\.model,[\s\S]*?input: buildResearchInput\(messages, selectedServerIds\)/);
 assert.match(source, /model: settings\.model,[\s\S]*?provider: "gemini"/);
 assert.ok(source.includes('"Accept": "text/event-stream"'));
 assert.match(source, /background: true,[\s\S]*?stream: true,[\s\S]*?store: true/);
@@ -42,12 +96,12 @@ assert.match(source, /name: server\.id/);
 assert.match(source, /url: server\.url/);
 assert.match(
   source,
-  /function getGeminiTools\(\)[\s\S]*?allowed_tools: \[\{\s*mode: "auto",\s*tools: server\.tools\.slice\(\)\s*\}\]/
+  /function getGeminiTools\(selectedServerIds\)[\s\S]*?allowed_tools: \[\{\s*mode: "auto",\s*tools: server\.tools\.slice\(\)\s*\}\]/
 );
 assert.match(source, /environment: "remote"/);
 assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
-assert.match(source, /النموذج المحدد في إعدادات الذكاء الاصطناعي العامة مباشرةً/);
-assert.match(source, /function callGeminiResearch[\s\S]*?postGeminiInteractionStream\([\s\S]*?tools: getGeminiTools\(\)/);
+assert.match(source, /settingsButton\.title = "اختر الجامع أو الشاملة أو كليهما\."/);
+assert.match(source, /function callGeminiResearch[\s\S]*?postGeminiInteractionStream\([\s\S]*?tools: getGeminiTools\(selectedServerIds\)/);
 assert.match(source, /function callGroqResearch[\s\S]*?postCloudJson\(/);
 
 assert.match(source, /function getGeminiInteraction\(payload\)/);
@@ -57,9 +111,10 @@ assert.match(source, /interactionStatus = interaction\.status \|\| payload\.stat
 assert.match(source, /Gemini لم يُرجع إجابة نهائية\. \" \+ describeGeminiResponse\(payload\)/);
 
 const helperStart = source.indexOf("  function getGeminiInteraction(payload) {");
-const helperEnd = source.indexOf("  function validateResearchResult(providerLabel, answer, toolCalls) {", helperStart);
+const helperEnd = source.indexOf("  function validateResearchResult(", helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, "Gemini response helpers must be testable");
-const helperSource = source.slice(helperStart, helperEnd) +
+const helperSource = "function normalizeSelectedServerIds(serverIds) { return Array.isArray(serverIds) ? serverIds : []; }\n" +
+  source.slice(helperStart, helperEnd) +
   "\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse, parseGeminiSseFrame, createGeminiStreamState, applyGeminiStreamEvent, buildGeminiStreamPayload, extractGeminiToolCalls };";
 const helperContext = {};
 vm.runInNewContext(helperSource, helperContext);
@@ -151,7 +206,8 @@ responseHelpers.applyGeminiStreamEvent(streamState, {
 const streamedPayload = responseHelpers.buildGeminiStreamPayload(streamState);
 assert.equal(streamedPayload.status, "completed");
 assert.equal(responseHelpers.extractGeminiAnswer(streamedPayload), "إجابة من التدفق");
-const streamedCalls = responseHelpers.extractGeminiToolCalls(streamedPayload);
+const streamedCalls = responseHelpers.extractGeminiToolCalls(streamedPayload, ["aljam3"]);
+assert.equal(responseHelpers.extractGeminiToolCalls(streamedPayload, ["shamela"]).length, 0);
 assert.equal(streamedCalls.length, 1);
 assert.equal(streamedCalls[0].server, "aljam3");
 assert.equal(streamedCalls[0].tool, "search");
@@ -171,12 +227,45 @@ assert.match(source, /https:\/\/mcp\.shamela\.ws/);
 assert.match(source, /mcp_server_tool_call/);
 assert.match(source, /mcp_server_tool_result/);
 assert.match(source, /resultCallId !== callId/);
-assert.match(source, /function validateResearchResult[\s\S]*?toolCalls\.length === 0[\s\S]*?أدوات MCP/);
+assert.match(source, /function validateResearchResult[\s\S]*?toolCalls\.length === 0[\s\S]*?المكتبات التي اخترتها/);
 assert.match(
   source,
-  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callCloudResearch\(history, settings\)/,
+  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callSelectedResearch\(history, settings, selectedServerIds\)/,
   "MCP must use the active ordinary chat history rather than an independent source transcript."
 );
-assert.doesNotMatch(source, /127\.0\.0\.1|DuckAI|Duck\.ai|callLocalResearch|BRIDGE_URL/);
+assert.match(source, /const LOCAL_MCP_HOST_URL = ["']http:\/\/127\.0\.0\.1:18081["']/);
+assert.match(source, /servers: selected/);
+assert.match(source, /function callLocalResearch[\s\S]*?validateResearchResult/);
+assert.match(source, /function callSelectedResearch[\s\S]*?callLocalResearch[\s\S]*?callCloudResearch/);
+assert.match(source, /const RESEARCH_ENGINE_KEY = ["']AR_MCP_RESEARCH_ENGINE["']/);
+assert.match(source, /targetAddressSpace = "loopback"/);
+
+
+const mcpConfigStart = source.indexOf("  const MCP_SERVERS = Object.freeze([");
+const mcpToolsEnd = source.indexOf("\n  async function postCloudJson", mcpConfigStart);
+assert.ok(mcpConfigStart >= 0 && mcpToolsEnd > mcpConfigStart, "MCP selection helpers must be testable");
+const selectionHelperSource = [
+  'const SELECTED_SERVERS_KEY = "AR_MCP_SELECTED_SERVERS";',
+  'const DEFAULT_SELECTED_SERVER_IDS = Object.freeze(["aljam3", "shamela"]);',
+  'function safeJson(value, fallback) { try { return value ? JSON.parse(value) : fallback; } catch (_) { return fallback; } }',
+  source.slice(mcpConfigStart, mcpToolsEnd),
+  'globalThis.__mcpSelectionHelpers = { normalizeSelectedServerIds, loadSelectedServerIds, saveSelectedServerIds, getSelectedMcpServers, getGroqTools, getGeminiTools };'
+].join("\n");
+const selectionContext = {
+  localStorage: {
+    value: null,
+    getItem: function () { return this.value; },
+    setItem: function (_key, value) { this.value = value; }
+  }
+};
+vm.runInNewContext(selectionHelperSource, selectionContext);
+const selectionHelpers = selectionContext.__mcpSelectionHelpers;
+assert.equal(JSON.stringify(selectionHelpers.loadSelectedServerIds()), JSON.stringify(["aljam3", "shamela"]));
+assert.equal(JSON.stringify(selectionHelpers.normalizeSelectedServerIds(["shamela", "unknown", "shamela"])), JSON.stringify(["shamela"]));
+assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3"]));
+assert.equal(JSON.stringify(selectionHelpers.getGeminiTools(["shamela"]).map(function (tool) { return tool.name; })), JSON.stringify(["shamela"]));
+assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3", "shamela"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3", "shamela"]));
+selectionHelpers.saveSelectedServerIds(["shamela"]);
+assert.equal(JSON.stringify(selectionHelpers.loadSelectedServerIds()), JSON.stringify(["shamela"]));
 
 console.log("Cloud MCP provider routing tests passed.");
