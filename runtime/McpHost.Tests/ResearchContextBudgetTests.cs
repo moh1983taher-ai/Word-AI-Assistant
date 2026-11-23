@@ -46,7 +46,7 @@ public sealed class ResearchContextBudgetTests
     }
 
     [Fact]
-    public void DuckAiProfileDoesNotInheritUnsafeExpandedInputAndOutputSettings()
+    public void DuckAiProfileHonorsExplicitExpandedInputAndOutputSettings()
     {
         try
         {
@@ -55,8 +55,27 @@ public sealed class ResearchContextBudgetTests
 
             var budget = ResearchContextBudget.LoadDuckAi();
 
-            Assert.Equal(20_000, budget.MaxContextCharacters);
-            Assert.Equal(5_000, budget.MaxOutputTokens);
+            Assert.Equal(120_000, budget.MaxContextCharacters);
+            Assert.Equal(12_000, budget.MaxOutputTokens);
+        }
+        finally
+        {
+            ClearSettings();
+        }
+    }
+
+    [Fact]
+    public void DuckAiProfileClampsExplicitOverridesToSupportedOperationalBounds()
+    {
+        try
+        {
+            Environment.SetEnvironmentVariable("RESEARCHTOOLS_CONTEXT_BUDGET_CHARS", "99999999");
+            Environment.SetEnvironmentVariable("RESEARCHTOOLS_MAX_OUTPUT_TOKENS", "99999999");
+
+            var budget = ResearchContextBudget.LoadDuckAi();
+
+            Assert.Equal(196_000, budget.MaxContextCharacters);
+            Assert.Equal(32_768, budget.MaxOutputTokens);
         }
         finally
         {
