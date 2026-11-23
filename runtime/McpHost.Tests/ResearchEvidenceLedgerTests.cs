@@ -74,7 +74,7 @@ public sealed class ResearchEvidenceLedgerTests
     }
 
     [Fact]
-    public void SendsCompleteLargeToolOutputWhenTheAdaptiveContextCanHoldIt()
+    public void KeepsLargeToolOutputInTheTaskLedgerAndSendsOnlyABoundedExcerpt()
     {
         using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
         var descriptor = new ToolDescriptor(
@@ -87,11 +87,12 @@ public sealed class ResearchEvidenceLedgerTests
         var context = ledger.BuildContext(
             ["shamela"],
             Array.Empty<string>(),
-            maxCharacters: 32_000);
+            maxCharacters: 10_000);
 
-        Assert.True(context.Length > 10_000);
-        Assert.Contains(fullResult, context);
-        Assert.DoesNotContain("مقتطف؛ النص الكامل", context);
+        Assert.InRange(context.Length, 1, 10_000);
+        Assert.DoesNotContain(fullResult, context);
+        Assert.Contains("مقتطف", context);
+        Assert.Equal(fullResult, Assert.Single(ledger.Entries).Content);
     }
 
     [Fact]
