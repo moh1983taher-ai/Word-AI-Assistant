@@ -53,4 +53,11 @@ public static class ResearchIntentClassifier
         return SourceIndicators.Any(indicator =>
             userMessage.Contains(indicator, StringComparison.OrdinalIgnoreCase));
     }
+
+    /// <summary>
+    /// A source-based request cannot be finalized until at least one selected MCP
+    /// tool has completed successfully. General conversational requests remain model-led.
+    /// </summary>
+    public static bool MustUseMcpBeforeFinal(string? userMessage, int successfulToolCalls) =>
+        successfulToolCalls <= 0 && RequiresMcpSources(userMessage);
 }
