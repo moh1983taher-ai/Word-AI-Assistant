@@ -53,6 +53,8 @@ public sealed class ResearchCoordinator
         var contextBudget = _providerOptions.UseLmStudio
             ? ResearchContextBudget.Load()
             : ResearchContextBudget.LoadDuckAi();
+        _log.Info(
+            $"Research context profile: task={taskId}; provider={_providerOptions.Provider}; contextBudgetCharacters={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}; contextBudgetOverride={!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RESEARCHTOOLS_CONTEXT_BUDGET_CHARS"))}; outputTokensOverride={!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("RESEARCHTOOLS_MAX_OUTPUT_TOKENS"))}.");
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
         timeout.CancelAfter(contextBudget.ResearchTimeout);
@@ -131,14 +133,24 @@ public sealed class ResearchCoordinator
             while (true)
             {
                 IReadOnlyList<ToolDescriptor> turnTools = activeTools;
-                var turnSystemPrompt = BuildSystemPrompt(turnTools, selectedLabels, warnings) +
+                var turnSystemPrompt = BuildSystemPrompt(
+                    turnTools,
+                    selectedLabels,
+                    warnings,
+                    out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
                     "تواصل مع مضيف MCP عبر بروتوكول قرارات JSON. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق؛ في tool_call املأ type وserver وtool وarguments واترك answer فارغاً، وفي final املأ type وanswer واجعل server وtool فارغين وarguments null.";
 
                 var availableInputCharacters = contextBudget.GetAvailableInputCharacters(turnSystemPrompt.Length);
                 if (availableInputCharacters <= 1)
+                {
+                    var minimumRequiredCharacters = turnSystemPrompt.Length + 2_048 + 2;
+                    var configuredBudget = Environment.GetEnvironmentVariable("RESEARCHTOOLS_CONTEXT_BUDGET_CHARS");
+                    _log.Error(
+                        $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; toolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
                     throw new InvalidOperationException(
-                        "تجاوزت أوصاف ومخططات أدوات MCP ميزانية السياق المتاحة. ارفع RESEARCHTOOLS_CONTEXT_BUDGET_CHARS بما يناسب سعة النموذج.");
+                        $"تعذر تجهيز تعريفات أدوات MCP ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات {turnSystemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف. راجع سجل المضيف لمعرفة تفاصيل مخططات الأدوات، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS ضمن سعة النموذج الفعلية.");
+                }
 
                 var evidenceBudget = contextBudget.GetEvidenceBudget(
                     availableInputCharacters,
@@ -551,12 +563,16 @@ public sealed class ResearchCoordinator
     private static string BuildSystemPrompt(
         IReadOnlyList<ToolDescriptor> tools,
         IReadOnlyList<string> selectedLabels,
-        IReadOnlyList<string> warnings)
+        IReadOnlyList<string> warnings,
+        out int toolCatalogCharacters)
     {
+        var serializedTools = JsonSerializer.Serialize(tools, JsonDefaults.Web);
+        toolCatalogCharacters = serializedTools.Length;
+
         var builder = new System.Text.StringBuilder(
             ResearchAgentInstructions.Build(selectedLabels, warnings));
         builder.AppendLine().AppendLine("أدوات MCP المتاحة ومخططات معاملاتها:");
-        builder.AppendLine(JsonSerializer.Serialize(tools, JsonDefaults.Web));
+        builder.AppendLine(serializedTools);
         return builder.ToString();
     }
 
