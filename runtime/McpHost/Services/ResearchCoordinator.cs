@@ -80,6 +80,9 @@ public sealed class ResearchCoordinator
             // Keep the latest user request available in every model turn, even when
             // older history and tool results need to be trimmed to the context budget.
             var currentUserMessageIndex = incoming.FindLastIndex(message => message.Role == "user");
+            var latestUserMessage = currentUserMessageIndex >= 0
+                ? incoming[currentUserMessageIndex].Content
+                : null;
             messages.AddRange(incoming);
             if (selectedServerIds.Count == 0)
                 throw new InvalidOperationException("يجب تحديد الجامع أو المكتبة الشاملة أو كليهما قبل البحث.");
@@ -117,6 +120,7 @@ public sealed class ResearchCoordinator
 
             // All selected-source tools remain visible throughout the task.
             var repairAttempted = false;
+            var sourceDecisionCorrectionAttempted = false;
             var toolCallsAttempted = 0;
 
             while (true)
@@ -203,6 +207,27 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
+                    if (ResearchIntentClassifier.MustUseMcpBeforeFinal(latestUserMessage, trace.Count))
+                    {
+                        if (!sourceDecisionCorrectionAttempted)
+                        {
+                            sourceDecisionCorrectionAttempted = true;
+                            _log.Warning(
+                                $"Research premature final deferred: task={taskId}; reason=explicit_source_request_without_successful_tool_call; recovery=one_agent_correction.");
+
+                            messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                            messages.Add(new DuckChatMessage(
+                                "user",
+                                "تنبيه تحقق: طلب المستخدم صريح في البحث أو استخراج المصادر من المكتبات المختارة، لكنك أصدرت إجابة نهائية دون استدعاء ناجح لأي أداة MCP. لا تستبدل البحث المطلوب بمعلومات الذاكرة. أعد تقييم الطلب واستخدم أداة بحث مناسبة من الأدوات المتاحة، ثم قرر بنفسك هل تحتاج إلى متابعة البحث أو فتح الكتب والصفحات. لا يلزم استخدام كل المكتبات المختارة. أخرج قرار tool_call وفق المخطط، ولا تنه المهمة الآن."));
+                            continue;
+                        }
+
+                        _log.Warning(
+                            $"Research final rejected: task={taskId}; reason=explicit_source_request_without_successful_tool_call; correctionAttempted=true.");
+                        throw new InvalidOperationException(
+                            "تعذر إتمام البحث المطلوب: أنهى النموذج المهمة دون تنفيذ استدعاء ناجح لأداة من المكتبات المختارة. لم تُعرض إجابته بوصفها بحثاً موثقاً.");
+                    }
+
                     _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; mode=json-schema; model={model}.");
                     return new ResearchResponse(
                         decision.Answer,
