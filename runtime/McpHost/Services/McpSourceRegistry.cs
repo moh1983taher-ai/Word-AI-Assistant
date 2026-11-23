@@ -123,7 +123,7 @@ public sealed class McpSourceRegistry : IAsyncDisposable
                 state.Definition.Id,
                 state.Definition.Label,
                 tool.Name,
-                Limit(tool.Description, 700),
+                tool.Description ?? string.Empty,
                 tool.JsonSchema.Clone())).ToArray();
 
             return new SourceDiscovery(descriptors, []);
@@ -221,12 +221,6 @@ public sealed class McpSourceRegistry : IAsyncDisposable
 
         state.Tools = [];
         state.CatalogExpiresAt = DateTimeOffset.MinValue;
-    }
-
-    private static string Limit(string? value, int maxLength)
-    {
-        var text = value ?? string.Empty;
-        return text.Length <= maxLength ? text : text[..maxLength];
     }
 
     public async ValueTask DisposeAsync()

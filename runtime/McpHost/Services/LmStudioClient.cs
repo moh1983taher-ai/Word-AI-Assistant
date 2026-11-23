@@ -161,7 +161,7 @@ public sealed class LmStudioClient
             ["input"] = input,
             ["system_prompt"] = systemPrompt,
             ["temperature"] = 0.0,
-            ["max_output_tokens"] = 5000,
+            ["max_output_tokens"] = ResearchContextBudget.Load().MaxOutputTokens,
             ["stream"] = true,
             ["store"] = false
         };

@@ -181,7 +181,7 @@ public sealed class DuckAiClient
             }
             catch (OperationCanceledException)
             {
-                failures.Add($"{baseAddress}: inference timed out after 55 seconds.");
+                failures.Add($"{baseAddress}: inference timed out after {ResearchContextBudget.Load().ModelRequestTimeout.TotalSeconds:0} seconds.");
                 _log.Warning($"DuckAI inference timed out at {baseAddress}; trying the next local endpoint.");
             }
             catch (HttpRequestException exception) when (IsRetryableEndpointFailure(exception.StatusCode))
@@ -211,7 +211,7 @@ public sealed class DuckAiClient
             ["model"] = model,
             ["messages"] = messages,
             ["temperature"] = 0.0,
-            ["max_tokens"] = 5000,
+            ["max_tokens"] = ResearchContextBudget.Load().MaxOutputTokens,
             ["stream"] = false
         };
 
@@ -226,7 +226,7 @@ public sealed class DuckAiClient
             payload["response_format"] = format;
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(55));
+        timeout.CancelAfter(ResearchContextBudget.Load().ModelRequestTimeout);
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post, $"{snapshot.BaseAddress}/v1/chat/completions")
