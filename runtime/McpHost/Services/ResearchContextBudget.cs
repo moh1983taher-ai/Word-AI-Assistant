@@ -51,17 +51,25 @@ internal sealed record ResearchContextBudget(
     }
 
     /// <summary>
-    /// DuckAI's local gateway has a smaller reliable request envelope than the
-    /// optional local inference server. Keep DuckAI within the last known-good
-    /// limits while leaving the configurable profile unchanged for LM Studio.
+    /// DuckAI keeps conservative defaults for gateways with a smaller reliable
+    /// request envelope. Explicit environment settings override those defaults
+    /// within the same operational bounds used by the general profile.
     /// </summary>
     internal static ResearchContextBudget LoadDuckAi()
     {
         var configured = Load();
         return configured with
         {
-            MaxContextCharacters = Math.Min(configured.MaxContextCharacters, 20_000),
-            MaxOutputTokens = Math.Min(configured.MaxOutputTokens, 5_000)
+            MaxContextCharacters = ReadBoundedSetting(
+                "RESEARCHTOOLS_CONTEXT_BUDGET_CHARS",
+                20_000,
+                MinimumContextCharacters,
+                MaximumContextCharacters),
+            MaxOutputTokens = ReadBoundedSetting(
+                "RESEARCHTOOLS_MAX_OUTPUT_TOKENS",
+                5_000,
+                MinimumOutputTokens,
+                MaximumOutputTokens)
         };
     }
 
