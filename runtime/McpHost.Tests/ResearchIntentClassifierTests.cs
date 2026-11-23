@@ -20,6 +20,8 @@ public sealed class ResearchIntentClassifierTests
     [InlineData("ما معنى الاجتهاد؟")]
     [InlineData("اشرح الفرق بين العام والخاص")]
     [InlineData("السلام عليكم")]
+    [InlineData("ما المقصود بكتاب الموافقات؟")]
+    [InlineData("أريد دراسة تحليلية لمفهوم الاجتهاد")]
     public void DoesNotRequireMcpSources_ForGeneralConversation(string prompt)
     {
         Assert.False(ResearchIntentClassifier.RequiresMcpSources(prompt));
