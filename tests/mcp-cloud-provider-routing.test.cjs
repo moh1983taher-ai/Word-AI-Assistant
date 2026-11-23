@@ -22,6 +22,7 @@ assert.match(source, /function loadSelectedServerIds\(\)[\s\S]*?DEFAULT_SELECTED
 assert.match(source, /function getGroqTools\(selectedServerIds\)[\s\S]*?getSelectedMcpServers\(selectedServerIds\)/);
 assert.match(source, /تعرّف على الأدوات من أسمائها وأوصافها ومخططات معاملاتها/);
 assert.match(source, /أدر استخدام الأدوات بنفسك/);
+assert.match(source, /إذا طلب المستخدم صراحة البحث داخل إحدى المكتبات المختارة/);
 assert.match(source, /المكتبات المتاحة لهذه المهمة وفق اختيار المستخدم/);
 assert.doesNotMatch(source, /لك حرية استخدام إحداهما أو كلتيهما/);
 assert.doesNotMatch(source, /لا يلزمك البحث في كلتيهما/);
