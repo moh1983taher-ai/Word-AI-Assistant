@@ -17,8 +17,6 @@ public sealed class ResearchBusyException : Exception
 /// </summary>
 public sealed class ResearchCoordinator
 {
-    private const int MaxConversationMessages = 40;
-
     private readonly DuckAiClient _duckAi;
     private readonly McpSourceRegistry _sources;
     private readonly HostLog _log;
@@ -49,9 +47,10 @@ public sealed class ResearchCoordinator
 
         var taskId = Guid.NewGuid().ToString("N")[..10];
         _log.Info($"Research started: task={taskId}.");
+        var contextBudget = ResearchContextBudget.Load();
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
-        timeout.CancelAfter(TimeSpan.FromSeconds(300));
+        timeout.CancelAfter(contextBudget.ResearchTimeout);
 
         var selectedServerIds = ResearchSourceSelection.Normalize(request.Servers);
         var warnings = new List<string>();
@@ -70,7 +69,6 @@ public sealed class ResearchCoordinator
                     message is not null &&
                     (message.Role == "user" || message.Role == "assistant") &&
                     !string.IsNullOrWhiteSpace(message.GetText()))
-                .TakeLast(MaxConversationMessages)
                 .Select(message => new DuckChatMessage(
                     message.Role!,
                     message.GetText().Trim()))
@@ -116,7 +114,6 @@ public sealed class ResearchCoordinator
             var selectedLabels = selectedServerIds
                 .Select(ResearchSourceSelection.GetLabel)
                 .ToArray();
-            var contextBudget = ResearchContextBudget.Load();
 
             // All selected-source tools remain visible throughout the task.
             var repairAttempted = false;
