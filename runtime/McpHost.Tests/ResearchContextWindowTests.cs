@@ -71,6 +71,25 @@ public sealed class ResearchContextWindowTests
     }
 
     [Fact]
+    public void CompactCapsLargeCurrentMessageAtTheDuckAiCompatibilityLimit()
+    {
+        var messages = new[]
+        {
+            new DuckChatMessage("user", new string('ن', 20_831))
+        };
+
+        var compacted = ResearchContextWindow.Compact(
+            messages,
+            maxConversationCharacters: 20_000,
+            maxMessageCharacters: 12_000,
+            pinnedMessageIndex: 0);
+
+        Assert.Single(compacted);
+        Assert.Equal(12_000, compacted[0].Content!.Length);
+        Assert.EndsWith("[اقتُطع لتحديد سياق البحث]", compacted[0].Content);
+    }
+
+    [Fact]
     public void CompactLeavesMessagesUnchangedWhenTheyFitTheBudget()
     {
         var messages = new[]

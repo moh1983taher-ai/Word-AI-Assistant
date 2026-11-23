@@ -17,6 +17,9 @@ public sealed class ResearchBusyException : Exception
 /// </summary>
 public sealed class ResearchCoordinator
 {
+    private const int MaxDuckAiMessageCharacters = 12_000;
+    private const int MaxDuckAiEvidenceContextCharacters = 10_000;
+
     private readonly DuckAiClient _duckAi;
     private readonly McpSourceRegistry _sources;
     private readonly HostLog _log;
@@ -47,7 +50,9 @@ public sealed class ResearchCoordinator
 
         var taskId = Guid.NewGuid().ToString("N")[..10];
         _log.Info($"Research started: task={taskId}.");
-        var contextBudget = ResearchContextBudget.Load();
+        var contextBudget = _providerOptions.UseLmStudio
+            ? ResearchContextBudget.Load()
+            : ResearchContextBudget.LoadDuckAi();
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
         timeout.CancelAfter(contextBudget.ResearchTimeout);
@@ -137,7 +142,8 @@ public sealed class ResearchCoordinator
 
                 var evidenceBudget = contextBudget.GetEvidenceBudget(
                     availableInputCharacters,
-                    evidenceLedger.EstimatedContextCharacters);
+                    evidenceLedger.EstimatedContextCharacters,
+                    MaxDuckAiEvidenceContextCharacters);
                 var evidenceContext = evidenceBudget > 0
                     ? evidenceLedger.BuildContext(selectedServerIds, Array.Empty<string>(), evidenceBudget)
                     : string.Empty;
@@ -145,7 +151,7 @@ public sealed class ResearchCoordinator
                 var conversation = ResearchContextWindow.Compact(
                     messages.ToArray(),
                     historyBudget,
-                    contextBudget.MaxContextCharacters,
+                    MaxDuckAiMessageCharacters,
                     currentUserMessageIndex);
 
                 var requestMessages = new List<DuckChatMessage>(conversation.Count + 2)
@@ -161,13 +167,9 @@ public sealed class ResearchCoordinator
                 var boundedContextCharacters = conversation
                     .Sum(message => message.Content?.Length ?? 0);
 
-                if (boundedContextCharacters < originalContextCharacters ||
-                    conversation.Count < messages.Count - 1 ||
-                    !string.IsNullOrWhiteSpace(evidenceContext))
-                {
-                    _log.Info(
-                        $"Research context bounded: task={taskId}; messages={conversation.Count}/{messages.Count - 1}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; budget={contextBudget.MaxContextCharacters}.");
-                }
+                var requestCharacters = requestMessages.Sum(message => message.Content?.Length ?? 0);
+                _log.Info(
+                    $"Research prompt prepared: task={taskId}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
 
                 var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
                     turnTools,
@@ -335,11 +337,12 @@ public sealed class ResearchCoordinator
             using var finalizationTimeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
             finalizationTimeout.CancelAfter(TimeSpan.FromSeconds(30));
 
-            var contextBudget = ResearchContextBudget.Load();
+            var contextBudget = ResearchContextBudget.LoadDuckAi();
             var availableInputCharacters = contextBudget.GetAvailableInputCharacters(systemPrompt.Length);
             var evidenceBudget = contextBudget.GetEvidenceBudget(
                 availableInputCharacters,
-                evidenceLedger.EstimatedContextCharacters);
+                evidenceLedger.EstimatedContextCharacters,
+                MaxDuckAiEvidenceContextCharacters);
             var evidenceContext = evidenceBudget > 0
                 ? evidenceLedger.BuildContext(selectedServerIds, pendingSourceIds, evidenceBudget)
                 : string.Empty;
@@ -352,7 +355,7 @@ public sealed class ResearchCoordinator
                 : ResearchContextWindow.Compact(
                     messages.ToArray(),
                     historyBudget,
-                    contextBudget.MaxContextCharacters,
+                    MaxDuckAiMessageCharacters,
                     currentUserMessageIndex);
 
             var requestMessages = new List<DuckChatMessage>(conversation.Count + 2)
@@ -436,7 +439,7 @@ public sealed class ResearchCoordinator
 
         builder.AppendLine("انتهت مهلة البحث، ولذلك لم يكتمل الاستقصاء. فيما يأتي ما أمكن جمعه قبل التوقف، دون إسقاط النتائج المتاحة:");
 
-        var maxFallbackCharacters = ResearchContextBudget.Load().MaxContextCharacters;
+        var maxFallbackCharacters = ResearchContextBudget.LoadDuckAi().MaxContextCharacters;
         foreach (var server in selectedServerIds)
         {
             if (builder.Length >= maxFallbackCharacters)
