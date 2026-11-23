@@ -23,5 +23,20 @@ public sealed class ResearchIntentClassifierTests
     public void DoesNotRequireMcpSources_ForGeneralConversation(string prompt)
     {
         Assert.False(ResearchIntentClassifier.RequiresMcpSources(prompt));
+        Assert.False(ResearchIntentClassifier.MustUseMcpBeforeFinal(prompt, 0));
+    }
+
+    [Theory]
+    [InlineData("ابحث في المكتبة الشاملة عن الأمر الوارد بعد الحظر", 0, true)]
+    [InlineData("ابحث في المكتبة الشاملة عن الأمر الوارد بعد الحظر", 1, false)]
+    [InlineData("ما معنى الاجتهاد؟", 0, false)]
+    public void RequiresSuccessfulMcpCallOnlyForExplicitSourceRequests(
+        string prompt,
+        int successfulToolCalls,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            ResearchIntentClassifier.MustUseMcpBeforeFinal(prompt, successfulToolCalls));
     }
 }
