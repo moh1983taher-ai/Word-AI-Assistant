@@ -14,6 +14,8 @@ public sealed class ResearchAgentInstructionsTests
 
         Assert.Contains("أدر استخدام الأدوات بنفسك", instructions);
         Assert.Contains("المكتبات المتاحة لهذه المهمة وفق اختيار المستخدم", instructions);
+        Assert.Contains("ابدأ باستدعاء أداة بحث مناسبة", instructions);
+        Assert.Contains("قدّر بنفسك هل تكفي للإجابة", instructions);
         Assert.DoesNotContain("عدد محدد", instructions);
         Assert.DoesNotContain("استقصائياً", instructions);
         Assert.DoesNotContain("لا يلزمك استخدام كل مكتبة", instructions);
@@ -28,6 +30,6 @@ public sealed class ResearchAgentInstructionsTests
 
         Assert.Contains("الجامع، المكتبة الشاملة", instructions);
         Assert.Contains("تعذر الاتصال بأحد المصادر", instructions);
-        Assert.DoesNotContain("يجب أن تستدعي", instructions);
+        Assert.DoesNotContain("يجب أن تستدعي كل مكتبة", instructions);
     }
 }
