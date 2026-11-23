@@ -50,6 +50,21 @@ internal sealed record ResearchContextBudget(
                 DefaultFinalizationTimeoutSeconds, MinimumFinalizationTimeoutSeconds, MaximumFinalizationTimeoutSeconds)));
     }
 
+    /// <summary>
+    /// DuckAI's local gateway has a smaller reliable request envelope than the
+    /// optional local inference server. Keep DuckAI within the last known-good
+    /// limits while leaving the configurable profile unchanged for LM Studio.
+    /// </summary>
+    internal static ResearchContextBudget LoadDuckAi()
+    {
+        var configured = Load();
+        return configured with
+        {
+            MaxContextCharacters = Math.Min(configured.MaxContextCharacters, 20_000),
+            MaxOutputTokens = Math.Min(configured.MaxOutputTokens, 5_000)
+        };
+    }
+
     internal int GetAvailableInputCharacters(int systemPromptCharacters)
     {
         return Math.Max(
@@ -57,16 +72,24 @@ internal sealed record ResearchContextBudget(
             MaxContextCharacters - Math.Max(0, systemPromptCharacters) - ProtocolReserveCharacters);
     }
 
-    internal int GetEvidenceBudget(int availableCharacters, int estimatedEvidenceCharacters)
+    internal int GetEvidenceBudget(
+        int availableCharacters,
+        int estimatedEvidenceCharacters,
+        int maximumEvidenceCharacters = int.MaxValue)
     {
-        if (availableCharacters <= 0 || estimatedEvidenceCharacters <= 0)
+        if (availableCharacters <= 0 ||
+            estimatedEvidenceCharacters <= 0 ||
+            maximumEvidenceCharacters <= 0)
             return 0;
 
-        // Evidence can use up to two thirds of the available input space when
-        // needed; unused evidence space remains available to conversation history.
+        // Evidence can use up to two thirds of the available input space, subject
+        // to a provider-specific ceiling. The full tool output remains in the
+        // task ledger; only this excerpt is sent in an individual model request.
         return Math.Min(
-            Math.Max(1, availableCharacters * 2 / 3),
-            estimatedEvidenceCharacters);
+            maximumEvidenceCharacters,
+            Math.Min(
+                Math.Max(1, availableCharacters * 2 / 3),
+                estimatedEvidenceCharacters));
     }
 
     private static int ReadBoundedSetting(
