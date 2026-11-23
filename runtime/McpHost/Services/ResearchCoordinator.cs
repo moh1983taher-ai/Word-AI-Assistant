@@ -337,7 +337,7 @@ public sealed class ResearchCoordinator
             using var finalizationTimeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
             finalizationTimeout.CancelAfter(TimeSpan.FromSeconds(30));
 
-            var contextBudget = ResearchContextBudget.Load();
+            var contextBudget = ResearchContextBudget.LoadDuckAi();
             var availableInputCharacters = contextBudget.GetAvailableInputCharacters(systemPrompt.Length);
             var evidenceBudget = contextBudget.GetEvidenceBudget(
                 availableInputCharacters,
