@@ -22,6 +22,7 @@ assert.match(source, /function loadSelectedServerIds\(\)[\s\S]*?DEFAULT_SELECTED
 assert.match(source, /function getGroqTools\(selectedServerIds\)[\s\S]*?getSelectedMcpServers\(selectedServerIds\)/);
 assert.match(source, /تعرّف على الأدوات من أسمائها وأوصافها ومخططات معاملاتها/);
 assert.match(source, /أدر استخدام الأدوات بنفسك/);
+assert.match(source, /إذا طلب المستخدم صراحة البحث داخل إحدى المكتبات المختارة/);
 assert.match(source, /المكتبات المتاحة لهذه المهمة وفق اختيار المستخدم/);
 assert.doesNotMatch(source, /لك حرية استخدام إحداهما أو كلتيهما/);
 assert.doesNotMatch(source, /لا يلزمك البحث في كلتيهما/);
@@ -48,17 +49,56 @@ const oneOfTwoLibraries = validateResearchResult(
   "DuckAI المحلي",
   "إجابة مستندة إلى البحث",
   [{ server: "shamela", tool: "shamela_find", completed: true }],
-  ["aljam3", "shamela"]
+  ["aljam3", "shamela"],
+  [{ role: "user", text: "ابحث في المكتبة الشاملة عن الأمر الوارد بعد الحظر" }]
 );
 assert.equal(oneOfTwoLibraries.answer, "إجابة مستندة إلى البحث");
 assert.equal(oneOfTwoLibraries.toolCalls.length, 1);
 assert.equal(oneOfTwoLibraries.toolCalls[0].server, "shamela");
 assert.throws(
   function () {
-    validateResearchResult("DuckAI المحلي", "إجابة", [], ["aljam3", "shamela"]);
+    validateResearchResult(
+      "DuckAI المحلي",
+      "إجابة",
+      [],
+      ["aljam3", "shamela"],
+      [{ role: "user", text: "ابحث في المكتبة الشاملة عن الأمر الوارد بعد الحظر" }]
+    );
   },
   /لم يُظهر أي استدعاء فعلي/
 );
+const generalAnswer = validateResearchResult(
+  "DuckAI المحلي",
+  "شرح موجز لمعنى الاجتهاد",
+  [],
+  ["aljam3", "shamela"],
+  [{ role: "user", text: "ما معنى الاجتهاد؟" }]
+);
+assert.equal(generalAnswer.answer, "شرح موجز لمعنى الاجتهاد");
+assert.equal(generalAnswer.toolCalls.length, 0);
+
+const ordinaryBookQuestion = validateResearchResult(
+  "DuckAI المحلي",
+  "المقصود بالموافقات",
+  [],
+  ["aljam3", "shamela"],
+  [{ role: "user", text: "ما المقصود بكتاب الموافقات؟" }]
+);
+assert.equal(ordinaryBookQuestion.toolCalls.length, 0);
+
+assert.throws(
+  function () {
+    validateResearchResult(
+      "DuckAI المحلي",
+      "إجابة",
+      [{ server: "shamela", tool: "shamela_find", completed: false }],
+      ["aljam3", "shamela"],
+      [{ role: "user", text: "أريد مراجع موثقة عن المسألة" }]
+    );
+  },
+  /لم يُرجع نتيجة ناجحة/
+);
+
 assert.throws(
   function () {
     validateResearchResult(

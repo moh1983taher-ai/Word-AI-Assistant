@@ -184,9 +184,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.0'
-          $title = 'ResearchTools Unified Setup v1.2.0'
-          $notes = 'Unified one-file x64 installer v1.2.0: self-contained .NET 10 MCP host v1.2.0; unified concise agent instructions across DuckAI, LM Studio and cloud MCP; removes duplicate research instructions, fixed history/message clipping, the 700-character MCP tool-description truncation, and the fixed 40,000-character tool-catalog ceiling; retains complete MCP outputs in task memory and allocates evidence and conversation context from an adaptive budget (64,000 characters by default, configurable up to 196,000); raises the default model output budget to 8,192 tokens (configurable up to 32,768); extends the default research window to 600 seconds and model request timeout to 120 seconds, both configurable; no fixed search count, source count, or tool-call cutoff—the model manages the MCP tool-use loop; preserves strict JSON tool decisions, user-selected source boundaries, read-only MCP tools, source provenance, citation accuracy, endpoint failover, SHA-256 verification, staged installation and rollback backup. Does not modify C:\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.2.1'
+          $title = 'ResearchTools Unified Setup v1.2.1'
+          $notes = 'Unified one-file x64 installer v1.2.1: self-contained .NET 10 MCP host v1.2.1; keeps model-led MCP tool selection and follow-up depth, while explicitly requiring a real selected-library tool call when the user wording asks for source research, quotations, or references; defers one premature final decision and prompts the model to reconsider, then rejects an unsupported no-tool final instead of presenting it as researched; general conversational requests remain free to finish without source lookup; does not force use of every selected library or impose a search/tool-call count; preserves adaptive context/evidence budgets, complete MCP task evidence, strict JSON tool decisions, user-selected source boundaries, read-only MCP tools, source provenance, citation accuracy, endpoint failover, SHA-256 verification, staged installation and rollback backup. Does not modify C:\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {

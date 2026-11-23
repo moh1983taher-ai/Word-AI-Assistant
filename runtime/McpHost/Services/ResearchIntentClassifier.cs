@@ -12,6 +12,7 @@ public static class ResearchIntentClassifier
         "البحث عن",
         "بحثاً عن",
         "بحثًا عن",
+        "بحث في",
         "بحث علمي",
         "مصدر",
         "مصادر",
@@ -22,25 +23,30 @@ public static class ResearchIntentClassifier
         "وثق",
         "استشهد",
         "استشهاد",
-        "دراسة",
-        "دراسات",
+        "الدراسات السابقة",
+        "دراسات سابقة",
+        "دراسات حول",
+        "دراسات عن",
         "أبحاث",
         "ابحاث",
         "رسالة علمية",
         "رسائل علمية",
-        "كتاب",
-        "كتب",
         "المكتبة الشاملة",
-        "الجامع",
         "تخريج",
         "أقوال العلماء",
         "اقوال العلماء",
+        "أقوال الأصوليين",
+        "اقوال الاصوليين",
+        "أقوال الفقهاء",
+        "اقوال الفقهاء",
         "نصوص العلماء",
+        "نصوص الأصوليين",
         "citations",
         "references",
         "bibliography",
         "sources",
         "search for",
+        "search in",
         "find studies",
         "research sources"
     ];
@@ -53,4 +59,11 @@ public static class ResearchIntentClassifier
         return SourceIndicators.Any(indicator =>
             userMessage.Contains(indicator, StringComparison.OrdinalIgnoreCase));
     }
+
+    /// <summary>
+    /// A source-based request cannot be finalized until at least one selected MCP
+    /// tool has completed successfully. General conversational requests remain model-led.
+    /// </summary>
+    public static bool MustUseMcpBeforeFinal(string? userMessage, int successfulToolCalls) =>
+        successfulToolCalls <= 0 && RequiresMcpSources(userMessage);
 }
