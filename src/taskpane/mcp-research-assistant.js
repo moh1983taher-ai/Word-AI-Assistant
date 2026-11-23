@@ -435,7 +435,6 @@
     }
     const selectedLabels = selectedServers.map(function (server) { return server.label; });
     const history = (Array.isArray(messages) ? messages : [])
-      .slice(-20)
       .map(function (message) {
         const role = message && message.role === "assistant" ? "المساعد" : "الباحث";
         const text = String(message && message.text || "");
