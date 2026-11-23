@@ -121,6 +121,7 @@ public sealed class DuckAiEndpointSelectionTests
 
         using var payload = System.Text.Json.JsonDocument.Parse(capturedPayload!);
         Assert.Equal(0, payload.RootElement.GetProperty("temperature").GetDouble());
+        Assert.Equal(5_000, payload.RootElement.GetProperty("max_tokens").GetInt32());
         var responseFormat = payload.RootElement.GetProperty("response_format");
         Assert.Equal("json_schema", responseFormat.GetProperty("type").GetString());
         Assert.True(responseFormat.GetProperty("json_schema").GetProperty("strict").GetBoolean());
