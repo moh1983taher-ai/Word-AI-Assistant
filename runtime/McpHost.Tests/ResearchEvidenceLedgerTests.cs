@@ -74,6 +74,27 @@ public sealed class ResearchEvidenceLedgerTests
     }
 
     [Fact]
+    public void SendsCompleteLargeToolOutputWhenTheAdaptiveContextCanHoldIt()
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
+        var descriptor = new ToolDescriptor(
+            "shamela", "المكتبة الشاملة", "shamela_open_many", "", schema.RootElement.Clone());
+        var fullResult = "بداية النتيجة " + new string('ن', 24_000) + " نهاية النتيجة";
+
+        var ledger = new ResearchEvidenceLedger();
+        ledger.Add(descriptor, fullResult, succeeded: true);
+
+        var context = ledger.BuildContext(
+            ["shamela"],
+            Array.Empty<string>(),
+            maxCharacters: 32_000);
+
+        Assert.True(context.Length > 10_000);
+        Assert.Contains(fullResult, context);
+        Assert.DoesNotContain("مقتطف؛ النص الكامل", context);
+    }
+
+    [Fact]
     public void IdentifiesPendingSourcesInTheRebuiltEvidenceContext()
     {
         using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
