@@ -11,10 +11,6 @@ namespace ResearchTools.McpHost.Services;
 /// </summary>
 public sealed class LmStudioResearchAgent
 {
-    private const int MaxConversationMessages = 40;
-    private static readonly TimeSpan ResearchTimeout = TimeSpan.FromSeconds(300);
-    private static readonly TimeSpan FinalizationTimeout = TimeSpan.FromSeconds(30);
-
     private readonly LmStudioClient _lmStudio;
     private readonly McpSourceRegistry _sources;
     private readonly HostLog _log;
@@ -42,8 +38,9 @@ public sealed class LmStudioResearchAgent
         if (messages.Count == 0)
             throw new InvalidOperationException("لا توجد رسائل بحث صالحة.");
 
+        var contextBudget = ResearchContextBudget.Load();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
-        timeout.CancelAfter(ResearchTimeout);
+        timeout.CancelAfter(contextBudget.ResearchTimeout);
 
         var warnings = new List<string>();
         var trace = new List<ToolCallTrace>();
@@ -116,7 +113,6 @@ public sealed class LmStudioResearchAgent
                 .ToArray();
 
             var systemPrompt = BuildSystemPrompt(selectedServerIds, warnings);
-            var contextBudget = ResearchContextBudget.Load();
             var availableInputCharacters = contextBudget.GetAvailableInputCharacters(systemPrompt.Length);
             var input = BuildTranscript(
                 messages,
@@ -274,7 +270,7 @@ public sealed class LmStudioResearchAgent
         try
         {
             using var finalizationTimeout = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation);
-            finalizationTimeout.CancelAfter(FinalizationTimeout);
+            finalizationTimeout.CancelAfter(contextBudget.FinalizationTimeout);
 
             var completion = await _lmStudio.ChatAsync(
                 model,
@@ -309,7 +305,6 @@ public sealed class LmStudioResearchAgent
                 message is not null &&
                 (message.Role == "user" || message.Role == "assistant") &&
                 !string.IsNullOrWhiteSpace(message.GetText()))
-            .TakeLast(MaxConversationMessages)
             .Select(message => new DuckChatMessage(
                 message.Role!,
                 message.GetText().Trim()))
