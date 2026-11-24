@@ -81,6 +81,54 @@ public sealed class ResearchEvidenceLedgerTests
     }
 
     [Fact]
+    public void ExtractsPageTextAndMetadataWhilePreservingTheRawOpenResult()
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
+        var open = new ToolDescriptor("shamela", "المكتبة الشاملة", "shamela_open", "", schema.RootElement.Clone());
+        var pageText = "بداية النص المطلوب " + string.Concat(Enumerable.Repeat("هذا نص الصفحة وسياقها. ", 80)) + " نهاية النص الذي يجب ألا يضيع.";
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            book_id = 21592,
+            page_id = 1157,
+            title = "كتاب في القواعد",
+            text = new { content = pageText }
+        });
+
+        var ledger = new ResearchEvidenceLedger();
+        ledger.Add(open, json, succeeded: true);
+        var entry = Assert.Single(ledger.Entries);
+        var context = ledger.BuildContext(["shamela"], Array.Empty<string>(), 12_000);
+
+        Assert.Equal(json, entry.Content);
+        Assert.Contains("book_id=21592", context);
+        Assert.Contains("بداية النص المطلوب", context);
+        Assert.Contains("نهاية النص الذي يجب ألا يضيع", context);
+    }
+
+    [Fact]
+    public void KeepsBeginningAndEndingOfLongOpenedPageWhenContextMustBeReduced()
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
+        var open = new ToolDescriptor("aljam3", "الجامع", "get_page", "", schema.RootElement.Clone());
+        var pageText = "بداية الصفحة التي تتضمن الموضوع. " +
+            string.Concat(Enumerable.Repeat("مقطع من نص الصفحة. ", 900)) +
+            "النهاية التي تتضمن الشاهد المهم.";
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            file_id = 8291,
+            page_number = 471,
+            text = new { content = pageText }
+        });
+
+        var ledger = new ResearchEvidenceLedger();
+        ledger.Add(open, json, succeeded: true);
+        var context = ledger.BuildContext(["aljam3"], Array.Empty<string>(), 1_200);
+
+        Assert.Contains("بداية الصفحة", context);
+        Assert.Contains("النهاية التي تتضمن الشاهد المهم", context);
+    }
+
+    [Fact]
     public void PreservesExplicitNoMatchResponsesForTheFinalAnswer()
     {
         using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
