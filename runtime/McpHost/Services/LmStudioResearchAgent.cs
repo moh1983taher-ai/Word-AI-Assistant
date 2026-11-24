@@ -46,6 +46,8 @@ public sealed class LmStudioResearchAgent
         var trace = new List<ToolCallTrace>();
         var evidenceLedger = new ResearchEvidenceLedger();
         var seenToolCalls = new HashSet<string>(StringComparer.Ordinal);
+        IReadOnlyList<ToolDescriptor> safeTools = [];
+        IReadOnlyList<McpServerInstruction> serverInstructions = [];
 
         try
         {
@@ -54,7 +56,8 @@ public sealed class LmStudioResearchAgent
             var discovery = await _sources.DiscoverSelectedAsync(selectedServerIds, timeout.Token);
             warnings.AddRange(discovery.Warnings);
 
-            var safeTools = discovery.Tools;
+            safeTools = discovery.Tools;
+            serverInstructions = discovery.ServerInstructions;
             foreach (var sourceId in selectedServerIds)
             {
                 if (!safeTools.Any(tool => string.Equals(tool.Server, sourceId, StringComparison.Ordinal)))
@@ -112,8 +115,17 @@ public sealed class LmStudioResearchAgent
                     item.Tools))
                 .ToArray();
 
-            var systemPrompt = BuildSystemPrompt(selectedServerIds, warnings);
+            var systemPrompt = BuildSystemPrompt(selectedServerIds, warnings, safeTools, serverInstructions);
             var availableInputCharacters = contextBudget.GetAvailableInputCharacters(systemPrompt.Length);
+            if (availableInputCharacters <= 1)
+            {
+                var serverInstructionCharacters = serverInstructions.Sum(instruction => instruction.Text.Length);
+                _log.Error(
+                    $"LM Studio MCP instructions exceed the configured context budget: task={taskId}; serverInstructionCharacters={serverInstructionCharacters}; systemPromptCharacters={systemPrompt.Length}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}.");
+                throw new InvalidOperationException(
+                    $"تعذر تجهيز تعليمات خوادم MCP ضمن ميزانية السياق الحالية في LM Studio. بلغ حجم تعليمات النظام {systemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف.");
+            }
+
             var input = BuildTranscript(
                 messages,
                 availableInputCharacters,
@@ -171,6 +183,8 @@ public sealed class LmStudioResearchAgent
                         messages,
                         evidenceLedger,
                         selectedServerIds,
+                        safeTools,
+                        serverInstructions,
                         warnings,
                         requestCancellation,
                         taskId);
@@ -225,6 +239,8 @@ public sealed class LmStudioResearchAgent
                 messages,
                 evidenceLedger,
                 selectedServerIds,
+                safeTools,
+                serverInstructions,
                 warnings,
                 requestCancellation,
                 taskId);
@@ -238,18 +254,28 @@ public sealed class LmStudioResearchAgent
         IReadOnlyList<DuckChatMessage> messages,
         ResearchEvidenceLedger evidenceLedger,
         IReadOnlyList<string> selectedServerIds,
+        IReadOnlyList<ToolDescriptor> tools,
+        IReadOnlyList<McpServerInstruction> serverInstructions,
         List<string> warnings,
         CancellationToken requestCancellation,
         string taskId)
     {
         var finalizationPrompt = ResearchAgentInstructions.Build(
             selectedServerIds.Select(ResearchSourceSelection.GetLabel).ToArray(),
-            warnings) +
+            warnings,
+            tools,
+            serverInstructions) +
             Environment.NewLine + Environment.NewLine +
             "انتهت مهلة البحث؛ هذه صياغة نهائية جزئية ولا تتاح فيها استدعاءات أدوات جديدة. استند إلى الأدلة المتاحة وبيّن أن البحث لم يكتمل.";
 
         var contextBudget = ResearchContextBudget.Load();
         var availableInputCharacters = contextBudget.GetAvailableInputCharacters(finalizationPrompt.Length);
+        if (availableInputCharacters <= 1)
+        {
+            warnings.Add("لم تتسع ميزانية السياق لتعليمات الخادم ومرحلة الصياغة الجزئية؛ عُرضت الأدلة التي جُمعت دون طلب توليد جديد.");
+            return (BuildEvidenceFallback(evidenceLedger, selectedServerIds), model);
+        }
+
         var evidenceBudget = contextBudget.GetEvidenceBudget(
             availableInputCharacters,
             evidenceLedger.EstimatedContextCharacters);
@@ -337,11 +363,15 @@ public sealed class LmStudioResearchAgent
 
     private static string BuildSystemPrompt(
         IReadOnlyList<string> selectedServerIds,
-        IReadOnlyList<string> warnings)
+        IReadOnlyList<string> warnings,
+        IReadOnlyList<ToolDescriptor> tools,
+        IReadOnlyList<McpServerInstruction> serverInstructions)
     {
         return ResearchAgentInstructions.Build(
             selectedServerIds.Select(ResearchSourceSelection.GetLabel).ToArray(),
-            warnings);
+            warnings,
+            tools,
+            serverInstructions);
     }
 
     private static string BuildEvidenceFallback(

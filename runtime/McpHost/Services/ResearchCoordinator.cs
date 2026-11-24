@@ -65,6 +65,8 @@ public sealed class ResearchCoordinator
         var trace = new List<ToolCallTrace>();
         var evidenceLedger = new ResearchEvidenceLedger();
         var model = request.Model ?? string.Empty;
+        IReadOnlyList<ToolDescriptor> availableTools = [];
+        IReadOnlyList<McpServerInstruction> serverInstructions = [];
 
         try
         {
@@ -97,6 +99,8 @@ public sealed class ResearchCoordinator
             var discovery = await _sources.DiscoverSelectedAsync(selectedServerIds, timeout.Token);
             warnings.AddRange(discovery.Warnings);
             var activeTools = discovery.Tools;
+            availableTools = activeTools;
+            serverInstructions = discovery.ServerInstructions;
             var unavailableSources = selectedServerIds
                 .Where(server => !activeTools.Any(tool =>
                     string.Equals(tool.Server, server, StringComparison.Ordinal)))
@@ -137,6 +141,7 @@ public sealed class ResearchCoordinator
                     turnTools,
                     selectedLabels,
                     warnings,
+                    serverInstructions,
                     out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
                     "تواصل مع مضيف MCP عبر بروتوكول قرارات JSON. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق؛ في tool_call املأ type وserver وtool وarguments واترك answer فارغاً، وفي final املأ type وanswer واجعل server وtool فارغين وarguments null.";
@@ -144,12 +149,13 @@ public sealed class ResearchCoordinator
                 var availableInputCharacters = contextBudget.GetAvailableInputCharacters(turnSystemPrompt.Length);
                 if (availableInputCharacters <= 1)
                 {
+                    var serverInstructionCharacters = serverInstructions.Sum(instruction => instruction.Text.Length);
                     var minimumRequiredCharacters = turnSystemPrompt.Length + 2_048 + 2;
                     var configuredBudget = Environment.GetEnvironmentVariable("RESEARCHTOOLS_CONTEXT_BUDGET_CHARS");
                     _log.Error(
-                        $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; toolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
+                        $"MCP instructions and tool catalog exceed the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; toolCatalogCharacters={toolCatalogCharacters}; serverInstructionCharacters={serverInstructionCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
                     throw new InvalidOperationException(
-                        $"تعذر تجهيز تعريفات أدوات MCP ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات {turnSystemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف. راجع سجل المضيف لمعرفة تفاصيل مخططات الأدوات، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS ضمن سعة النموذج الفعلية.");
+                        $"تعذر تجهيز تعليمات خوادم MCP وتعريفات أدواتها ضمن ميزانية السياق الحالية. يبلغ حجم تعليمات النظام والكتالوج {turnSystemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف. راجع سجل المضيف لمعرفة أحجام أوصاف الأدوات وتعليمات الخوادم، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS ضمن سعة النموذج الفعلية.");
                 }
 
                 var evidenceBudget = contextBudget.GetEvidenceBudget(
@@ -301,6 +307,8 @@ public sealed class ResearchCoordinator
                 evidenceLedger,
                 selectedServerIds,
                 pendingSources,
+                availableTools,
+                serverInstructions,
                 warnings,
                 requestCancellation,
                 taskId);
@@ -332,13 +340,17 @@ public sealed class ResearchCoordinator
         ResearchEvidenceLedger evidenceLedger,
         IReadOnlyList<string> selectedServerIds,
         IReadOnlyList<string> pendingSourceIds,
+        IReadOnlyList<ToolDescriptor> tools,
+        IReadOnlyList<McpServerInstruction> serverInstructions,
         List<string> warnings,
         CancellationToken requestCancellation,
         string taskId)
     {
         var systemPrompt = ResearchAgentInstructions.Build(
             selectedServerIds.Select(ResearchSourceSelection.GetLabel).ToArray(),
-            warnings) +
+            warnings,
+            tools,
+            serverInstructions) +
             Environment.NewLine + Environment.NewLine +
             "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. اعرض ما تسمح به الأدلة المتاحة ووضّح أن البحث لم يكتمل." +
             Environment.NewLine +
@@ -351,6 +363,12 @@ public sealed class ResearchCoordinator
 
             var contextBudget = ResearchContextBudget.LoadDuckAi();
             var availableInputCharacters = contextBudget.GetAvailableInputCharacters(systemPrompt.Length);
+            if (availableInputCharacters <= 1)
+            {
+                warnings.Add("لم تتسع ميزانية السياق لتعليمات خوادم MCP ومرحلة الصياغة الجزئية؛ عُرضت الأدلة التي جُمعت دون طلب توليد جديد.");
+                return (BuildTimeoutFallback(evidenceLedger, selectedServerIds, pendingSourceIds), model);
+            }
+
             var evidenceBudget = contextBudget.GetEvidenceBudget(
                 availableInputCharacters,
                 evidenceLedger.EstimatedContextCharacters,
@@ -564,13 +582,14 @@ public sealed class ResearchCoordinator
         IReadOnlyList<ToolDescriptor> tools,
         IReadOnlyList<string> selectedLabels,
         IReadOnlyList<string> warnings,
+        IReadOnlyList<McpServerInstruction> serverInstructions,
         out int toolCatalogCharacters)
     {
         var serializedTools = JsonSerializer.Serialize(tools, JsonDefaults.Web);
         toolCatalogCharacters = serializedTools.Length;
 
         var builder = new System.Text.StringBuilder(
-            ResearchAgentInstructions.Build(selectedLabels, warnings));
+            ResearchAgentInstructions.Build(selectedLabels, warnings, tools, serverInstructions));
         builder.AppendLine().AppendLine("أدوات MCP المتاحة ومخططات معاملاتها:");
         builder.AppendLine(serializedTools);
         return builder.ToString();
