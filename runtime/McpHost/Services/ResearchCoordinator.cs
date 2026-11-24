@@ -105,20 +105,26 @@ public sealed class ResearchCoordinator
 
             if (unavailableSources.Length > 0)
             {
-                var unavailableLabels = unavailableSources.Select(ResearchSourceSelection.GetLabel);
+                var unavailableLabels = unavailableSources
+                    .Select(ResearchSourceSelection.GetLabel)
+                    .ToArray();
                 warnings.Add(
-                    "لم تتوفر أدوات قراءة مسموح بها في المكتبات المختارة الآتية: " +
+                    "تعذر الاتصال بأدوات البحث في المكتبات المختارة الآتية: " +
                     string.Join("، ", unavailableLabels) +
-                    ". سيواصل النموذج باستخدام الأدوات المتاحة، ولن تُعد المكتبات غير المتاحة دليلاً على عدم وجود مصادر.");
+                    ". أُوقف البحث قبل التنفيذ حتى لا تُعرض تغطية جزئية بوصفها بحثاً في جميع المصادر.");
+
+                var answer =
+                    "تعذر بدء البحث في جميع المكتبات التي اخترتها. لم تتوفر أدوات بحث في: " +
+                    string.Join("، ", unavailableLabels) +
+                    ". لم يُنفذ بحث جزئي، ولا يصح استنتاج عدم وجود مصادر في هذه المكتبات.";
+                return new ResearchResponse(answer, model, trace.ToArray(), warnings.ToArray());
             }
 
             if (activeTools.Count == 0)
             {
-                var unavailableLabels = selectedServerIds.Select(ResearchSourceSelection.GetLabel);
                 var answer =
-                    "تعذر بدء البحث؛ لم تتوفر أدوات قراءة مسموح بها في المكتبات التي اخترتها: " +
-                    string.Join("، ", unavailableLabels) +
-                    ". لم يُنفذ بحث يمكن الاستناد إلى نتائجه، ولا يصح استنتاج عدم وجود مصادر للمسألة.";
+                    "تعذر بدء البحث؛ لم تتوفر أدوات قراءة مسموح بها في المكتبات التي اخترتها. " +
+                    "لم يُنفذ بحث يمكن الاستناد إلى نتائجه، ولا يصح استنتاج عدم وجود مصادر للمسألة.";
                 return new ResearchResponse(answer, model, trace.ToArray(), warnings.ToArray());
             }
 
