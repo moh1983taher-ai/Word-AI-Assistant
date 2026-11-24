@@ -46,6 +46,22 @@ public sealed class ResearchIntentClassifierTests
             "ابحث عن القاعدة في الجامع والمكتبة الشاملة", selected, searched));
     }
 
+    [Theory]
+    [InlineData("ما حكم بناء القوي على الضعيف؟")]
+    [InlineData("أين وردت قاعدة بناء القوي على الضعيف في كتب الفقه؟")]
+    [InlineData("ما موقف الحنفية وغيرهم من هذه القاعدة؟")]
+    public void ResearchModeRequiresSearchForNaturalQuestionsWithoutSearchKeywords(string prompt)
+    {
+        var selected = new[] { "aljam3", "shamela" };
+
+        Assert.Equal(
+            selected,
+            ResearchIntentClassifier.GetPendingSearchSources(
+                prompt,
+                selected,
+                new HashSet<string>(StringComparer.Ordinal)));
+    }
+
     [Fact]
     public void DoesNotRequireMcpSearchCoverageForNonResearchRequests()
     {
