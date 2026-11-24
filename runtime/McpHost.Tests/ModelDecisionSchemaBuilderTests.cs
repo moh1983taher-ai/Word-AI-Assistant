@@ -61,6 +61,14 @@ public sealed class ModelDecisionSchemaBuilderTests
                 .EnumerateArray().Select(item => item.GetString()).ToArray());
 
         var arguments = properties.GetProperty("arguments").GetProperty("anyOf");
+        var argumentDescriptions = arguments.EnumerateArray()
+            .Select(item => item.GetProperty("description").GetString())
+            .ToArray();
+        Assert.Contains(argumentDescriptions, description =>
+            description is not null && description.Contains("aljam3/search", StringComparison.Ordinal));
+        Assert.Contains(argumentDescriptions, description =>
+            description is not null && description.Contains("aljam3/get_page", StringComparison.Ordinal));
+
         var searchArguments = arguments.EnumerateArray().Single(item =>
             item.GetProperty("properties").TryGetProperty("query", out _));
         var searchProperties = searchArguments.GetProperty("properties");
