@@ -27,8 +27,10 @@ internal sealed class McpEvidenceProvenance
 
     private readonly Dictionary<string, SourceIndex> _sources = new(StringComparer.Ordinal);
 
-    internal int SearchHitCount { get; private set; }
-    internal int VerifiedOpenCount { get; private set; }
+    internal int SearchHitCount => _sources.Values.Sum(index => index.SearchHitCount);
+    internal int VerifiedOpenCount => _sources.Values.Sum(index => index.VerifiedOpenCount);
+    internal bool HasUnverifiedSearchHits =>
+        _sources.Values.Any(index => index.SearchHitCount > 0 && index.VerifiedOpenCount == 0);
 
     internal int SearchReferenceCount =>
         _sources.Values.Sum(index => index.ReferenceCount);
@@ -60,10 +62,9 @@ internal sealed class McpEvidenceProvenance
         if (isError)
             return 0;
 
-        if (hasUsableContent)
-            SearchHitCount++;
-
         var index = GetSourceIndex(descriptor.Server);
+        if (hasUsableContent)
+            index.SearchHitCount++;
         var before = index.ReferenceCount;
 
         if (structuredContent is { } structured &&
@@ -161,7 +162,7 @@ internal sealed class McpEvidenceProvenance
     internal void RecordVerifiedOpen(ToolDescriptor descriptor, bool succeeded)
     {
         if (succeeded && IsReferenceReadTool(descriptor))
-            VerifiedOpenCount++;
+            GetSourceIndex(descriptor.Server).VerifiedOpenCount++;
     }
 
     private SourceIndex GetSourceIndex(string sourceId)
@@ -410,6 +411,8 @@ internal sealed class McpEvidenceProvenance
 
     private sealed class SourceIndex
     {
+        internal int SearchHitCount { get; set; }
+        internal int VerifiedOpenCount { get; set; }
         internal HashSet<string> BookIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> PageIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> OpaqueIds { get; } = new(StringComparer.Ordinal);
