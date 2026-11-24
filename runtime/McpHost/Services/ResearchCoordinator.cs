@@ -405,7 +405,7 @@ public sealed class ResearchCoordinator
 
                         coverageCorrectionAttempts++;
                         _log.Warning(
-                            $"Research final coverage deferred: task={taskId}; attempt={coverageCorrectionAttempts}; missingCoverageItems={missingCoverage.Length}; recovery=targeted_research.");
+                            $"Research final coverage deferred: task={taskId}; attempt={coverageCorrectionAttempts}; missingCoverageItems={unreportedCoverage.Length}; recovery=targeted_research.");
                         messages.Add(new DuckChatMessage("assistant", decision.Raw));
                         messages.Add(new DuckChatMessage(
                             "user",
