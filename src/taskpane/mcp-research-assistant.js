@@ -14,6 +14,16 @@
   const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
   const GEMINI_STREAM_TIMEOUT_MS = 20 * 60 * 1000;
   const GEMINI_STREAM_RECONNECT_LIMIT = 3;
+  const GEMINI_MCP_AGENT = "antigravity-preview-09-2026";
+  const GEMINI_MCP_AGENT_MODELS = Object.freeze([
+    "gemini-4-hydrogen",
+    "gemini-4-carbon",
+    "gemini-4-argon",
+    "gemini-4-neon",
+    "gemini-3.8-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite"
+  ]);
 
   const GROQ_REMOTE_MCP_MODELS = Object.freeze([
     "openai/gpt-oss-20b",
@@ -126,10 +136,17 @@
       if (!current.model) {
         return { ready: false, title: "لم يُحدد نموذج Gemini", detail: "اختر نموذج Gemini من قائمة النماذج في إعدادات الذكاء الاصطناعي العامة." };
       }
+      if (GEMINI_MCP_AGENT_MODELS.indexOf(current.model) < 0) {
+        return {
+          ready: false,
+          title: "نموذج Gemini المختار غير مدعوم مع MCP البعيد",
+          detail: "يتطلب MCP البعيد وكيل Antigravity. اختر نموذجًا مدعومًا: " + GEMINI_MCP_AGENT_MODELS.join("، ")
+        };
+      }
       return {
         ready: true,
-        title: "Gemini جاهز للبحث السحابي عبر MCP",
-        detail: "النموذج المختار من إعدادات الذكاء الاصطناعي العامة: " + current.model
+        title: "Gemini جاهز للبحث السحابي عبر وكيل Antigravity",
+        detail: "وكيل MCP: " + GEMINI_MCP_AGENT + "؛ النموذج الداخلي: " + current.model
       };
     }
     return {
@@ -489,12 +506,22 @@
         type: "mcp_server",
         name: server.id,
         url: server.url,
-        allowed_tools: [{
-          mode: "auto",
-          tools: server.tools.slice()
-        }]
+        allowed_tools: server.tools.slice()
       };
     });
+  }
+
+  function buildGeminiInteractionRequest(messages, settings, serverIds) {
+    return {
+      agent: GEMINI_MCP_AGENT,
+      input: buildResearchInput(messages, serverIds),
+      environment: "remote",
+      agent_config: {
+        type: "antigravity",
+        model: settings.model
+      },
+      tools: getGeminiTools(serverIds)
+    };
   }
 
   async function postCloudJson(url, headers, body, providerLabel) {
@@ -1188,12 +1215,10 @@
   }
 
   async function callGeminiResearchForSource(messages, settings, serverIds) {
-    const payload = await postGeminiInteractionStream({
-      model: settings.model,
-      input: buildResearchInput(messages, serverIds),
-      environment: "remote",
-      tools: getGeminiTools(serverIds)
-    }, settings.key);
+    const payload = await postGeminiInteractionStream(
+      buildGeminiInteractionRequest(messages, settings, serverIds),
+      settings.key
+    );
 
     const interaction = getGeminiInteraction(payload);
     const interactionStatus = interaction.status || payload.status;
