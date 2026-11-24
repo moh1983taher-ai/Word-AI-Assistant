@@ -10,9 +10,11 @@ internal static class ResearchDecisionProtocol
 {
     internal static string BuildTurnInstructions(
         bool allowFinal,
-        IReadOnlyList<string> pendingSourceLabels)
+        IReadOnlyList<string> pendingSourceLabels,
+        IReadOnlyList<string>? pendingPageSourceLabels = null)
     {
         ArgumentNullException.ThrowIfNull(pendingSourceLabels);
+        pendingPageSourceLabels ??= [];
 
         var builder = new StringBuilder();
         builder.AppendLine("بروتوكول قرار البحث (JSON عادي):");
@@ -27,14 +29,27 @@ internal static class ResearchDecisionProtocol
 
         if (!allowFinal)
         {
-            builder.Append("لا يُسمح بالإجابة النهائية الآن. لم يكتمل البحث في: ")
-                .Append(string.Join("، ", pendingSourceLabels))
-                .AppendLine(". نفّذ بحثاً ناجحاً في كل مصدر متبقٍ، ثم افتح الصفحات المطابقة للنتائج.");
+            builder.AppendLine("لا يُسمح بالإجابة النهائية الآن.");
+            if (pendingSourceLabels.Count > 0)
+            {
+                builder.Append("لم يكتمل البحث الأولي في: ")
+                    .Append(string.Join("، ", pendingSourceLabels))
+                    .AppendLine(". نفّذ بحثاً ناجحاً في كل مصدر متبقٍ.");
+            }
+
+            if (pendingPageSourceLabels.Count > 0)
+            {
+                builder.Append("أعادت المصادر الآتية نتائج فعلية، لكن لم يتحقق المضيف من فتح صفحة مطابقة فيها بعد: ")
+                    .Append(string.Join("، ", pendingPageSourceLabels))
+                    .AppendLine(". افتح صفحة واحدة على الأقل من كل مصدر مذكور، مستخدماً المعرّفات الواردة حرفياً في نتيجة البحث من المصدر نفسه، ثم افحص النص وسياقه.");
+            }
+
+            builder.AppendLine("لا تخرج قرار final ما دام أي من الشرطين السابقين غير مكتمل؛ أخرج قرار tool_call لأداة الفتح المناسبة.");
         }
         else
         {
             builder.AppendLine(
-                "اكتمل البحث الأولي في المصادر التي اختارها المستخدم. يمكنك فتح الصفحات التي ستستشهد بها أو تنفيذ بحث تكميلي، ثم أجب عندما تتحقق من الأدلة.");
+                "اكتمل البحث الأولي، وفتح المضيف صفحة متحققة من كل مصدر أعاد نتائج فعلية. يمكنك الآن صياغة الإجابة مع الاقتصار على الأدلة التي فُتحت وتحققت.");
         }
 
         return builder.ToString();
