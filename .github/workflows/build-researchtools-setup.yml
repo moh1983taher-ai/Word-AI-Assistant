@@ -63,7 +63,18 @@ jobs:
             Select-Object -First 1
           $workflowVersionMatch = [regex]::Match(
             [string]$releaseVersionLine,
-            '(?m)^\s*\$releaseVersion\s*=\s*''(?<version>\d+\.\d+\.\d+)''\s*          foreach ($required in @('ResearchTools-MCP-Host-release.zip','ResearchTools-Launcher.vbs','-McpHostArchive','-McpHostShaFile','-LauncherFile')) {
+            "(?m)^\s*`$releaseVersion\s*=\s*'(?<version>\d+\.\d+\.\d+)'\s*$")
+          if (-not $hostVersionMatch.Success -or -not $setupVersionMatch.Success -or -not $workflowVersionMatch.Success) {
+            throw 'Could not read MCP host, Inno Setup and release workflow versions.'
+          }
+          $hostVersion = $hostVersionMatch.Groups['version'].Value
+          $setupVersion = $setupVersionMatch.Groups['version'].Value
+          $workflowVersion = $workflowVersionMatch.Groups['version'].Value
+          if ($hostVersion -ne $setupVersion -or $hostVersion -ne $workflowVersion) {
+            throw "Version mismatch: MCP host=$hostVersion; Setup=$setupVersion; release=$workflowVersion."
+          }
+          Write-Host "MCP host, Setup executable and release tag are aligned at v$hostVersion."
+          foreach ($required in @('ResearchTools-MCP-Host-release.zip','ResearchTools-Launcher.vbs','-McpHostArchive','-McpHostShaFile','-LauncherFile')) {
             if ($iss -notmatch [regex]::Escape($required)) { throw "Setup script does not embed $required." }
           }
           # Regression contract: the installer and Setup packager must require the
