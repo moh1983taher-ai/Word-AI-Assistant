@@ -59,7 +59,7 @@ public sealed class ModelDecisionParserTests
     [Fact]
     public void AcceptsJsonCodeFence()
     {
-        const string response = "```json\n{\"type\":\"final\",\"answer\":\"تم\"}\n```";
+        const string response = "```json\n{\"type\":\"final\",\"answer\":\"تم\",\"covered\":[\"محور\"],\"uncovered\":[]}\n```";
 
         Assert.True(ModelDecisionParser.TryParse(response, out var decision));
         Assert.Equal("تم", decision.Answer);
