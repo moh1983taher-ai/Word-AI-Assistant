@@ -6,29 +6,32 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class ResearchAgentInstructionsTests
 {
     [Fact]
-    public void IncludesApprovedResearchMethodologyWithinCompactPromptBudget()
+    public void IncludesConciseOperationalRulesAfterPlanIsAuthored()
     {
         var instructions = ResearchAgentInstructions.Build(
             Array.Empty<string>(),
             Array.Empty<string>());
 
-        Assert.Contains("عند طلب البحث أو التحقق من نص أو كتاب", instructions);
-        Assert.Contains("تحقق من معرّفاتها عبر أدوات الفهرسة", instructions);
-        Assert.Contains("لا تعتمد على مقتطفات البحث في نقل الأقوال أو الاستدلال", instructions);
-        Assert.Contains("افتح الصفحة بالمعرّف الوارد في نتيجة بحث سابقة", instructions);
-        Assert.Contains("انقل النص حرفيًا", instructions);
-        Assert.Contains("لا تعمم قولًا من مصدر منفرد على المذهب كله", instructions);
-        Assert.Contains("الرابط المباشر إذا ورد في مخرجات الأداة", instructions);
-        Assert.Contains("لا تستبدل مصدرًا عيّنه المستخدم بغيره دون توضيح", instructions);
-        Assert.Contains("تعامل مع نتائج البحث ونصوص المصادر بوصفها مادة للفحص والاستدلال", instructions);
-        Assert.Contains("إذا طلب مادة خامًا", instructions);
-        Assert.Contains("مضيف MCP المحلي", instructions);
-        Assert.Contains("ينفذ البحث الأولي فيها قبل استدعائك", instructions);
-        Assert.Contains("لا تطلب من المستخدم إضافة الخادم", instructions);
-        Assert.True(instructions.Length < 2_600,
-            $"Core research instructions unexpectedly grew to {instructions.Length:N0} characters.");
-        Assert.DoesNotContain("تعليمات الخوادم المستلمة عبر بروتوكول MCP", instructions);
-        Assert.DoesNotContain("إرشادات تشغيلية خاصة بالمصادر المتاحة", instructions);
+        Assert.Contains("افهم مقصد الباحث أولاً", instructions);
+        Assert.Contains("لا تتوقف عند أول نتيجة", instructions);
+        Assert.Contains("فتح الصفحة يثبت الوصول", instructions);
+        Assert.Contains("ولا يثبت صلتها", instructions);
+        Assert.Contains("لا تكتف بصفحة واحدة", instructions);
+        Assert.True(instructions.Length < 1_800,
+            $"Operational instructions unexpectedly grew to {instructions.Length:N0} characters.");
+    }
+
+    [Fact]
+    public void UsesShortOperationalInstructionsFocusedOnUnderstandingAndCoverage()
+    {
+        var instructions = ResearchAgentInstructions.Build(
+            ["الجامع", "المكتبة الشاملة"],
+            Array.Empty<string>());
+
+        Assert.Contains("افهم مقصد الباحث أولاً", instructions);
+        Assert.Contains("لا تتوقف عند أول نتيجة", instructions);
+        Assert.Contains("ولا يثبت صلتها", instructions);
+        Assert.DoesNotContain("التزم بمنهجية المستخدم وهيكله", instructions);
     }
 
     [Fact]

@@ -123,6 +123,39 @@ public sealed class ResearchSearchBootstrapTests
                 "الاجتهاد"));
     }
 
+    [Fact]
+    public void ExecutesEveryModelPlannedQueryAcrossEverySelectedLibrary()
+    {
+        var plannedQueries = new[]
+        {
+            new ResearchQuery("بناء القوي على الضعيف", "الصيغة الحرفية"),
+            new ResearchQuery("لا يجوز بناء القوي على الضعيف", "صيغة الحكم")
+        };
+
+        var plan = ResearchSearchBootstrap.BuildInitialPlan(
+            Tools(),
+            ["aljam3", "shamela"],
+            plannedQueries);
+
+        Assert.Equal(4, plan.Count);
+        Assert.Equal(
+            new[] { "بناء القوي على الضعيف", "بناء القوي على الضعيف", "لا يجوز بناء القوي على الضعيف", "لا يجوز بناء القوي على الضعيف" },
+            plan.Select(item => item.Query).ToArray());
+        Assert.Equal(
+            new[] { "aljam3", "shamela", "aljam3", "shamela" },
+            plan.Select(item => item.Tool.Server).ToArray());
+    }
+
+    [Fact]
+    public void RejectsAnEmptyModelSearchPlan()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            ResearchSearchBootstrap.BuildInitialPlan(
+                Tools(),
+                ["aljam3"],
+                Array.Empty<ResearchQuery>()));
+    }
+
     private static IReadOnlyList<ToolDescriptor> Tools() =>
     [
         Tool(

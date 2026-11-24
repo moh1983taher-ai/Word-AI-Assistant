@@ -14,7 +14,11 @@ public sealed class ResearchDecisionProtocolTests
 
         Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
         Assert.Contains("\"type\":\"final\"", prompt, StringComparison.Ordinal);
-        Assert.Contains("inputSchema", prompt, StringComparison.Ordinal);
+        Assert.Contains("covered", prompt, StringComparison.Ordinal);
+        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
+        Assert.Contains("arguments", prompt, StringComparison.Ordinal);
+        Assert.Contains("covered", prompt, StringComparison.Ordinal);
+        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("response_format", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("json_schema", prompt, StringComparison.OrdinalIgnoreCase);
     }
@@ -26,7 +30,7 @@ public sealed class ResearchDecisionProtocolTests
             allowFinal: false,
             pendingSourceLabels: ["المكتبة الشاملة"]);
 
-        Assert.Contains("لا يُسمح بالإجابة النهائية الآن", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تُنه البحث الآن", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
         Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
     }
@@ -56,10 +60,45 @@ public sealed class ResearchDecisionProtocolTests
             pendingSourceLabels: [],
             pendingPageSourceLabels: ["المكتبة الشاملة"]);
 
-        Assert.Contains("لا يُسمح بالإجابة النهائية الآن", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تُنه البحث الآن", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
-        Assert.Contains("افتح صفحة", prompt, StringComparison.Ordinal);
+        Assert.Contains("افتحها", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("لم يكتمل البحث في:", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DoesNotTreatOneOpenedPageAsEvidenceThatResearchIsComplete()
+    {
+        var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
+            allowFinal: true,
+            pendingSourceLabels: []);
+
+        Assert.Contains("لا يعني ذلك اكتمال الاستقصاء", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تكتف بصفحة واحدة", prompt, StringComparison.Ordinal);
+        Assert.Contains("تغطية محاور خطة البحث", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InvalidDecisionRepairDoesNotOfferFinalWhilePageReadsRemainPending()
+    {
+        var prompt = ResearchDecisionProtocol.BuildInvalidDecisionRepair(
+            allowFinal: false,
+            pendingSourceLabels: [],
+            pendingPageSourceLabels: ["المكتبة الشاملة"]);
+
+        Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"type\":\"final\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CoverageCorrectionAllowsAnExplicitUnresolvedFacetAfterReasonableSearch()
+    {
+        var prompt = ResearchDecisionProtocol.BuildCoverageCorrection(["نسبة الصيغة إلى مصدرها"]);
+
+        Assert.Contains("استنفدت المسارات المعقولة", prompt, StringComparison.Ordinal);
+        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
+        Assert.Contains("سبب التعذر", prompt, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -18,7 +18,7 @@ public sealed class ResearchBusyException : Exception
 public sealed class ResearchCoordinator
 {
     private const int MaxDuckAiMessageCharacters = 12_000;
-    private const int MaxDuckAiEvidenceContextCharacters = 10_000;
+    private const int MaxDuckAiEvidenceContextCharacters = 36_000;
 
     private readonly DuckAiClient _duckAi;
     private readonly McpSourceRegistry _sources;
@@ -132,27 +132,104 @@ public sealed class ResearchCoordinator
                 .Select(ResearchSourceSelection.GetLabel)
                 .ToArray();
 
-            // All selected-source tools remain visible throughout the task.
-            var repairAttempted = false;
+            // The model must understand the request and author a task-specific plan
+            // before the host executes any search. The host then validates arguments
+            // against the live schemas and executes every planned query in each selected
+            // library; it does not invent a generic query plan.
+            var planningInstructions = ResearchPlanningProtocol.BuildInitialInstructions(selectedLabels);
+            var planningAttempts = 0;
+            ResearchPlan? researchPlan = null;
+            while (researchPlan is null)
+            {
+                var planningMessages = new List<DuckChatMessage>
+                {
+                    new("system", planningInstructions)
+                };
+                var planningInputBudget = contextBudget.GetAvailableInputCharacters(planningInstructions.Length);
+                if (planningInputBudget <= 1)
+                {
+                    return new ResearchResponse(
+                        "تعذر إعداد مرحلة فهم السؤال ضمن ميزانية السياق الحالية؛ لم يبدأ البحث.",
+                        model,
+                        trace.ToArray(),
+                        warnings.ToArray());
+                }
+
+                var planningConversation = ResearchContextWindow.Compact(
+                    messages.ToArray(),
+                    planningInputBudget,
+                    MaxDuckAiMessageCharacters,
+                    currentUserMessageIndex);
+                planningMessages.AddRange(planningConversation);
+
+                _log.Info(
+                    $"Research planning prompt prepared: task={taskId}; attempt={planningAttempts + 1}; selectedSources={selectedServerIds.Count}; messages={planningMessages.Count}; promptCharacters={planningInstructions.Length}; historyCharacters={planningConversation.Sum(message => message.Content?.Length ?? 0)}.");
+
+                var planningCompletion = await _duckAi.CompleteAsync(
+                    model,
+                    planningMessages,
+                    functionTools: null,
+                    cancellationToken: timeout.Token);
+                model = planningCompletion.Model;
+
+                ModelDecision? acceptedPlanDecision = null;
+                if (planningCompletion.ToolCalls.Count == 0 &&
+                    ModelDecisionParser.TryParse(planningCompletion.Text, out var parsedPlanDecision) &&
+                    parsedPlanDecision.Type == "plan" &&
+                    parsedPlanDecision.Plan is not null)
+                {
+                    acceptedPlanDecision = parsedPlanDecision;
+                }
+
+                if (acceptedPlanDecision?.Plan is not null)
+                {
+                    researchPlan = acceptedPlanDecision.Plan;
+                    messages.Add(new DuckChatMessage("assistant", planningCompletion.Text));
+                    _log.Info(
+                        $"Research plan accepted: task={taskId}; kind={researchPlan.Kind}; queries={researchPlan.Queries.Count}; coverageItems={researchPlan.Coverage.Count}.");
+                    break;
+                }
+
+                _log.Warning(
+                    $"Research planning decision invalid: task={taskId}; attempt={planningAttempts + 1}; responseCharacters={planningCompletion.Text.Length}; toolCalls={planningCompletion.ToolCalls.Count}; protocol=model-authored-plan.");
+
+                if (planningAttempts >= 2)
+                {
+                    warnings.Add("تعذر استخراج خطة بحث سليمة من استجابة النموذج؛ لم تُنفذ استعلامات ولم تُنشأ إحالات غير متحققة.");
+                    return new ResearchResponse(
+                        "تعذر إعداد خطة بحث صالحة من استجابة النموذج. لم يبدأ البحث، ولم تُعرض نتائج أو إحالات غير متحققة. أعد الطلب أو جرّب نموذجاً آخر.",
+                        model,
+                        trace.ToArray(),
+                        warnings.ToArray());
+                }
+
+                messages.Add(new DuckChatMessage("assistant", planningCompletion.Text));
+                messages.Add(new DuckChatMessage("user", ResearchPlanningProtocol.BuildRepairInstructions()));
+                planningAttempts++;
+            }
+
+            // Plan queries are authored by the model. The host only maps them to the
+            // selected libraries' live input schemas and validates the resulting calls.
+            var invalidDecisionAttempts = 0;
             var searchDecisionCorrectionAttempted = false;
             var pageVerificationCorrectionAttempted = false;
+            var coverageCorrectionAttempts = 0;
             var toolCallsAttempted = 0;
+            var completedSearchCalls = 0;
             var searchedSourceIds = new HashSet<string>(StringComparer.Ordinal);
-
-            // The host, not the model, guarantees the first search call to every
-            // selected library. Arguments are derived from each live MCP input schema.
             var initialSearchPlan = ResearchSearchBootstrap.BuildInitialPlan(
                 activeTools,
                 selectedServerIds,
-                latestUserMessage ?? string.Empty);
+                researchPlan!.Queries);
+
             _log.Info(
-                $"Research host search plan: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; calls={initialSearchPlan.Count}; protocol=host-owned.");
+                $"Research host search plan: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; modelQueries={researchPlan.Queries.Count}; calls={initialSearchPlan.Count}; protocol=model-authored.");
 
             foreach (var invocation in initialSearchPlan)
             {
                 toolCallsAttempted++;
                 _log.Info(
-                    $"Research host search dispatch: task={taskId}; call={toolCallsAttempted}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}.");
+                    $"Research host search dispatch: task={taskId}; call={toolCallsAttempted}; queryIndex={invocation.QueryIndex}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; purposeCharacters={invocation.Purpose.Length}.");
 
                 var execution = await ExecuteToolAsync(
                     invocation.Tool,
@@ -167,7 +244,10 @@ public sealed class ResearchCoordinator
                 var completedSearch = execution.Succeeded &&
                     ResearchToolResultClassifier.IsCompletedSearch(invocation.Tool, isError: false);
                 if (completedSearch)
+                {
+                    completedSearchCalls++;
                     searchedSourceIds.Add(invocation.Tool.Server);
+                }
 
                 if (execution.Succeeded)
                     trace.Add(new ToolCallTrace(
@@ -176,7 +256,7 @@ public sealed class ResearchCoordinator
                         invocation.Tool.Name));
 
                 _log.Info(
-                    $"Research host search result: task={taskId}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; success={execution.Succeeded}; completedSearch={completedSearch}; searchCoverage={searchedSourceIds.Count}/{selectedServerIds.Count}; evidenceEntries={evidenceLedger.Entries.Count}.");
+                    $"Research host search result: task={taskId}; queryIndex={invocation.QueryIndex}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; success={execution.Succeeded}; completedSearch={completedSearch}; completedSearchCalls={completedSearchCalls}/{initialSearchPlan.Count}; searchCoverage={searchedSourceIds.Count}/{selectedServerIds.Count}; references={evidenceProvenance.SearchReferenceCount}; evidenceEntries={evidenceLedger.Entries.Count}.");
             }
 
             while (true)
@@ -200,6 +280,7 @@ public sealed class ResearchCoordinator
                     turnTools,
                     selectedLabels,
                     warnings,
+                    researchPlan!,
                     out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
                     ResearchDecisionProtocol.BuildTurnInstructions(
@@ -261,30 +342,78 @@ public sealed class ResearchCoordinator
 
                 model = completion.Model;
 
-                if (completion.ToolCalls.Count > 0)
-                    throw new InvalidOperationException(
-                        "أعاد DuckAI استدعاءات وظائف غير مطلوبة؛ تم رفضها لأن المضيف يستخدم بروتوكول قرارات JSON.");
+                ModelDecision? parsedDecision = null;
+                if (completion.ToolCalls.Count == 0 &&
+                    ModelDecisionParser.TryParse(completion.Text, out var candidateDecision))
+                {
+                    parsedDecision = candidateDecision;
+                }
 
-                if (!ModelDecisionParser.TryParse(completion.Text, out var decision))
+                if (parsedDecision is null)
                 {
                     _log.Warning(
-                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; responseFormat=omitted; protocol=prompted-json.");
+                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; toolCalls={completion.ToolCalls.Count}; responseFormat=omitted; protocol=prompted-json; repairAttempt={invalidDecisionAttempts + 1}.");
 
-                    if (repairAttempted)
-                        throw new InvalidOperationException("تعذر التحقق من قرار النموذج بصيغة JSON بعد محاولة الإصلاح.");
+                    if (invalidDecisionAttempts >= 2)
+                    {
+                        warnings.Add("تعذر متابعة البحث لأن النموذج لم ينتج قراراً صالحاً بعد محاولتي إصلاح؛ لم يعتمد المضيف إجابة نهائية غير متحققة.");
+                        _log.Warning(
+                            $"Research stopped with preserved evidence: task={taskId}; reason=invalid_model_decision; evidenceEntries={evidenceLedger.Entries.Count}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}.");
+                        return new ResearchResponse(
+                            $"توقف البحث قبل اكتمال التحليل؛ جمع النظام {evidenceLedger.Entries.Count} مخرجاً من أدوات المكتبات، لكن النموذج لم ينتج قراراً صالحاً لمتابعة فتح المراجع وتحليلها. لم تُعتمد إجابة نهائية أو إحالات غير متحققة. أعد المحاولة أو استخدم نموذجاً آخر.",
+                            model,
+                            trace.ToArray(),
+                            warnings.ToArray());
+                    }
 
-                    repairAttempted = true;
                     messages.Add(new DuckChatMessage("assistant", completion.Text));
                     messages.Add(new DuckChatMessage(
                         "user",
-                        "لم تكن استجابتك قرار JSON صالحاً. أخرج كائناً واحداً فقط: إما {\"type\":\"tool_call\",\"server\":\"معرّف المكتبة\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}، أو {\"type\":\"final\",\"answer\":\"نص الإجابة\"}. استخدم اسم أداة ومعاملاتها كما وردت في فهرس MCP ومخططها المعروضين في تعليمات النظام. لا تضع أي نص خارج الكائن."));
+                        ResearchDecisionProtocol.BuildInvalidDecisionRepair(
+                            allowFinal,
+                            pendingSourceLabels,
+                            pendingPageSourceLabels)));
+                    invalidDecisionAttempts++;
                     continue;
                 }
 
-                repairAttempted = false;
+                invalidDecisionAttempts = 0;
+                var decision = parsedDecision!;
 
                 if (decision.Type == "final")
                 {
+                    var unreportedCoverage = ResearchCoveragePolicy.GetUnreportedCoverage(
+                        researchPlan!.Coverage,
+                        decision.Covered,
+                        decision.Uncovered);
+
+                    if (unreportedCoverage.Count > 0)
+                    {
+                        if (coverageCorrectionAttempts >= 2)
+                        {
+                            warnings.Add("لم يصنف النموذج جميع محاور الخطة تصنيفاً واضحاً بين ما غُطي وما تعذر إثباته؛ أُعيدت المهمة بوصفها غير مكتملة.");
+                            _log.Warning(
+                                $"Research final coverage incomplete: task={taskId}; unreportedCoverageItems={unreportedCoverage.Count}; evidenceEntries={evidenceLedger.Entries.Count}.");
+                            return new ResearchResponse(
+                                "لم يكتمل تقرير تغطية خطة المهمة؛ بقيت محاور لم يصنفها النموذج: " +
+                                string.Join("، ", unreportedCoverage) +
+                                ". لم تُعتمد إجابة نهائية بوصفها بحثاً مكتملاً. أعد المحاولة أو وسّع خطة البحث.",
+                                model,
+                                trace.ToArray(),
+                                warnings.ToArray());
+                        }
+
+                        coverageCorrectionAttempts++;
+                        _log.Warning(
+                            $"Research final coverage deferred: task={taskId}; attempt={coverageCorrectionAttempts}; missingCoverageItems={unreportedCoverage.Count}; recovery=targeted_research.");
+                        messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                        messages.Add(new DuckChatMessage(
+                            "user",
+                            ResearchDecisionProtocol.BuildCoverageCorrection(unreportedCoverage)));
+                        continue;
+                    }
+
+                    coverageCorrectionAttempts = 0;
                     var searchWasSkipped = pendingSearchSources.Count > 0;
                     // Every request reaching this coordinator is an explicit source-research
                     // request. Verify opened pages regardless of the wording used by the user.
@@ -718,6 +847,7 @@ public sealed class ResearchCoordinator
         IReadOnlyList<ToolDescriptor> tools,
         IReadOnlyList<string> selectedLabels,
         IReadOnlyList<string> warnings,
+        ResearchPlan researchPlan,
         out int toolCatalogCharacters)
     {
         // Duck2API drops response_format, so the actual read-only MCP input schemas
@@ -738,6 +868,8 @@ public sealed class ResearchCoordinator
         builder.AppendLine().AppendLine(
             "أدوات MCP المتاحة وأوصافها ومخطط inputSchema الفعلي لكل أداة. استخدم المخطط لتحديد أسماء المعاملات وأنواعها والقيم الإلزامية والافتراضية، ولا تخمّن أي معرّف أو معامل:");
         builder.AppendLine(serializedTools);
+        builder.AppendLine().AppendLine("خطة البحث التي أعدها النموذج لهذه المهمة؛ راجع تغطيتها، وعدّل الاستعلامات أو وسّعها عند الحاجة:");
+        builder.AppendLine(ResearchPlanningProtocol.FormatPlan(researchPlan));
         return builder.ToString();
     }
 

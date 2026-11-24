@@ -27,56 +27,96 @@ internal static class ResearchSearchBootstrap
     internal static IReadOnlyList<ResearchSearchInvocation> BuildInitialPlan(
         IReadOnlyList<ToolDescriptor> availableTools,
         IReadOnlyList<string> selectedServerIds,
-        string query)
+        string query) =>
+        BuildInitialPlan(
+            availableTools,
+            selectedServerIds,
+            [new ResearchQuery(query, "استعلام البحث")]);
+
+    internal static IReadOnlyList<ResearchSearchInvocation> BuildInitialPlan(
+        IReadOnlyList<ToolDescriptor> availableTools,
+        IReadOnlyList<string> selectedServerIds,
+        IReadOnlyList<ResearchQuery> researchQueries)
     {
         ArgumentNullException.ThrowIfNull(availableTools);
         ArgumentNullException.ThrowIfNull(selectedServerIds);
+        ArgumentNullException.ThrowIfNull(researchQueries);
 
-        var normalizedQuery = (query ?? string.Empty).Trim();
-        if (normalizedQuery.Length > MaximumQueryCharacters)
-            normalizedQuery = normalizedQuery[..MaximumQueryCharacters];
+        if (researchQueries.Count == 0 || researchQueries.Count > 8)
+            throw new InvalidOperationException("يجب أن تتضمن خطة البحث استعلاماً واحداً على الأقل، وألا تتجاوز ثمانية استعلامات.");
 
-        if (string.IsNullOrWhiteSpace(normalizedQuery))
-            throw new InvalidOperationException("لا يمكن بدء البحث لأن نص الاستعلام فارغ.");
+        var sources = ResearchSourceSelection.Normalize(selectedServerIds);
+        if (sources.Count == 0)
+            throw new InvalidOperationException("لم تُحدد مكتبة صالحة لتنفيذ خطة البحث.");
+
+        var normalizedQueries = new List<ResearchQuery>();
+        var seenQueries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in researchQueries)
+        {
+            var query = (item?.Query ?? string.Empty).Trim();
+            if (query.Length > MaximumQueryCharacters)
+                query = query[..MaximumQueryCharacters];
+            if (string.IsNullOrWhiteSpace(query))
+                throw new InvalidOperationException("تتضمن خطة البحث استعلاماً فارغاً.");
+
+            var normalized = string.Join(' ', query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            if (!seenQueries.Add(normalized))
+                continue;
+
+            normalizedQueries.Add(new ResearchQuery(
+                query,
+                (item?.Purpose ?? string.Empty).Trim()));
+        }
+
+        if (normalizedQueries.Count == 0)
+            throw new InvalidOperationException("لا تتضمن خطة البحث استعلامات مستقلة قابلة للتنفيذ.");
 
         var plan = new List<ResearchSearchInvocation>();
-
-        foreach (var source in ResearchSourceSelection.Normalize(selectedServerIds))
+        for (var queryIndex = 0; queryIndex < normalizedQueries.Count; queryIndex++)
         {
-            var candidates = availableTools
-                .Where(tool =>
-                    string.Equals(tool.Server, source, StringComparison.Ordinal) &&
-                    ResearchToolResultClassifier.IsSearchTool(tool))
-                .OrderBy(tool => SearchPreference(source, tool.Name))
-                .ToArray();
-
-            if (candidates.Length == 0)
+            var researchQuery = normalizedQueries[queryIndex];
+            foreach (var source in sources)
             {
-                throw new InvalidOperationException(
-                    $"لا تتوفر أداة بحث معروفة للمكتبة المختارة {ResearchSourceSelection.GetLabel(source)} ({source}).");
-            }
+                var candidates = availableTools
+                    .Where(tool =>
+                        string.Equals(tool.Server, source, StringComparison.Ordinal) &&
+                        ResearchToolResultClassifier.IsSearchTool(tool))
+                    .OrderBy(tool => SearchPreference(source, tool.Name))
+                    .ToArray();
 
-            string? lastError = null;
-            ResearchSearchInvocation? invocation = null;
-
-            foreach (var candidate in candidates)
-            {
-                if (TryBuildArguments(candidate, normalizedQuery, out var arguments, out var error))
+                if (candidates.Length == 0)
                 {
-                    invocation = new ResearchSearchInvocation(candidate, arguments);
-                    break;
+                    throw new InvalidOperationException(
+                        $"لا تتوفر أداة بحث معروفة للمكتبة المختارة {ResearchSourceSelection.GetLabel(source)} ({source}).");
                 }
 
-                lastError = error;
-            }
+                string? lastError = null;
+                ResearchSearchInvocation? invocation = null;
 
-            if (invocation is null)
-            {
-                throw new InvalidOperationException(
-                    $"تعذر بناء معاملات بحث صحيحة للمكتبة {ResearchSourceSelection.GetLabel(source)}. {lastError}");
-            }
+                foreach (var candidate in candidates)
+                {
+                    if (TryBuildArguments(candidate, researchQuery.Query, out var arguments, out var error))
+                    {
+                        invocation = new ResearchSearchInvocation(
+                            candidate,
+                            arguments,
+                            researchQuery.Query,
+                            researchQuery.Purpose,
+                            queryIndex + 1);
+                        break;
+                    }
 
-            plan.Add(invocation);
+                    lastError = error;
+                }
+
+                if (invocation is null)
+                {
+                    throw new InvalidOperationException(
+                        $"تعذر بناء معاملات بحث صحيحة للمكتبة {ResearchSourceSelection.GetLabel(source)}. {lastError}");
+                }
+
+                plan.Add(invocation);
+            }
         }
 
         return plan;
@@ -288,4 +328,7 @@ internal static class ResearchSearchBootstrap
 
 internal sealed record ResearchSearchInvocation(
     ToolDescriptor Tool,
-    IReadOnlyDictionary<string, object?> Arguments);
+    IReadOnlyDictionary<string, object?> Arguments,
+    string Query,
+    string Purpose,
+    int QueryIndex);

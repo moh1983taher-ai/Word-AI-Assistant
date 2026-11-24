@@ -17,16 +17,24 @@ internal sealed class ResearchEvidenceLedger
     internal IReadOnlyList<ResearchEvidenceEntry> Entries => _entries;
 
     internal int EstimatedContextCharacters =>
-        Header.Length + _entries.Sum(entry => entry.Content.Length + 100);
+        Header.Length + _entries.Sum(entry => entry.ContextContent.Length + 100);
 
     internal void Add(ToolDescriptor source, string content, bool succeeded)
     {
         ArgumentNullException.ThrowIfNull(source);
+        var storedContent = content ?? string.Empty;
+        var contextContent = storedContent;
+        if (ResearchToolResultClassifier.IsSearchTool(source))
+            contextContent = ResearchSearchResultCompactor.Compact(storedContent);
+        else if (McpEvidenceProvenance.IsReferenceReadTool(source))
+            contextContent = ResearchOpenedPageFormatter.Format(storedContent);
+
         _entries.Add(new ResearchEvidenceEntry(
             source.Server,
             source.ServerLabel,
             source.Name,
-            content ?? string.Empty,
+            storedContent,
+            contextContent,
             succeeded,
             _entries.Count + 1));
     }
@@ -82,7 +90,7 @@ internal sealed class ResearchEvidenceLedger
             if (entryBudget <= 0)
                 break;
 
-            var excerpt = Clip(entry.Content, entryBudget);
+            var excerpt = Clip(entry.ContextContent, entryBudget);
             AppendBounded(builder, excerpt + Environment.NewLine, maxCharacters);
         }
 
@@ -105,17 +113,145 @@ internal sealed class ResearchEvidenceLedger
         if (value.Length <= maximum)
             return value;
 
-        const string marker = " [مقتطف؛ النص الكامل محفوظ في سجل المهمة]";
+        const string marker = " [مقتطف سياقي مختصر؛ السجل الكامل محفوظ للمهمة]";
         if (maximum <= marker.Length)
             return value[..maximum];
 
-        var available = maximum - marker.Length;
-        var prefixLength = Math.Max(1, (int)(available * 0.8));
-        var suffixLength = available - prefixLength;
-        if (suffixLength <= 0)
-            return value[..prefixLength] + marker;
+        var lines = value.Split('\n');
+        if (lines.Length < 3)
+        {
+            var singleEntryAvailable = maximum - marker.Length;
+            var prefixLength = Math.Max(1, singleEntryAvailable / 2);
+            var suffixLength = singleEntryAvailable - prefixLength;
+            return suffixLength <= 0
+                ? value[..prefixLength] + marker
+                : value[..prefixLength] + marker + value[^suffixLength..];
+        }
 
-        return value[..prefixLength] + marker + value[^suffixLength..];
+        var available = maximum - marker.Length;
+        var lineBudget = (available - lines.Length) / lines.Length;
+        IReadOnlyList<int> selectedIndexes;
+        if (lineBudget >= 48)
+        {
+            selectedIndexes = Enumerable.Range(0, lines.Length).ToArray();
+        }
+        else
+        {
+            var targetCount = Math.Clamp(available / 48, 2, lines.Length);
+            selectedIndexes = Enumerable.Range(0, targetCount)
+                .Select(index => targetCount == 1
+                    ? 0
+                    : (int)Math.Round(index * (lines.Length - 1d) / (targetCount - 1d)))
+                .Distinct()
+                .ToArray();
+            lineBudget = Math.Max(24, (available - selectedIndexes.Count) / selectedIndexes.Count);
+        }
+
+        var firstPageTextLine = Array.FindIndex(
+            lines,
+            line => line.Contains("النص المستخرج من الصفحة المفتوحة:", StringComparison.Ordinal));
+        if (firstPageTextLine >= 0)
+        {
+            firstPageTextLine++;
+            while (firstPageTextLine < lines.Length && string.IsNullOrWhiteSpace(lines[firstPageTextLine]))
+                firstPageTextLine++;
+        }
+
+        var lastPageTextLine = lines.Length - 1;
+        while (lastPageTextLine >= 0 && string.IsNullOrWhiteSpace(lines[lastPageTextLine]))
+            lastPageTextLine--;
+
+        // Uniform sampling can select a trailing blank line instead of the
+        // final evidence line. Always retain the first and last actual page-text
+        // lines so both ends remain available to the model after context clipping.
+        selectedIndexes = selectedIndexes
+            .Append(firstPageTextLine)
+            .Append(lastPageTextLine)
+            .Where(index => index >= 0 && index < lines.Length)
+            .Distinct()
+            .OrderBy(index => index)
+            .ToArray();
+        lineBudget = Math.Max(24, (available - selectedIndexes.Count) / selectedIndexes.Count);
+
+        var builder = new StringBuilder(maximum);
+        foreach (var index in selectedIndexes)
+        {
+            var line = lines[index].TrimEnd('\r');
+            var preservePrefix = index == firstPageTextLine;
+            var preserveSuffix = index == lastPageTextLine;
+            var compactLine = ClipEvidenceLine(line, lineBudget, preservePrefix, preserveSuffix);
+            var required = compactLine.Length + (builder.Length == 0 ? 0 : 1);
+            if (builder.Length + required + marker.Length > maximum)
+                continue;
+            if (builder.Length > 0)
+                builder.Append('\n');
+            builder.Append(compactLine);
+        }
+
+        if (builder.Length + marker.Length > maximum)
+            return builder.ToString(0, Math.Max(0, maximum - marker.Length)) + marker;
+        return builder.Append(marker).ToString();
+    }
+
+    private static string ClipEvidenceLine(
+        string line,
+        int maximum,
+        bool preservePrefix = false,
+        bool preserveSuffix = false)
+    {
+        if (line.Length <= maximum)
+            return line;
+
+        if (!line.Contains(" | ", StringComparison.Ordinal))
+        {
+            if (preservePrefix && !preserveSuffix)
+                return line[..maximum];
+            if (preserveSuffix && !preservePrefix)
+                return line[^maximum..];
+
+            var prefixLength = Math.Max(1, (maximum - 1) / 2);
+            var suffixLength = Math.Max(1, maximum - prefixLength - 1);
+            return line[..prefixLength] + "…" + line[^suffixLength..];
+        }
+
+        var parts = line.Split(" | ", StringSplitOptions.RemoveEmptyEntries);
+        var prioritized = parts
+            .OrderBy(part =>
+            {
+                var separator = part.IndexOf('=');
+                var key = separator > 0 ? part[..separator] : part;
+                if (key.Contains("book_id", StringComparison.OrdinalIgnoreCase) ||
+                    key.Contains("page_id", StringComparison.OrdinalIgnoreCase) ||
+                    key.Contains("file_id", StringComparison.OrdinalIgnoreCase) ||
+                    key.Contains("page_number", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("id", StringComparison.OrdinalIgnoreCase))
+                    return 0;
+                if (key.Contains("title", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("name", StringComparison.OrdinalIgnoreCase))
+                    return 1;
+                if (key.Contains("url", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("href", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("uri", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("link", StringComparison.OrdinalIgnoreCase))
+                    return 2;
+                if (key.Contains("author", StringComparison.OrdinalIgnoreCase))
+                    return 3;
+                return 4;
+            })
+            .ToArray();
+
+        var result = new StringBuilder();
+        foreach (var part in prioritized)
+        {
+            var extra = part.Length + (result.Length == 0 ? 0 : 3);
+            if (result.Length + extra > maximum)
+                continue;
+            if (result.Length > 0)
+                result.Append(" | ");
+            result.Append(part);
+        }
+
+        return result.Length > 0 ? result.ToString() : line[..Math.Min(line.Length, maximum)];
     }
 }
 
@@ -124,5 +260,6 @@ internal sealed record ResearchEvidenceEntry(
     string ServerLabel,
     string Tool,
     string Content,
+    string ContextContent,
     bool Succeeded,
     int Index);
