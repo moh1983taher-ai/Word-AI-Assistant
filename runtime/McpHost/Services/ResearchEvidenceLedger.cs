@@ -161,6 +161,18 @@ internal sealed class ResearchEvidenceLedger
         while (lastPageTextLine >= 0 && string.IsNullOrWhiteSpace(lines[lastPageTextLine]))
             lastPageTextLine--;
 
+        // Uniform sampling can select a trailing blank line instead of the
+        // final evidence line. Always retain the first and last actual page-text
+        // lines so both ends remain available to the model after context clipping.
+        selectedIndexes = selectedIndexes
+            .Append(firstPageTextLine)
+            .Append(lastPageTextLine)
+            .Where(index => index >= 0 && index < lines.Length)
+            .Distinct()
+            .OrderBy(index => index)
+            .ToArray();
+        lineBudget = Math.Max(24, (available - selectedIndexes.Count) / selectedIndexes.Count);
+
         var builder = new StringBuilder(maximum);
         foreach (var index in selectedIndexes)
         {
