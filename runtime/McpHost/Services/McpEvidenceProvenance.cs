@@ -265,7 +265,7 @@ internal sealed class McpEvidenceProvenance
                 if (bookId is not null || pageId is not null)
                     references.Add(new Reference(bookId, pageId, null));
 
-                if (TryGetProperty(element, "id", out var idElement))
+                if (pageId is null && TryGetProperty(element, "id", out var idElement))
                     AddTargetIdentifier(ReadScalar(idElement), bookId, references);
 
                 foreach (var property in element.EnumerateObject())
