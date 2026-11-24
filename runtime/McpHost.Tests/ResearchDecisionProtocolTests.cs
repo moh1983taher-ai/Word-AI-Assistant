@@ -14,6 +14,8 @@ public sealed class ResearchDecisionProtocolTests
 
         Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
         Assert.Contains("\"type\":\"final\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("covered", prompt, StringComparison.Ordinal);
+        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
         Assert.Contains("arguments", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("response_format", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("json_schema", prompt, StringComparison.OrdinalIgnoreCase);
