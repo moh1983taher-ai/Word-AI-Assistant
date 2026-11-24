@@ -172,14 +172,18 @@ public sealed class ResearchCoordinator
                     cancellationToken: timeout.Token);
                 model = planningCompletion.Model;
 
-                var parsedPlan = planningCompletion.ToolCalls.Count == 0 &&
-                    ModelDecisionParser.TryParse(planningCompletion.Text, out var planDecision) &&
-                    planDecision.Type == "plan" &&
-                    planDecision.Plan is not null;
-
-                if (parsedPlan)
+                ModelDecision? acceptedPlanDecision = null;
+                if (planningCompletion.ToolCalls.Count == 0 &&
+                    ModelDecisionParser.TryParse(planningCompletion.Text, out var parsedPlanDecision) &&
+                    parsedPlanDecision.Type == "plan" &&
+                    parsedPlanDecision.Plan is not null)
                 {
-                    researchPlan = planDecision!.Plan!;
+                    acceptedPlanDecision = parsedPlanDecision;
+                }
+
+                if (acceptedPlanDecision?.Plan is not null)
+                {
+                    researchPlan = acceptedPlanDecision.Plan;
                     messages.Add(new DuckChatMessage("assistant", planningCompletion.Text));
                     _log.Info(
                         $"Research plan accepted: task={taskId}; kind={researchPlan.Kind}; queries={researchPlan.Queries.Count}; coverageItems={researchPlan.Coverage.Count}.");
