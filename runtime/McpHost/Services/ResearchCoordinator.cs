@@ -387,13 +387,13 @@ public sealed class ResearchCoordinator
                         decision.Covered,
                         decision.Uncovered);
 
-                    if (unreportedCoverage.Length > 0)
+                    if (unreportedCoverage.Count > 0)
                     {
                         if (coverageCorrectionAttempts >= 2)
                         {
                             warnings.Add("لم يصنف النموذج جميع محاور الخطة تصنيفاً واضحاً بين ما غُطي وما تعذر إثباته؛ أُعيدت المهمة بوصفها غير مكتملة.");
                             _log.Warning(
-                                $"Research final coverage incomplete: task={taskId}; unreportedCoverageItems={unreportedCoverage.Length}; evidenceEntries={evidenceLedger.Entries.Count}.");
+                                $"Research final coverage incomplete: task={taskId}; unreportedCoverageItems={unreportedCoverage.Count}; evidenceEntries={evidenceLedger.Entries.Count}.");
                             return new ResearchResponse(
                                 "لم يكتمل تقرير تغطية خطة المهمة؛ بقيت محاور لم يصنفها النموذج: " +
                                 string.Join("، ", unreportedCoverage) +
@@ -405,7 +405,7 @@ public sealed class ResearchCoordinator
 
                         coverageCorrectionAttempts++;
                         _log.Warning(
-                            $"Research final coverage deferred: task={taskId}; attempt={coverageCorrectionAttempts}; missingCoverageItems={unreportedCoverage.Length}; recovery=targeted_research.");
+                            $"Research final coverage deferred: task={taskId}; attempt={coverageCorrectionAttempts}; missingCoverageItems={unreportedCoverage.Count}; recovery=targeted_research.");
                         messages.Add(new DuckChatMessage("assistant", decision.Raw));
                         messages.Add(new DuckChatMessage(
                             "user",
