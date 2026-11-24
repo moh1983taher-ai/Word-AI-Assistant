@@ -69,6 +69,42 @@ public sealed class DuckAiEndpointSelectionTests
     }
 
     [Fact]
+    public async Task OmitsUnsupportedResponseFormatWhenResearchUsesPromptGuidedJson()
+    {
+        string? capturedPayload = null;
+        var handler = new StubHandler(request =>
+        {
+            if (request.Method == HttpMethod.Get &&
+                request.RequestUri!.AbsolutePath == "/v1/models")
+                return Json(HttpStatusCode.OK, """{"data":[{"id":"luna-test"}]}""");
+
+            if (request.Method == HttpMethod.Post &&
+                request.RequestUri!.AbsolutePath == "/v1/chat/completions")
+            {
+                capturedPayload = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                return Json(
+                    HttpStatusCode.OK,
+                    """{"choices":[{"message":{"content":"{\"type\":\"final\",\"answer\":\"تم\"}"}}]}""");
+            }
+
+            return Json(HttpStatusCode.NotFound, """{"error":"not found"}""");
+        });
+
+        var client = new DuckAiClient(new StubHttpClientFactory(handler), new HostLog());
+        var completion = await client.CompleteAsync(
+            requestedModel: "",
+            messages: [new DuckChatMessage("user", "اختبار قرار البحث")],
+            functionTools: null,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Contains("تم", completion.Text);
+        Assert.NotNull(capturedPayload);
+
+        using var payload = System.Text.Json.JsonDocument.Parse(capturedPayload!);
+        Assert.False(payload.RootElement.TryGetProperty("response_format", out _));
+    }
+
+    [Fact]
     public async Task SendsStrictJsonSchemaAndDeterministicTemperature()
     {
         string? capturedPayload = null;

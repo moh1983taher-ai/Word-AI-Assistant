@@ -8,9 +8,10 @@ using ResearchTools.McpHost.Models;
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Adapter for DuckAI's local OpenAI-compatible HTTP API. Research decisions use
-/// per-turn strict JSON Schema response formats; native tool calls remain supported
-/// for other callers.
+/// Adapter for DuckAI's local OpenAI-compatible HTTP API. The research coordinator
+/// uses prompt-guided JSON and host-owned initial MCP searches because the bundled
+/// Duck2API endpoint does not enforce response_format JSON Schema. Optional response
+/// formats remain available to callers using a compatible endpoint.
 /// </summary>
 public sealed class DuckAiClient
 {

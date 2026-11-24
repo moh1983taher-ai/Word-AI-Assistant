@@ -33,7 +33,12 @@ $unavailableSelectedSources = @($selectedSourceStatus | Where-Object {
 if ($unavailableSelectedSources.Count -gt 0) {
     throw ('A selected MCP source is not ready: ' + (($unavailableSelectedSources | ForEach-Object { $_.id }) -join ', '))
 }
-Write-Host ('OK: أدوات المكتبات المختارة متاحة: ' + ($Servers -join ' + '))
+if ($sources.initialSearchReady -ne $true) {
+    $sources.initialSearchWarnings | ForEach-Object { Write-Error $_ }
+    throw 'The live MCP input schemas could not build the initial search plan.'
+}
+$sources.initialSearchPlan | Format-Table server, tool -AutoSize
+Write-Host ('OK: اتصالات المكتبات ومخططات البحث الأولي جاهزة: ' + ($Servers -join ' + '))
 
 Write-Host ([Environment]::NewLine + '4/4 - تنفيذ بحث فعلي عبر محرك الذكاء الاصطناعي وMCP...')
 Write-Host ('المكتبات المختارة: ' + ($Servers -join ' + '))
@@ -79,15 +84,39 @@ Write-Host ([Environment]::NewLine + '========== نتيجة الاختبار ===
 Write-Host "نجح البحث عبر المزود: $($health.provider); النموذج: $($result.model)"
 Write-Host "عدد فحوص /ping أثناء البحث: $pingCount"
 Write-Host ([Environment]::NewLine + 'الأدوات التي استُدعيت:')
-if (@($result.toolCalls).Count -eq 0) {
-    throw 'أعاد DuckAI إجابة دون تنفيذ أداة MCP بنجاح؛ فشل اختبار البحث الفعلي، ولا تُعد هذه الإجابة بحثاً موثقاً.'
+$calls = @($result.toolCalls)
+if ($calls.Count -eq 0) {
+    throw 'أعاد المضيف إجابة دون تنفيذ أداة MCP بنجاح؛ فشل اختبار البحث الفعلي.'
 }
-$result.toolCalls | Format-Table server, label, tool -AutoSize
-$unexpectedServers = @($result.toolCalls | Where-Object { $Servers -notcontains $_.server })
+$calls | Format-Table server, label, tool -AutoSize
+$unexpectedServers = @($calls | Where-Object { $Servers -notcontains $_.server })
 if ($unexpectedServers.Count -gt 0) {
     throw 'The host invoked a source that the user did not select.'
 }
-Write-Host 'لم يُشترط استخدام كل مكتبة اختارها المستخدم؛ قرار اختيار المصدر وتكرار البحث يعود للنموذج.'
+$missingSources = @($Servers | Where-Object {
+    $selectedServer = $_
+    -not @($calls | Where-Object { $_.server -eq $selectedServer }).Count
+})
+if ($missingSources.Count -gt 0) {
+    throw ('لم يكتمل البحث في جميع المكتبات المختارة: ' + ($missingSources -join ', '))
+}
+$missingInitialSearches = @($Servers | Where-Object {
+    $selectedServer = $_
+    if ($selectedServer -eq 'aljam3') {
+        -not @($calls | Where-Object {
+            $_.server -eq 'aljam3' -and $_.tool -eq 'search'
+        }).Count
+    }
+    else {
+        -not @($calls | Where-Object {
+            $_.server -eq 'shamela' -and $_.tool -in @('shamela_find', 'shamela_find_scoped')
+        }).Count
+    }
+})
+if ($missingInitialSearches.Count -gt 0) {
+    throw ('لم يُسجل استدعاء بحث ناجح متوقع في المكتبات الآتية: ' + ($missingInitialSearches -join ', '))
+}
+Write-Host 'نجح البحث الأولي في جميع المكتبات المختارة؛ المضيف المحلي يضمن تغطيتها قبل السماح بالإجابة.'
 if (@($result.connectionWarnings).Count -gt 0) {
     Write-Warning ($result.connectionWarnings -join '; ')
 }

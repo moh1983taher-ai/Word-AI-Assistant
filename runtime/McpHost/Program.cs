@@ -242,6 +242,30 @@ app.MapGet("/v1/mcp/sources", async (
         }
     }
 
+    // Verify that the real upstream search input schemas can build the
+    // host-owned first call for every source without executing any search.
+    var initialSearchWarnings = new List<string>();
+    IReadOnlyList<ResearchSearchInvocation> initialSearchPlan = [];
+    try
+    {
+        initialSearchPlan = ResearchSearchBootstrap.BuildInitialPlan(
+            discovery.Tools,
+            ids,
+            "اختبار فحص مخطط البحث");
+    }
+    catch (Exception exception) when (
+        exception is ArgumentException or InvalidOperationException)
+    {
+        initialSearchWarnings.Add($"{exception.GetType().Name}: {exception.Message}");
+    }
+
+    var initialSearchReady =
+        status.All(source => source.connected && source.toolCount > 0) &&
+        initialSearchWarnings.Count == 0 &&
+        initialSearchPlan.Count == ids.Length;
+
+    // Retain the legacy strict-schema diagnostic for troubleshooting only.
+    // The DuckAI research flow no longer sends response_format=json_schema.
     var strictOutputReady =
         status.All(source => source.connected && source.toolCount > 0) &&
         strictSchemaWarnings.Count == 0;
@@ -250,6 +274,13 @@ app.MapGet("/v1/mcp/sources", async (
     {
         connected = status.Count(source => source.connected),
         totalTools = status.Sum(source => source.toolCount),
+        initialSearchReady,
+        initialSearchPlan = initialSearchPlan.Select(invocation => new
+        {
+            server = invocation.Tool.Server,
+            tool = invocation.Tool.Name
+        }).ToArray(),
+        initialSearchWarnings,
         strictOutputReady,
         strictSchemaWarnings,
         sources = status,

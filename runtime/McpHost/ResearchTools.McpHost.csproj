@@ -6,7 +6,7 @@
     <InvariantGlobalization>false</InvariantGlobalization>
     <AssemblyName>ResearchTools.McpHost</AssemblyName>
     <RootNamespace>ResearchTools.McpHost</RootNamespace>
-    <Version>1.2.7</Version>
+    <Version>1.2.8</Version>
     <Description>Local asynchronous MCP host for ResearchTools and DuckAI.</Description>
   </PropertyGroup>
   <ItemGroup>
