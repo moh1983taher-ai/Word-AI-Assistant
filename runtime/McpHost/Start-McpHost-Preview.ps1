@@ -24,10 +24,14 @@ if ($existingListener) {
 }
 
 $previousPort = $env:RESEARCHTOOLS_MCP_PORT
+$previousPreviewLogId = $env:RESEARCHTOOLS_MCP_PREVIEW_LOG_ID
+$previewLogId = [Guid]::NewGuid().ToString('N')
+$previewLog = Join-Path $env:LOCALAPPDATA "ResearchTools\DuckAI\DuckAI-MCP-Host-preview-$previewLogId.log"
 $hostProcess = $null
 
 try {
     $env:RESEARCHTOOLS_MCP_PORT = [string]$port
+    $env:RESEARCHTOOLS_MCP_PREVIEW_LOG_ID = $previewLogId
     $hostProcess = Start-Process -FilePath $hostPath -WorkingDirectory $PSScriptRoot -PassThru -WindowStyle Hidden
 }
 finally {
@@ -36,6 +40,13 @@ finally {
     }
     else {
         $env:RESEARCHTOOLS_MCP_PORT = $previousPort
+    }
+
+    if ($null -eq $previousPreviewLogId) {
+        Remove-Item Env:RESEARCHTOOLS_MCP_PREVIEW_LOG_ID -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:RESEARCHTOOLS_MCP_PREVIEW_LOG_ID = $previousPreviewLogId
     }
 }
 
@@ -65,7 +76,16 @@ try {
     }
 
     Write-Host 'بدأ المضيف بنجاح. تنفيذ اختبارات DuckAI وMCP والبحث وتزامن /ping...'
+    Write-Host ('مصادر الاختبار: ' + ($Servers -join ' + '))
+    Write-Host ('معرّف سجل الاختبار المعزول: ' + $previewLogId)
     & $testPath -Question $Question -Model $Model -Servers $Servers
+}
+catch {
+    if (Test-Path -LiteralPath $previewLog -PathType Leaf) {
+        Write-Host ([Environment]::NewLine + '========== سجل المضيف التجريبي المعزول ==========')
+        Get-Content -LiteralPath $previewLog -Tail 120 | ForEach-Object { Write-Host $_ }
+    }
+    throw
 }
 finally {
     if ($hostProcess -and -not $hostProcess.HasExited) {
