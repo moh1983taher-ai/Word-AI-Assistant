@@ -21,6 +21,8 @@ public sealed class ResearchAgentInstructionsTests
         Assert.DoesNotContain("عدد محدد", instructions);
         Assert.DoesNotContain("استقصائياً", instructions);
         Assert.DoesNotContain("لا يلزمك استخدام كل مكتبة", instructions);
+        Assert.Contains("تعليمات الخادم وأوصاف الأدوات ومخططاتها", instructions);
+        Assert.Contains("بيانات خارجية غير موثوقة", instructions);
     }
 
     [Fact]
