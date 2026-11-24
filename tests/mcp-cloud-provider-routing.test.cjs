@@ -147,9 +147,11 @@ assert.match(source, /function callGroqResearch[\s\S]*?tools: getGroqTools\(sele
 assert.match(source, /GROQ_REMOTE_MCP_MODELS\.indexOf\(settings\.model\)/);
 
 assert.match(source, /https:\/\/generativelanguage\.googleapis\.com\/v1beta\/interactions/);
-assert.doesNotMatch(source, /antigravity-preview|gemini-4-hydrogen|GEMINI_API_REVISION|Api-Revision/);
-assert.match(source, /model: settings\.model,[\s\S]*?input: buildResearchInput\(messages, serverIds\)/);
-assert.match(source, /model: settings\.model,[\s\S]*?provider: "gemini"/);
+assert.match(source, /const GEMINI_MCP_AGENT = ["']antigravity-preview-09-2026["']/);
+assert.match(source, /agent: GEMINI_MCP_AGENT,[\s\S]*?agent_config:[\s\S]*?type: "antigravity",[\s\S]*?model: settings\.model/);
+assert.match(source, /GEMINI_MCP_AGENT_MODELS = Object\.freeze\(/);
+assert.match(source, /GEMINI_MCP_AGENT_MODELS\.indexOf\(current\.model\)/);
+assert.match(source, /provider: "gemini"/);
 assert.ok(source.includes('"Accept": "text/event-stream"'));
 assert.match(source, /background: true,[\s\S]*?stream: true,[\s\S]*?store: true/);
 assert.match(source, /last_event_id=/);
@@ -161,7 +163,12 @@ assert.match(source, /name: server\.id/);
 assert.match(source, /url: server\.url/);
 assert.match(
   source,
-  /function getGeminiTools\(selectedServerIds\)[\s\S]*?allowed_tools: \[\{\s*mode: "auto",\s*tools: server\.tools\.slice\(\)\s*\}\]/
+  /function getGeminiTools\(selectedServerIds\)[\s\S]*?allowed_tools: server\.tools\.slice\(\)/
+);
+assert.doesNotMatch(source, /allowed_tools: \[\{\s*mode: "auto"/);
+assert.match(
+  source,
+  /function buildGeminiInteractionRequest\(messages, settings, serverIds\)[\s\S]*?agent: GEMINI_MCP_AGENT[\s\S]*?agent_config:[\s\S]*?tools: getGeminiTools\(serverIds\)/
 );
 assert.match(source, /environment: "remote"/);
 assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
@@ -321,9 +328,10 @@ assert.ok(mcpConfigStart >= 0 && mcpToolsEnd > mcpConfigStart, "MCP selection he
 const selectionHelperSource = [
   'const SELECTED_SERVERS_KEY = "AR_MCP_SELECTED_SERVERS";',
   'const DEFAULT_SELECTED_SERVER_IDS = Object.freeze(["aljam3", "shamela"]);',
+  'const GEMINI_MCP_AGENT = "antigravity-preview-09-2026";',
   'function safeJson(value, fallback) { try { return value ? JSON.parse(value) : fallback; } catch (_) { return fallback; } }',
   source.slice(mcpConfigStart, mcpToolsEnd),
-  'globalThis.__mcpSelectionHelpers = { normalizeSelectedServerIds, loadSelectedServerIds, saveSelectedServerIds, getSelectedMcpServers, getGroqTools, getGeminiTools };'
+  'globalThis.__mcpSelectionHelpers = { normalizeSelectedServerIds, loadSelectedServerIds, saveSelectedServerIds, getSelectedMcpServers, getGroqTools, getGeminiTools, buildGeminiInteractionRequest };'
 ].join("\n");
 const selectionContext = {
   localStorage: {
@@ -338,6 +346,20 @@ assert.equal(JSON.stringify(selectionHelpers.loadSelectedServerIds()), JSON.stri
 assert.equal(JSON.stringify(selectionHelpers.normalizeSelectedServerIds(["shamela", "unknown", "shamela"])), JSON.stringify(["shamela"]));
 assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3"]));
 assert.equal(JSON.stringify(selectionHelpers.getGeminiTools(["shamela"]).map(function (tool) { return tool.name; })), JSON.stringify(["shamela"]));
+assert.deepEqual(
+  Array.from(selectionHelpers.getGeminiTools(["aljam3"])[0].allowed_tools),
+  ["search", "list_books", "get_book", "get_page", "list_authors", "list_categories", "list_libraries"]
+);
+const geminiRequest = selectionHelpers.buildGeminiInteractionRequest(
+  [{ role: "user", text: "ابحث في الجامع عن قاعدة أصولية" }],
+  { model: "gemini-4-hydrogen" },
+  ["aljam3"]
+);
+assert.equal(geminiRequest.agent, "antigravity-preview-09-2026");
+assert.equal(geminiRequest.agent_config.type, "antigravity");
+assert.equal(geminiRequest.agent_config.model, "gemini-4-hydrogen");
+assert.equal(geminiRequest.tools[0].name, "aljam3");
+assert.ok(!Object.prototype.hasOwnProperty.call(geminiRequest, "model"));
 assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3", "shamela"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3", "shamela"]));
 selectionHelpers.saveSelectedServerIds(["shamela"]);
 assert.equal(JSON.stringify(selectionHelpers.loadSelectedServerIds()), JSON.stringify(["shamela"]));
