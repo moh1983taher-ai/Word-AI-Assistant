@@ -74,7 +74,7 @@ internal static class ResearchDecisionProtocol
         {
             builder.AppendLine("يمكنك إخراج tool_call لمتابعة البحث أو final إذا غطت الأدلة المفتوحة محاور الخطة بالفعل.");
             builder.AppendLine("{\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}");
-            builder.AppendLine("{\"type\":\"final\",\"answer\":\"نص الإجابة\"}");
+            builder.AppendLine("{\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور مغطى من الخطة\"],\"uncovered\":[]}");
         }
 
         return builder.ToString();
