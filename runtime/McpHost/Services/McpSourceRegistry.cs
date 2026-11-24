@@ -68,15 +68,14 @@ public sealed class McpSourceRegistry : IAsyncDisposable
             catch (Exception exception)
             {
                 _log.Warning($"MCP discovery failed for {definition.Id}: {exception.GetType().Name}");
-                return new SourceDiscovery([], [$"{definition.Id}: {exception.GetType().Name}: {exception.Message}"], []);
+                return new SourceDiscovery([], [$"{definition.Id}: {exception.GetType().Name}: {exception.Message}"]);
             }
         });
 
         var sources = await Task.WhenAll(tasks);
         return new SourceDiscovery(
             sources.SelectMany(source => source.Tools).ToArray(),
-            sources.SelectMany(source => source.Warnings).ToArray(),
-            sources.SelectMany(source => source.ServerInstructions).ToArray());
+            sources.SelectMany(source => source.Warnings).ToArray());
     }
 
     public async Task<CallToolResult> CallToolAsync(
@@ -124,18 +123,10 @@ public sealed class McpSourceRegistry : IAsyncDisposable
                 state.Definition.Id,
                 state.Definition.Label,
                 tool.Name,
-                tool.Description ?? string.Empty,
+                Limit(tool.Description, 700),
                 tool.JsonSchema.Clone())).ToArray();
 
-            IReadOnlyList<McpServerInstruction> serverInstructions =
-                string.IsNullOrWhiteSpace(state.ServerInstructions)
-                    ? []
-                    : [new McpServerInstruction(
-                        state.Definition.Id,
-                        state.Definition.Label,
-                        state.ServerInstructions)];
-
-            return new SourceDiscovery(descriptors, [], serverInstructions);
+            return new SourceDiscovery(descriptors, []);
         }
         finally
         {
@@ -191,11 +182,10 @@ public sealed class McpSourceRegistry : IAsyncDisposable
             state.Transport = transport;
             state.Client = client;
             state.Tools = tools.Where(candidate => ToolPolicy.IsAllowed(candidate.ProtocolTool)).ToList();
-            state.ServerInstructions = client.ServerInstructions ?? string.Empty;
             state.CatalogExpiresAt = DateTimeOffset.UtcNow.Add(CatalogLifetime);
 
             _log.Info(
-                $"MCP connected: {state.Definition.Id}; discovered={tools.Count}; readOnly={state.Tools.Count}; serverInstructionsCharacters={state.ServerInstructions.Length}; protocol={client.NegotiatedProtocolVersion ?? "per-request"}.");
+                $"MCP connected: {state.Definition.Id}; discovered={tools.Count}; readOnly={state.Tools.Count}; protocol={client.NegotiatedProtocolVersion ?? "per-request"}.");
         }
         catch
         {
@@ -212,7 +202,7 @@ public sealed class McpSourceRegistry : IAsyncDisposable
         state.Tools = tools.Where(candidate => ToolPolicy.IsAllowed(candidate.ProtocolTool)).ToList();
         state.CatalogExpiresAt = DateTimeOffset.UtcNow.Add(CatalogLifetime);
         _log.Info(
-            $"MCP catalog refreshed: {state.Definition.Id}; discovered={tools.Count}; readOnly={state.Tools.Count}; serverInstructionsCharacters={state.ServerInstructions.Length}.");
+            $"MCP catalog refreshed: {state.Definition.Id}; discovered={tools.Count}; readOnly={state.Tools.Count}.");
     }
 
     private static async Task DisposeConnectionAsync(SourceState state)
@@ -230,8 +220,13 @@ public sealed class McpSourceRegistry : IAsyncDisposable
         }
 
         state.Tools = [];
-        state.ServerInstructions = string.Empty;
         state.CatalogExpiresAt = DateTimeOffset.MinValue;
+    }
+
+    private static string Limit(string? value, int maxLength)
+    {
+        var text = value ?? string.Empty;
+        return text.Length <= maxLength ? text : text[..maxLength];
     }
 
     public async ValueTask DisposeAsync()
@@ -260,7 +255,6 @@ public sealed class McpSourceRegistry : IAsyncDisposable
         public HttpClientTransport? Transport { get; set; }
         public McpClient? Client { get; set; }
         public List<McpClientTool> Tools { get; set; } = [];
-        public string ServerInstructions { get; set; } = string.Empty;
         public DateTimeOffset CatalogExpiresAt { get; set; }
     }
 }
