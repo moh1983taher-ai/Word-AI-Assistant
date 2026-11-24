@@ -258,7 +258,7 @@ public sealed class ResearchCoordinator
                         $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; responseFormat=omitted; protocol=prompted-json.");
 
                     if (repairAttempted)
-                        throw new InvalidOperationException("تعذر التحقق من استجابة النموذج وفق مخطط JSON الصارم بعد محاولة الإصلاح.");
+                        throw new InvalidOperationException("تعذر التحقق من قرار النموذج بصيغة JSON بعد محاولة الإصلاح.");
 
                     repairAttempted = true;
                     messages.Add(new DuckChatMessage("assistant", completion.Text));
