@@ -138,7 +138,17 @@ function Test-McpHostArchive([string]$Path) {
             $expanded += [int64]$entry.Length
             if ($expanded -gt 180MB) { throw 'MCP archive expands beyond the safe size limit.' }
         }
-        if (-not $names.ContainsKey('ResearchTools.McpHost.exe') -or -not $names.ContainsKey('ResearchTools.McpHost.exe.sha256')) { throw 'MCP archive is incomplete.' }
+        $requiredMcpFiles = @(
+            'ResearchTools.McpHost.exe',
+            'ResearchTools.McpHost.exe.sha256',
+            'Test-McpHost-Preview.ps1',
+            'Start-McpHost-Preview.ps1'
+        )
+        foreach ($requiredMcpFile in $requiredMcpFiles) {
+            if (-not $names.ContainsKey($requiredMcpFile)) {
+                throw ('MCP archive is missing required file: ' + $requiredMcpFile)
+            }
+        }
     }
     finally { $zip.Dispose() }
 }
