@@ -37,7 +37,7 @@ public sealed class ResearchContextBudgetTests
             Assert.Equal(64_000, budget.MaxContextCharacters);
             Assert.Equal(5_000, budget.MaxOutputTokens);
             Assert.True(budget.GetAvailableInputCharacters(31_376) > 25_000);
-            Assert.True(budget.GetAvailableInputCharacters(31_376) > 0);
+            Assert.True(budget.GetAvailableInputCharacters(31_376 + 20_000) > 10_000);
             Assert.Equal(TimeSpan.FromMinutes(10), budget.ResearchTimeout);
             Assert.Equal(TimeSpan.FromSeconds(120), budget.ModelRequestTimeout);
         }
