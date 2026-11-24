@@ -63,12 +63,16 @@ public sealed class ResearchIntentClassifierTests
     }
 
     [Fact]
-    public void DoesNotRequireMcpSearchCoverageForNonResearchRequests()
+    public void RequiresSearchForEveryRequestRoutedThroughResearchMode()
     {
-        Assert.Empty(ResearchIntentClassifier.GetPendingSearchSources(
-            "ما معنى الاجتهاد؟",
-            ["aljam3", "shamela"],
-            new HashSet<string>(StringComparer.Ordinal)));
+        var selected = new[] { "aljam3", "shamela" };
+
+        Assert.Equal(
+            selected,
+            ResearchIntentClassifier.GetPendingSearchSources(
+                "ما معنى الاجتهاد؟",
+                selected,
+                new HashSet<string>(StringComparer.Ordinal)));
     }
 
     [Theory]
