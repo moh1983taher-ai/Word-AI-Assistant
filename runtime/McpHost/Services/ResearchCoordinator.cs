@@ -151,7 +151,7 @@ public sealed class ResearchCoordinator
                     _log.Error(
                         $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; toolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
                     throw new InvalidOperationException(
-                        $"تعذر تجهيز تعريفات أدوات MCP ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات {turnSystemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف. راجع سجل المضيف لمعرفة تفاصيل مخططات الأدوات، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS ضمن سعة النموذج الفعلية.");
+                        $"تعذر تجهيز تعريفات أدوات MCP ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات {turnSystemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف، والحد الأدنى اللازم لتجاوز تعريفاتها {minimumRequiredCharacters:N0} حرف. راجع سجل المضيف لمعرفة حجم مخططات الأدوات، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS فقط إذا كان النموذج والبوابة يدعمان سعة أكبر.");
                 }
 
                 var evidenceBudget = contextBudget.GetEvidenceBudget(
