@@ -5,8 +5,8 @@ using ResearchTools.McpHost.Models;
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Tracks page references returned by selected MCP search tools and prevents
-/// page-reading tools from opening identifiers absent from the current task's search results.
+/// Tracks page references returned by each MCP source and rejects page reads that
+/// do not use a reference from a prior search in that same source.
 /// </summary>
 internal sealed class McpEvidenceProvenance
 {
@@ -25,15 +25,13 @@ internal sealed class McpEvidenceProvenance
         """^\s*(?<book>\d+)\s*:\s*(?<page>\d+)\s*$""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    private readonly HashSet<string> _bookIds = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _pageIds = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _opaqueIds = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _bookPagePairs = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, SourceIndex> _sources = new(StringComparer.Ordinal);
+
+    internal int SearchHitCount { get; private set; }
+    internal int VerifiedOpenCount { get; private set; }
 
     internal int SearchReferenceCount =>
-        _bookPagePairs.Count + _pageIds.Count + _opaqueIds.Count;
-
-    internal int VerifiedOpenCount { get; private set; }
+        _sources.Values.Sum(index => index.ReferenceCount);
 
     internal static bool IsReferenceReadTool(ToolDescriptor descriptor)
     {
@@ -52,27 +50,35 @@ internal sealed class McpEvidenceProvenance
         ToolDescriptor descriptor,
         JsonElement? structuredContent,
         IEnumerable<string>? textBlocks,
-        bool isError)
+        bool isError,
+        bool hasUsableContent)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        if (isError || !ResearchToolResultClassifier.IsSearchTool(descriptor))
+        if (!ResearchToolResultClassifier.IsSearchTool(descriptor))
             return 0;
 
-        var before = SearchReferenceCount;
+        if (isError)
+            return 0;
+
+        if (hasUsableContent)
+            SearchHitCount++;
+
+        var index = GetSourceIndex(descriptor.Server);
+        var before = index.ReferenceCount;
 
         if (structuredContent is { } structured &&
             structured.ValueKind is not JsonValueKind.Undefined and not JsonValueKind.Null)
         {
-            VisitSearchPayload(structured, inheritedBookId: null);
+            VisitSearchPayload(structured, index, inheritedBookId: null);
         }
 
         if (textBlocks is not null)
         {
             foreach (var text in textBlocks)
-                VisitSearchText(text);
+                VisitSearchText(text, index);
         }
 
-        return SearchReferenceCount - before;
+        return index.ReferenceCount - before;
     }
 
     internal string? ValidateReferenceRead(
@@ -85,7 +91,8 @@ internal sealed class McpEvidenceProvenance
         if (!IsReferenceReadTool(descriptor))
             return null;
 
-        if (SearchReferenceCount == 0)
+        if (!_sources.TryGetValue(descriptor.Server, out var index) ||
+            index.ReferenceCount == 0)
         {
             return "لا توجد نتيجة بحث سابقة من هذه المكتبة تحمل معرّف صفحة يمكن التحقق منه؛ أعد البحث قبل فتح الصفحة.";
         }
@@ -99,9 +106,53 @@ internal sealed class McpEvidenceProvenance
             return "معاملات فتح الصفحة لا تتضمن معرّف كتاب أو صفحة معروفاً؛ لا تخمّن المعرّفات، واستخدم معرّفاً وارداً في نتيجة البحث.";
         }
 
-        if (requested.Any(reference => !WasReturnedBySearch(reference)))
+        if (requested.Any(reference => !WasReturnedBySearch(index, reference)))
         {
             return "المعرّف المطلوب فتحه غير موجود في نتائج البحث السابقة لهذه المكتبة؛ اختر نتيجة من المخرجات الفعلية أو أعد البحث. لا تفتح موضعاً مستنتجاً أو منقولاً من مصدر آخر.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// If an opened page returns its own book/page identifiers, make sure they
+    /// identify the same hit that the host authorized for opening. Plain-text
+    /// servers that omit response identifiers remain traceable to the authorized input.
+    /// </summary>
+    internal string? ValidateOpenedResult(
+        ToolDescriptor descriptor,
+        IReadOnlyDictionary<string, object?> arguments,
+        JsonElement? structuredContent,
+        IEnumerable<string>? textBlocks)
+    {
+        if (!IsReferenceReadTool(descriptor))
+            return null;
+
+        var requested = new List<Reference>();
+        VisitOpenArguments(JsonSerializer.SerializeToElement(arguments), requested, inheritedBookId: null);
+
+        if (requested.Count == 0)
+            return "تعذر تحديد الصفحة المطلوبة للتحقق من نتيجة الفتح.";
+
+        var returned = new SourceIndex();
+        if (structuredContent is { } structured &&
+            structured.ValueKind is not JsonValueKind.Undefined and not JsonValueKind.Null)
+        {
+            VisitSearchPayload(structured, returned, inheritedBookId: null);
+        }
+
+        if (textBlocks is not null)
+        {
+            foreach (var text in textBlocks)
+                VisitSearchText(text, returned);
+        }
+
+        if (returned.ReferenceCount == 0)
+            return null;
+
+        if (requested.Any(request => !returned.Contains(request)))
+        {
+            return "أعادت أداة الفتح بيانات كتاب أو صفحة لا تطابق المعرّف الذي طُلب فتحه؛ لم يعتمد المضيف هذا المحتوى دليلاً.";
         }
 
         return null;
@@ -113,24 +164,38 @@ internal sealed class McpEvidenceProvenance
             VerifiedOpenCount++;
     }
 
-    private bool WasReturnedBySearch(Reference reference)
+    private SourceIndex GetSourceIndex(string sourceId)
     {
-        if (reference.BookId is not null && reference.PageId is not null)
-            return _bookPagePairs.Contains(Pair(reference.BookId, reference.PageId));
+        if (!_sources.TryGetValue(sourceId, out var index))
+        {
+            index = new SourceIndex();
+            _sources.Add(sourceId, index);
+        }
 
-        if (reference.BookId is not null)
-            return _bookIds.Contains(reference.BookId);
-
-        if (reference.PageId is not null)
-            return _pageIds.Contains(reference.PageId) ||
-                   _opaqueIds.Contains(reference.PageId);
-
-        return reference.OpaqueId is not null &&
-               (_opaqueIds.Contains(reference.OpaqueId) ||
-                _pageIds.Contains(reference.OpaqueId));
+        return index;
     }
 
-    private void VisitSearchPayload(JsonElement element, string? inheritedBookId)
+    private static bool WasReturnedBySearch(SourceIndex index, Reference reference)
+    {
+        if (reference.BookId is not null && reference.PageId is not null)
+            return index.BookPagePairs.Contains(Pair(reference.BookId, reference.PageId));
+
+        if (reference.BookId is not null)
+            return index.BookIds.Contains(reference.BookId);
+
+        if (reference.PageId is not null)
+            return index.PageIds.Contains(reference.PageId) ||
+                   index.OpaqueIds.Contains(reference.PageId);
+
+        return reference.OpaqueId is not null &&
+               (index.OpaqueIds.Contains(reference.OpaqueId) ||
+                index.PageIds.Contains(reference.OpaqueId));
+    }
+
+    private static void VisitSearchPayload(
+        JsonElement element,
+        SourceIndex index,
+        string? inheritedBookId)
     {
         switch (element.ValueKind)
         {
@@ -140,34 +205,34 @@ internal sealed class McpEvidenceProvenance
                 var pageId = ReadScalar(element, PageKeys);
 
                 if (bookId is not null)
-                    _bookIds.Add(bookId);
+                    index.BookIds.Add(bookId);
 
                 if (bookId is not null && pageId is not null)
-                    _bookPagePairs.Add(Pair(bookId, pageId));
+                    index.BookPagePairs.Add(Pair(bookId, pageId));
                 else if (pageId is not null)
-                    _pageIds.Add(pageId);
+                    index.PageIds.Add(pageId);
 
                 if (TryGetProperty(element, "id", out var idElement))
-                    AddIdentifier(ReadScalar(idElement), bookId);
+                    AddIdentifier(index, ReadScalar(idElement), bookId);
 
                 foreach (var property in element.EnumerateObject())
                 {
                     if (IsLinkKey(property.Name) && property.Value.ValueKind == JsonValueKind.String)
-                        VisitSearchText(property.Value.GetString());
+                        VisitSearchText(property.Value.GetString(), index);
 
                     if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
-                        VisitSearchPayload(property.Value, bookId);
+                        VisitSearchPayload(property.Value, index, bookId);
                 }
                 break;
             }
 
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
-                    VisitSearchPayload(item, inheritedBookId);
+                    VisitSearchPayload(item, index, inheritedBookId);
                 break;
 
             case JsonValueKind.String:
-                VisitSearchText(element.GetString());
+                VisitSearchText(element.GetString(), index);
                 break;
         }
     }
@@ -212,21 +277,21 @@ internal sealed class McpEvidenceProvenance
         }
     }
 
-    private void VisitSearchText(string? text)
+    private static void VisitSearchText(string? text, SourceIndex index)
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
 
         foreach (Match match in BookPagePath.Matches(text))
-            _bookPagePairs.Add(Pair(match.Groups["book"].Value, match.Groups["page"].Value));
+            index.BookPagePairs.Add(Pair(match.Groups["book"].Value, match.Groups["page"].Value));
 
         foreach (Match match in BookPagePair.Matches(text))
-            _bookPagePairs.Add(Pair(match.Groups["book"].Value, match.Groups["page"].Value));
+            index.BookPagePairs.Add(Pair(match.Groups["book"].Value, match.Groups["page"].Value));
 
         var candidate = text.Trim();
         var colonPair = ColonPair.Match(candidate);
         if (colonPair.Success)
-            _bookPagePairs.Add(Pair(colonPair.Groups["book"].Value, colonPair.Groups["page"].Value));
+            index.BookPagePairs.Add(Pair(colonPair.Groups["book"].Value, colonPair.Groups["page"].Value));
 
         var firstBrace = candidate.IndexOf('{');
         var lastBrace = candidate.LastIndexOf('}');
@@ -236,15 +301,15 @@ internal sealed class McpEvidenceProvenance
         try
         {
             using var document = JsonDocument.Parse(candidate);
-            VisitSearchPayload(document.RootElement, inheritedBookId: null);
+            VisitSearchPayload(document.RootElement, index, inheritedBookId: null);
         }
         catch (JsonException)
         {
-            // Search servers may return Markdown; the URL and key-value patterns above still apply.
+            // Search servers may return Markdown; URL and key-value patterns above still apply.
         }
     }
 
-    private void AddIdentifier(string? id, string? bookId)
+    private static void AddIdentifier(SourceIndex index, string? id, string? bookId)
     {
         if (string.IsNullOrWhiteSpace(id))
             return;
@@ -253,14 +318,14 @@ internal sealed class McpEvidenceProvenance
         var pair = ColonPair.Match(normalized);
         if (pair.Success)
         {
-            _bookPagePairs.Add(Pair(pair.Groups["book"].Value, pair.Groups["page"].Value));
+            index.BookPagePairs.Add(Pair(pair.Groups["book"].Value, pair.Groups["page"].Value));
             return;
         }
 
         if (bookId is not null)
-            _bookPagePairs.Add(Pair(bookId, normalized));
+            index.BookPagePairs.Add(Pair(bookId, normalized));
         else
-            _opaqueIds.Add(normalized);
+            index.OpaqueIds.Add(normalized);
     }
 
     private static void AddTargetIdentifier(
@@ -331,6 +396,7 @@ internal sealed class McpEvidenceProvenance
 
     private static bool IsIdentifierCollectionKey(string name) =>
         name.Equals("ids", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("pages", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("page_ids", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("pageIds", StringComparison.OrdinalIgnoreCase);
 
@@ -340,6 +406,30 @@ internal sealed class McpEvidenceProvenance
     {
         var normalized = value?.Trim();
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private sealed class SourceIndex
+    {
+        internal HashSet<string> BookIds { get; } = new(StringComparer.Ordinal);
+        internal HashSet<string> PageIds { get; } = new(StringComparer.Ordinal);
+        internal HashSet<string> OpaqueIds { get; } = new(StringComparer.Ordinal);
+        internal HashSet<string> BookPagePairs { get; } = new(StringComparer.Ordinal);
+        internal int ReferenceCount => PageIds.Count + OpaqueIds.Count + BookPagePairs.Count;
+
+        internal bool Contains(Reference reference)
+        {
+            if (reference.BookId is not null && reference.PageId is not null)
+                return BookPagePairs.Contains(Pair(reference.BookId, reference.PageId));
+
+            if (reference.BookId is not null)
+                return BookIds.Contains(reference.BookId);
+
+            if (reference.PageId is not null)
+                return PageIds.Contains(reference.PageId) || OpaqueIds.Contains(reference.PageId);
+
+            return reference.OpaqueId is not null &&
+                   (OpaqueIds.Contains(reference.OpaqueId) || PageIds.Contains(reference.OpaqueId));
+        }
     }
 
     private sealed record Reference(string? BookId, string? PageId, string? OpaqueId);
