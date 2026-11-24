@@ -63,6 +63,18 @@ public sealed class ResearchDecisionProtocolTests
     }
 
     [Fact]
+    public void DoesNotTreatOneOpenedPageAsEvidenceThatResearchIsComplete()
+    {
+        var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
+            allowFinal: true,
+            pendingSourceLabels: []);
+
+        Assert.Contains("لا يعني ذلك اكتمال الاستقصاء", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تكتف بصفحة واحدة", prompt, StringComparison.Ordinal);
+        Assert.Contains("تغطية محاور خطة البحث", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TimeoutFinalizationOnlyPermitsFinalJson()
     {
         var prompt = ResearchDecisionProtocol.BuildTimeoutFinalInstructions();
