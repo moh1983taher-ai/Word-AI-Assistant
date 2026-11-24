@@ -131,13 +131,19 @@ public sealed class ResearchCoordinator
             var searchDecisionCorrectionAttempted = false;
             var pageVerificationCorrectionAttempted = false;
             var toolCallsAttempted = 0;
+            var searchedSourceIds = new HashSet<string>(StringComparer.Ordinal);
 
             while (true)
             {
                 IReadOnlyList<ToolDescriptor> turnTools = activeTools;
+                var pendingSearchSources = ResearchIntentClassifier.GetPendingSearchSources(
+                    latestUserMessage,
+                    selectedServerIds,
+                    searchedSourceIds);
+                var allowFinal = pendingSearchSources.Count == 0;
                 var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
                     turnTools,
-                    allowFinal: true,
+                    allowFinal: allowFinal,
                     allowToolCalls: true);
                 var responseFormatCharacters = responseFormat.GetRawText().Length;
                 var turnSystemPrompt = BuildSystemPrompt(
@@ -146,7 +152,12 @@ public sealed class ResearchCoordinator
                     warnings,
                     out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
-                    "تواصل مع مضيف MCP عبر بروتوكول قرارات JSON. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق؛ في tool_call املأ type وserver وtool وarguments واترك answer فارغاً، وفي final املأ type وanswer واجعل server وtool فارغين وarguments null.";
+                    (allowFinal
+                        ? "تواصل مع مضيف MCP عبر بروتوكول قرارات JSON. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق؛ في tool_call املأ type وserver وtool وarguments واترك answer فارغاً، وفي final املأ type وanswer واجعل server وtool فارغين وarguments null."
+                        : "هذه مهمة بحث مصدري لم يكتمل البحث فيها بعد. المكتبات التي يجب أن تبحث فيها الآن: " +
+                          string.Join("، ", pendingSearchSources.Select(source =>
+                              $"{ResearchSourceSelection.GetLabel(source)} ({(source == "aljam3" ? "search" : "shamela_find أو shamela_find_scoped")})")) +
+                          ". يجب أن يكون القرار tool_call لأداة بحث من إحدى هذه المكتبات، مع معاملات بحث صحيحة. لا تصدر final ولا تجب من الذاكرة. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق.");
 
                 // Count both the compact tool directory and the strict argument schema.
                 // The argument schema is sent separately as response_format and must
@@ -192,7 +203,7 @@ public sealed class ResearchCoordinator
 
                 var requestCharacters = requestMessages.Sum(message => message.Content?.Length ?? 0);
                 _log.Info(
-                    $"Research prompt prepared: task={taskId}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormatCharacters={responseFormatCharacters}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
+                    $"Research prompt prepared: task={taskId}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormatCharacters={responseFormatCharacters}; pendingSearchSources={pendingSearchSources.Count}; finalAllowed={allowFinal}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
 
                 var completion = await _duckAi.CompleteAsync(
                     model,
@@ -229,9 +240,7 @@ public sealed class ResearchCoordinator
                 {
                     var sourceResearchRequired =
                         ResearchIntentClassifier.RequiresMcpSources(latestUserMessage);
-                    var searchWasSkipped = ResearchIntentClassifier.MustUseMcpBeforeFinal(
-                        latestUserMessage,
-                        trace.Count);
+                    var searchWasSkipped = pendingSearchSources.Count > 0;
                     var matchingPageWasNotOpened =
                         sourceResearchRequired &&
                         evidenceProvenance.HasUnverifiedSearchResults;
@@ -247,7 +256,9 @@ public sealed class ResearchCoordinator
                             messages.Add(new DuckChatMessage("assistant", decision.Raw));
                             messages.Add(new DuckChatMessage(
                                 "user",
-                                "تنبيه تحقق: طلب المستخدم صريح في البحث من المكتبات المختارة، لكنك أصدرت إجابة نهائية دون تنفيذ أداة بحث ناجحة. لا تستبدل البحث بمعلومات الذاكرة. نفّذ بحثاً فعلياً أولاً، ثم افتح الصفحات المطابقة للنتائج التي ستستشهد بها."));
+                                "تنبيه تحقق: لا يزال البحث غير منفذ في المكتبات الآتية: " +
+                                string.Join("، ", pendingSearchSources.Select(ResearchSourceSelection.GetLabel)) +
+                                ". لا تصدر إجابة نهائية ولا تعتمد على الذاكرة. نفّذ أداة البحث الصحيحة في كل مكتبة متبقية، ثم افتح الصفحات المطابقة للنتائج التي ستستشهد بها."));
                             continue;
                         }
 
@@ -334,6 +345,11 @@ public sealed class ResearchCoordinator
 
                 evidenceLedger.Add(descriptorForJson, execution.Content, execution.Succeeded);
 
+                var completedSearch = execution.Succeeded &&
+                    ResearchToolResultClassifier.IsCompletedSearch(descriptorForJson, isError: false);
+                if (completedSearch)
+                    searchedSourceIds.Add(descriptorForJson.Server);
+
                 if (execution.Succeeded)
                     trace.Add(new ToolCallTrace(
                         descriptorForJson.Server,
@@ -341,7 +357,7 @@ public sealed class ResearchCoordinator
                         descriptorForJson.Name));
 
                 _log.Info(
-                    $"Research tool result: task={taskId}; source={decision.Server}; tool={decision.Tool}; success={execution.Succeeded}; evidenceEntries={evidenceLedger.Entries.Count}.");
+                    $"Research tool result: task={taskId}; source={decision.Server}; tool={decision.Tool}; success={execution.Succeeded}; completedSearch={completedSearch}; searchCoverage={searchedSourceIds.Count}/{selectedServerIds.Count}; evidenceEntries={evidenceLedger.Entries.Count}.");
             }
 
         }
