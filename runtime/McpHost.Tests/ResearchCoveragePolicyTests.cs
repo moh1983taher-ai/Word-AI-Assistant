@@ -6,35 +6,57 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class ResearchCoveragePolicyTests
 {
     [Fact]
-    public void AcceptsFinalOnlyWhenEveryPlannedFacetIsDeclaredCovered()
+    public void AcceptsFinalWhenEveryPlannedFacetIsCovered()
     {
-        var missing = ResearchCoveragePolicy.GetMissingCoverage(
+        var unreported = ResearchCoveragePolicy.GetUnreportedCoverage(
             ["التعريف", "الصيغ", "النسبة"],
             [" التعريف ", "الصيغ", "النسبة"],
             []);
 
-        Assert.Empty(missing);
+        Assert.Empty(unreported);
     }
 
     [Fact]
-    public void ReturnsEveryUncoveredOrUnattestedFacet()
+    public void AcceptsExplicitlyUnresolvedFacetsForTransparentPartialAnswers()
     {
-        var missing = ResearchCoveragePolicy.GetMissingCoverage(
+        var unreported = ResearchCoveragePolicy.GetUnreportedCoverage(
+            ["التعريف", "الصيغ", "النسبة"],
+            ["التعريف"],
+            ["الصيغ", "النسبة"]);
+
+        Assert.Empty(unreported);
+    }
+
+    [Fact]
+    public void RejectsFacetsOmittedFromBothCoverageLists()
+    {
+        var unreported = ResearchCoveragePolicy.GetUnreportedCoverage(
             ["التعريف", "الصيغ", "النسبة"],
             ["التعريف"],
             ["النسبة"]);
 
-        Assert.Equal(new[] { "الصيغ", "النسبة" }, missing);
+        Assert.Equal(new[] { "الصيغ" }, unreported);
+    }
+
+    [Fact]
+    public void RejectsAPlanFacetDeclaredBothCoveredAndUncovered()
+    {
+        var unreported = ResearchCoveragePolicy.GetUnreportedCoverage(
+            ["التعريف", "الصيغ"],
+            ["التعريف", "الصيغ"],
+            ["الصيغ"]);
+
+        Assert.Equal(new[] { "الصيغ" }, unreported);
     }
 
     [Fact]
     public void NormalizesWhitespaceWhenComparingPlanCoverage()
     {
-        var missing = ResearchCoveragePolicy.GetMissingCoverage(
+        var unreported = ResearchCoveragePolicy.GetUnreportedCoverage(
             ["أثر المصطلح في الاستنباط"],
             ["أثر   المصطلح في الاستنباط"],
             []);
 
-        Assert.Empty(missing);
+        Assert.Empty(unreported);
     }
 }
