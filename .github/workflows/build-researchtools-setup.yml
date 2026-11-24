@@ -184,9 +184,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.5'
-          $title = 'ResearchTools Unified Setup v1.2.5'
-          $notes = 'Unified one-file x64 installer v1.2.5: raises the local DuckAI MCP research input budget to 64,000 characters by default while retaining the 5,000-token output ceiling; keeps the prompt-side tool directory compact and sends the full strict argument schemas once in the structured response format, with both prompt and schema sizes accounted for in the context budget. Also retains source-bound evidence provenance: page reads must use identifiers returned by a prior search in the same library, opened-page identifiers are checked when the server returns them, and research cannot be finalized while a selected library with usable hits has no verified page open. Preserves the existing read-only MCP servers, source selection, DuckAI architecture, SHA-256 checks, staged installation, and rollback protections. Does not modify C:\\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.2.6'
+          $title = 'ResearchTools Unified Setup v1.2.6'
+          $notes = 'Unified one-file x64 installer v1.2.6: keeps the 64,000-character DuckAI MCP research input budget and strict structured decision protocol; fixes premature finalization by removing the final-answer option from the response schema until a successful search has been completed in every user-selected library. The prompt now identifies the exact remaining library search tools, and logs expose pending-search coverage and whether finalization is allowed. A successful empty search counts as completed coverage; failed calls and non-search tools do not. Existing page provenance checks still require verified same-library page opens before citing search hits. Preserves the read-only MCP servers, source selection, DuckAI architecture, SHA-256 checks, staged installation, and rollback protections. Does not modify C:\\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
