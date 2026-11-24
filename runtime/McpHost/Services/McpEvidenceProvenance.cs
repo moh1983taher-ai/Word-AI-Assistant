@@ -185,11 +185,12 @@ internal sealed class McpEvidenceProvenance
             return index.BookPagePairs.Contains(Pair(reference.BookId, reference.PageId));
 
         if (reference.BookId is not null)
-            return index.BookIds.Contains(reference.BookId);
+            return false;
 
         if (reference.PageId is not null)
             return index.PageIds.Contains(reference.PageId) ||
-                   index.OpaqueIds.Contains(reference.PageId);
+                   index.OpaqueIds.Contains(reference.PageId) ||
+                   index.HasUnambiguousPageId(reference.PageId);
 
         return reference.OpaqueId is not null &&
                (index.OpaqueIds.Contains(reference.OpaqueId) ||
@@ -208,11 +209,8 @@ internal sealed class McpEvidenceProvenance
                 var bookId = ReadScalar(element, BookKeys) ?? inheritedBookId;
                 var pageId = ReadScalar(element, SearchPageKeys);
 
-                if (bookId is not null)
-                    index.BookIds.Add(bookId);
-
                 if (bookId is not null && pageId is not null)
-                    index.BookPagePairs.Add(Pair(bookId, pageId));
+                    index.AddBookPagePair(bookId, pageId);
                 else if (pageId is not null)
                     index.PageIds.Add(pageId);
 
@@ -302,15 +300,15 @@ internal sealed class McpEvidenceProvenance
             return;
 
         foreach (Match match in BookPagePath.Matches(text))
-            index.BookPagePairs.Add(Pair(match.Groups["book"].Value, match.Groups["page"].Value));
+            index.AddBookPagePair(match.Groups["book"].Value, match.Groups["page"].Value);
 
         foreach (Match match in BookPagePair.Matches(text))
-            index.BookPagePairs.Add(Pair(match.Groups["book"].Value, match.Groups["page"].Value));
+            index.AddBookPagePair(match.Groups["book"].Value, match.Groups["page"].Value);
 
         var candidate = text.Trim();
         var colonPair = ColonPair.Match(candidate);
         if (colonPair.Success)
-            index.BookPagePairs.Add(Pair(colonPair.Groups["book"].Value, colonPair.Groups["page"].Value));
+            index.AddBookPagePair(colonPair.Groups["book"].Value, colonPair.Groups["page"].Value);
 
         var firstBrace = candidate.IndexOf('{');
         var lastBrace = candidate.LastIndexOf('}');
@@ -337,12 +335,12 @@ internal sealed class McpEvidenceProvenance
         var pair = ColonPair.Match(normalized);
         if (pair.Success)
         {
-            index.BookPagePairs.Add(Pair(pair.Groups["book"].Value, pair.Groups["page"].Value));
+            index.AddBookPagePair(pair.Groups["book"].Value, pair.Groups["page"].Value);
             return;
         }
 
         if (bookId is not null)
-            index.BookPagePairs.Add(Pair(bookId, normalized));
+            index.AddBookPagePair(bookId, normalized);
         else
             index.OpaqueIds.Add(normalized);
     }
@@ -431,11 +429,26 @@ internal sealed class McpEvidenceProvenance
     {
         internal int SearchHitCount { get; set; }
         internal int VerifiedOpenCount { get; set; }
-        internal HashSet<string> BookIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> PageIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> OpaqueIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> BookPagePairs { get; } = new(StringComparer.Ordinal);
+        private Dictionary<string, HashSet<string>> PageBooks { get; } = new(StringComparer.Ordinal);
         internal int ReferenceCount => PageIds.Count + OpaqueIds.Count + BookPagePairs.Count;
+
+        internal void AddBookPagePair(string bookId, string pageId)
+        {
+            BookPagePairs.Add(Pair(bookId, pageId));
+            if (!PageBooks.TryGetValue(pageId, out var books))
+            {
+                books = new HashSet<string>(StringComparer.Ordinal);
+                PageBooks.Add(pageId, books);
+            }
+
+            books.Add(bookId);
+        }
+
+        internal bool HasUnambiguousPageId(string pageId) =>
+            PageBooks.TryGetValue(pageId, out var books) && books.Count == 1;
 
         internal bool Contains(Reference reference)
         {
@@ -443,10 +456,12 @@ internal sealed class McpEvidenceProvenance
                 return BookPagePairs.Contains(Pair(reference.BookId, reference.PageId));
 
             if (reference.BookId is not null)
-                return BookIds.Contains(reference.BookId);
+                return false;
 
             if (reference.PageId is not null)
-                return PageIds.Contains(reference.PageId) || OpaqueIds.Contains(reference.PageId);
+                return PageIds.Contains(reference.PageId) ||
+                       OpaqueIds.Contains(reference.PageId) ||
+                       HasUnambiguousPageId(reference.PageId);
 
             return reference.OpaqueId is not null &&
                    (OpaqueIds.Contains(reference.OpaqueId) || PageIds.Contains(reference.OpaqueId));
