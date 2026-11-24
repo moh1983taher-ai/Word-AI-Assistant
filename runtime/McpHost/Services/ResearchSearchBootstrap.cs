@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ResearchTools.McpHost.Infrastructure;
 using ResearchTools.McpHost.Models;
+using ResearchTools.McpHost.Security;
 
 namespace ResearchTools.McpHost.Services;
 
