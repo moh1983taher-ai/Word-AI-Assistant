@@ -341,10 +341,14 @@ public sealed class ResearchCoordinator
 
                 model = completion.Model;
 
-                var hasValidDecision = completion.ToolCalls.Count == 0 &&
-                    ModelDecisionParser.TryParse(completion.Text, out var decision);
+                ModelDecision? parsedDecision = null;
+                if (completion.ToolCalls.Count == 0 &&
+                    ModelDecisionParser.TryParse(completion.Text, out var candidateDecision))
+                {
+                    parsedDecision = candidateDecision;
+                }
 
-                if (!hasValidDecision)
+                if (parsedDecision is null)
                 {
                     _log.Warning(
                         $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; toolCalls={completion.ToolCalls.Count}; responseFormat=omitted; protocol=prompted-json; repairAttempt={invalidDecisionAttempts + 1}.");
@@ -373,6 +377,7 @@ public sealed class ResearchCoordinator
                 }
 
                 invalidDecisionAttempts = 0;
+                var decision = parsedDecision;
 
                 if (decision.Type == "final")
                 {
