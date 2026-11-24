@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Encodings.Web;
 
 namespace ResearchTools.McpHost.Services;
 
@@ -36,6 +37,9 @@ internal static class ResearchPlanningProtocol
             queries = plan.Queries.Select(query => new { query = query.Query, purpose = query.Purpose }).ToArray(),
             coverage = plan.Coverage
         };
-        return JsonSerializer.Serialize(payload);
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
     }
 }
