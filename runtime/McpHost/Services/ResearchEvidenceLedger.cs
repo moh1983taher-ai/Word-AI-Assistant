@@ -174,8 +174,8 @@ internal sealed class ResearchEvidenceLedger
         {
             if (line.Length <= maximum)
                 return line;
-            var prefixLength = Math.Max(1, maximum / 2);
-            var suffixLength = Math.Max(1, maximum - prefixLength - 1);
+            var suffixLength = Math.Max(1, (int)Math.Ceiling((maximum - 1) * 0.75));
+            var prefixLength = Math.Max(1, maximum - suffixLength - 1);
             return line[..prefixLength] + "…" + line[^suffixLength..];
         }
 
