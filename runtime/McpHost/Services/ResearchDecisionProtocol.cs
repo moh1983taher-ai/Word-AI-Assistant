@@ -47,6 +47,39 @@ internal static class ResearchDecisionProtocol
         return builder.ToString();
     }
 
+    internal static string BuildInvalidDecisionRepair(
+        bool allowFinal,
+        IReadOnlyList<string> pendingSourceLabels,
+        IReadOnlyList<string> pendingPageSourceLabels)
+    {
+        ArgumentNullException.ThrowIfNull(pendingSourceLabels);
+        ArgumentNullException.ThrowIfNull(pendingPageSourceLabels);
+
+        var builder = new StringBuilder();
+        builder.AppendLine("كان القرار السابق غير صالح بصيغة JSON. أعد قراراً واحداً صحيحاً فقط، دون Markdown أو شرح.");
+        builder.AppendLine("استعمل أسماء الخوادم والأدوات ومعاملاتها كما وردت حرفياً في فهرس MCP.");
+        if (!allowFinal)
+        {
+            builder.AppendLine("لا يُسمح الآن بقرار final؛ أخرج tool_call فقط.");
+            if (pendingSourceLabels.Count > 0)
+                builder.Append("المصادر التي لم يكتمل البحث فيها: ")
+                    .Append(string.Join("، ", pendingSourceLabels)).AppendLine(".");
+            if (pendingPageSourceLabels.Count > 0)
+                builder.Append("مصادر أعادت نتائج وتحتاج إلى فتح مواضع مرشحة: ")
+                    .Append(string.Join("، ", pendingPageSourceLabels)).AppendLine(".");
+            builder.AppendLine("اختر أداة البحث أو فتح الصفحة المناسبة من المخطط، ولا تكرر فتح صفحة تم التحقق منها إذا بقي مصدر آخر غير مفحوص.");
+            builder.AppendLine("{\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}");
+        }
+        else
+        {
+            builder.AppendLine("يمكنك إخراج tool_call لمتابعة البحث أو final إذا غطت الأدلة المفتوحة محاور الخطة بالفعل.");
+            builder.AppendLine("{\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}");
+            builder.AppendLine("{\"type\":\"final\",\"answer\":\"نص الإجابة\"}");
+        }
+
+        return builder.ToString();
+    }
+
     internal static string BuildTimeoutFinalInstructions() =>
         "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. " +
         "اعرض ما تسمح به الأدلة المفتوحة وبيّن المحاور التي لم يكتمل التحقق منها. " +
