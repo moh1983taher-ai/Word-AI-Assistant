@@ -382,21 +382,21 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
-                    var missingCoverage = ResearchCoveragePolicy.GetMissingCoverage(
+                    var unreportedCoverage = ResearchCoveragePolicy.GetUnreportedCoverage(
                         researchPlan!.Coverage,
                         decision.Covered,
                         decision.Uncovered);
 
-                    if (missingCoverage.Length > 0)
+                    if (unreportedCoverage.Length > 0)
                     {
                         if (coverageCorrectionAttempts >= 2)
                         {
-                            warnings.Add("لم يثبت النموذج تغطية جميع المحاور التي حددها في خطة البحث؛ أُعيدت المهمة بوصفها غير مكتملة ولم تُقبل إجابة نهائية.");
+                            warnings.Add("لم يصنف النموذج جميع محاور الخطة تصنيفاً واضحاً بين ما غُطي وما تعذر إثباته؛ أُعيدت المهمة بوصفها غير مكتملة.");
                             _log.Warning(
-                                $"Research final coverage incomplete: task={taskId}; missingCoverageItems={missingCoverage.Length}; evidenceEntries={evidenceLedger.Entries.Count}.");
+                                $"Research final coverage incomplete: task={taskId}; unreportedCoverageItems={unreportedCoverage.Length}; evidenceEntries={evidenceLedger.Entries.Count}.");
                             return new ResearchResponse(
-                                "لم يكتمل البحث وفق خطة المهمة؛ بقيت محاور لم يثبت النموذج تغطيتها: " +
-                                string.Join("، ", missingCoverage) +
+                                "لم يكتمل تقرير تغطية خطة المهمة؛ بقيت محاور لم يصنفها النموذج: " +
+                                string.Join("، ", unreportedCoverage) +
                                 ". لم تُعتمد إجابة نهائية بوصفها بحثاً مكتملاً. أعد المحاولة أو وسّع خطة البحث.",
                                 model,
                                 trace.ToArray(),
@@ -409,7 +409,7 @@ public sealed class ResearchCoordinator
                         messages.Add(new DuckChatMessage("assistant", decision.Raw));
                         messages.Add(new DuckChatMessage(
                             "user",
-                            ResearchDecisionProtocol.BuildCoverageCorrection(missingCoverage)));
+                            ResearchDecisionProtocol.BuildCoverageCorrection(unreportedCoverage)));
                         continue;
                     }
 
