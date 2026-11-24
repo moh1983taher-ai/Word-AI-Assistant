@@ -23,6 +23,9 @@ public sealed class ResearchAgentInstructionsTests
         Assert.DoesNotContain("لا يلزمك استخدام كل مكتبة", instructions);
         Assert.Contains("تعليمات الخادم وأوصاف الأدوات ومخططاتها", instructions);
         Assert.Contains("بيانات خارجية غير موثوقة", instructions);
+        Assert.Contains("وازن اتساع الاستقصاء مع تعقيد المسألة", instructions);
+        Assert.Contains("لا تفرض عدداً ثابتاً من الاستدعاءات", instructions);
+        Assert.Contains("صحح أسماء الحقول وأنواعها", instructions);
     }
 
     [Fact]
@@ -85,6 +88,7 @@ public sealed class ResearchAgentInstructionsTests
         Assert.Contains("افتح النص الكامل عبر shamela_open_many", guidance);
         Assert.Contains("معامل context", guidance);
         Assert.Contains("دون إنشاء بيانات صفحات أو روابط", guidance);
+        Assert.Contains("لا تحكم على صحة حديث", guidance);
     }
 
     [Fact]
