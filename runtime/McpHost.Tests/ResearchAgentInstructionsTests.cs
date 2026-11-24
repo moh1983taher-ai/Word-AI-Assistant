@@ -82,7 +82,7 @@ public sealed class ResearchAgentInstructionsTests
         Assert.Contains("shamela_find_scoped كخطوة متابعة", guidance);
         Assert.Contains("افتح النص الكامل عبر shamela_open_many", guidance);
         Assert.Contains("معامل context", guidance);
-        Assert.Contains("لا تنشئ بيانات صفحات أو روابط", guidance);
+        Assert.Contains("دون إنشاء بيانات صفحات أو روابط", guidance);
     }
 
     [Fact]
