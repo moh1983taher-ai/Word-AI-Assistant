@@ -184,9 +184,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.7'
-          $title = 'ResearchTools Unified Setup v1.2.7'
-          $notes = 'Unified one-file x64 installer v1.2.7: preserves the 64,000-character DuckAI MCP budget and strict JSON decision protocol; makes every request sent through the explicit MCP research endpoint require a successful search in every user-selected library, regardless of whether the natural-language question contains trigger words such as search, sources, or citations. Removes the lexical gate both from per-library search coverage and from opened-page verification, and records selected source IDs in the host diagnostics. A successful empty search counts as completed coverage; failed calls and non-search tools do not. Existing provenance checks still require verified same-library page opens before citing search hits. Preserves read-only MCP servers, user source selection, DuckAI architecture, SHA-256 checks, staged installation and rollback protections. Does not modify C:\\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.2.8'
+          $title = 'ResearchTools Unified Setup v1.2.8'
+          $notes = 'Unified one-file x64 installer v1.2.8: replaces the unsupported DuckAI response_format=json_schema research path with a validated prompt-guided JSON decision protocol. The local MCP host now constructs and executes the first search in every user-selected source from the live MCP inputSchema, verifies the real search schemas in diagnostics, and fails closed if any selected source is unavailable or lacks safe query arguments. It exposes live input schemas to the model for follow-up page reads and tells the model that remote MCP servers are already connected through the local host, avoiding redundant setup advice. The preview test now requires a successful search call from every selected source. Existing evidence provenance still requires verified same-source page opens before citing results. Preserves read-only MCP servers, source selection, DuckAI architecture, SHA-256 verification, staged installation and rollback protections. Does not modify C:\\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
