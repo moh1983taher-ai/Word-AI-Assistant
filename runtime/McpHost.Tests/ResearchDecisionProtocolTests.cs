@@ -26,7 +26,7 @@ public sealed class ResearchDecisionProtocolTests
             allowFinal: false,
             pendingSourceLabels: ["المكتبة الشاملة"]);
 
-        Assert.Contains("لا يُسمح بالإجابة النهائية الآن", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تُنه البحث الآن", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
         Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
     }
@@ -58,7 +58,7 @@ public sealed class ResearchDecisionProtocolTests
 
         Assert.Contains("لا يُسمح بالإجابة النهائية الآن", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
-        Assert.Contains("افتح صفحة", prompt, StringComparison.Ordinal);
+        Assert.Contains("افتحها", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("لم يكتمل البحث في:", prompt, StringComparison.Ordinal);
     }
 
