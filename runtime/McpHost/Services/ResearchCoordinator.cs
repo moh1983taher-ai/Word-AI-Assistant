@@ -229,8 +229,7 @@ public sealed class ResearchCoordinator
                         trace.Count);
                     var matchingPageWasNotOpened =
                         sourceResearchRequired &&
-                        evidenceProvenance.SearchHitCount > 0 &&
-                        evidenceProvenance.VerifiedOpenCount == 0;
+                        evidenceProvenance.HasUnverifiedSearchHits;
 
                     if (searchWasSkipped || matchingPageWasNotOpened)
                     {
