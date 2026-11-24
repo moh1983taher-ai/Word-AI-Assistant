@@ -229,7 +229,7 @@ public sealed class ResearchCoordinator
                         trace.Count);
                     var matchingPageWasNotOpened =
                         sourceResearchRequired &&
-                        evidenceProvenance.HasUnverifiedSearchHits;
+                        evidenceProvenance.HasUnverifiedSearchResults;
 
                     if (searchWasSkipped || matchingPageWasNotOpened)
                     {
@@ -240,7 +240,7 @@ public sealed class ResearchCoordinator
                                 ? "explicit_source_request_without_successful_tool_call"
                                 : "search_hit_not_opened_or_verified";
                             _log.Warning(
-                                $"Research premature final deferred: task={taskId}; reason={reason}; searchHits={evidenceProvenance.SearchHitCount}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedOpenCount}; recovery=one_agent_correction.");
+                                $"Research premature final deferred: task={taskId}; reason={reason}; searchResponses={evidenceProvenance.NonEmptySearchResponseCount}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}; recovery=one_agent_correction.");
 
                             var correction = searchWasSkipped
                                 ? "تنبيه تحقق: طلب المستخدم صريح في البحث من المكتبات المختارة، لكنك أصدرت إجابة نهائية دون تنفيذ أداة بحث ناجحة. لا تستبدل البحث بمعلومات الذاكرة. نفّذ بحثاً فعلياً أولاً."
