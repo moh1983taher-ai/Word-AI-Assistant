@@ -32,6 +32,19 @@ public sealed class ResearchAgentInstructionsTests
     }
 
     [Fact]
+    public void UsesShortOperationalInstructionsFocusedOnUnderstandingAndCoverage()
+    {
+        var instructions = ResearchAgentInstructions.Build(
+            ["الجامع", "المكتبة الشاملة"],
+            Array.Empty<string>());
+
+        Assert.Contains("افهم مقصد الباحث أولاً", instructions);
+        Assert.Contains("لا تكتف بأول نتيجة", instructions);
+        Assert.Contains("لا تعتبر فتح الصفحة دليلاً على صلتها", instructions);
+        Assert.DoesNotContain("التزم بمنهجية المستخدم وهيكله", instructions);
+    }
+
+    [Fact]
     public void AddsOnlySelectedSourcesAndOperationalWarningsAsContext()
     {
         var instructions = ResearchAgentInstructions.Build(
