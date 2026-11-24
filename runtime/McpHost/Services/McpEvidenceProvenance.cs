@@ -221,6 +221,16 @@ internal sealed class McpEvidenceProvenance
                     if (IsLinkKey(property.Name) && property.Value.ValueKind == JsonValueKind.String)
                         VisitSearchText(property.Value.GetString(), index);
 
+                    if (IsIdentifierCollectionKey(property.Name) &&
+                        property.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var item in property.Value.EnumerateArray())
+                        {
+                            if (item.ValueKind is JsonValueKind.String or JsonValueKind.Number)
+                                AddIdentifier(index, ReadScalar(item), bookId);
+                        }
+                    }
+
                     if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
                         VisitSearchPayload(property.Value, index, bookId);
                 }
@@ -274,6 +284,10 @@ internal sealed class McpEvidenceProvenance
 
             case JsonValueKind.String:
                 AddTargetIdentifier(element.GetString(), inheritedBookId, references);
+                break;
+
+            case JsonValueKind.Number:
+                AddTargetIdentifier(element.GetRawText(), inheritedBookId, references);
                 break;
         }
     }
