@@ -127,7 +127,15 @@ function Test-McpHostArchive([string]$Path) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead($Path)
     try {
-        if ($zip.Entries.Count -ne 2) { throw 'Unexpected MCP archive entry count.' }
+        $requiredMcpFiles = @(
+            'ResearchTools.McpHost.exe',
+            'ResearchTools.McpHost.exe.sha256',
+            'Test-McpHost-Preview.ps1',
+            'Start-McpHost-Preview.ps1'
+        )
+        if ($zip.Entries.Count -ne $requiredMcpFiles.Count) {
+            throw ('Unexpected MCP archive entry count. Expected ' + $requiredMcpFiles.Count + ', found ' + $zip.Entries.Count + '.')
+        }
         $names = @{}
         [int64]$expanded = 0
         foreach ($entry in $zip.Entries) {
@@ -138,12 +146,6 @@ function Test-McpHostArchive([string]$Path) {
             $expanded += [int64]$entry.Length
             if ($expanded -gt 180MB) { throw 'MCP archive expands beyond the safe size limit.' }
         }
-        $requiredMcpFiles = @(
-            'ResearchTools.McpHost.exe',
-            'ResearchTools.McpHost.exe.sha256',
-            'Test-McpHost-Preview.ps1',
-            'Start-McpHost-Preview.ps1'
-        )
         foreach ($requiredMcpFile in $requiredMcpFiles) {
             if (-not $names.ContainsKey($requiredMcpFile)) {
                 throw ('MCP archive is missing required file: ' + $requiredMcpFile)
