@@ -128,7 +128,8 @@ public sealed class ResearchCoordinator
 
             // All selected-source tools remain visible throughout the task.
             var repairAttempted = false;
-            var sourceDecisionCorrectionAttempted = false;
+            var searchDecisionCorrectionAttempted = false;
+            var pageVerificationCorrectionAttempted = false;
             var toolCallsAttempted = 0;
 
             while (true)
@@ -231,31 +232,46 @@ public sealed class ResearchCoordinator
                         sourceResearchRequired &&
                         evidenceProvenance.HasUnverifiedSearchResults;
 
-                    if (searchWasSkipped || matchingPageWasNotOpened)
+                    if (searchWasSkipped)
                     {
-                        if (!sourceDecisionCorrectionAttempted)
+                        if (!searchDecisionCorrectionAttempted)
                         {
-                            sourceDecisionCorrectionAttempted = true;
-                            var reason = searchWasSkipped
-                                ? "explicit_source_request_without_successful_tool_call"
-                                : "search_hit_not_opened_or_verified";
+                            searchDecisionCorrectionAttempted = true;
                             _log.Warning(
-                                $"Research premature final deferred: task={taskId}; reason={reason}; searchResponses={evidenceProvenance.NonEmptySearchResponseCount}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}; recovery=one_agent_correction.");
+                                $"Research premature final deferred: task={taskId}; reason=explicit_source_request_without_successful_tool_call; recovery=one_search_correction.");
 
-                            var correction = searchWasSkipped
-                                ? "تنبيه تحقق: طلب المستخدم صريح في البحث من المكتبات المختارة، لكنك أصدرت إجابة نهائية دون تنفيذ أداة بحث ناجحة. لا تستبدل البحث بمعلومات الذاكرة. نفّذ بحثاً فعلياً أولاً."
-                                : "تنبيه تحقق: عثرت أدوات البحث على مراجع ذات معرّفات قابلة للفتح، لكنك لم تفتح صفحة مطابقة لنتيجة البحث وتتحقق من نصها. افتح إحدى الصفحات باستعمال معرّف الكتاب والصفحة الواردين حرفياً في نتيجة سابقة، ثم افحص النص وسياقه قبل الاستشهاد. إذا تعذر ذلك فصرّح بتعذر التحقق ولا تستشهد بالنتيجة.";
                             messages.Add(new DuckChatMessage("assistant", decision.Raw));
                             messages.Add(new DuckChatMessage(
                                 "user",
-                                correction + " لا يلزم استخدام كل المكتبات المختارة. أخرج قرار tool_call وفق المخطط، ولا تنه المهمة الآن."));
+                                "تنبيه تحقق: طلب المستخدم صريح في البحث من المكتبات المختارة، لكنك أصدرت إجابة نهائية دون تنفيذ أداة بحث ناجحة. لا تستبدل البحث بمعلومات الذاكرة. نفّذ بحثاً فعلياً أولاً، ثم افتح الصفحات المطابقة للنتائج التي ستستشهد بها."));
                             continue;
                         }
 
                         _log.Warning(
-                            $"Research final rejected: task={taskId}; searchSkipped={searchWasSkipped}; pageVerificationMissing={matchingPageWasNotOpened}; correctionAttempted=true.");
+                            $"Research final rejected: task={taskId}; reason=explicit_source_request_without_successful_tool_call; correctionAttempted=true.");
                         throw new InvalidOperationException(
-                            "تعذر اعتماد إجابة البحث: لم ينجح المضيف في التحقق من فتح صفحة مطابقة لنتيجة بحث سابقة. أُوقف تمرير الإجابة غير المكتملة بدلاً من عرضها بوصفها بحثاً موثقاً.");
+                            "تعذر إتمام البحث المطلوب: أنهى النموذج المهمة دون تنفيذ استدعاء ناجح لأداة بحث من المكتبات المختارة. لم تُعرض إجابته بوصفها بحثاً موثقاً.");
+                    }
+
+                    if (matchingPageWasNotOpened)
+                    {
+                        if (!pageVerificationCorrectionAttempted)
+                        {
+                            pageVerificationCorrectionAttempted = true;
+                            _log.Warning(
+                                $"Research premature final deferred: task={taskId}; reason=search_results_without_verified_page_open; searchResponses={evidenceProvenance.NonEmptySearchResponseCount}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}; recovery=one_page_verification_correction.");
+
+                            messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                            messages.Add(new DuckChatMessage(
+                                "user",
+                                "تنبيه تحقق: أعادت مكتبة واحدة أو أكثر نتائج بحث فعلية، لكن لم يُفتح موضع مطابق من كل مكتبة ظهرت منها نتائج. افتح صفحة مطابقة واحدة على الأقل من كل مكتبة ذات نتائج، مستخدماً معرّفات الكتاب والصفحة الواردة حرفياً في نتائج تلك المكتبة نفسها. افحص النص وسياقه قبل الاستشهاد. إذا لم يتوفر معرّف قابل للتحقق، فصرّح بتعذر فتح المصدر ولا تستشهد بمقتطف البحث."));
+                            continue;
+                        }
+
+                        _log.Warning(
+                            $"Research final rejected: task={taskId}; reason=search_results_without_verified_page_open; correctionAttempted=true.");
+                        throw new InvalidOperationException(
+                            "تعذر اعتماد إجابة البحث: بقيت مكتبة أعادت نتائج فعلية من دون فتح صفحة مطابقة والتحقق من معرّفها. أُوقف تمرير الإجابة غير المكتملة بدلاً من عرضها بوصفها بحثاً موثقاً.");
                     }
 
                     _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; mode=json-schema; model={model}.");
