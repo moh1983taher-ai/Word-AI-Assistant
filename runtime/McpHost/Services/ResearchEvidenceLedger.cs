@@ -121,7 +121,7 @@ internal sealed class ResearchEvidenceLedger
         if (lines.Length < 3)
         {
             var singleEntryAvailable = maximum - marker.Length;
-            var prefixLength = Math.Max(1, (int)(singleEntryAvailable * 0.75));
+            var prefixLength = Math.Max(1, singleEntryAvailable / 2);
             var suffixLength = singleEntryAvailable - prefixLength;
             return suffixLength <= 0
                 ? value[..prefixLength] + marker
@@ -147,11 +147,27 @@ internal sealed class ResearchEvidenceLedger
             lineBudget = Math.Max(24, (available - selectedIndexes.Count) / selectedIndexes.Count);
         }
 
+        var firstPageTextLine = Array.FindIndex(
+            lines,
+            line => line.Contains("النص المستخرج من الصفحة المفتوحة:", StringComparison.Ordinal));
+        if (firstPageTextLine >= 0)
+        {
+            firstPageTextLine++;
+            while (firstPageTextLine < lines.Length && string.IsNullOrWhiteSpace(lines[firstPageTextLine]))
+                firstPageTextLine++;
+        }
+
+        var lastPageTextLine = lines.Length - 1;
+        while (lastPageTextLine >= 0 && string.IsNullOrWhiteSpace(lines[lastPageTextLine]))
+            lastPageTextLine--;
+
         var builder = new StringBuilder(maximum);
         foreach (var index in selectedIndexes)
         {
             var line = lines[index].TrimEnd('\r');
-            var compactLine = ClipEvidenceLine(line, lineBudget);
+            var preservePrefix = index == firstPageTextLine;
+            var preserveSuffix = index == lastPageTextLine;
+            var compactLine = ClipEvidenceLine(line, lineBudget, preservePrefix, preserveSuffix);
             var required = compactLine.Length + (builder.Length == 0 ? 0 : 1);
             if (builder.Length + required + marker.Length > maximum)
                 continue;
@@ -165,17 +181,24 @@ internal sealed class ResearchEvidenceLedger
         return builder.Append(marker).ToString();
     }
 
-    private static string ClipEvidenceLine(string line, int maximum)
+    private static string ClipEvidenceLine(
+        string line,
+        int maximum,
+        bool preservePrefix = false,
+        bool preserveSuffix = false)
     {
         if (line.Length <= maximum)
             return line;
 
         if (!line.Contains(" | ", StringComparison.Ordinal))
         {
-            if (line.Length <= maximum)
-                return line;
-            var suffixLength = Math.Max(1, (int)Math.Ceiling((maximum - 1) * 0.75));
-            var prefixLength = Math.Max(1, maximum - suffixLength - 1);
+            if (preservePrefix && !preserveSuffix)
+                return line[..maximum];
+            if (preserveSuffix && !preservePrefix)
+                return line[^maximum..];
+
+            var prefixLength = Math.Max(1, (maximum - 1) / 2);
+            var suffixLength = Math.Max(1, maximum - prefixLength - 1);
             return line[..prefixLength] + "…" + line[^suffixLength..];
         }
 
