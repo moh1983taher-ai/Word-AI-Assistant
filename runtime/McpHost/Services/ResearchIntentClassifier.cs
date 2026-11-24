@@ -66,4 +66,26 @@ public static class ResearchIntentClassifier
     /// </summary>
     public static bool MustUseMcpBeforeFinal(string? userMessage, int successfulToolCalls) =>
         successfulToolCalls <= 0 && RequiresMcpSources(userMessage);
+
+    /// <summary>
+    /// Returns selected libraries that still require a successful search before a
+    /// research response may be finalized. A successful search with zero matches
+    /// still counts as coverage; a failed call or a non-search tool does not.
+    /// </summary>
+    public static IReadOnlyList<string> GetPendingSearchSources(
+        string? userMessage,
+        IReadOnlyCollection<string> selectedSourceIds,
+        IReadOnlySet<string> successfullySearchedSourceIds)
+    {
+        ArgumentNullException.ThrowIfNull(selectedSourceIds);
+        ArgumentNullException.ThrowIfNull(successfullySearchedSourceIds);
+
+        if (!RequiresMcpSources(userMessage))
+            return Array.Empty<string>();
+
+        return selectedSourceIds
+            .Where(sourceId => !successfullySearchedSourceIds.Contains(sourceId))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
 }
