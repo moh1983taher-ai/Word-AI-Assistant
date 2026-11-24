@@ -111,7 +111,15 @@ jobs:
             if (-not $shamela.connected -or $shamela.toolCount -lt 4) {
               throw 'Official SDK did not discover the expected read-only Shamela catalog.'
             }
-            Write-Host 'Official MCP SDK discovered both upstream sources and all expected read-only tools.'
+            foreach ($source in @($aljam3, $shamela)) {
+              if ($source.PSObject.Properties.Name -notcontains 'serverInstructionsAvailable' -or
+                  $source.PSObject.Properties.Name -notcontains 'serverInstructionsCharacters') {
+                throw "MCP diagnostics omitted server-instruction metadata for $($source.id)."
+              }
+              Write-Host ("Source {0}: tools={1}; serverInstructionsAvailable={2}; serverInstructionsCharacters={3}" -f
+                $source.id, $source.toolCount, $source.serverInstructionsAvailable, $source.serverInstructionsCharacters)
+            }
+            Write-Host 'Official MCP SDK discovered both upstream sources, their instruction metadata, and all expected read-only tools.'
           }
           finally {
             if ($hostProcess -and -not $hostProcess.HasExited) {
