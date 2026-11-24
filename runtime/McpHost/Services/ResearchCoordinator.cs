@@ -382,16 +382,10 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
-                    var declaredCoverage = decision.Covered
-                        .Select(NormalizeCoverageLabel)
-                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                    var missingCoverage = researchPlan!.Coverage
-                        .Where(item => !declaredCoverage.Contains(NormalizeCoverageLabel(item)))
-                        .Concat(decision.Uncovered)
-                        .Select(item => item.Trim())
-                        .Where(item => item.Length > 0)
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToArray();
+                    var missingCoverage = ResearchCoveragePolicy.GetMissingCoverage(
+                        researchPlan!.Coverage,
+                        decision.Covered,
+                        decision.Uncovered);
 
                     if (missingCoverage.Length > 0)
                     {
@@ -848,10 +842,6 @@ public sealed class ResearchCoordinator
                 false);
         }
     }
-
-    private static string NormalizeCoverageLabel(string value) =>
-        string.Join(' ', (value ?? string.Empty)
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static string BuildSystemPrompt(
         IReadOnlyList<ToolDescriptor> tools,
