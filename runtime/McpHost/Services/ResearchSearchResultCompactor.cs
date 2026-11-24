@@ -10,6 +10,13 @@ internal static class ResearchSearchResultCompactor
         "results", "matches", "hits", "items", "records", "pages", "sources", "documents"
     };
 
+    private static readonly HashSet<string> PaginationFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "next_cursor", "nextCursor", "next_page", "nextPage", "cursor",
+        "has_more", "hasMore", "total", "total_count", "totalCount",
+        "count", "page", "per_page", "perPage", "limit"
+    };
+
     private static readonly HashSet<string> UsefulFields = new(StringComparer.OrdinalIgnoreCase)
     {
         "id", "book_id", "bookId", "page_id", "pageId", "file_id", "fileId",
@@ -33,7 +40,8 @@ internal static class ResearchSearchResultCompactor
 
             var builder = new StringBuilder();
             builder.Append("نتائج البحث المنظمة: ").Append(records.Count)
-                .AppendLine(" مرجعاً. المعرفات والبيانات أدناه من مخرجات المكتبة نفسها؛ المقتطفات للاكتشاف فقط.");
+                .AppendLine(" مرجعاً في هذه الاستجابة. المعرفات والبيانات أدناه من مخرجات المكتبة نفسها؛ المقتطفات للاكتشاف فقط.");
+            AppendPaginationMetadata(document.RootElement, builder, depth: 0);
             for (var index = 0; index < records.Count; index++)
             {
                 builder.Append('[').Append(index + 1).Append("] ");
@@ -43,6 +51,38 @@ internal static class ResearchSearchResultCompactor
             }
 
             return builder.ToString();
+        }
+    }
+
+    private static void AppendPaginationMetadata(JsonElement element, StringBuilder builder, int depth)
+    {
+        if (depth > 8 || element.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array))
+            return;
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (PaginationFields.Contains(property.Name) &&
+                    property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False)
+                {
+                    var value = property.Value.ValueKind == JsonValueKind.String
+                        ? property.Value.GetString()
+                        : property.Value.GetRawText();
+                    if (!string.IsNullOrWhiteSpace(value))
+                        builder.Append("بيانات متابعة البحث: ")
+                            .Append(property.Name).Append('=').AppendLine(value);
+                }
+                else if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                {
+                    AppendPaginationMetadata(property.Value, builder, depth + 1);
+                }
+            }
+        }
+        else
+        {
+            foreach (var item in element.EnumerateArray())
+                AppendPaginationMetadata(item, builder, depth + 1);
         }
     }
 
