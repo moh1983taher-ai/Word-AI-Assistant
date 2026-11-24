@@ -32,6 +32,14 @@ public sealed class ResearchDecisionProtocolTests
     }
 
     [Fact]
+    public void PreventsFinalWhenSearchIsCompleteButAResultPageIsNotVerified()
+    {
+        Assert.False(ResearchFinalizationPolicy.CanFinalize(
+            pendingSearchSourceCount: 0,
+            unverifiedPageSourceCount: 1));
+    }
+
+    [Fact]
     public void TimeoutFinalizationOnlyPermitsFinalJson()
     {
         var prompt = ResearchDecisionProtocol.BuildTimeoutFinalInstructions();
