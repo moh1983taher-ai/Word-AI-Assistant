@@ -93,6 +93,6 @@ internal static class ResearchDecisionProtocol
     internal static string BuildTimeoutFinalInstructions() =>
         "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. " +
         "اعرض ما تسمح به الأدلة المفتوحة وبيّن المحاور التي لم يكتمل التحقق منها. " +
-        "أخرج كائناً واحداً فقط: {\"type\":\"final\",\"answer\":\"نص الإجابة\"}. " +
+            "أخرج كائناً واحداً فقط: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور تحقق\"],\"uncovered\":[\"محور لم يكتمل\"]}. " +
         "لا تضف شرحاً أو Markdown خارج JSON.";
 }
