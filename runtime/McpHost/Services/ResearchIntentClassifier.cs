@@ -68,9 +68,10 @@ public static class ResearchIntentClassifier
         successfulToolCalls <= 0 && RequiresMcpSources(userMessage);
 
     /// <summary>
-    /// Returns selected libraries that still require a successful search before a
-    /// research response may be finalized. A successful search with zero matches
-    /// still counts as coverage; a failed call or a non-search tool does not.
+    /// Returns every selected library that still needs a successful search.
+    /// This helper is called only by the dedicated MCP research endpoint, not
+    /// ordinary chat, so source coverage must not depend on trigger words in the
+    /// user's natural-language question.
     /// </summary>
     public static IReadOnlyList<string> GetPendingSearchSources(
         string? userMessage,
@@ -79,9 +80,6 @@ public static class ResearchIntentClassifier
     {
         ArgumentNullException.ThrowIfNull(selectedSourceIds);
         ArgumentNullException.ThrowIfNull(successfullySearchedSourceIds);
-
-        if (!RequiresMcpSources(userMessage))
-            return Array.Empty<string>();
 
         return selectedSourceIds
             .Where(sourceId => !successfullySearchedSourceIds.Contains(sourceId))
