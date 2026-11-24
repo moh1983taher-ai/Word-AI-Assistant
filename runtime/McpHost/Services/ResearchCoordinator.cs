@@ -203,7 +203,7 @@ public sealed class ResearchCoordinator
 
                 var requestCharacters = requestMessages.Sum(message => message.Content?.Length ?? 0);
                 _log.Info(
-                    $"Research prompt prepared: task={taskId}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormatCharacters={responseFormatCharacters}; pendingSearchSources={pendingSearchSources.Count}; finalAllowed={allowFinal}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
+                    $"Research prompt prepared: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormatCharacters={responseFormatCharacters}; pendingSearchSources={pendingSearchSources.Count}; finalAllowed={allowFinal}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
 
                 var completion = await _duckAi.CompleteAsync(
                     model,
@@ -238,11 +238,10 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
-                    var sourceResearchRequired =
-                        ResearchIntentClassifier.RequiresMcpSources(latestUserMessage);
                     var searchWasSkipped = pendingSearchSources.Count > 0;
+                    // Every request reaching this coordinator is an explicit source-research
+                    // request. Verify opened pages regardless of the wording used by the user.
                     var matchingPageWasNotOpened =
-                        sourceResearchRequired &&
                         evidenceProvenance.HasUnverifiedSearchResults;
 
                     if (searchWasSkipped)

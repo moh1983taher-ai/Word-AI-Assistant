@@ -46,13 +46,33 @@ public sealed class ResearchIntentClassifierTests
             "ابحث عن القاعدة في الجامع والمكتبة الشاملة", selected, searched));
     }
 
-    [Fact]
-    public void DoesNotRequireMcpSearchCoverageForNonResearchRequests()
+    [Theory]
+    [InlineData("ما حكم بناء القوي على الضعيف؟")]
+    [InlineData("أين وردت قاعدة بناء القوي على الضعيف في كتب الفقه؟")]
+    [InlineData("ما موقف الحنفية وغيرهم من هذه القاعدة؟")]
+    public void ResearchModeRequiresSearchForNaturalQuestionsWithoutSearchKeywords(string prompt)
     {
-        Assert.Empty(ResearchIntentClassifier.GetPendingSearchSources(
-            "ما معنى الاجتهاد؟",
-            ["aljam3", "shamela"],
-            new HashSet<string>(StringComparer.Ordinal)));
+        var selected = new[] { "aljam3", "shamela" };
+
+        Assert.Equal(
+            selected,
+            ResearchIntentClassifier.GetPendingSearchSources(
+                prompt,
+                selected,
+                new HashSet<string>(StringComparer.Ordinal)));
+    }
+
+    [Fact]
+    public void RequiresSearchForEveryRequestRoutedThroughResearchMode()
+    {
+        var selected = new[] { "aljam3", "shamela" };
+
+        Assert.Equal(
+            selected,
+            ResearchIntentClassifier.GetPendingSearchSources(
+                "ما معنى الاجتهاد؟",
+                selected,
+                new HashSet<string>(StringComparer.Ordinal)));
     }
 
     [Theory]
