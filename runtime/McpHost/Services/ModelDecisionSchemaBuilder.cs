@@ -60,11 +60,29 @@ internal static class ModelDecisionSchemaBuilder
         {
             foreach (var tool in tools)
             {
-                argumentVariants.Add(NormalizeSchema(
+                var argumentSchema = NormalizeSchema(
                     tool.InputSchema,
                     nullable: false,
                     rootSchema: tool.InputSchema,
-                    activeReferences: new HashSet<string>(StringComparer.Ordinal)));
+                    activeReferences: new HashSet<string>(StringComparer.Ordinal));
+
+                if (argumentSchema is JsonObject argumentObject)
+                {
+                    var toolIdentity = $"{tool.Server}/{tool.Name}";
+                    var description = $"Arguments for MCP tool {toolIdentity}";
+                    if (!string.IsNullOrWhiteSpace(tool.ServerLabel))
+                        description += $" ({tool.ServerLabel})";
+                    if (!string.IsNullOrWhiteSpace(tool.Description))
+                        description += $": {tool.Description.Trim()}";
+
+                    var schemaDescription = argumentObject["description"]?.GetValue<string>();
+                    if (!string.IsNullOrWhiteSpace(schemaDescription))
+                        description += $" Schema details: {schemaDescription.Trim()}";
+
+                    argumentObject["description"] = description;
+                }
+
+                argumentVariants.Add(argumentSchema);
             }
         }
 

@@ -135,6 +135,11 @@ public sealed class ResearchCoordinator
             while (true)
             {
                 IReadOnlyList<ToolDescriptor> turnTools = activeTools;
+                var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
+                    turnTools,
+                    allowFinal: true,
+                    allowToolCalls: true);
+                var responseFormatCharacters = responseFormat.GetRawText().Length;
                 var turnSystemPrompt = BuildSystemPrompt(
                     turnTools,
                     selectedLabels,
@@ -143,15 +148,19 @@ public sealed class ResearchCoordinator
                     Environment.NewLine + Environment.NewLine +
                     "تواصل مع مضيف MCP عبر بروتوكول قرارات JSON. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق؛ في tool_call املأ type وserver وtool وarguments واترك answer فارغاً، وفي final املأ type وanswer واجعل server وtool فارغين وarguments null.";
 
-                var availableInputCharacters = contextBudget.GetAvailableInputCharacters(turnSystemPrompt.Length);
+                // Count both the compact tool directory and the strict argument schema.
+                // The argument schema is sent separately as response_format and must
+                // still be accounted for when deciding how much history and evidence fit.
+                var fixedRequestCharacters = turnSystemPrompt.Length + responseFormatCharacters;
+                var availableInputCharacters = contextBudget.GetAvailableInputCharacters(fixedRequestCharacters);
                 if (availableInputCharacters <= 1)
                 {
-                    var minimumRequiredCharacters = turnSystemPrompt.Length + 2_048 + 2;
+                    var minimumRequiredCharacters = fixedRequestCharacters + 2_048 + 2;
                     var configuredBudget = Environment.GetEnvironmentVariable("RESEARCHTOOLS_CONTEXT_BUDGET_CHARS");
                     _log.Error(
-                        $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; toolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
+                        $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; compactToolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; responseFormatCharacters={responseFormatCharacters}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
                     throw new InvalidOperationException(
-                        $"تعذر تجهيز تعريفات أدوات MCP ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات {turnSystemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف. راجع سجل المضيف لمعرفة تفاصيل مخططات الأدوات، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS ضمن سعة النموذج الفعلية.");
+                        $"تعذر تجهيز أدوات MCP ومخطط معاملات الاستجابة ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات {turnSystemPrompt.Length:N0} حرفاً ومخطط معاملاتها {responseFormatCharacters:N0} حرف، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف، والحد الأدنى اللازم مع احتياطي البروتوكول {minimumRequiredCharacters:N0} حرف. راجع سجل المضيف، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS فقط إذا كان النموذج والبوابة يدعمان سعة أكبر.");
                 }
 
                 var evidenceBudget = contextBudget.GetEvidenceBudget(
@@ -183,12 +192,7 @@ public sealed class ResearchCoordinator
 
                 var requestCharacters = requestMessages.Sum(message => message.Content?.Length ?? 0);
                 _log.Info(
-                    $"Research prompt prepared: task={taskId}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
-
-                var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
-                    turnTools,
-                    allowFinal: true,
-                    allowToolCalls: true);
+                    $"Research prompt prepared: task={taskId}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormatCharacters={responseFormatCharacters}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
 
                 var completion = await _duckAi.CompleteAsync(
                     model,
@@ -662,12 +666,22 @@ public sealed class ResearchCoordinator
         IReadOnlyList<string> warnings,
         out int toolCatalogCharacters)
     {
-        var serializedTools = JsonSerializer.Serialize(tools, JsonDefaults.Web);
+        // The full argument schemas are already carried by the strict response format.
+        // Keep this prompt-side directory small to avoid serializing every schema twice.
+        var toolDirectory = tools.Select(tool => new
+        {
+            server = tool.Server,
+            source = tool.ServerLabel,
+            name = tool.Name,
+            description = tool.Description
+        }).ToArray();
+        var serializedTools = JsonSerializer.Serialize(toolDirectory, JsonDefaults.Web);
         toolCatalogCharacters = serializedTools.Length;
 
         var builder = new System.Text.StringBuilder(
             ResearchAgentInstructions.Build(selectedLabels, warnings));
-        builder.AppendLine().AppendLine("أدوات MCP المتاحة ومخططات معاملاتها:");
+        builder.AppendLine().AppendLine(
+            "أدوات MCP المتاحة وأوصافها. مخطط معاملات كل أداة مرفق في مخطط الاستجابة المهيكل، ويحدد وصفه اسم المكتبة والأداة:");
         builder.AppendLine(serializedTools);
         return builder.ToString();
     }

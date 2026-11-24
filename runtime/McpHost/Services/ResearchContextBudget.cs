@@ -51,9 +51,9 @@ internal sealed record ResearchContextBudget(
     }
 
     /// <summary>
-    /// DuckAI keeps conservative defaults for gateways with a smaller reliable
-    /// request envelope. Explicit environment settings override those defaults
-    /// within the same operational bounds used by the general profile.
+    /// DuckAI keeps its output ceiling conservative, while sharing the expanded
+    /// 64k-character input budget needed by the selected MCP catalog. Explicit
+    /// environment settings remain authoritative within the supported bounds.
     /// </summary>
     internal static ResearchContextBudget LoadDuckAi()
     {
@@ -62,7 +62,7 @@ internal sealed record ResearchContextBudget(
         {
             MaxContextCharacters = ReadBoundedSetting(
                 "RESEARCHTOOLS_CONTEXT_BUDGET_CHARS",
-                20_000,
+                64_000,
                 MinimumContextCharacters,
                 MaximumContextCharacters),
             MaxOutputTokens = ReadBoundedSetting(
