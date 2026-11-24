@@ -363,6 +363,12 @@ public sealed class ResearchCoordinator
 
             var contextBudget = ResearchContextBudget.LoadDuckAi();
             var availableInputCharacters = contextBudget.GetAvailableInputCharacters(systemPrompt.Length);
+            if (availableInputCharacters <= 1)
+            {
+                warnings.Add("لم تتسع ميزانية السياق لتعليمات خوادم MCP ومرحلة الصياغة الجزئية؛ عُرضت الأدلة التي جُمعت دون طلب توليد جديد.");
+                return (BuildEvidenceFallback(evidenceLedger, selectedServerIds), model);
+            }
+
             var evidenceBudget = contextBudget.GetEvidenceBudget(
                 availableInputCharacters,
                 evidenceLedger.EstimatedContextCharacters,
