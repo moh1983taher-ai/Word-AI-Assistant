@@ -366,7 +366,7 @@ public sealed class ResearchCoordinator
             if (availableInputCharacters <= 1)
             {
                 warnings.Add("لم تتسع ميزانية السياق لتعليمات خوادم MCP ومرحلة الصياغة الجزئية؛ عُرضت الأدلة التي جُمعت دون طلب توليد جديد.");
-                return (BuildEvidenceFallback(evidenceLedger, selectedServerIds), model);
+                return (BuildTimeoutFallback(evidenceLedger, selectedServerIds, pendingSourceIds), model);
             }
 
             var evidenceBudget = contextBudget.GetEvidenceBudget(
