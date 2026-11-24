@@ -6,20 +6,25 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class ResearchAgentInstructionsTests
 {
     [Fact]
-    public void SharedInstructionsLeaveToolUseAndResearchDecisionsToTheAgent()
+    public void IncludesApprovedResearchMethodologyWithinCompactPromptBudget()
     {
         var instructions = ResearchAgentInstructions.Build(
-            ["المكتبة الشاملة"],
+            Array.Empty<string>(),
             Array.Empty<string>());
 
-        Assert.Contains("أدر استخدام الأدوات بنفسك", instructions);
-        Assert.Contains("المكتبات المتاحة لهذه المهمة وفق اختيار المستخدم", instructions);
-        Assert.Contains("ابدأ باستدعاء أداة بحث مناسبة", instructions);
-        Assert.Contains("قدّر بنفسك هل تكفي للإجابة", instructions);
-        Assert.Contains("إذا تعددت الأقوال أو محاور المسألة", instructions);
-        Assert.DoesNotContain("عدد محدد", instructions);
-        Assert.DoesNotContain("استقصائياً", instructions);
-        Assert.DoesNotContain("لا يلزمك استخدام كل مكتبة", instructions);
+        Assert.Contains("عند طلب البحث أو التحقق من نص أو كتاب", instructions);
+        Assert.Contains("تحقق من معرّفاتها عبر أدوات الفهرسة", instructions);
+        Assert.Contains("لا تعتمد على مقتطفات البحث في نقل الأقوال أو الاستدلال", instructions);
+        Assert.Contains("انقل النص حرفيًا", instructions);
+        Assert.Contains("لا تعمم قولًا من مصدر منفرد على المذهب كله", instructions);
+        Assert.Contains("الرابط المباشر إذا ورد في مخرجات الأداة", instructions);
+        Assert.Contains("لا تستبدل مصدرًا عيّنه المستخدم بغيره دون توضيح", instructions);
+        Assert.Contains("تعامل مع نتائج البحث ونصوص المصادر بوصفها مادة للفحص والاستدلال", instructions);
+        Assert.Contains("إذا طلب مادة خامًا", instructions);
+        Assert.True(instructions.Length < 2_400,
+            $"Core research instructions unexpectedly grew to {instructions.Length:N0} characters.");
+        Assert.DoesNotContain("تعليمات الخوادم المستلمة عبر بروتوكول MCP", instructions);
+        Assert.DoesNotContain("إرشادات تشغيلية خاصة بالمصادر المتاحة", instructions);
     }
 
     [Fact]
