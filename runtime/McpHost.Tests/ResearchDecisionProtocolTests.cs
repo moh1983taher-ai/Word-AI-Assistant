@@ -31,12 +31,21 @@ public sealed class ResearchDecisionProtocolTests
         Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void PreventsFinalWhenSearchIsCompleteButAResultPageIsNotVerified()
+    [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(1, 0, false)]
+    [InlineData(0, 1, false)]
+    [InlineData(2, 3, false)]
+    public void AllowsFinalOnlyWhenSearchAndPageVerificationAreComplete(
+        int pendingSearchSourceCount,
+        int unverifiedPageSourceCount,
+        bool expected)
     {
-        Assert.False(ResearchFinalizationPolicy.CanFinalize(
-            pendingSearchSourceCount: 0,
-            unverifiedPageSourceCount: 1));
+        Assert.Equal(
+            expected,
+            ResearchFinalizationPolicy.CanFinalize(
+                pendingSearchSourceCount,
+                unverifiedPageSourceCount));
     }
 
     [Fact]
