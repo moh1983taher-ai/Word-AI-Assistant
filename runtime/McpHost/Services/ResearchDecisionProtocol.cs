@@ -20,7 +20,7 @@ internal static class ResearchDecisionProtocol
         builder.AppendLine("بروتوكول قرار البحث (JSON عادي):");
         builder.AppendLine("أخرج كائناً واحداً فقط، دون Markdown أو أي نص خارجه.");
         builder.AppendLine("لاستدعاء أداة MCP أخرج: {\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}.");
-        builder.AppendLine("للإجابة النهائية أخرج: {\"type\":\"final\",\"answer\":\"نص الإجابة\"}.");
+        builder.AppendLine("للإجابة النهائية أخرج: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور مغطى من الخطة\"],\"uncovered\":[]}. يجب أن تكون القائمتان موجودتين دائماً.");
         builder.AppendLine("التزم حرفياً بأسماء الأدوات ومعاملاتها في مخطط MCP، ولا تخمّن المعرّفات أو تنقلها بين المكتبات.");
 
         if (!allowFinal)
@@ -78,6 +78,16 @@ internal static class ResearchDecisionProtocol
         }
 
         return builder.ToString();
+    }
+
+    internal static string BuildCoverageCorrection(IReadOnlyList<string> missingCoverage)
+    {
+        ArgumentNullException.ThrowIfNull(missingCoverage);
+        return "لا تعتمد الإجابة النهائية بعد؛ لم تثبت تغطية محاور الخطة الآتية: " +
+            string.Join("، ", missingCoverage) +
+            ". نفّذ بحثاً تكميلياً أو افتح مراجع إضافية ذات صلة، ثم أعد التقييم. لا تكرر استعلاماً أو فتح صفحة دون حاجة. " +
+            "لا تصدر final إلا بعد تغطية هذه المحاور فعلاً. أخرج قرار tool_call مناسباً، أو final إذا اكتملت التغطية، مع نقل عناوين المحاور في covered وترك uncovered فارغة. " +
+            "صيغة final: {\"type\":\"final\",\"answer\":\"...\",\"covered\":[\"...\"],\"uncovered\":[]}.";
     }
 
     internal static string BuildTimeoutFinalInstructions() =>
