@@ -37,9 +37,9 @@ assert.doesNotMatch(source, /لك حرية استخدام إحداهما أو ك
 assert.doesNotMatch(source, /لا يلزمك البحث في كلتيهما/);
 assert.doesNotMatch(source, /slice\(0, 16000\)/);
 
-const validatorStart = source.indexOf("  function validateResearchResult(");
+const validatorStart = source.indexOf("  function getLatestResearchPrompt(");
 const validatorEnd = source.indexOf("\n  async function callGroqResearch", validatorStart);
-assert.ok(validatorStart >= 0 && validatorEnd > validatorStart, "Research result validator must be testable");
+assert.ok(validatorStart >= 0 && validatorEnd > validatorStart, "Research source routing and result validation must be testable");
 const validatorContext = {
   getSelectedMcpServers: function (ids) {
     return ids.map(function (id) {
@@ -50,10 +50,26 @@ const validatorContext = {
 const validatorSource = [
   "function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? ids : []; }",
   source.slice(validatorStart, validatorEnd),
-  "globalThis.__validateResearchResult = validateResearchResult;"
+  "globalThis.__researchValidation = { validateResearchResult, requiresMcpSources, getRequiredResearchServerIds };"
 ].join("\n");
 vm.runInNewContext(validatorSource, validatorContext);
-const validateResearchResult = validatorContext.__validateResearchResult;
+const researchValidation = validatorContext.__researchValidation;
+const validateResearchResult = researchValidation.validateResearchResult;
+const dualLibraryResearchPrompt = [
+  { role: "user", text: "استقصي صيغ قاعدة: بناء القوي على الضعيف لا يجوز مع التوثيق ورابط الصفحة" }
+];
+assert.equal(researchValidation.requiresMcpSources(dualLibraryResearchPrompt), true);
+assert.deepEqual(
+  Array.from(researchValidation.getRequiredResearchServerIds(dualLibraryResearchPrompt, ["aljam3", "shamela"])),
+  ["aljam3", "shamela"]
+);
+assert.deepEqual(
+  Array.from(researchValidation.getRequiredResearchServerIds(
+    [{ role: "user", text: "ابحث في المكتبة الشاملة عن المسألة" }],
+    ["aljam3", "shamela"]
+  )),
+  ["shamela"]
+);
 const oneOfTwoLibraries = validateResearchResult(
   "DuckAI المحلي",
   "إجابة مستندة إلى البحث",
@@ -64,6 +80,18 @@ const oneOfTwoLibraries = validateResearchResult(
 assert.equal(oneOfTwoLibraries.answer, "إجابة مستندة إلى البحث");
 assert.equal(oneOfTwoLibraries.toolCalls.length, 1);
 assert.equal(oneOfTwoLibraries.toolCalls[0].server, "shamela");
+assert.throws(
+  function () {
+    validateResearchResult(
+      "Gemini",
+      "إجابة مستندة إلى الشاملة فقط",
+      [{ server: "shamela", tool: "shamela_find", completed: true }],
+      ["aljam3", "shamela"],
+      dualLibraryResearchPrompt
+    );
+  },
+  /لم يستكمل البحث في جميع المكتبات المطلوبة.*الجامع/
+);
 assert.throws(
   function () {
     validateResearchResult(
@@ -132,7 +160,7 @@ assert.match(source, /GROQ_REMOTE_MCP_MODELS\.indexOf\(settings\.model\)/);
 
 assert.match(source, /https:\/\/generativelanguage\.googleapis\.com\/v1beta\/interactions/);
 assert.doesNotMatch(source, /antigravity-preview|gemini-4-hydrogen|GEMINI_API_REVISION|Api-Revision/);
-assert.match(source, /model: settings\.model,[\s\S]*?input: buildResearchInput\(messages, selectedServerIds\)/);
+assert.match(source, /model: settings\.model,[\s\S]*?input: buildResearchInput\(messages, serverIds\)/);
 assert.match(source, /model: settings\.model,[\s\S]*?provider: "gemini"/);
 assert.ok(source.includes('"Accept": "text/event-stream"'));
 assert.match(source, /background: true,[\s\S]*?stream: true,[\s\S]*?store: true/);
@@ -150,7 +178,10 @@ assert.match(
 assert.match(source, /environment: "remote"/);
 assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
 assert.match(source, /settingsButton\.title = "اختر الجامع أو الشاملة أو كليهما\."/);
-assert.match(source, /function callGeminiResearch[\s\S]*?postGeminiInteractionStream\([\s\S]*?tools: getGeminiTools\(selectedServerIds\)/);
+assert.match(source, /async function callGeminiResearchForSource[\s\S]*?postGeminiInteractionStream\([\s\S]*?tools: getGeminiTools\(serverIds\)/);
+assert.match(source, /async function callGeminiResearch\([\s\S]*?callGeminiResearchForSource/);
+assert.match(source, /sourceFailures: failures/);
+assert.match(source, /formatSourceFailures\(result\.sourceFailures\)/);
 assert.match(source, /function callGroqResearch[\s\S]*?postCloudJson\(/);
 
 assert.match(source, /function getGeminiInteraction\(payload\)/);
