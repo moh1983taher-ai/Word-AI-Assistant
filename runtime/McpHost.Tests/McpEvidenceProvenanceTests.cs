@@ -234,15 +234,15 @@ public sealed class McpEvidenceProvenanceTests
     }
 
     [Fact]
-    public void TracksUnverifiedSearchHitsPerSourceUntilAValidPageIsOpened()
+    public void TracksUnverifiedSearchResultsPerSourceUntilAValidPageIsOpened()
     {
         var provenance = SearchShamela(
             """{"results":[{"book_id":21592,"page_id":1157}]}""");
         var open = Tool("shamela", "shamela_open");
 
-        Assert.True(provenance.HasUnverifiedSearchHits);
+        Assert.True(provenance.HasUnverifiedSearchResults);
         provenance.RecordVerifiedOpen(open, succeeded: true);
-        Assert.False(provenance.HasUnverifiedSearchHits);
+        Assert.False(provenance.HasUnverifiedSearchResults);
     }
 
     [Fact]
@@ -259,8 +259,8 @@ public sealed class McpEvidenceProvenanceTests
             isError: false,
             hasUsableContent: false);
 
-        Assert.Equal(0, provenance.SearchHitCount);
-        Assert.False(provenance.HasUnverifiedSearchHits);
+        Assert.Equal(0, provenance.NonEmptySearchResponseCount);
+        Assert.False(provenance.HasUnverifiedSearchResults);
     }
 
     private static McpEvidenceProvenance SearchShamela(string json)
