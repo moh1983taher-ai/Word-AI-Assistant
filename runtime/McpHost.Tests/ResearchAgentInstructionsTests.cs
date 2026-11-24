@@ -28,7 +28,7 @@ public sealed class ResearchAgentInstructionsTests
             ["الجامع", "المكتبة الشاملة"],
             Array.Empty<string>());
 
-        Assert.Contains("اتبع خطة البحث", instructions);
+        Assert.Contains("افهم مقصد الباحث أولاً", instructions);
         Assert.Contains("لا تتوقف عند أول نتيجة", instructions);
         Assert.Contains("ولا يثبت صلتها", instructions);
         Assert.DoesNotContain("التزم بمنهجية المستخدم وهيكله", instructions);
