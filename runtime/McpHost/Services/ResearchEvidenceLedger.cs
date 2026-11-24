@@ -171,7 +171,13 @@ internal sealed class ResearchEvidenceLedger
             return line;
 
         if (!line.Contains(" | ", StringComparison.Ordinal))
-            return line[..Math.Min(line.Length, maximum)];
+        {
+            if (line.Length <= maximum)
+                return line;
+            var prefixLength = Math.Max(1, maximum / 2);
+            var suffixLength = Math.Max(1, maximum - prefixLength - 1);
+            return line[..prefixLength] + "…" + line[^suffixLength..];
+        }
 
         var parts = line.Split(" | ", StringSplitOptions.RemoveEmptyEntries);
         var prioritized = parts
