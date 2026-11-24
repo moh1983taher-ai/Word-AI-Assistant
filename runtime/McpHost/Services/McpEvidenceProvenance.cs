@@ -11,7 +11,10 @@ namespace ResearchTools.McpHost.Services;
 internal sealed class McpEvidenceProvenance
 {
     private static readonly string[] BookKeys = ["book_id", "bookId", "bookid"];
-    private static readonly string[] PageKeys = ["page_id", "pageId", "pageid", "page", "start_page_id", "startPageId"];
+    // Search results must expose an internal page identifier, not a printed page number.
+    private static readonly string[] SearchPageKeys = ["page_id", "pageId", "pageid", "start_page_id", "startPageId"];
+    // The open tool may name its requested internal page identifier simply "page".
+    private static readonly string[] OpenPageKeys = ["page_id", "pageId", "pageid", "page", "start_page_id", "startPageId"];
 
     private static readonly Regex BookPagePath = new(
         """(?i)/(?:books?)/(?<book>\d+)/(?:pages?/)?(?<page>\d+)(?:[/?#\s]|$)""",
@@ -203,7 +206,7 @@ internal sealed class McpEvidenceProvenance
             case JsonValueKind.Object:
             {
                 var bookId = ReadScalar(element, BookKeys) ?? inheritedBookId;
-                var pageId = ReadScalar(element, PageKeys);
+                var pageId = ReadScalar(element, SearchPageKeys);
 
                 if (bookId is not null)
                     index.BookIds.Add(bookId);
@@ -213,7 +216,8 @@ internal sealed class McpEvidenceProvenance
                 else if (pageId is not null)
                     index.PageIds.Add(pageId);
 
-                if (TryGetProperty(element, "id", out var idElement))
+                // An object may be a book record; its generic id is not necessarily a page id.
+                if (bookId is null && TryGetProperty(element, "id", out var idElement))
                     AddIdentifier(index, ReadScalar(idElement), bookId);
 
                 foreach (var property in element.EnumerateObject())
@@ -258,7 +262,7 @@ internal sealed class McpEvidenceProvenance
             case JsonValueKind.Object:
             {
                 var bookId = ReadScalar(element, BookKeys) ?? inheritedBookId;
-                var pageId = ReadScalar(element, PageKeys);
+                var pageId = ReadScalar(element, OpenPageKeys);
 
                 if (bookId is not null || pageId is not null)
                     references.Add(new Reference(bookId, pageId, null));
