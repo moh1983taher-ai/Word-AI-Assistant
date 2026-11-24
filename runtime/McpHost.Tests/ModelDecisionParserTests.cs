@@ -8,11 +8,29 @@ public sealed class ModelDecisionParserTests
     [Fact]
     public void ParsesFinalAnswer()
     {
-        const string json = "{\"type\":\"final\",\"answer\":\"النتيجة\"}";
+        const string json = "{\"type\":\"final\",\"answer\":\"النتيجة\",\"covered\":[\"محور البحث\"],\"uncovered\":[]}";
 
         Assert.True(ModelDecisionParser.TryParse(json, out var decision));
         Assert.Equal("final", decision.Type);
         Assert.Equal("النتيجة", decision.Answer);
+    }
+
+    [Fact]
+    public void RejectsFinalWithoutExplicitCoverageAttestation()
+    {
+        const string json = """{"type":"final","answer":"النتيجة"}""";
+
+        Assert.False(ModelDecisionParser.TryParse(json, out _));
+    }
+
+    [Fact]
+    public void ParsesCoveredAndUncoveredPlanFacets()
+    {
+        const string json = """{"type":"final","answer":"النتيجة","covered":["التعريف","الأقوال"],"uncovered":["التطبيقات"]}""";
+
+        Assert.True(ModelDecisionParser.TryParse(json, out var decision));
+        Assert.Equal(new[] { "التعريف", "الأقوال" }, decision.Covered);
+        Assert.Equal(new[] { "التطبيقات" }, decision.Uncovered);
     }
 
     [Fact]
