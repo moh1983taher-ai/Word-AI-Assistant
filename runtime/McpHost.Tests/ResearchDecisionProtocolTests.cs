@@ -75,6 +75,19 @@ public sealed class ResearchDecisionProtocolTests
     }
 
     [Fact]
+    public void InvalidDecisionRepairDoesNotOfferFinalWhilePageReadsRemainPending()
+    {
+        var prompt = ResearchDecisionProtocol.BuildInvalidDecisionRepair(
+            allowFinal: false,
+            pendingSourceLabels: [],
+            pendingPageSourceLabels: ["المكتبة الشاملة"]);
+
+        Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"type\":\"final\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TimeoutFinalizationOnlyPermitsFinalJson()
     {
         var prompt = ResearchDecisionProtocol.BuildTimeoutFinalInstructions();
