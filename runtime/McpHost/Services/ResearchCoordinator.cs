@@ -149,12 +149,13 @@ public sealed class ResearchCoordinator
                 var availableInputCharacters = contextBudget.GetAvailableInputCharacters(turnSystemPrompt.Length);
                 if (availableInputCharacters <= 1)
                 {
+                    var serverInstructionCharacters = serverInstructions.Sum(instruction => instruction.Text.Length);
                     var minimumRequiredCharacters = turnSystemPrompt.Length + 2_048 + 2;
                     var configuredBudget = Environment.GetEnvironmentVariable("RESEARCHTOOLS_CONTEXT_BUDGET_CHARS");
                     _log.Error(
-                        $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; toolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
+                        $"MCP instructions and tool catalog exceed the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; toolCatalogCharacters={toolCatalogCharacters}; serverInstructionCharacters={serverInstructionCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
                     throw new InvalidOperationException(
-                        $"تعذر تجهيز تعريفات أدوات MCP ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات {turnSystemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف. راجع سجل المضيف لمعرفة تفاصيل مخططات الأدوات، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS ضمن سعة النموذج الفعلية.");
+                        $"تعذر تجهيز تعليمات خوادم MCP وتعريفات أدواتها ضمن ميزانية السياق الحالية. يبلغ حجم تعليمات النظام والكتالوج {turnSystemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف. راجع سجل المضيف لمعرفة أحجام أوصاف الأدوات وتعليمات الخوادم، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS ضمن سعة النموذج الفعلية.");
                 }
 
                 var evidenceBudget = contextBudget.GetEvidenceBudget(
