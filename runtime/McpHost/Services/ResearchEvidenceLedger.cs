@@ -17,20 +17,24 @@ internal sealed class ResearchEvidenceLedger
     internal IReadOnlyList<ResearchEvidenceEntry> Entries => _entries;
 
     internal int EstimatedContextCharacters =>
-        Header.Length + _entries.Sum(entry => entry.Content.Length + 100);
+        Header.Length + _entries.Sum(entry => entry.ContextContent.Length + 100);
 
     internal void Add(ToolDescriptor source, string content, bool succeeded)
     {
         ArgumentNullException.ThrowIfNull(source);
         var storedContent = content ?? string.Empty;
+        var contextContent = storedContent;
         if (ResearchToolResultClassifier.IsSearchTool(source))
-            storedContent = ResearchSearchResultCompactor.Compact(storedContent);
+            contextContent = ResearchSearchResultCompactor.Compact(storedContent);
+        else if (McpEvidenceProvenance.IsReferenceReadTool(source))
+            contextContent = ResearchOpenedPageFormatter.Format(storedContent);
 
         _entries.Add(new ResearchEvidenceEntry(
             source.Server,
             source.ServerLabel,
             source.Name,
             storedContent,
+            contextContent,
             succeeded,
             _entries.Count + 1));
     }
@@ -86,7 +90,7 @@ internal sealed class ResearchEvidenceLedger
             if (entryBudget <= 0)
                 break;
 
-            var excerpt = Clip(entry.Content, entryBudget);
+            var excerpt = Clip(entry.ContextContent, entryBudget);
             AppendBounded(builder, excerpt + Environment.NewLine, maxCharacters);
         }
 
@@ -124,15 +128,33 @@ internal sealed class ResearchEvidenceLedger
                 : value[..prefixLength] + marker + value[^suffixLength..];
         }
 
-        var lineBudget = Math.Max(48, (maximum - marker.Length - lines.Length) / lines.Length);
+        var available = maximum - marker.Length;
+        var lineBudget = (available - lines.Length) / lines.Length;
+        IReadOnlyList<int> selectedIndexes;
+        if (lineBudget >= 48)
+        {
+            selectedIndexes = Enumerable.Range(0, lines.Length).ToArray();
+        }
+        else
+        {
+            var targetCount = Math.Clamp(available / 48, 2, lines.Length);
+            selectedIndexes = Enumerable.Range(0, targetCount)
+                .Select(index => targetCount == 1
+                    ? 0
+                    : (int)Math.Round(index * (lines.Length - 1d) / (targetCount - 1d)))
+                .Distinct()
+                .ToArray();
+            lineBudget = Math.Max(24, (available - selectedIndexes.Count) / selectedIndexes.Count);
+        }
+
         var builder = new StringBuilder(maximum);
-        for (var index = 0; index < lines.Length; index++)
+        foreach (var index in selectedIndexes)
         {
             var line = lines[index].TrimEnd('\r');
             var compactLine = ClipEvidenceLine(line, lineBudget);
             var required = compactLine.Length + (builder.Length == 0 ? 0 : 1);
             if (builder.Length + required + marker.Length > maximum)
-                break;
+                continue;
             if (builder.Length > 0)
                 builder.Append('\n');
             builder.Append(compactLine);
@@ -197,5 +219,6 @@ internal sealed record ResearchEvidenceEntry(
     string ServerLabel,
     string Tool,
     string Content,
+    string ContextContent,
     bool Succeeded,
     int Index);
