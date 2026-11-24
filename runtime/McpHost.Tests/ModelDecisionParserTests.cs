@@ -100,6 +100,14 @@ public sealed class ModelDecisionParserTests
     }
 
     [Fact]
+    public void RejectsResearchPlanWithoutCoverageFacets()
+    {
+        const string json = """{"type":"plan","intent":"بحث عام","kind":"broad","queries":[{"query":"الاجتهاد","purpose":"المفهوم"}],"coverage":[]}""";
+
+        Assert.False(ModelDecisionParser.TryParse(json, out _));
+    }
+
+    [Fact]
     public void ExtractsOneJsonObjectFromSurroundingModelText()
     {
         const string response = """
