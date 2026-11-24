@@ -136,6 +136,45 @@ public sealed class McpEvidenceProvenanceTests
     }
 
     [Fact]
+    public void AllowsPageIdOnlyWhenItUniquelyIdentifiesASearchedBookPage()
+    {
+        var provenance = SearchShamela(
+            """{"results":[{"book_id":21592,"page_id":1157}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("shamela", "shamela_open"),
+            Arguments("""{"page_id":1157}"""));
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void RejectsPageIdOnlyWhenSearchHitsUseItInMoreThanOneBook()
+    {
+        var provenance = SearchShamela(
+            """{"results":[{"book_id":10,"page_id":1157},{"book_id":20,"page_id":1157}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("shamela", "shamela_open"),
+            Arguments("""{"page_id":1157}"""));
+
+        Assert.Contains("غير موجود في نتائج البحث السابقة", error);
+    }
+
+    [Fact]
+    public void DoesNotAllowOpeningABookWithoutAPageReference()
+    {
+        var provenance = SearchShamela(
+            """{"results":[{"book_id":21592,"page_id":1157}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("shamela", "shamela_open"),
+            Arguments("""{"book_id":21592}"""));
+
+        Assert.Contains("غير موجود في نتائج البحث السابقة", error);
+    }
+
+    [Fact]
     public void SupportsOpenToolPageAliasOnlyWhenSearchReturnedAnInternalPageId()
     {
         var provenance = SearchShamela(
