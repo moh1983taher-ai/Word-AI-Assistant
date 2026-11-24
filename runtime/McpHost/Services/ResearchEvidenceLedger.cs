@@ -109,7 +109,7 @@ internal sealed class ResearchEvidenceLedger
         if (value.Length <= maximum)
             return value;
 
-        const string marker = " [اختُصر عرض السياق؛ السجل الكامل محفوظ للمهمة]";
+        const string marker = " [مقتطف سياقي مختصر؛ السجل الكامل محفوظ للمهمة]";
         if (maximum <= marker.Length)
             return value[..maximum];
 
