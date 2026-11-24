@@ -40,6 +40,20 @@ public sealed class ResearchDecisionProtocolTests
     }
 
     [Fact]
+    public void GivesPageVerificationInstructionsWhenNoSearchSourceRemainsPending()
+    {
+        var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
+            allowFinal: false,
+            pendingSourceLabels: [],
+            pendingPageSourceLabels: ["المكتبة الشاملة"]);
+
+        Assert.Contains("لا يُسمح بالإجابة النهائية الآن", prompt, StringComparison.Ordinal);
+        Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
+        Assert.Contains("افتح صفحة", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("لم يكتمل البحث في:", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TimeoutFinalizationOnlyPermitsFinalJson()
     {
         var prompt = ResearchDecisionProtocol.BuildTimeoutFinalInstructions();
