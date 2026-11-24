@@ -234,9 +234,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.10'
-          $title = 'ResearchTools Unified Setup v1.2.10'
-          $notes = 'Unified Setup v1.2.10 fixes Aljam3 page-reference verification: the host records exact file_id/page_number pairs returned by search, authorizes only matching get_page calls, verifies the returned page identity, and no longer mistakes the search-hit id for file_id. Shamela book_id/page_id provenance validation remains intact. Adds regression coverage for exact matches, mismatched and cross-hit references, and opened-page identity. All 147 MCP host unit tests pass. CI validates the Windows x64 host build, PowerShell 5.1 scripts, and discovery of both official read-only MCP catalogs with valid initial search plans. Preserves the DuckAI research protocol, source selection, SHA-256 verification, staged installation and rollback protections. Does not modify C:\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.2.11'
+          $title = 'ResearchTools Unified Setup v1.2.11'
+          $notes = 'Unified Setup v1.2.11 fixes premature finalization in MCP research: the host now allows a final answer only when every selected source has completed its initial search and every source with usable hits has at least one verified page open. It sends a distinct page-verification instruction when search is complete but pages remain unopened, and logs pending page sources without recording prompts or source text. Preview runs now write to a private per-run log, separate from the permanent host log, and the preview script prints the HTTP error response body so the actual failure is visible. Includes regression coverage for source-specific unverified pages, empty search results, finalization policy combinations, and page-verification instructions. All 154 MCP host tests pass; Windows x64 publish, PowerShell 5.1 syntax validation, and discovery of both official read-only MCP catalogs with valid initial search plans pass. Preserves Aljam3 file_id/page_number provenance validation and Shamela book_id/page_id validation. Does not modify C:\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
