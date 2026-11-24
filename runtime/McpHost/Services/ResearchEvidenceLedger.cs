@@ -22,11 +22,15 @@ internal sealed class ResearchEvidenceLedger
     internal void Add(ToolDescriptor source, string content, bool succeeded)
     {
         ArgumentNullException.ThrowIfNull(source);
+        var storedContent = content ?? string.Empty;
+        if (ResearchToolResultClassifier.IsSearchTool(source))
+            storedContent = ResearchSearchResultCompactor.Compact(storedContent);
+
         _entries.Add(new ResearchEvidenceEntry(
             source.Server,
             source.ServerLabel,
             source.Name,
-            content ?? string.Empty,
+            storedContent,
             succeeded,
             _entries.Count + 1));
     }
@@ -105,17 +109,86 @@ internal sealed class ResearchEvidenceLedger
         if (value.Length <= maximum)
             return value;
 
-        const string marker = " [مقتطف؛ النص الكامل محفوظ في سجل المهمة]";
+        const string marker = " [اختُصر عرض السياق؛ السجل الكامل محفوظ للمهمة]";
         if (maximum <= marker.Length)
             return value[..maximum];
 
-        var available = maximum - marker.Length;
-        var prefixLength = Math.Max(1, (int)(available * 0.8));
-        var suffixLength = available - prefixLength;
-        if (suffixLength <= 0)
-            return value[..prefixLength] + marker;
+        var lines = value.Split('\n');
+        if (lines.Length < 3)
+        {
+            var available = maximum - marker.Length;
+            var prefixLength = Math.Max(1, (int)(available * 0.75));
+            var suffixLength = available - prefixLength;
+            return suffixLength <= 0
+                ? value[..prefixLength] + marker
+                : value[..prefixLength] + marker + value[^suffixLength..];
+        }
 
-        return value[..prefixLength] + marker + value[^suffixLength..];
+        var lineBudget = Math.Max(48, (maximum - marker.Length - lines.Length) / lines.Length);
+        var builder = new StringBuilder(maximum);
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index].TrimEnd('\r');
+            var compactLine = ClipEvidenceLine(line, lineBudget);
+            var required = compactLine.Length + (builder.Length == 0 ? 0 : 1);
+            if (builder.Length + required + marker.Length > maximum)
+                break;
+            if (builder.Length > 0)
+                builder.Append('\n');
+            builder.Append(compactLine);
+        }
+
+        if (builder.Length + marker.Length > maximum)
+            return builder.ToString(0, Math.Max(0, maximum - marker.Length)) + marker;
+        return builder.Append(marker).ToString();
+    }
+
+    private static string ClipEvidenceLine(string line, int maximum)
+    {
+        if (line.Length <= maximum)
+            return line;
+
+        if (!line.Contains(" | ", StringComparison.Ordinal))
+            return line[..Math.Min(line.Length, maximum)];
+
+        var parts = line.Split(" | ", StringSplitOptions.RemoveEmptyEntries);
+        var prioritized = parts
+            .OrderBy(part =>
+            {
+                var separator = part.IndexOf('=');
+                var key = separator > 0 ? part[..separator] : part;
+                if (key.Contains("book_id", StringComparison.OrdinalIgnoreCase) ||
+                    key.Contains("page_id", StringComparison.OrdinalIgnoreCase) ||
+                    key.Contains("file_id", StringComparison.OrdinalIgnoreCase) ||
+                    key.Contains("page_number", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("id", StringComparison.OrdinalIgnoreCase))
+                    return 0;
+                if (key.Contains("title", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("name", StringComparison.OrdinalIgnoreCase))
+                    return 1;
+                if (key.Contains("url", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("href", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("uri", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("link", StringComparison.OrdinalIgnoreCase))
+                    return 2;
+                if (key.Contains("author", StringComparison.OrdinalIgnoreCase))
+                    return 3;
+                return 4;
+            })
+            .ToArray();
+
+        var result = new StringBuilder();
+        foreach (var part in prioritized)
+        {
+            var extra = part.Length + (result.Length == 0 ? 0 : 3);
+            if (result.Length + extra > maximum)
+                continue;
+            if (result.Length > 0)
+                result.Append(" | ");
+            result.Append(part);
+        }
+
+        return result.Length > 0 ? result.ToString() : line[..Math.Min(line.Length, maximum)];
     }
 }
 
