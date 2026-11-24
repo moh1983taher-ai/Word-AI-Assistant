@@ -123,14 +123,40 @@ public sealed class McpEvidenceProvenanceTests
     }
 
     [Fact]
-    public void RejectsOpeningWhenSearchOnlyReturnedPrintedPageNumber()
+    public void DoesNotTreatGenericSearchPageNumberAsAnInternalPageId()
     {
         var provenance = SearchShamela(
-            """{"results":[{"book_id":21592,"printed_page":"369"}]}""");
+            """{"results":[{"book_id":21592,"page":369,"printed_page":"369"}]}""");
 
         var error = provenance.ValidateReferenceRead(
             Tool("shamela", "shamela_open"),
             Arguments("""{"book_id":21592,"page_id":369}"""));
+
+        Assert.Contains("لا توجد نتيجة بحث سابقة", error);
+    }
+
+    [Fact]
+    public void SupportsOpenToolPageAliasOnlyWhenSearchReturnedAnInternalPageId()
+    {
+        var provenance = SearchShamela(
+            """{"results":[{"book_id":21592,"page_id":1157}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("shamela", "shamela_open"),
+            Arguments("""{"book_id":21592,"page":1157}"""));
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void DoesNotInferPageIdFromGenericBookRecordId()
+    {
+        var provenance = SearchShamela(
+            """{"results":[{"book_id":21592,"id":1157,"title":"المنثور في القواعد"}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("shamela", "shamela_open"),
+            Arguments("""{"book_id":21592,"page_id":1157}"""));
 
         Assert.Contains("لا توجد نتيجة بحث سابقة", error);
     }
