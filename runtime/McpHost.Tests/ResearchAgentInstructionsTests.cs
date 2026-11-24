@@ -15,7 +15,7 @@ public sealed class ResearchAgentInstructionsTests
         Assert.Contains("اتبع خطة البحث", instructions);
         Assert.Contains("لا تتوقف عند أول نتيجة", instructions);
         Assert.Contains("فتح الصفحة يثبت الوصول", instructions);
-        Assert.Contains("لا تعتبر فتح الصفحة دليلاً على صلتها", instructions);
+        Assert.Contains("ولا يثبت صلتها", instructions);
         Assert.Contains("لا تكتف بصفحة واحدة", instructions);
         Assert.True(instructions.Length < 1_800,
             $"Operational instructions unexpectedly grew to {instructions.Length:N0} characters.");
@@ -28,9 +28,9 @@ public sealed class ResearchAgentInstructionsTests
             ["الجامع", "المكتبة الشاملة"],
             Array.Empty<string>());
 
-        Assert.Contains("افهم مقصد الباحث أولاً", instructions);
-        Assert.Contains("لا تكتف بأول نتيجة", instructions);
-        Assert.Contains("لا تعتبر فتح الصفحة دليلاً على صلتها", instructions);
+        Assert.Contains("اتبع خطة البحث", instructions);
+        Assert.Contains("لا تتوقف عند أول نتيجة", instructions);
+        Assert.Contains("ولا يثبت صلتها", instructions);
         Assert.DoesNotContain("التزم بمنهجية المستخدم وهيكله", instructions);
     }
 
