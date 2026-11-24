@@ -28,6 +28,33 @@ public sealed class ResearchIntentClassifierTests
         Assert.False(ResearchIntentClassifier.MustUseMcpBeforeFinal(prompt, 0));
     }
 
+    [Fact]
+    public void KeepsFinalDisabledUntilEverySelectedLibraryHasCompletedSearch()
+    {
+        var selected = new[] { "aljam3", "shamela" };
+        var searched = new HashSet<string>(StringComparer.Ordinal);
+
+        Assert.Equal(selected, ResearchIntentClassifier.GetPendingSearchSources(
+            "ابحث عن القاعدة في الجامع والمكتبة الشاملة", selected, searched));
+
+        searched.Add("aljam3");
+        Assert.Equal(new[] { "shamela" }, ResearchIntentClassifier.GetPendingSearchSources(
+            "ابحث عن القاعدة في الجامع والمكتبة الشاملة", selected, searched));
+
+        searched.Add("shamela");
+        Assert.Empty(ResearchIntentClassifier.GetPendingSearchSources(
+            "ابحث عن القاعدة في الجامع والمكتبة الشاملة", selected, searched));
+    }
+
+    [Fact]
+    public void DoesNotRequireMcpSearchCoverageForNonResearchRequests()
+    {
+        Assert.Empty(ResearchIntentClassifier.GetPendingSearchSources(
+            "ما معنى الاجتهاد؟",
+            ["aljam3", "shamela"],
+            new HashSet<string>(StringComparer.Ordinal)));
+    }
+
     [Theory]
     [InlineData("ابحث في المكتبة الشاملة عن الأمر الوارد بعد الحظر", 0, true)]
     [InlineData("ابحث في المكتبة الشاملة عن الأمر الوارد بعد الحظر", 1, false)]
