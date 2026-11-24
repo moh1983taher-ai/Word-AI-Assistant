@@ -1098,7 +1098,7 @@
     const prompt = getLatestResearchPrompt(messages);
     const requested = [];
     if (/(?:الجامع|aljam3)/i.test(prompt)) requested.push("aljam3");
-    if (/(?:المكتبة\\s+الشاملة|الشاملة|shamela)/i.test(prompt)) requested.push("shamela");
+    if (/(?:المكتبة\s+الشاملة|الشاملة|shamela)/i.test(prompt)) requested.push("shamela");
     if (!requested.length) return selected;
     return selected.filter(function (serverId) {
       return requested.indexOf(serverId) >= 0;
