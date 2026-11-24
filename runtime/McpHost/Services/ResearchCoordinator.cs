@@ -65,6 +65,8 @@ public sealed class ResearchCoordinator
         var trace = new List<ToolCallTrace>();
         var evidenceLedger = new ResearchEvidenceLedger();
         var model = request.Model ?? string.Empty;
+        IReadOnlyList<ToolDescriptor> availableTools = [];
+        IReadOnlyList<McpServerInstruction> serverInstructions = [];
 
         try
         {
@@ -97,6 +99,8 @@ public sealed class ResearchCoordinator
             var discovery = await _sources.DiscoverSelectedAsync(selectedServerIds, timeout.Token);
             warnings.AddRange(discovery.Warnings);
             var activeTools = discovery.Tools;
+            availableTools = activeTools;
+            serverInstructions = discovery.ServerInstructions;
             var unavailableSources = selectedServerIds
                 .Where(server => !activeTools.Any(tool =>
                     string.Equals(tool.Server, server, StringComparison.Ordinal)))
@@ -137,6 +141,7 @@ public sealed class ResearchCoordinator
                     turnTools,
                     selectedLabels,
                     warnings,
+                    serverInstructions,
                     out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
                     "تواصل مع مضيف MCP عبر بروتوكول قرارات JSON. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق؛ في tool_call املأ type وserver وtool وarguments واترك answer فارغاً، وفي final املأ type وanswer واجعل server وtool فارغين وarguments null.";
@@ -301,6 +306,8 @@ public sealed class ResearchCoordinator
                 evidenceLedger,
                 selectedServerIds,
                 pendingSources,
+                availableTools,
+                serverInstructions,
                 warnings,
                 requestCancellation,
                 taskId);
@@ -332,13 +339,17 @@ public sealed class ResearchCoordinator
         ResearchEvidenceLedger evidenceLedger,
         IReadOnlyList<string> selectedServerIds,
         IReadOnlyList<string> pendingSourceIds,
+        IReadOnlyList<ToolDescriptor> tools,
+        IReadOnlyList<McpServerInstruction> serverInstructions,
         List<string> warnings,
         CancellationToken requestCancellation,
         string taskId)
     {
         var systemPrompt = ResearchAgentInstructions.Build(
             selectedServerIds.Select(ResearchSourceSelection.GetLabel).ToArray(),
-            warnings) +
+            warnings,
+            tools,
+            serverInstructions) +
             Environment.NewLine + Environment.NewLine +
             "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. اعرض ما تسمح به الأدلة المتاحة ووضّح أن البحث لم يكتمل." +
             Environment.NewLine +
@@ -564,13 +575,14 @@ public sealed class ResearchCoordinator
         IReadOnlyList<ToolDescriptor> tools,
         IReadOnlyList<string> selectedLabels,
         IReadOnlyList<string> warnings,
+        IReadOnlyList<McpServerInstruction> serverInstructions,
         out int toolCatalogCharacters)
     {
         var serializedTools = JsonSerializer.Serialize(tools, JsonDefaults.Web);
         toolCatalogCharacters = serializedTools.Length;
 
         var builder = new System.Text.StringBuilder(
-            ResearchAgentInstructions.Build(selectedLabels, warnings));
+            ResearchAgentInstructions.Build(selectedLabels, warnings, tools, serverInstructions));
         builder.AppendLine().AppendLine("أدوات MCP المتاحة ومخططات معاملاتها:");
         builder.AppendLine(serializedTools);
         return builder.ToString();
