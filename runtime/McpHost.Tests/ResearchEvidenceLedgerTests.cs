@@ -29,6 +29,32 @@ public sealed class ResearchEvidenceLedgerTests
     }
 
     [Fact]
+    public void PreservesAllSearchReferencesInCompactResearchContext()
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
+        var search = new ToolDescriptor("shamela", "المكتبة الشاملة", "shamela_find", "", schema.RootElement.Clone());
+        var results = Enumerable.Range(1, 45).Select(index => new
+        {
+            book_id = 1000 + index,
+            page_id = 2000 + index,
+            title = "كتاب " + index,
+            snippet = "مقتطف قصير عن المسألة",
+            url = $"https://shamela.ws/book/{1000 + index}/{2000 + index}"
+        }).ToArray();
+        var json = System.Text.Json.JsonSerializer.Serialize(new { results });
+
+        var ledger = new ResearchEvidenceLedger();
+        ledger.Add(search, json, succeeded: true);
+        var context = ledger.BuildContext(["shamela"], Array.Empty<string>(), 12_000);
+
+        Assert.Contains("45", context);
+        Assert.Contains("كتاب 1", context);
+        Assert.Contains("كتاب 45", context);
+        Assert.Contains("/book/1001/2001", context);
+        Assert.Contains("/book/1045/2045", context);
+    }
+
+    [Fact]
     public void RebuildsBoundedContextWithEvidenceFromEverySelectedSource()
     {
         using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
