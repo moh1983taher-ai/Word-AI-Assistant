@@ -11,6 +11,8 @@ public sealed record ModelDecision(
     string Raw)
 {
     public ResearchPlan? Plan { get; init; }
+    public IReadOnlyList<string> Covered { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> Uncovered { get; init; } = Array.Empty<string>();
 }
 
 public static class ModelDecisionParser
@@ -58,7 +60,15 @@ public static class ModelDecisionParser
                 if (string.IsNullOrWhiteSpace(answer))
                     return false;
 
-                decision = new ModelDecision("final", answer.Trim(), string.Empty, string.Empty, default, response ?? string.Empty);
+                if (!TryReadStringArray(root, "covered", out var covered) ||
+                    !TryReadStringArray(root, "uncovered", out var uncovered))
+                    return false;
+
+                decision = new ModelDecision("final", answer.Trim(), string.Empty, string.Empty, default, response ?? string.Empty)
+                {
+                    Covered = covered,
+                    Uncovered = uncovered
+                };
                 return true;
             }
 
@@ -158,7 +168,38 @@ public static class ModelDecisionParser
             }
         }
 
+        if (coverage.Count == 0)
+            return false;
+
         plan = new ResearchPlan(intent, kind, queries, coverage);
+        return true;
+    }
+
+    private static bool TryReadStringArray(
+        JsonElement root,
+        string propertyName,
+        out IReadOnlyList<string> values)
+    {
+        values = Array.Empty<string>();
+        if (!TryGet(root, propertyName, out var array) ||
+            array.ValueKind != JsonValueKind.Array)
+            return false;
+
+        var result = new List<string>();
+        foreach (var item in array.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String)
+                return false;
+            var value = Limit(item.GetString() ?? string.Empty, 240).Trim();
+            if (value.Length == 0)
+                return false;
+            if (!result.Contains(value, StringComparer.OrdinalIgnoreCase))
+                result.Add(value);
+            if (result.Count >= MaximumCoverageItems)
+                break;
+        }
+
+        values = result;
         return true;
     }
 
