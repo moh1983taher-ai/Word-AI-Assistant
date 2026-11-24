@@ -133,6 +133,46 @@ public sealed class ResearchCoordinator
             var toolCallsAttempted = 0;
             var searchedSourceIds = new HashSet<string>(StringComparer.Ordinal);
 
+            // The host, not the model, guarantees the first search call to every
+            // selected library. Arguments are derived from each live MCP input schema.
+            var initialSearchPlan = ResearchSearchBootstrap.BuildInitialPlan(
+                activeTools,
+                selectedServerIds,
+                latestUserMessage ?? string.Empty);
+            _log.Info(
+                $"Research host search plan: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; calls={initialSearchPlan.Count}; protocol=host-owned.");
+
+            foreach (var invocation in initialSearchPlan)
+            {
+                toolCallsAttempted++;
+                _log.Info(
+                    $"Research host search dispatch: task={taskId}; call={toolCallsAttempted}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}.");
+
+                var execution = await ExecuteToolAsync(
+                    invocation.Tool,
+                    invocation.Arguments,
+                    warnings,
+                    evidenceProvenance,
+                    taskId,
+                    timeout.Token);
+
+                evidenceLedger.Add(invocation.Tool, execution.Content, execution.Succeeded);
+
+                var completedSearch = execution.Succeeded &&
+                    ResearchToolResultClassifier.IsCompletedSearch(invocation.Tool, isError: false);
+                if (completedSearch)
+                    searchedSourceIds.Add(invocation.Tool.Server);
+
+                if (execution.Succeeded)
+                    trace.Add(new ToolCallTrace(
+                        invocation.Tool.Server,
+                        invocation.Tool.ServerLabel,
+                        invocation.Tool.Name));
+
+                _log.Info(
+                    $"Research host search result: task={taskId}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; success={execution.Succeeded}; completedSearch={completedSearch}; searchCoverage={searchedSourceIds.Count}/{selectedServerIds.Count}; evidenceEntries={evidenceLedger.Entries.Count}.");
+            }
+
             while (true)
             {
                 IReadOnlyList<ToolDescriptor> turnTools = activeTools;
@@ -141,11 +181,6 @@ public sealed class ResearchCoordinator
                     selectedServerIds,
                     searchedSourceIds);
                 var allowFinal = pendingSearchSources.Count == 0;
-                var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
-                    turnTools,
-                    allowFinal: allowFinal,
-                    allowToolCalls: true);
-                var responseFormatCharacters = responseFormat.GetRawText().Length;
                 var turnSystemPrompt = BuildSystemPrompt(
                     turnTools,
                     selectedLabels,
@@ -153,16 +188,16 @@ public sealed class ResearchCoordinator
                     out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
                     (allowFinal
-                        ? "تواصل مع مضيف MCP عبر بروتوكول قرارات JSON. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق؛ في tool_call املأ type وserver وtool وarguments واترك answer فارغاً، وفي final املأ type وanswer واجعل server وtool فارغين وarguments null."
+                        ? "أعد كائن JSON واحداً فقط وفق بروتوكول القرارات الموضح أدناه. استخدم final مع answer عند اكتمال البحث، أو tool_call مع server وtool وarguments عند الحاجة إلى فتح صفحة أو بحث تكميلي. لا تضع Markdown أو شرحاً خارج JSON."
                         : "هذه مهمة بحث مصدري لم يكتمل البحث فيها بعد. المكتبات التي يجب أن تبحث فيها الآن: " +
                           string.Join("، ", pendingSearchSources.Select(source =>
                               $"{ResearchSourceSelection.GetLabel(source)} ({(source == "aljam3" ? "search" : "shamela_find أو shamela_find_scoped")})")) +
-                          ". يجب أن يكون القرار tool_call لأداة بحث من إحدى هذه المكتبات، مع معاملات بحث صحيحة. لا تصدر final ولا تجب من الذاكرة. أخرج كائن JSON واحداً مطابقاً للمخطط المرفق.");
+                          ". لا تصدر final ولا تجب من الذاكرة. أخرج قرار tool_call صحيحاً وفق مخططات الأدوات المعروضة في تعليمات النظام.");
 
-                // Count both the compact tool directory and the strict argument schema.
-                // The argument schema is sent separately as response_format and must
-                // still be accounted for when deciding how much history and evidence fit.
-                var fixedRequestCharacters = turnSystemPrompt.Length + responseFormatCharacters;
+                // Tool input schemas are included in the system prompt as ordinary data.
+                // Duck2API does not enforce response_format=json_schema, so no hidden
+                // schema payload is sent or counted here.
+                var fixedRequestCharacters = turnSystemPrompt.Length;
                 var availableInputCharacters = contextBudget.GetAvailableInputCharacters(fixedRequestCharacters);
                 if (availableInputCharacters <= 1)
                 {
@@ -171,7 +206,7 @@ public sealed class ResearchCoordinator
                     _log.Error(
                         $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; compactToolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; responseFormatCharacters={responseFormatCharacters}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
                     throw new InvalidOperationException(
-                        $"تعذر تجهيز أدوات MCP ومخطط معاملات الاستجابة ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات {turnSystemPrompt.Length:N0} حرفاً ومخطط معاملاتها {responseFormatCharacters:N0} حرف، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف، والحد الأدنى اللازم مع احتياطي البروتوكول {minimumRequiredCharacters:N0} حرف. راجع سجل المضيف، واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS فقط إذا كان النموذج والبوابة يدعمان سعة أكبر.");
+                        $"تعذر تجهيز فهرس أدوات MCP وتعليماته ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات ومخططاتها {turnSystemPrompt.Length:N0} حرف، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف، والحد الأدنى اللازم مع احتياطي البروتوكول {minimumRequiredCharacters:N0} حرف. راجع سجل المضيف واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS فقط إذا كان النموذج والبوابة يدعمان سعة أكبر.");
                 }
 
                 var evidenceBudget = contextBudget.GetEvidenceBudget(
@@ -203,14 +238,13 @@ public sealed class ResearchCoordinator
 
                 var requestCharacters = requestMessages.Sum(message => message.Content?.Length ?? 0);
                 _log.Info(
-                    $"Research prompt prepared: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormatCharacters={responseFormatCharacters}; pendingSearchSources={pendingSearchSources.Count}; finalAllowed={allowFinal}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
+                    $"Research prompt prepared: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormat=omitted; pendingSearchSources={pendingSearchSources.Count}; finalAllowed={allowFinal}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
 
                 var completion = await _duckAi.CompleteAsync(
                     model,
                     requestMessages,
                     functionTools: null,
-                    cancellationToken: timeout.Token,
-                    responseFormat: responseFormat);
+                    cancellationToken: timeout.Token);
 
                 model = completion.Model;
 
@@ -221,7 +255,7 @@ public sealed class ResearchCoordinator
                 if (!ModelDecisionParser.TryParse(completion.Text, out var decision))
                 {
                     _log.Warning(
-                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; responseFormat=json_schema.");
+                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; responseFormat=omitted; protocol=prompted-json.");
 
                     if (repairAttempted)
                         throw new InvalidOperationException("تعذر التحقق من استجابة النموذج وفق مخطط JSON الصارم بعد محاولة الإصلاح.");
@@ -230,7 +264,7 @@ public sealed class ResearchCoordinator
                     messages.Add(new DuckChatMessage("assistant", completion.Text));
                     messages.Add(new DuckChatMessage(
                         "user",
-                        "لم تطابق استجابتك مخطط JSON الصارم. أعد القرار وفق المخطط المرفق حرفياً، دون أي شرح أو Markdown. لا تغيّر نوع القرار أو المكتبة أو الأداة المسموح بها."));
+                        "لم تكن استجابتك قرار JSON صالحاً. أخرج كائناً واحداً فقط: إما {\"type\":\"tool_call\",\"server\":\"معرّف المكتبة\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}، أو {\"type\":\"final\",\"answer\":\"نص الإجابة\"}. استخدم اسم أداة ومعاملاتها كما وردت في فهرس MCP ومخططها المعروضين في تعليمات النظام. لا تضع أي نص خارج الكائن."));
                     continue;
                 }
 
@@ -288,7 +322,7 @@ public sealed class ResearchCoordinator
                             "تعذر اعتماد إجابة البحث: بقيت مكتبة أعادت نتائج فعلية من دون فتح صفحة مطابقة والتحقق من معرّفها. أُوقف تمرير الإجابة غير المكتملة بدلاً من عرضها بوصفها بحثاً موثقاً.");
                     }
 
-                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; mode=json-schema; model={model}.");
+                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; mode=prompted-json; model={model}.");
                     return new ResearchResponse(
                         decision.Answer,
                         model,
@@ -413,7 +447,7 @@ public sealed class ResearchCoordinator
             Environment.NewLine + Environment.NewLine +
             "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. اعرض ما تسمح به الأدلة المتاحة ووضّح أن البحث لم يكتمل." +
             Environment.NewLine +
-            "أخرج JSON واحداً وفق المخطط: type=final، وanswer نص الإجابة، وserver وtool فارغان، وarguments=null.";
+            "أخرج كائناً واحداً فقط: {\"type\":\"final\",\"answer\":\"نص الإجابة\"}. لا تضف شرحاً أو Markdown خارج JSON.";
 
         try
         {
@@ -460,17 +494,11 @@ public sealed class ResearchCoordinator
             if (!string.IsNullOrWhiteSpace(evidenceContext))
                 requestMessages.Add(new DuckChatMessage("user", evidenceContext));
 
-            var responseFormat = ModelDecisionSchemaBuilder.BuildResponseFormat(
-                Array.Empty<ToolDescriptor>(),
-                allowFinal: true,
-                allowToolCalls: false);
-
             var completion = await _duckAi.CompleteAsync(
                 model,
                 requestMessages,
                 functionTools: null,
-                cancellationToken: finalizationTimeout.Token,
-                responseFormat: responseFormat);
+                cancellationToken: finalizationTimeout.Token);
 
             if (completion.ToolCalls.Count > 0)
                 throw new InvalidOperationException("أعاد النموذج استدعاء أداة في مرحلة الإغلاق التي لا تسمح باستدعاء أدوات.");
@@ -688,7 +716,8 @@ public sealed class ResearchCoordinator
             server = tool.Server,
             source = tool.ServerLabel,
             name = tool.Name,
-            description = tool.Description
+            description = tool.Description,
+            inputSchema = tool.InputSchema
         }).ToArray();
         var serializedTools = JsonSerializer.Serialize(toolDirectory, JsonDefaults.Web);
         toolCatalogCharacters = serializedTools.Length;
@@ -696,7 +725,7 @@ public sealed class ResearchCoordinator
         var builder = new System.Text.StringBuilder(
             ResearchAgentInstructions.Build(selectedLabels, warnings));
         builder.AppendLine().AppendLine(
-            "أدوات MCP المتاحة وأوصافها. مخطط معاملات كل أداة مرفق في مخطط الاستجابة المهيكل، ويحدد وصفه اسم المكتبة والأداة:");
+            "أدوات MCP المتاحة وأوصافها ومخطط inputSchema الفعلي لكل أداة. استخدم المخطط لتحديد أسماء المعاملات وأنواعها والقيم الإلزامية والافتراضية، ولا تخمّن أي معرّف أو معامل:");
         builder.AppendLine(serializedTools);
         return builder.ToString();
     }
