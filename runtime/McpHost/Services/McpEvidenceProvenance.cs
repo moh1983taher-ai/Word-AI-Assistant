@@ -11,6 +11,8 @@ namespace ResearchTools.McpHost.Services;
 internal sealed class McpEvidenceProvenance
 {
     private static readonly string[] BookKeys = ["book_id", "bookId", "bookid"];
+    private static readonly string[] FileKeys = ["file_id", "fileId"];
+    private static readonly string[] FilePageNumberKeys = ["page_number", "pageNumber"];
     // Search results must expose an internal page identifier, not a printed page number.
     private static readonly string[] SearchPageKeys = ["page_id", "pageId", "pageid", "start_page_id", "startPageId"];
     // The open tool may name its requested internal page identifier simply "page".
@@ -71,13 +73,13 @@ internal sealed class McpEvidenceProvenance
         if (structuredContent is { } structured &&
             structured.ValueKind is not JsonValueKind.Undefined and not JsonValueKind.Null)
         {
-            VisitSearchPayload(structured, index, inheritedBookId: null);
+            VisitSearchPayload(structured, index, inheritedBookId: null, descriptor.Server);
         }
 
         if (textBlocks is not null)
         {
             foreach (var text in textBlocks)
-                VisitSearchText(text, index);
+                VisitSearchText(text, index, descriptor.Server);
         }
 
         return index.ReferenceCount;
@@ -101,7 +103,7 @@ internal sealed class McpEvidenceProvenance
 
         var input = JsonSerializer.SerializeToElement(arguments);
         var requested = new List<Reference>();
-        VisitOpenArguments(input, requested, inheritedBookId: null);
+        VisitOpenArguments(input, requested, inheritedBookId: null, descriptor.Server);
 
         if (requested.Count == 0)
         {
@@ -140,13 +142,13 @@ internal sealed class McpEvidenceProvenance
         if (structuredContent is { } structured &&
             structured.ValueKind is not JsonValueKind.Undefined and not JsonValueKind.Null)
         {
-            VisitSearchPayload(structured, returned, inheritedBookId: null);
+            VisitSearchPayload(structured, returned, inheritedBookId: null, descriptor.Server);
         }
 
         if (textBlocks is not null)
         {
             foreach (var text in textBlocks)
-                VisitSearchText(text, returned);
+                VisitSearchText(text, returned, descriptor.Server);
         }
 
         if (returned.ReferenceCount == 0)
@@ -179,6 +181,10 @@ internal sealed class McpEvidenceProvenance
 
     private static bool WasReturnedBySearch(SourceIndex index, Reference reference)
     {
+        if (reference.FileId is not null || reference.FilePageNumber is not null)
+            return reference.FileId is not null && reference.FilePageNumber is not null &&
+                   index.FilePagePairs.Contains(Pair(reference.FileId, reference.FilePageNumber));
+
         if (reference.BookId is not null && reference.PageId is not null)
             return index.BookPagePairs.Contains(Pair(reference.BookId, reference.PageId));
 
@@ -198,7 +204,8 @@ internal sealed class McpEvidenceProvenance
     private static void VisitSearchPayload(
         JsonElement element,
         SourceIndex index,
-        string? inheritedBookId)
+        string? inheritedBookId,
+        string sourceId)
     {
         switch (element.ValueKind)
         {
@@ -206,20 +213,29 @@ internal sealed class McpEvidenceProvenance
             {
                 var bookId = ReadScalar(element, BookKeys) ?? inheritedBookId;
                 var pageId = ReadScalar(element, SearchPageKeys);
+                if (sourceId == "aljam3")
+                {
+                    var fileId = ReadScalar(element, FileKeys);
+                    var pageNumber = ReadScalar(element, FilePageNumberKeys);
+                    if (fileId is not null && pageNumber is not null)
+                        index.AddFilePagePair(fileId, pageNumber);
+                }
 
                 if (bookId is not null && pageId is not null)
                     index.AddBookPagePair(bookId, pageId);
                 else if (pageId is not null)
                     index.PageIds.Add(pageId);
 
-                // An object may be a book record; its generic id is not necessarily a page id.
-                if (bookId is null && TryGetProperty(element, "id", out var idElement))
+                // Aljam3 search-hit `id` identifies the page record, not the
+                // file/page pair required by get_page. Never authorize it as an opaque page ref.
+                if (sourceId != "aljam3" && bookId is null &&
+                    TryGetProperty(element, "id", out var idElement))
                     AddIdentifier(index, ReadScalar(idElement), bookId);
 
                 foreach (var property in element.EnumerateObject())
                 {
                     if (IsLinkKey(property.Name) && property.Value.ValueKind == JsonValueKind.String)
-                        VisitSearchText(property.Value.GetString(), index);
+                        VisitSearchText(property.Value.GetString(), index, sourceId);
 
                     if (IsIdentifierCollectionKey(property.Name) &&
                         property.Value.ValueKind == JsonValueKind.Array)
@@ -232,7 +248,7 @@ internal sealed class McpEvidenceProvenance
                     }
 
                     if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
-                        VisitSearchPayload(property.Value, index, bookId);
+                        VisitSearchPayload(property.Value, index, bookId, sourceId);
                 }
                 break;
             }
@@ -251,26 +267,40 @@ internal sealed class McpEvidenceProvenance
     private static void VisitOpenArguments(
         JsonElement element,
         List<Reference> references,
-        string? inheritedBookId)
+        string? inheritedBookId,
+        string sourceId)
     {
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
             {
-                var bookId = ReadScalar(element, BookKeys) ?? inheritedBookId;
-                var pageId = ReadScalar(element, OpenPageKeys);
+                var bookId = sourceId == "aljam3"
+                    ? inheritedBookId
+                    : ReadScalar(element, BookKeys) ?? inheritedBookId;
 
-                if (bookId is not null || pageId is not null)
-                    references.Add(new Reference(bookId, pageId, null));
+                if (sourceId == "aljam3")
+                {
+                    var fileId = ReadScalar(element, FileKeys);
+                    var pageNumber = ReadScalar(element, FilePageNumberKeys);
+                    if (fileId is not null || pageNumber is not null)
+                        references.Add(new Reference(null, null, null, fileId, pageNumber));
+                }
+                else
+                {
+                    var pageId = ReadScalar(element, OpenPageKeys);
+                    if (bookId is not null || pageId is not null)
+                        references.Add(new Reference(bookId, pageId, null));
 
-                if (pageId is null && TryGetProperty(element, "id", out var idElement))
-                    AddTargetIdentifier(ReadScalar(idElement), bookId, references);
+                    if (pageId is null && TryGetProperty(element, "id", out var idElement))
+                        AddTargetIdentifier(ReadScalar(idElement), bookId, references);
+                }
 
                 foreach (var property in element.EnumerateObject())
                 {
                     if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
-                        VisitOpenArguments(property.Value, references, bookId);
-                    else if (property.Value.ValueKind == JsonValueKind.String &&
+                        VisitOpenArguments(property.Value, references, bookId, sourceId);
+                    else if (sourceId != "aljam3" &&
+                             property.Value.ValueKind == JsonValueKind.String &&
                              IsIdentifierCollectionKey(property.Name))
                         AddTargetIdentifier(property.Value.GetString(), bookId, references);
                 }
@@ -279,7 +309,7 @@ internal sealed class McpEvidenceProvenance
 
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
-                    VisitOpenArguments(item, references, inheritedBookId);
+                    VisitOpenArguments(item, references, inheritedBookId, sourceId);
                 break;
 
             case JsonValueKind.String:
@@ -292,7 +322,7 @@ internal sealed class McpEvidenceProvenance
         }
     }
 
-    private static void VisitSearchText(string? text, SourceIndex index)
+    private static void VisitSearchText(string? text, SourceIndex index, string sourceId)
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
@@ -316,7 +346,7 @@ internal sealed class McpEvidenceProvenance
         try
         {
             using var document = JsonDocument.Parse(candidate);
-            VisitSearchPayload(document.RootElement, index, inheritedBookId: null);
+            VisitSearchPayload(document.RootElement, index, inheritedBookId: null, sourceId);
         }
         catch (JsonException)
         {
@@ -430,8 +460,9 @@ internal sealed class McpEvidenceProvenance
         internal HashSet<string> PageIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> OpaqueIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> BookPagePairs { get; } = new(StringComparer.Ordinal);
+        internal HashSet<string> FilePagePairs { get; } = new(StringComparer.Ordinal);
         private Dictionary<string, HashSet<string>> PageBooks { get; } = new(StringComparer.Ordinal);
-        internal int ReferenceCount => PageIds.Count + OpaqueIds.Count + BookPagePairs.Count;
+        internal int ReferenceCount => PageIds.Count + OpaqueIds.Count + BookPagePairs.Count + FilePagePairs.Count;
 
         internal void AddBookPagePair(string bookId, string pageId)
         {
@@ -445,11 +476,18 @@ internal sealed class McpEvidenceProvenance
             books.Add(bookId);
         }
 
+        internal void AddFilePagePair(string fileId, string pageNumber) =>
+            FilePagePairs.Add(Pair(fileId, pageNumber));
+
         internal bool HasUnambiguousPageId(string pageId) =>
             PageBooks.TryGetValue(pageId, out var books) && books.Count == 1;
 
         internal bool Contains(Reference reference)
         {
+            if (reference.FileId is not null || reference.FilePageNumber is not null)
+                return reference.FileId is not null && reference.FilePageNumber is not null &&
+                       FilePagePairs.Contains(Pair(reference.FileId, reference.FilePageNumber));
+
             if (reference.BookId is not null && reference.PageId is not null)
                 return BookPagePairs.Contains(Pair(reference.BookId, reference.PageId));
 
@@ -466,5 +504,10 @@ internal sealed class McpEvidenceProvenance
         }
     }
 
-    private sealed record Reference(string? BookId, string? PageId, string? OpaqueId);
+    private sealed record Reference(
+        string? BookId,
+        string? PageId,
+        string? OpaqueId,
+        string? FileId = null,
+        string? FilePageNumber = null);
 }
