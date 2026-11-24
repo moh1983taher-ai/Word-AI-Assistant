@@ -117,6 +117,15 @@ public sealed class LmStudioResearchAgent
 
             var systemPrompt = BuildSystemPrompt(selectedServerIds, warnings, safeTools, serverInstructions);
             var availableInputCharacters = contextBudget.GetAvailableInputCharacters(systemPrompt.Length);
+            if (availableInputCharacters <= 1)
+            {
+                var serverInstructionCharacters = serverInstructions.Sum(instruction => instruction.Text.Length);
+                _log.Error(
+                    $"LM Studio MCP instructions exceed the configured context budget: task={taskId}; serverInstructionCharacters={serverInstructionCharacters}; systemPromptCharacters={systemPrompt.Length}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}.");
+                throw new InvalidOperationException(
+                    $"تعذر تجهيز تعليمات خوادم MCP ضمن ميزانية السياق الحالية في LM Studio. بلغ حجم تعليمات النظام {systemPrompt.Length:N0} حرفاً، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف.");
+            }
+
             var input = BuildTranscript(
                 messages,
                 availableInputCharacters,
@@ -261,6 +270,12 @@ public sealed class LmStudioResearchAgent
 
         var contextBudget = ResearchContextBudget.Load();
         var availableInputCharacters = contextBudget.GetAvailableInputCharacters(finalizationPrompt.Length);
+        if (availableInputCharacters <= 1)
+        {
+            warnings.Add("لم تتسع ميزانية السياق لتعليمات الخادم ومرحلة الصياغة الجزئية؛ عُرضت الأدلة التي جُمعت دون طلب توليد جديد.");
+            return (BuildEvidenceFallback(evidenceLedger, selectedServerIds), model);
+        }
+
         var evidenceBudget = contextBudget.GetEvidenceBudget(
             availableInputCharacters,
             evidenceLedger.EstimatedContextCharacters);
