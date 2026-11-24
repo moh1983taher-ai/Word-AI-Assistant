@@ -246,6 +246,52 @@ public sealed class McpEvidenceProvenanceTests
     }
 
     [Fact]
+    public void ReportsOnlySourcesWithSearchHitsThatStillNeedPageVerification()
+    {
+        var provenance = SearchAljam3(
+            """{"results":[{"file_id":8291,"page_number":471}]}""");
+        RegisterSearch(
+            provenance,
+            Tool("shamela", "shamela_find"),
+            """{"results":[{"book_id":21592,"page_id":1157}]}""");
+
+        Assert.Equal(
+            new[] { "aljam3", "shamela" },
+            provenance.GetUnverifiedSearchSources());
+
+        provenance.RecordVerifiedOpen(
+            Tool("aljam3", "get_page"),
+            succeeded: true);
+
+        Assert.Equal(
+            new[] { "shamela" },
+            provenance.GetUnverifiedSearchSources());
+
+        provenance.RecordVerifiedOpen(
+            Tool("shamela", "shamela_open"),
+            succeeded: true);
+
+        Assert.Empty(provenance.GetUnverifiedSearchSources());
+    }
+
+    [Fact]
+    public void DoesNotRequirePageVerificationForSourcesWithNoSearchHits()
+    {
+        var provenance = new McpEvidenceProvenance();
+        var search = Tool("shamela", "shamela_find");
+        using var empty = JsonDocument.Parse("""{"results":[]}""");
+
+        provenance.RecordSearchResult(
+            search,
+            empty.RootElement,
+            Array.Empty<string>(),
+            isError: false,
+            hasUsableContent: false);
+
+        Assert.Empty(provenance.GetUnverifiedSearchSources());
+    }
+
+    [Fact]
     public void DoesNotRequireOpeningWhenSearchReturnsNoHits()
     {
         var provenance = new McpEvidenceProvenance();

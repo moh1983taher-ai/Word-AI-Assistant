@@ -53,7 +53,36 @@ $payload = @{
 $body = ConvertTo-Json -InputObject $payload -Depth 40 -Compress
 $job = Start-Job -ArgumentList $base, $headers, $body -ScriptBlock {
     param($uri, $requestHeaders, $requestBody)
-    Invoke-RestMethod -Method Post -Uri ($uri + '/v1/research') -Headers $requestHeaders -ContentType 'text/plain; charset=utf-8' -Body $requestBody -TimeoutSec 190
+    try {
+        $data = Invoke-RestMethod -Method Post -Uri ($uri + '/v1/research') -Headers $requestHeaders -ContentType 'text/plain; charset=utf-8' -Body $requestBody -TimeoutSec 190
+        [pscustomobject]@{ Succeeded = $true; Data = $data; StatusCode = 200; Error = $null; ResponseBody = $null }
+    }
+    catch {
+        $statusCode = $null
+        $responseBody = $null
+        $response = $_.Exception.Response
+        if ($response) {
+            try { $statusCode = [int]$response.StatusCode } catch { }
+            try {
+                $stream = $response.GetResponseStream()
+                if ($stream) {
+                    $reader = [System.IO.StreamReader]::new($stream)
+                    $responseBody = $reader.ReadToEnd()
+                    $reader.Dispose()
+                }
+            } catch { }
+        }
+        if ([string]::IsNullOrWhiteSpace($responseBody) -and $_.ErrorDetails.Message) {
+            $responseBody = $_.ErrorDetails.Message
+        }
+        [pscustomobject]@{
+            Succeeded = $false
+            Data = $null
+            StatusCode = $statusCode
+            Error = $_.Exception.Message
+            ResponseBody = $responseBody
+        }
+    }
 }
 
 $pingCount = 0
@@ -65,7 +94,16 @@ try {
         Start-Sleep -Milliseconds 800
     }
 
-    $result = Receive-Job -Job $job -Wait
+    $jobResult = Receive-Job -Job $job -Wait
+    if (-not $jobResult.Succeeded) {
+        Write-Host "فشل طلب البحث: HTTP $($jobResult.StatusCode) - $($jobResult.Error)" -ForegroundColor Red
+        if (-not [string]::IsNullOrWhiteSpace([string]$jobResult.ResponseBody)) {
+            Write-Host 'متن استجابة المضيف:'
+            Write-Host $jobResult.ResponseBody
+        }
+        throw "Research endpoint returned HTTP $($jobResult.StatusCode). See the isolated preview log printed by the launcher."
+    }
+    $result = $jobResult.Data
 }
 finally {
     if ($job) {

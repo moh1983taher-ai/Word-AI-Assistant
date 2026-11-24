@@ -186,8 +186,14 @@ public sealed class ResearchCoordinator
                     latestUserMessage,
                     selectedServerIds,
                     searchedSourceIds);
-                var allowFinal = pendingSearchSources.Count == 0;
+                var pendingPageSources = evidenceProvenance.GetUnverifiedSearchSources();
+                var allowFinal = ResearchFinalizationPolicy.CanFinalize(
+                    pendingSearchSources.Count,
+                    pendingPageSources.Count);
                 var pendingSourceLabels = pendingSearchSources
+                    .Select(ResearchSourceSelection.GetLabel)
+                    .ToArray();
+                var pendingPageSourceLabels = pendingPageSources
                     .Select(ResearchSourceSelection.GetLabel)
                     .ToArray();
                 var turnSystemPrompt = BuildSystemPrompt(
@@ -196,7 +202,10 @@ public sealed class ResearchCoordinator
                     warnings,
                     out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
-                    ResearchDecisionProtocol.BuildTurnInstructions(allowFinal, pendingSourceLabels);
+                    ResearchDecisionProtocol.BuildTurnInstructions(
+                        allowFinal,
+                        pendingSourceLabels,
+                        pendingPageSourceLabels);
 
                 // Tool input schemas are included in the system prompt as ordinary data.
                 // Duck2API does not enforce response_format=json_schema, so no hidden
@@ -242,7 +251,7 @@ public sealed class ResearchCoordinator
 
                 var requestCharacters = requestMessages.Sum(message => message.Content?.Length ?? 0);
                 _log.Info(
-                    $"Research prompt prepared: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormat=omitted; pendingSearchSources={pendingSearchSources.Count}; finalAllowed={allowFinal}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
+                    $"Research prompt prepared: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; messages={requestMessages.Count}; systemCharacters={turnSystemPrompt.Length}; toolCatalogCharacters={toolCatalogCharacters}; responseFormat=omitted; pendingSearchSources={pendingSearchSources.Count}; pendingPageSources={pendingPageSources.Count}; finalAllowed={allowFinal}; historyCharacters={boundedContextCharacters}/{originalContextCharacters}; evidenceCharacters={evidenceContext.Length}; requestCharacters={requestCharacters}; fixedRequestCharacters={fixedRequestCharacters}; contextBudget={contextBudget.MaxContextCharacters}; maxOutputTokens={contextBudget.MaxOutputTokens}.");
 
                 var completion = await _duckAi.CompleteAsync(
                     model,
@@ -311,7 +320,7 @@ public sealed class ResearchCoordinator
                         {
                             pageVerificationCorrectionAttempted = true;
                             _log.Warning(
-                                $"Research premature final deferred: task={taskId}; reason=search_results_without_verified_page_open; searchResponses={evidenceProvenance.NonEmptySearchResponseCount}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}; recovery=one_page_verification_correction.");
+                                $"Research premature final deferred: task={taskId}; reason=search_results_without_verified_page_open; finalAllowed={allowFinal}; pendingPageSources={string.Join(",", pendingPageSources)}; searchResponses={evidenceProvenance.NonEmptySearchResponseCount}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}; recovery=one_page_verification_correction.");
 
                             messages.Add(new DuckChatMessage("assistant", decision.Raw));
                             messages.Add(new DuckChatMessage(
@@ -321,7 +330,7 @@ public sealed class ResearchCoordinator
                         }
 
                         _log.Warning(
-                            $"Research final rejected: task={taskId}; reason=search_results_without_verified_page_open; correctionAttempted=true.");
+                            $"Research final rejected: task={taskId}; reason=search_results_without_verified_page_open; finalAllowed={allowFinal}; pendingPageSources={string.Join(",", pendingPageSources)}; correctionAttempted=true.");
                         throw new InvalidOperationException(
                             "تعذر اعتماد إجابة البحث: بقيت مكتبة أعادت نتائج فعلية من دون فتح صفحة مطابقة والتحقق من معرّفها. أُوقف تمرير الإجابة غير المكتملة بدلاً من عرضها بوصفها بحثاً موثقاً.");
                     }

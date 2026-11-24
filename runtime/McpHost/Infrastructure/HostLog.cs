@@ -18,7 +18,16 @@ public sealed class HostLog
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ResearchTools", "DuckAI");
         Directory.CreateDirectory(directory);
-        _path = Path.Combine(directory, "DuckAI-MCP-Host.log");
+
+        // Preview runs use a private log so their diagnostics cannot be confused
+        // with concurrent requests handled by the permanent 18081 service.
+        var previewLogId = Environment.GetEnvironmentVariable("RESEARCHTOOLS_MCP_PREVIEW_LOG_ID");
+        var isValidPreviewId = !string.IsNullOrWhiteSpace(previewLogId) &&
+            previewLogId.All(char.IsAsciiLetterOrDigit);
+        var fileName = isValidPreviewId
+            ? $"DuckAI-MCP-Host-preview-{previewLogId}.log"
+            : "DuckAI-MCP-Host.log";
+        _path = Path.Combine(directory, fileName);
     }
 
     public void Info(string message) => Write("INFO", message);
