@@ -52,6 +52,12 @@ public sealed record ToolDescriptor(
     string Description,
     JsonElement InputSchema);
 
+public sealed record McpServerInstruction(
+    string Server,
+    string ServerLabel,
+    string Text);
+
 public sealed record SourceDiscovery(
     IReadOnlyList<ToolDescriptor> Tools,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    IReadOnlyList<McpServerInstruction> ServerInstructions);
