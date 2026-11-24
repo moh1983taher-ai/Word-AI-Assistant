@@ -72,7 +72,7 @@ public sealed class McpEvidenceProvenanceTests
         provenance.RecordSearchResult(
             search,
             empty.RootElement,
-            ["موضع النص: https://shamela.ws/book/21592/1157"],
+            ["موضع النص: [فتح الصفحة](https://shamela.ws/book/21592/1157)"],
             isError: false,
             hasUsableContent: true);
 
