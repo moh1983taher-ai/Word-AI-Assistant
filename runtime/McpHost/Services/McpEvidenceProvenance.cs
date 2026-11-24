@@ -30,10 +30,10 @@ internal sealed class McpEvidenceProvenance
 
     private readonly Dictionary<string, SourceIndex> _sources = new(StringComparer.Ordinal);
 
-    internal int SearchHitCount => _sources.Values.Sum(index => index.SearchHitCount);
-    internal int VerifiedOpenCount => _sources.Values.Sum(index => index.VerifiedOpenCount);
-    internal bool HasUnverifiedSearchHits =>
-        _sources.Values.Any(index => index.SearchHitCount > 0 && index.VerifiedOpenCount == 0);
+    internal int NonEmptySearchResponseCount => _sources.Values.Sum(index => index.NonEmptySearchResponseCount);
+    internal int VerifiedPageOpenCount => _sources.Values.Sum(index => index.VerifiedPageOpenCount);
+    internal bool HasUnverifiedSearchResults =>
+        _sources.Values.Any(index => index.NonEmptySearchResponseCount > 0 && index.VerifiedPageOpenCount == 0);
 
     internal int SearchReferenceCount =>
         _sources.Values.Sum(index => index.ReferenceCount);
@@ -67,7 +67,7 @@ internal sealed class McpEvidenceProvenance
 
         var index = GetSourceIndex(descriptor.Server);
         if (hasUsableContent)
-            index.SearchHitCount++;
+            index.NonEmptySearchResponseCount++;
         var before = index.ReferenceCount;
 
         if (structuredContent is { } structured &&
@@ -165,7 +165,7 @@ internal sealed class McpEvidenceProvenance
     internal void RecordVerifiedOpen(ToolDescriptor descriptor, bool succeeded)
     {
         if (succeeded && IsReferenceReadTool(descriptor))
-            GetSourceIndex(descriptor.Server).VerifiedOpenCount++;
+            GetSourceIndex(descriptor.Server).VerifiedPageOpenCount++;
     }
 
     private SourceIndex GetSourceIndex(string sourceId)
@@ -427,8 +427,8 @@ internal sealed class McpEvidenceProvenance
 
     private sealed class SourceIndex
     {
-        internal int SearchHitCount { get; set; }
-        internal int VerifiedOpenCount { get; set; }
+        internal int NonEmptySearchResponseCount { get; set; }
+        internal int VerifiedPageOpenCount { get; set; }
         internal HashSet<string> PageIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> OpaqueIds { get; } = new(StringComparer.Ordinal);
         internal HashSet<string> BookPagePairs { get; } = new(StringComparer.Ordinal);
