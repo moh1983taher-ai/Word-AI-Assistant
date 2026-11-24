@@ -23,7 +23,7 @@ internal static class ResearchOpenedPageFormatter
         if (string.IsNullOrWhiteSpace(content))
             return content;
 
-        if (!TryParseJson(content, out var document))
+        if (!TryParseJson(content, out var document, out var jsonEnd))
             return WrapLongText(content);
 
         using (document)
@@ -32,6 +32,12 @@ internal static class ResearchOpenedPageFormatter
             var textParts = new List<string>();
             CollectMetadata(document.RootElement, metadata, depth: 0);
             CollectText(document.RootElement, textParts, depth: 0);
+            if (jsonEnd < content.Length)
+            {
+                var trailingText = content[jsonEnd..].Trim();
+                if (!string.IsNullOrWhiteSpace(trailingText))
+                    textParts.Add(trailingText);
+            }
 
             if (textParts.Count == 0)
                 return WrapLongText(content);
@@ -142,9 +148,10 @@ internal static class ResearchOpenedPageFormatter
         return output.ToString().TrimEnd();
     }
 
-    private static bool TryParseJson(string content, out JsonDocument document)
+    private static bool TryParseJson(string content, out JsonDocument document, out int jsonEnd)
     {
         document = null!;
+        jsonEnd = 0;
         for (var start = 0; start < content.Length; start++)
         {
             if (content[start] is not ('{' or '['))
@@ -176,6 +183,7 @@ internal static class ResearchOpenedPageFormatter
                         try
                         {
                             document = JsonDocument.Parse(content[start..(index + 1)]);
+                            jsonEnd = index + 1;
                             return document.RootElement.ValueKind is JsonValueKind.Object or JsonValueKind.Array;
                         }
                         catch (JsonException)
