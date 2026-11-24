@@ -37,6 +37,13 @@ internal sealed class McpEvidenceProvenance
     internal bool HasUnverifiedSearchResults =>
         _sources.Values.Any(index => index.NonEmptySearchResponseCount > 0 && index.VerifiedPageOpenCount == 0);
 
+    internal IReadOnlyList<string> GetUnverifiedSearchSources() =>
+        _sources
+            .Where(entry => entry.Value.NonEmptySearchResponseCount > 0 &&
+                            entry.Value.VerifiedPageOpenCount == 0)
+            .Select(entry => entry.Key)
+            .ToArray();
+
     internal int SearchReferenceCount =>
         _sources.Values.Sum(index => index.ReferenceCount);
 
