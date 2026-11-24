@@ -193,7 +193,7 @@ public sealed class ResearchCoordinator
                 _log.Warning(
                     $"Research planning decision invalid: task={taskId}; attempt={planningAttempts + 1}; responseCharacters={planningCompletion.Text.Length}; toolCalls={planningCompletion.ToolCalls.Count}; protocol=model-authored-plan.");
 
-                if (planningAttempts >= 1)
+                if (planningAttempts >= 2)
                 {
                     warnings.Add("تعذر استخراج خطة بحث سليمة من استجابة النموذج؛ لم تُنفذ استعلامات ولم تُنشأ إحالات غير متحققة.");
                     return new ResearchResponse(
@@ -210,7 +210,7 @@ public sealed class ResearchCoordinator
 
             // Plan queries are authored by the model. The host only maps them to the
             // selected libraries' live input schemas and validates the resulting calls.
-            var repairAttempted = false;
+            var invalidDecisionAttempts = 0;
             var searchDecisionCorrectionAttempted = false;
             var pageVerificationCorrectionAttempted = false;
             var toolCallsAttempted = 0;
@@ -341,27 +341,38 @@ public sealed class ResearchCoordinator
 
                 model = completion.Model;
 
-                if (completion.ToolCalls.Count > 0)
-                    throw new InvalidOperationException(
-                        "أعاد DuckAI استدعاءات وظائف غير مطلوبة؛ تم رفضها لأن المضيف يستخدم بروتوكول قرارات JSON.");
+                var hasValidDecision = completion.ToolCalls.Count == 0 &&
+                    ModelDecisionParser.TryParse(completion.Text, out var decision);
 
-                if (!ModelDecisionParser.TryParse(completion.Text, out var decision))
+                if (!hasValidDecision)
                 {
                     _log.Warning(
-                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; responseFormat=omitted; protocol=prompted-json.");
+                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; toolCalls={completion.ToolCalls.Count}; responseFormat=omitted; protocol=prompted-json; repairAttempt={invalidDecisionAttempts + 1}.");
 
-                    if (repairAttempted)
-                        throw new InvalidOperationException("تعذر التحقق من قرار النموذج بصيغة JSON بعد محاولة الإصلاح.");
+                    if (invalidDecisionAttempts >= 2)
+                    {
+                        warnings.Add("تعذر متابعة البحث لأن النموذج لم ينتج قراراً صالحاً بعد محاولتي إصلاح؛ لم يعتمد المضيف إجابة نهائية غير متحققة.");
+                        _log.Warning(
+                            $"Research stopped with preserved evidence: task={taskId}; reason=invalid_model_decision; evidenceEntries={evidenceLedger.Entries.Count}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}.");
+                        return new ResearchResponse(
+                            $"توقف البحث قبل اكتمال التحليل؛ جمع النظام {evidenceLedger.Entries.Count} مخرجاً من أدوات المكتبات، لكن النموذج لم ينتج قراراً صالحاً لمتابعة فتح المراجع وتحليلها. لم تُعتمد إجابة نهائية أو إحالات غير متحققة. أعد المحاولة أو استخدم نموذجاً آخر.",
+                            model,
+                            trace.ToArray(),
+                            warnings.ToArray());
+                    }
 
-                    repairAttempted = true;
                     messages.Add(new DuckChatMessage("assistant", completion.Text));
                     messages.Add(new DuckChatMessage(
                         "user",
-                        "لم تكن استجابتك قرار JSON صالحاً. أخرج كائناً واحداً فقط: إما {\"type\":\"tool_call\",\"server\":\"معرّف المكتبة\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}، أو {\"type\":\"final\",\"answer\":\"نص الإجابة\"}. استخدم اسم أداة ومعاملاتها كما وردت في فهرس MCP ومخططها المعروضين في تعليمات النظام. لا تضع أي نص خارج الكائن."));
+                        ResearchDecisionProtocol.BuildInvalidDecisionRepair(
+                            allowFinal,
+                            pendingSourceLabels,
+                            pendingPageSourceLabels)));
+                    invalidDecisionAttempts++;
                     continue;
                 }
 
-                repairAttempted = false;
+                invalidDecisionAttempts = 0;
 
                 if (decision.Type == "final")
                 {
