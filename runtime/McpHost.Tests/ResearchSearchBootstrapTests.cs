@@ -56,10 +56,12 @@ public sealed class ResearchSearchBootstrapTests
     [Fact]
     public void PrefersGeneralShamelaSearchBeforeScopedSearch()
     {
-        var tools = Tools()
-            .Where(tool => tool.Server != "aljam3")
-            .Reverse()
-            .ToArray();
+        var available = Tools().Where(tool => tool.Server == "shamela").ToArray();
+        var tools = new[]
+        {
+            available.Single(tool => tool.Name == "shamela_find_scoped"),
+            available.Single(tool => tool.Name == "shamela_find")
+        };
 
         var plan = ResearchSearchBootstrap.BuildInitialPlan(
             tools,
