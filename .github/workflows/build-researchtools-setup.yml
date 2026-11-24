@@ -184,8 +184,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.3'
-          $title = 'ResearchTools Unified Setup v1.2.3'
+          $tag = 'researchtools-setup-v1.2.4'
+          $title = 'ResearchTools Unified Setup v1.2.4'
           $notes = 'Unified one-file x64 installer v1.2.3: updates the local .NET 10 MCP host with the approved research methodology shared with the Word cloud MCP assistant: research for explicit source lookups and specialist scholarly tasks; concise source-language queries and verified book or section identifiers; opening the relevant passage and context before quotation; accurate attribution to authors and schools, explicit secondary-source transmission, and transparent edition and citation metadata; clear reporting of missing sources or unavailable tools; adaptive stopping without repetitive searches. Retains the existing read-only MCP servers, selected-source boundaries, local DuckAI and MCP host architecture, SHA-256 checks, staged installation, and rollback protections. Does not modify C:\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
