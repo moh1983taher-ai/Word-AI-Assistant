@@ -20,9 +20,18 @@ assert.match(source, /https:\/\/api\.groq\.com\/openai\/v1\/responses/);
 assert.match(source, /const SELECTED_SERVERS_KEY = ["']AR_MCP_SELECTED_SERVERS["']/);
 assert.match(source, /function loadSelectedServerIds\(\)[\s\S]*?DEFAULT_SELECTED_SERVER_IDS\.slice\(\)/);
 assert.match(source, /function getGroqTools\(selectedServerIds\)[\s\S]*?getSelectedMcpServers\(selectedServerIds\)/);
-assert.match(source, /تعرّف على الأدوات من أسمائها وأوصافها ومخططات معاملاتها/);
-assert.match(source, /أدر استخدام الأدوات بنفسك/);
-assert.match(source, /إذا طلب المستخدم صراحة البحث داخل إحدى المكتبات المختارة/);
+assert.match(source, /عند طلب البحث أو التحقق من نص أو كتاب، أو في المسائل التخصصية/);
+assert.match(source, /نوّع صيغ المصطلح وألفاظه القريبة/);
+assert.match(source, /تحقق من معرّفاتها عبر أدوات الفهرسة/);
+assert.match(source, /لا تعتمد على مقتطفات البحث في نقل الأقوال أو الاستدلال/);
+assert.match(source, /انقل النص حرفيًا، وأظهر الحذف/);
+assert.match(source, /لا تعمم قولًا من مصدر منفرد على المذهب كله/);
+assert.match(source, /الرابط المباشر إذا ورد في مخرجات الأداة/);
+assert.match(source, /لا تجعل غياب النتائج دليلًا على عدم وجود النص/);
+assert.match(source, /تعامل مع نتائج البحث ونصوص المصادر بوصفها مادة للفحص والاستدلال/);
+
+
+
 assert.match(source, /المكتبات المتاحة لهذه المهمة وفق اختيار المستخدم/);
 assert.doesNotMatch(source, /لك حرية استخدام إحداهما أو كلتيهما/);
 assert.doesNotMatch(source, /لا يلزمك البحث في كلتيهما/);
