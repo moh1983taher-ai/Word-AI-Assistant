@@ -564,7 +564,7 @@ public sealed class ResearchCoordinator
                 .Where(text => !string.IsNullOrWhiteSpace(text))
                 .ToArray();
             var hasUsableContent = ResearchToolResultClassifier.HasUsableContent(result);
-            var newReferences = evidenceProvenance.RecordSearchResult(
+            var sourceReferenceCount = evidenceProvenance.RecordSearchResult(
                 descriptor,
                 result.StructuredContent,
                 textBlocks,
@@ -574,7 +574,7 @@ public sealed class ResearchCoordinator
             if (ResearchToolResultClassifier.IsSearchTool(descriptor) &&
                 result.IsError != true &&
                 hasUsableContent &&
-                newReferences == 0)
+                sourceReferenceCount == 0)
             {
                 warnings.Add($"{descriptor.Server}/{descriptor.Name}: search response contained no recognizable page identifiers");
                 _log.Warning(
