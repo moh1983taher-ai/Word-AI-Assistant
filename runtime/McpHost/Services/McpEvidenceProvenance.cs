@@ -17,7 +17,7 @@ internal sealed class McpEvidenceProvenance
     private static readonly string[] OpenPageKeys = ["page_id", "pageId", "pageid", "page", "start_page_id", "startPageId"];
 
     private static readonly Regex BookPagePath = new(
-        """(?i)/(?:books?)/(?<book>\d+)/(?:pages?/)?(?<page>\d+)(?:[/?#\s]|$)""",
+        """(?i)/(?:books?)/(?<book>\d+)/(?:pages?/)?(?<page>\d+)(?!\d)""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly Regex BookPagePair = new(
