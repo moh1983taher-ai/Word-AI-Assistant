@@ -445,6 +445,11 @@
     return [
       "أنت مساعد بحث علمي في «أدوات الباحث». استخدم أدوات MCP باستقلالية، واختر المصادر ومسار البحث وفق طلب المستخدم، وقدّر بنفسك مدى كفاية النتائج.",
       "",
+      "قاعدة تغطية المصادر المختارة:",
+      "- إذا كانت المهمة بحثًا أو استقصاءً أو تحققًا أو توثيقًا، فكل مكتبة مدرجة في قائمة المصادر مطلوبة بذاتها، ولا يجوز الاكتفاء بمكتبة أخرى بدلًا منها.",
+      "- ابحث في المكتبة المتاحة لك في هذا التفاعل، ثم افتح مواضع النتائج المناسبة واقرأ سياقها. لا تدّعِ البحث في مكتبة لم تستدعِ أدواتها فعليًا.",
+      "- إذا تعذر استخدام مكتبة، فاذكر تعذرها صراحةً، ولا تعرض نتائج المكتبة الأخرى كما لو أنها تغطي المصادر كلها.",
+      "",
       "منهج البحث:",
       "- عند طلب البحث أو التحقق من نص أو كتاب، أو في المسائل التخصصية التي تتطلب تحريرًا علميًا أو مقارنة أقوال أو نسبة مذاهب أو تخريجًا أو توثيقًا، ارجع إلى المصادر قبل الإجابة، ولا تعتمد على الذاكرة وحدها.",
       "- صغ استعلامات موجزة بألفاظ المصادر ومصطلحاتها، ونوّع صيغ المصطلح وألفاظه القريبة. ابدأ بالبحث العام، ثم ضيّق النطاق بالكتب أو المؤلفين أو الأقسام عند الحاجة. تحقق من معرّفاتها عبر أدوات الفهرسة قبل استخدامها في البحث المقيّد، وإذا ضعفت النتائج فجرّب صيغًا أبسط.",
@@ -1059,23 +1064,21 @@
     });
   }
 
-  function validateResearchResult(providerLabel, answer, toolCalls, selectedServerIds, messages) {
-    if (!answer) {
-      throw new Error(providerLabel + " لم يُرجع إجابة نهائية.");
-    }
-
-    const allowedServers = normalizeSelectedServerIds(selectedServerIds);
+  function getLatestResearchPrompt(messages) {
     const conversation = Array.isArray(messages) ? messages : [];
-    let latestUserPrompt = "";
     for (let index = conversation.length - 1; index >= 0; index -= 1) {
       if (conversation[index] && conversation[index].role === "user") {
-        latestUserPrompt = String(conversation[index].text || conversation[index].content || "");
-        break;
+        return String(conversation[index].text || conversation[index].content || "");
       }
     }
+    return "";
+  }
 
+  function requiresMcpSources(messages) {
+    const prompt = getLatestResearchPrompt(messages).toLowerCase();
     const sourceIndicators = [
       "ابحث", "البحث عن", "بحثاً عن", "بحثًا عن", "بحث في", "بحث علمي",
+      "استقص", "استقصاء", "تتبع النصوص", "تتبّع النصوص", "صيغ قاعدة", "صيغ القاعدة",
       "مصدر", "مصادر", "مرجع", "مراجع", "توثيق", "وثّق", "وثق",
       "استشهد", "استشهاد", "الدراسات السابقة", "دراسات سابقة", "دراسات حول",
       "دراسات عن", "أبحاث", "ابحاث", "رسالة علمية", "رسائل علمية",
@@ -1085,12 +1088,39 @@
       "bibliography", "sources", "search for", "search in", "find studies",
       "research sources"
     ];
-    const requiresMcpSources = sourceIndicators.some(function (indicator) {
-      return latestUserPrompt.toLowerCase().indexOf(indicator.toLowerCase()) >= 0;
+    return sourceIndicators.some(function (indicator) {
+      return prompt.indexOf(indicator.toLowerCase()) >= 0;
     });
+  }
+
+  function getRequiredResearchServerIds(messages, selectedServerIds) {
+    const selected = normalizeSelectedServerIds(selectedServerIds);
+    const prompt = getLatestResearchPrompt(messages);
+    const requested = [];
+    if (/(?:الجامع|aljam3)/i.test(prompt)) requested.push("aljam3");
+    if (/(?:المكتبة\\s+الشاملة|الشاملة|shamela)/i.test(prompt)) requested.push("shamela");
+    if (!requested.length) return selected;
+    return selected.filter(function (serverId) {
+      return requested.indexOf(serverId) >= 0;
+    });
+  }
+
+  function validateResearchResult(providerLabel, answer, toolCalls, selectedServerIds, messages) {
+    if (!answer) {
+      throw new Error(providerLabel + " لم يُرجع إجابة نهائية.");
+    }
+
+    const allowedServers = normalizeSelectedServerIds(selectedServerIds);
+    const requiresSources = requiresMcpSources(messages);
+    const requiredServers = requiresSources
+      ? getRequiredResearchServerIds(messages, allowedServers)
+      : [];
+    if (requiresSources && requiredServers.length === 0) {
+      throw new Error(providerLabel + " لم تُحدد المكتبة المطلوبة ضمن مصادر البحث المختارة.");
+    }
 
     if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
-      if (requiresMcpSources) {
+      if (requiresSources) {
         throw new Error(providerLabel + " لم يُظهر أي استدعاء فعلي لأدوات المكتبات التي اخترتها؛ لم تُعرض الإجابة بوصفها بحثاً موثقاً.");
       }
       return { answer: answer, toolCalls: [] };
@@ -1107,10 +1137,24 @@
       return call.completed !== false;
     });
     if (completed.length === 0) {
-      if (requiresMcpSources) {
+      if (requiresSources) {
         throw new Error(providerLabel + " لم يُرجع نتيجة ناجحة من المكتبات التي اخترتها.");
       }
       return { answer: answer, toolCalls: [] };
+    }
+
+    const coveredServers = Array.from(new Set(completed.map(function (call) {
+      return call.server;
+    })));
+    const missingServers = requiredServers.filter(function (serverId) {
+      return coveredServers.indexOf(serverId) < 0;
+    });
+    if (missingServers.length) {
+      const missingLabels = getSelectedMcpServers(missingServers).map(function (server) {
+        return server.label;
+      });
+      throw new Error(providerLabel + " لم يستكمل البحث في جميع المكتبات المطلوبة. لم يُنفّذ بحث فعلي في: " +
+        missingLabels.join("، ") + ".");
     }
 
     return { answer: answer, toolCalls: completed };
@@ -1148,12 +1192,12 @@
     };
   }
 
-  async function callGeminiResearch(messages, settings, selectedServerIds) {
+  async function callGeminiResearchForSource(messages, settings, serverIds) {
     const payload = await postGeminiInteractionStream({
       model: settings.model,
-      input: buildResearchInput(messages, selectedServerIds),
+      input: buildResearchInput(messages, serverIds),
       environment: "remote",
-      tools: getGeminiTools(selectedServerIds)
+      tools: getGeminiTools(serverIds)
     }, settings.key);
 
     const interaction = getGeminiInteraction(payload);
@@ -1167,14 +1211,67 @@
     if (!answer) {
       throw new Error("Gemini لم يُرجع إجابة نهائية. " + describeGeminiResponse(payload));
     }
-    const toolCalls = extractGeminiToolCalls(payload, selectedServerIds);
-    const validated = validateResearchResult("Gemini", answer, toolCalls, selectedServerIds, messages);
+    const toolCalls = extractGeminiToolCalls(payload, serverIds);
+    const validated = validateResearchResult("Gemini", answer, toolCalls, serverIds, messages);
     return {
       answer: validated.answer,
       toolCalls: validated.toolCalls,
+      sourceServer: serverIds[0] || "",
       model: settings.model,
       provider: "gemini"
     };
+  }
+
+  async function callGeminiResearch(messages, settings, selectedServerIds) {
+    const selected = normalizeSelectedServerIds(selectedServerIds);
+    const required = requiresMcpSources(messages)
+      ? getRequiredResearchServerIds(messages, selected)
+      : selected;
+    if (!required.length) {
+      throw new Error("لم تُحدد مكتبة صالحة لتنفيذ بحث Gemini.");
+    }
+
+    // For source-backed research, isolate each selected library in its own interaction.
+    // This prevents a failure in one remote MCP server from hiding results from another.
+    if (requiresMcpSources(messages) && required.length > 1) {
+      const successes = [];
+      const failures = [];
+      for (let index = 0; index < required.length; index += 1) {
+        const serverId = required[index];
+        try {
+          successes.push(await callGeminiResearchForSource(messages, settings, [serverId]));
+        } catch (error) {
+          failures.push({
+            server: serverId,
+            message: error && error.message ? error.message : String(error)
+          });
+        }
+      }
+
+      if (!successes.length) {
+        const failureText = failures.map(function (failure) {
+          const server = getSelectedMcpServers([failure.server])[0];
+          return (server ? server.label : failure.server) + ": " + failure.message;
+        }).join(" | ");
+        throw new Error("تعذر استكمال البحث في المكتبات المختارة عبر Gemini. " + failureText);
+      }
+
+      const combinedAnswer = successes.map(function (result) {
+        const server = getSelectedMcpServers([result.sourceServer])[0];
+        return "### نتائج " + (server ? server.label : result.sourceServer) + "\n\n" + result.answer;
+      }).join("\n\n");
+      return {
+        answer: combinedAnswer,
+        toolCalls: successes.reduce(function (all, result) {
+          return all.concat(result.toolCalls);
+        }, []),
+        sourceFailures: failures,
+        model: settings.model,
+        provider: "gemini"
+      };
+    }
+
+    return callGeminiResearchForSource(messages, settings, required);
   }
 
   async function fetchLocalHostJson(path, options, timeoutMs) {
@@ -1352,6 +1449,17 @@
     return "\n\n---\n\n**المصادر التي جرى الرجوع إليها والأدوات المستخدمة:**\n\n" + lines.join("\n");
   }
 
+  function formatSourceFailures(failures) {
+    if (!Array.isArray(failures) || !failures.length) return "";
+    const lines = failures.map(function (failure) {
+      const server = getSelectedMcpServers([failure.server])[0];
+      return "- **" + (server ? server.label : failure.server) + "**: " +
+        String(failure.message || "تعذر الاتصال بالمصدر.");
+    });
+    return "\n\n---\n\n**تنبيه بشأن المصادر:**\n\n" + lines.join("\n") +
+      "\n\nالنتائج أعلاه جزئية؛ لم يكتمل البحث في جميع المكتبات المختارة.";
+  }
+
   async function sendMessage(rawText) {
     const prompt = String(rawText || "").trim();
     if (!prompt || state.busy) return;
@@ -1411,7 +1519,8 @@
       const fallbackNote = result.fallbackFrom
         ? "\n\nملاحظة: تعذر المسار المحلي، فاستُخدم المزود السحابي المحفوظ احتياطياً. سبب التحويل: " + result.fallbackFrom
         : "";
-      const answer = result.answer.trim() + formatToolTrace(result) + fallbackNote;
+      const answer = result.answer.trim() + formatToolTrace(result) +
+        formatSourceFailures(result.sourceFailures) + fallbackNote;
       bridge.removePendingMessage(pending);
       bridge.appendAssistantMessage(chatId, answer, {
         sources: sources,
