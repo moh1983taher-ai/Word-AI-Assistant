@@ -120,9 +120,9 @@ internal sealed class ResearchEvidenceLedger
         var lines = value.Split('\n');
         if (lines.Length < 3)
         {
-            var available = maximum - marker.Length;
-            var prefixLength = Math.Max(1, (int)(available * 0.75));
-            var suffixLength = available - prefixLength;
+            var singleEntryAvailable = maximum - marker.Length;
+            var prefixLength = Math.Max(1, (int)(singleEntryAvailable * 0.75));
+            var suffixLength = singleEntryAvailable - prefixLength;
             return suffixLength <= 0
                 ? value[..prefixLength] + marker
                 : value[..prefixLength] + marker + value[^suffixLength..];
