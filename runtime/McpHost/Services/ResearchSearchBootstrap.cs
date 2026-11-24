@@ -328,4 +328,7 @@ internal static class ResearchSearchBootstrap
 
 internal sealed record ResearchSearchInvocation(
     ToolDescriptor Tool,
-    IReadOnlyDictionary<string, object?> Arguments);
+    IReadOnlyDictionary<string, object?> Arguments,
+    string Query,
+    string Purpose,
+    int QueryIndex);
