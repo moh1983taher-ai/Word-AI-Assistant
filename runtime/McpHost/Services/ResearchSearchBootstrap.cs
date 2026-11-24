@@ -65,7 +65,7 @@ internal static class ResearchSearchBootstrap
 
             normalizedQueries.Add(new ResearchQuery(
                 query,
-                (item.Purpose ?? string.Empty).Trim()));
+                (item?.Purpose ?? string.Empty).Trim()));
         }
 
         if (normalizedQueries.Count == 0)
