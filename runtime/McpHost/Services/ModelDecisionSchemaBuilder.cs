@@ -74,6 +74,11 @@ internal static class ModelDecisionSchemaBuilder
                         description += $" ({tool.ServerLabel})";
                     if (!string.IsNullOrWhiteSpace(tool.Description))
                         description += $": {tool.Description.Trim()}";
+
+                    var schemaDescription = argumentObject["description"]?.GetValue<string>();
+                    if (!string.IsNullOrWhiteSpace(schemaDescription))
+                        description += $" Schema details: {schemaDescription.Trim()}";
+
                     argumentObject["description"] = description;
                 }
 
