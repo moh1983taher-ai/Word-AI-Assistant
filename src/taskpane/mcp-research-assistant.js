@@ -803,6 +803,21 @@
     return state;
   }
 
+  function describeGeminiStreamError(errorValue) {
+    if (errorValue === null || errorValue === undefined) return "خطأ غير محدد";
+    const value = typeof errorValue === "object" && errorValue.error
+      ? errorValue.error
+      : errorValue;
+    if (typeof value === "string") return value;
+    if (typeof value !== "object") return String(value);
+    const parts = [value.message, value.code, value.status];
+    if (value.details !== undefined) {
+      parts.push(typeof value.details === "string" ? value.details : JSON.stringify(value.details));
+    }
+    const summary = parts.filter(Boolean).join(" | ");
+    return summary || JSON.stringify(value);
+  }
+
   function buildGeminiStreamPayload(state) {
     const interaction = Object.assign({}, state.interaction || {});
     const indexes = Object.keys(state.stepsByIndex).sort(function (a, b) {
@@ -981,7 +996,7 @@
 
       const finalPayload = buildGeminiStreamPayload(state);
       if (state.error) {
-        const errorMessage = state.error.message || state.error.code || JSON.stringify(state.error);
+        const errorMessage = describeGeminiStreamError(state.error);
         throw new Error("فشل تنفيذ تفاعل Gemini: " + String(errorMessage).slice(0, 1000));
       }
       if (!state.completed && finalPayload.status !== "completed") {
@@ -1112,12 +1127,6 @@
 
     const allowedServers = normalizeSelectedServerIds(selectedServerIds);
     const requiresSources = requiresMcpSources(messages);
-    const requiredServers = requiresSources
-      ? getRequiredResearchServerIds(messages, allowedServers)
-      : [];
-    if (requiresSources && requiredServers.length === 0) {
-      throw new Error(providerLabel + " لم تُحدد المكتبة المطلوبة ضمن مصادر البحث المختارة.");
-    }
 
     if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
       if (requiresSources) {
@@ -1141,20 +1150,6 @@
         throw new Error(providerLabel + " لم يُرجع نتيجة ناجحة من المكتبات التي اخترتها.");
       }
       return { answer: answer, toolCalls: [] };
-    }
-
-    const coveredServers = Array.from(new Set(completed.map(function (call) {
-      return call.server;
-    })));
-    const missingServers = requiredServers.filter(function (serverId) {
-      return coveredServers.indexOf(serverId) < 0;
-    });
-    if (missingServers.length) {
-      const missingLabels = getSelectedMcpServers(missingServers).map(function (server) {
-        return server.label;
-      });
-      throw new Error(providerLabel + " لم يستكمل البحث في جميع المكتبات المطلوبة. لم يُنفّذ بحث فعلي في: " +
-        missingLabels.join("، ") + ".");
     }
 
     return { answer: answer, toolCalls: completed };
