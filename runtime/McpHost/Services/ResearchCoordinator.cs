@@ -181,18 +181,16 @@ public sealed class ResearchCoordinator
                     selectedServerIds,
                     searchedSourceIds);
                 var allowFinal = pendingSearchSources.Count == 0;
+                var pendingSourceLabels = pendingSearchSources
+                    .Select(ResearchSourceSelection.GetLabel)
+                    .ToArray();
                 var turnSystemPrompt = BuildSystemPrompt(
                     turnTools,
                     selectedLabels,
                     warnings,
                     out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
-                    (allowFinal
-                        ? "أعد كائن JSON واحداً فقط وفق بروتوكول القرارات الموضح أدناه. استخدم final مع answer عند اكتمال البحث، أو tool_call مع server وtool وarguments عند الحاجة إلى فتح صفحة أو بحث تكميلي. لا تضع Markdown أو شرحاً خارج JSON."
-                        : "هذه مهمة بحث مصدري لم يكتمل البحث فيها بعد. المكتبات التي يجب أن تبحث فيها الآن: " +
-                          string.Join("، ", pendingSearchSources.Select(source =>
-                              $"{ResearchSourceSelection.GetLabel(source)} ({(source == "aljam3" ? "search" : "shamela_find أو shamela_find_scoped")})")) +
-                          ". لا تصدر final ولا تجب من الذاكرة. أخرج قرار tool_call صحيحاً وفق مخططات الأدوات المعروضة في تعليمات النظام.");
+                    ResearchDecisionProtocol.BuildTurnInstructions(allowFinal, pendingSourceLabels);
 
                 // Tool input schemas are included in the system prompt as ordinary data.
                 // Duck2API does not enforce response_format=json_schema, so no hidden
@@ -445,9 +443,7 @@ public sealed class ResearchCoordinator
             selectedServerIds.Select(ResearchSourceSelection.GetLabel).ToArray(),
             warnings) +
             Environment.NewLine + Environment.NewLine +
-            "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. اعرض ما تسمح به الأدلة المتاحة ووضّح أن البحث لم يكتمل." +
-            Environment.NewLine +
-            "أخرج كائناً واحداً فقط: {\"type\":\"final\",\"answer\":\"نص الإجابة\"}. لا تضف شرحاً أو Markdown خارج JSON.";
+            ResearchDecisionProtocol.BuildTimeoutFinalInstructions();
 
         try
         {
