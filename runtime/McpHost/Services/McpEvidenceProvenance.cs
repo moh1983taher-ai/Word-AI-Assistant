@@ -68,8 +68,6 @@ internal sealed class McpEvidenceProvenance
         var index = GetSourceIndex(descriptor.Server);
         if (hasUsableContent)
             index.NonEmptySearchResponseCount++;
-        var before = index.ReferenceCount;
-
         if (structuredContent is { } structured &&
             structured.ValueKind is not JsonValueKind.Undefined and not JsonValueKind.Null)
         {
@@ -82,7 +80,7 @@ internal sealed class McpEvidenceProvenance
                 VisitSearchText(text, index);
         }
 
-        return index.ReferenceCount - before;
+        return index.ReferenceCount;
     }
 
     internal string? ValidateReferenceRead(
