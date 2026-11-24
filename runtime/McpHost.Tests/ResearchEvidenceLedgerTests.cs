@@ -8,6 +8,27 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class ResearchEvidenceLedgerTests
 {
     [Fact]
+    public void MarksSearchExcerptsAsDiscoveryOnlyUntilThePageIsOpened()
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
+        var search = new ToolDescriptor("shamela", "المكتبة الشاملة", "shamela_find", "", schema.RootElement.Clone());
+        var open = new ToolDescriptor("shamela", "المكتبة الشاملة", "shamela_open", "", schema.RootElement.Clone());
+
+        var ledger = new ResearchEvidenceLedger();
+        ledger.Add(search, "مقتطف نتيجة البحث", succeeded: true);
+        ledger.Add(open, "النص الكامل للصفحة", succeeded: true);
+
+        var context = ledger.BuildContext(
+            ["shamela"],
+            Array.Empty<string>(),
+            maxCharacters: 2_000);
+
+        Assert.Contains("نتائج البحث الأولية مخصصة لاكتشاف المراجع", context);
+        Assert.Contains("مقتطف نتيجة البحث", context);
+        Assert.Contains("النص الكامل للصفحة", context);
+    }
+
+    [Fact]
     public void RebuildsBoundedContextWithEvidenceFromEverySelectedSource()
     {
         using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
