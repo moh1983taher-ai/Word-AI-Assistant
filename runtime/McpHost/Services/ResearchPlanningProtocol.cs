@@ -24,7 +24,7 @@ internal static class ResearchPlanningProtocol
     internal static string BuildRepairInstructions() =>
         "أعد إخراج خطة البحث فقط بصيغة JSON صحيحة. لا تبدأ البحث ولا تكتب إجابة. " +
         "استخدم هذا الشكل حرفيًا: {\"type\":\"plan\",\"intent\":\"...\",\"kind\":\"broad أو exact_text أو multiple_forms أو comparison أو attribution أو other\",\"queries\":[{\"query\":\"...\",\"purpose\":\"...\"}],\"coverage\":[\"...\"]}. " +
-        "يجب أن تحتوي queries على استعلام واحد على الأقل، ولا تتجاوز ثمانية استعلامات. لا تضع Markdown أو نصًا خارج JSON.";
+        "يجب أن تحتوي queries على استعلام واحد على الأقل، ولا تتجاوز ثمانية استعلامات، وأن تتضمن coverage محوراً واحداً على الأقل يحدد معيار اكتمال البحث. لا تضع Markdown أو نصاً خارج JSON.";
 
     internal static string FormatPlan(ResearchPlan plan)
     {
