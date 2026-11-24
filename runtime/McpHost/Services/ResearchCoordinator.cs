@@ -213,6 +213,7 @@ public sealed class ResearchCoordinator
             var invalidDecisionAttempts = 0;
             var searchDecisionCorrectionAttempted = false;
             var pageVerificationCorrectionAttempted = false;
+            var coverageCorrectionAttempts = 0;
             var toolCallsAttempted = 0;
             var completedSearchCalls = 0;
             var searchedSourceIds = new HashSet<string>(StringComparer.Ordinal);
@@ -377,10 +378,48 @@ public sealed class ResearchCoordinator
                 }
 
                 invalidDecisionAttempts = 0;
-                var decision = parsedDecision;
+                var decision = parsedDecision!;
 
                 if (decision.Type == "final")
                 {
+                    var declaredCoverage = decision.Covered
+                        .Select(NormalizeCoverageLabel)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var missingCoverage = researchPlan!.Coverage
+                        .Where(item => !declaredCoverage.Contains(NormalizeCoverageLabel(item)))
+                        .Concat(decision.Uncovered)
+                        .Select(item => item.Trim())
+                        .Where(item => item.Length > 0)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+
+                    if (missingCoverage.Length > 0)
+                    {
+                        if (coverageCorrectionAttempts >= 2)
+                        {
+                            warnings.Add("لم يثبت النموذج تغطية جميع المحاور التي حددها في خطة البحث؛ أُعيدت المهمة بوصفها غير مكتملة ولم تُقبل إجابة نهائية.");
+                            _log.Warning(
+                                $"Research final coverage incomplete: task={taskId}; missingCoverageItems={missingCoverage.Length}; evidenceEntries={evidenceLedger.Entries.Count}.");
+                            return new ResearchResponse(
+                                "لم يكتمل البحث وفق خطة المهمة؛ بقيت محاور لم يثبت النموذج تغطيتها: " +
+                                string.Join("، ", missingCoverage) +
+                                ". لم تُعتمد إجابة نهائية بوصفها بحثاً مكتملاً. أعد المحاولة أو وسّع خطة البحث.",
+                                model,
+                                trace.ToArray(),
+                                warnings.ToArray());
+                        }
+
+                        coverageCorrectionAttempts++;
+                        _log.Warning(
+                            $"Research final coverage deferred: task={taskId}; attempt={coverageCorrectionAttempts}; missingCoverageItems={missingCoverage.Length}; recovery=targeted_research.");
+                        messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                        messages.Add(new DuckChatMessage(
+                            "user",
+                            ResearchDecisionProtocol.BuildCoverageCorrection(missingCoverage)));
+                        continue;
+                    }
+
+                    coverageCorrectionAttempts = 0;
                     var searchWasSkipped = pendingSearchSources.Count > 0;
                     // Every request reaching this coordinator is an explicit source-research
                     // request. Verify opened pages regardless of the wording used by the user.
@@ -809,6 +848,10 @@ public sealed class ResearchCoordinator
                 false);
         }
     }
+
+    private static string NormalizeCoverageLabel(string value) =>
+        string.Join(' ', (value ?? string.Empty)
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static string BuildSystemPrompt(
         IReadOnlyList<ToolDescriptor> tools,
