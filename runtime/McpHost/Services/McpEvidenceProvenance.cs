@@ -5,22 +5,24 @@ using ResearchTools.McpHost.Models;
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Tracks page references actually returned by selected MCP search tools and prevents
-/// page-reading tools from opening identifiers that were not returned by a prior search.
+/// Tracks page references returned by selected MCP search tools and prevents
+/// page-reading tools from opening identifiers absent from the current task's search results.
 /// </summary>
 internal sealed class McpEvidenceProvenance
 {
     private static readonly string[] BookKeys = ["book_id", "bookId", "bookid"];
     private static readonly string[] PageKeys = ["page_id", "pageId", "pageid", "page", "start_page_id", "startPageId"];
-    private static readonly string[] CollectionKeys = ["results", "matches", "hits", "items", "pages", "records", "data"];
+
     private static readonly Regex BookPagePath = new(
-        @"(?i)/(?:books?/)(?<book>\\d+)/(?:pages?/)?(?<page>\\d+)(?:[/?#\\s]|$)",
+        """(?i)/(?:books?)/(?<book>\d+)/(?:pages?/)?(?<page>\d+)(?:[/?#\s]|$)""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private static readonly Regex BookPagePair = new(
-        @"(?i)\\bbook[_\\s-]?id[\\s\"'=:\\]]+(?<book>\\d+)[\\s\\S]{0,240}?\\bpage[_\\s-]?id[\\s\"'=:\\]]+(?<page>\\d+)",
+        """(?i)\bbook[_\s-]?id["'\s:=]+(?<book>\d+)[\s\S]{0,240}?\bpage[_\s-]?id["'\s:=]+(?<page>\d+)""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private static readonly Regex ColonPair = new(
-        @"^\\s*(?<book>\\d+)\\s*:\\s*(?<page>\\d+)\\s*$",
+        """^\s*(?<book>\d+)\s*:\s*(?<page>\d+)\s*$""",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly HashSet<string> _bookIds = new(StringComparer.Ordinal);
@@ -57,16 +59,17 @@ internal sealed class McpEvidenceProvenance
             return 0;
 
         var before = SearchReferenceCount;
+
         if (structuredContent is { } structured &&
             structured.ValueKind is not JsonValueKind.Undefined and not JsonValueKind.Null)
         {
-            Visit(structured, inheritedBookId: null);
+            VisitSearchPayload(structured, inheritedBookId: null);
         }
 
         if (textBlocks is not null)
         {
             foreach (var text in textBlocks)
-                VisitText(text);
+                VisitSearchText(text);
         }
 
         return SearchReferenceCount - before;
@@ -84,20 +87,19 @@ internal sealed class McpEvidenceProvenance
 
         if (SearchReferenceCount == 0)
         {
-            return "لا توجد نتيجة بحث سابقة من هذه المكتبة تحمل معرّف كتاب أو صفحة يمكن التحقق منه؛ أعد البحث قبل فتح الصفحة.";
+            return "لا توجد نتيجة بحث سابقة من هذه المكتبة تحمل معرّف صفحة يمكن التحقق منه؛ أعد البحث قبل فتح الصفحة.";
         }
 
-        var element = JsonSerializer.SerializeToElement(arguments);
+        var input = JsonSerializer.SerializeToElement(arguments);
         var requested = new List<Reference>();
-        VisitTargets(element, requested, inheritedBookId: null);
+        VisitOpenArguments(input, requested, inheritedBookId: null);
 
         if (requested.Count == 0)
         {
             return "معاملات فتح الصفحة لا تتضمن معرّف كتاب أو صفحة معروفاً؛ لا تخمّن المعرّفات، واستخدم معرّفاً وارداً في نتيجة البحث.";
         }
 
-        var unmatched = requested.FirstOrDefault(reference => !WasReturnedBySearch(reference));
-        if (unmatched is not null)
+        if (requested.Any(reference => !WasReturnedBySearch(reference)))
         {
             return "المعرّف المطلوب فتحه غير موجود في نتائج البحث السابقة لهذه المكتبة؛ اختر نتيجة من المخرجات الفعلية أو أعد البحث. لا تفتح موضعاً مستنتجاً أو منقولاً من مصدر آخر.";
         }
@@ -128,7 +130,7 @@ internal sealed class McpEvidenceProvenance
                 _pageIds.Contains(reference.OpaqueId));
     }
 
-    private void Visit(JsonElement element, string? inheritedBookId)
+    private void VisitSearchPayload(JsonElement element, string? inheritedBookId)
     {
         switch (element.ValueKind)
         {
@@ -136,6 +138,7 @@ internal sealed class McpEvidenceProvenance
             {
                 var bookId = ReadScalar(element, BookKeys) ?? inheritedBookId;
                 var pageId = ReadScalar(element, PageKeys);
+
                 if (bookId is not null)
                     _bookIds.Add(bookId);
 
@@ -149,25 +152,27 @@ internal sealed class McpEvidenceProvenance
 
                 foreach (var property in element.EnumerateObject())
                 {
-                    if (IsIdentifierTextKey(property.Name) && property.Value.ValueKind == JsonValueKind.String)
-                        VisitText(property.Value.GetString());
+                    if (IsLinkKey(property.Name) && property.Value.ValueKind == JsonValueKind.String)
+                        VisitSearchText(property.Value.GetString());
 
                     if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
-                        Visit(property.Value, bookId);
+                        VisitSearchPayload(property.Value, bookId);
                 }
                 break;
             }
+
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
-                    Visit(item, inheritedBookId);
+                    VisitSearchPayload(item, inheritedBookId);
                 break;
+
             case JsonValueKind.String:
-                VisitText(element.GetString());
+                VisitSearchText(element.GetString());
                 break;
         }
     }
 
-    private static void VisitTargets(
+    private static void VisitOpenArguments(
         JsonElement element,
         List<Reference> references,
         string? inheritedBookId)
@@ -178,63 +183,36 @@ internal sealed class McpEvidenceProvenance
             {
                 var bookId = ReadScalar(element, BookKeys) ?? inheritedBookId;
                 var pageId = ReadScalar(element, PageKeys);
-                var reference = new Reference(bookId, pageId, null);
-                if (reference.BookId is not null || reference.PageId is not null)
-                    references.Add(reference);
+
+                if (bookId is not null || pageId is not null)
+                    references.Add(new Reference(bookId, pageId, null));
 
                 if (TryGetProperty(element, "id", out var idElement))
-                {
-                    var id = ReadScalar(idElement);
-                    if (id is not null)
-                    {
-                        var pair = ColonPair.Match(id);
-                        if (pair.Success)
-                            references.Add(new Reference(pair.Groups["book"].Value, pair.Groups["page"].Value, null));
-                        else if (bookId is not null)
-                            references.Add(new Reference(bookId, id, null));
-                        else
-                            references.Add(new Reference(null, null, id));
-                    }
-                }
+                    AddTargetIdentifier(ReadScalar(idElement), bookId, references);
 
                 foreach (var property in element.EnumerateObject())
                 {
                     if (property.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
-                        VisitTargets(property.Value, references, bookId);
+                        VisitOpenArguments(property.Value, references, bookId);
                     else if (property.Value.ValueKind == JsonValueKind.String &&
-                             IsIdentifierTextKey(property.Name))
-                    {
-                        var value = property.Value.GetString();
-                        if (value is not null)
-                        {
-                            var pair = ColonPair.Match(value);
-                            if (pair.Success)
-                                references.Add(new Reference(pair.Groups["book"].Value, pair.Groups["page"].Value, null));
-                        }
-                    }
+                             IsIdentifierCollectionKey(property.Name))
+                        AddTargetIdentifier(property.Value.GetString(), bookId, references);
                 }
                 break;
             }
+
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
-                    VisitTargets(item, references, inheritedBookId);
+                    VisitOpenArguments(item, references, inheritedBookId);
                 break;
+
             case JsonValueKind.String:
-            {
-                var value = element.GetString();
-                if (value is not null)
-                {
-                    var pair = ColonPair.Match(value);
-                    references.Add(pair.Success
-                        ? new Reference(pair.Groups["book"].Value, pair.Groups["page"].Value, null)
-                        : new Reference(inheritedBookId, inheritedBookId is null ? null : value, inheritedBookId is null ? value : null));
-                }
+                AddTargetIdentifier(element.GetString(), inheritedBookId, references);
                 break;
-            }
         }
     }
 
-    private void VisitText(string? text)
+    private void VisitSearchText(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
@@ -246,6 +224,10 @@ internal sealed class McpEvidenceProvenance
             _bookPagePairs.Add(Pair(match.Groups["book"].Value, match.Groups["page"].Value));
 
         var candidate = text.Trim();
+        var colonPair = ColonPair.Match(candidate);
+        if (colonPair.Success)
+            _bookPagePairs.Add(Pair(colonPair.Groups["book"].Value, colonPair.Groups["page"].Value));
+
         var firstBrace = candidate.IndexOf('{');
         var lastBrace = candidate.LastIndexOf('}');
         if (firstBrace >= 0 && lastBrace > firstBrace)
@@ -254,11 +236,11 @@ internal sealed class McpEvidenceProvenance
         try
         {
             using var document = JsonDocument.Parse(candidate);
-            Visit(document.RootElement, inheritedBookId: null);
+            VisitSearchPayload(document.RootElement, inheritedBookId: null);
         }
         catch (JsonException)
         {
-            // Search tools may return Markdown rather than JSON; URL and key-value patterns above cover it.
+            // Search servers may return Markdown; the URL and key-value patterns above still apply.
         }
     }
 
@@ -267,7 +249,7 @@ internal sealed class McpEvidenceProvenance
         if (string.IsNullOrWhiteSpace(id))
             return;
 
-        var normalized = NormalizeId(id);
+        var normalized = id.Trim();
         var pair = ColonPair.Match(normalized);
         if (pair.Success)
         {
@@ -281,15 +263,35 @@ internal sealed class McpEvidenceProvenance
             _opaqueIds.Add(normalized);
     }
 
+    private static void AddTargetIdentifier(
+        string? id,
+        string? bookId,
+        List<Reference> references)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return;
+
+        var normalized = id.Trim();
+        var pair = ColonPair.Match(normalized);
+        if (pair.Success)
+            references.Add(new Reference(pair.Groups["book"].Value, pair.Groups["page"].Value, null));
+        else if (bookId is not null)
+            references.Add(new Reference(bookId, normalized, null));
+        else
+            references.Add(new Reference(null, null, normalized));
+    }
+
     private static string? ReadScalar(JsonElement element, IReadOnlyCollection<string>? keys = null)
     {
         if (keys is null)
+        {
             return element.ValueKind switch
             {
                 JsonValueKind.String => NormalizeId(element.GetString()),
                 JsonValueKind.Number => NormalizeId(element.GetRawText()),
                 _ => null
             };
+        }
 
         if (element.ValueKind != JsonValueKind.Object)
             return null;
@@ -321,11 +323,16 @@ internal sealed class McpEvidenceProvenance
         return false;
     }
 
-    private static bool IsIdentifierTextKey(string name) =>
+    private static bool IsLinkKey(string name) =>
         name.Equals("url", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("uri", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("href", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("link", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsIdentifierCollectionKey(string name) =>
+        name.Equals("ids", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("page_ids", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("pageIds", StringComparison.OrdinalIgnoreCase);
 
     private static string Pair(string bookId, string pageId) => bookId + "/" + pageId;
 
