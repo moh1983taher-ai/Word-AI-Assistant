@@ -229,7 +229,7 @@ public sealed class ResearchCoordinator
                         trace.Count);
                     var matchingPageWasNotOpened =
                         sourceResearchRequired &&
-                        evidenceProvenance.SearchReferenceCount > 0 &&
+                        evidenceProvenance.SearchHitCount > 0 &&
                         evidenceProvenance.VerifiedOpenCount == 0;
 
                     if (searchWasSkipped || matchingPageWasNotOpened)
@@ -241,7 +241,7 @@ public sealed class ResearchCoordinator
                                 ? "explicit_source_request_without_successful_tool_call"
                                 : "search_hit_not_opened_or_verified";
                             _log.Warning(
-                                $"Research premature final deferred: task={taskId}; reason={reason}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedOpenCount}; recovery=one_agent_correction.");
+                                $"Research premature final deferred: task={taskId}; reason={reason}; searchHits={evidenceProvenance.SearchHitCount}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedOpenCount}; recovery=one_agent_correction.");
 
                             var correction = searchWasSkipped
                                 ? "تنبيه تحقق: طلب المستخدم صريح في البحث من المكتبات المختارة، لكنك أصدرت إجابة نهائية دون تنفيذ أداة بحث ناجحة. لا تستبدل البحث بمعلومات الذاكرة. نفّذ بحثاً فعلياً أولاً."
@@ -564,15 +564,17 @@ public sealed class ResearchCoordinator
                 .Select(block => block.Text)
                 .Where(text => !string.IsNullOrWhiteSpace(text))
                 .ToArray();
+            var hasUsableContent = ResearchToolResultClassifier.HasUsableContent(result);
             var newReferences = evidenceProvenance.RecordSearchResult(
                 descriptor,
                 result.StructuredContent,
                 textBlocks,
-                result.IsError == true);
+                result.IsError == true,
+                hasUsableContent);
 
             if (ResearchToolResultClassifier.IsSearchTool(descriptor) &&
                 result.IsError != true &&
-                ResearchToolResultClassifier.HasUsableContent(result) &&
+                hasUsableContent &&
                 newReferences == 0)
             {
                 warnings.Add($"{descriptor.Server}/{descriptor.Name}: search response contained no recognizable page identifiers");
@@ -587,7 +589,7 @@ public sealed class ResearchCoordinator
                 return new ToolExecutionResult(formattedResult, false);
             }
 
-            if (!ResearchToolResultClassifier.HasUsableContent(result))
+            if (!hasUsableContent)
             {
                 if (ResearchToolResultClassifier.IsCompletedSearch(descriptor, result.IsError == true))
                 {
@@ -601,6 +603,23 @@ public sealed class ResearchCoordinator
                 warnings.Add($"{descriptor.Server}/{descriptor.Name}: MCP returned no usable content");
                 evidenceProvenance.RecordVerifiedOpen(descriptor, succeeded: false);
                 return new ToolExecutionResult(formattedResult, false);
+            }
+
+            if (McpEvidenceProvenance.IsReferenceReadTool(descriptor))
+            {
+                var openedPageError = evidenceProvenance.ValidateOpenedResult(
+                    descriptor,
+                    arguments,
+                    result.StructuredContent,
+                    textBlocks);
+                if (openedPageError is not null)
+                {
+                    warnings.Add($"{descriptor.Server}/{descriptor.Name}: opened page identity did not match the requested result");
+                    _log.Warning(
+                        $"MCP opened page rejected: task={taskId}; source={descriptor.Server}; tool={descriptor.Name}; reason=response-reference-mismatch.");
+                    evidenceProvenance.RecordVerifiedOpen(descriptor, succeeded: false);
+                    return new ToolExecutionResult(openedPageError, false);
+                }
             }
 
             evidenceProvenance.RecordVerifiedOpen(descriptor, succeeded: true);
