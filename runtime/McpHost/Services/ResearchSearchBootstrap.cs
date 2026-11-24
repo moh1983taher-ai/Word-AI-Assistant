@@ -126,7 +126,7 @@ internal static class ResearchSearchBootstrap
             return false;
         }
 
-        values[queryProperty.Value.Name] = queryValue;
+        values[queryProperty.Value.Key] = queryValue;
 
         if (TryGetProperty(schema, "required", out var required) &&
             required.ValueKind == JsonValueKind.Array)
