@@ -84,6 +84,45 @@ public sealed class McpEvidenceProvenanceTests
     }
 
     [Fact]
+    public void ExtractsNumericPageIdCollectionsReturnedBySearch()
+    {
+        var provenance = new McpEvidenceProvenance();
+        var search = Tool("shamela", "shamela_find");
+        using var result = JsonDocument.Parse(
+            """{"book_id":21592,"pages":[1157,1158]}""");
+
+        provenance.RecordSearchResult(
+            search,
+            result.RootElement,
+            Array.Empty<string>(),
+            isError: false,
+            hasUsableContent: true);
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("shamela", "shamela_open_many"),
+            Arguments("""{"pages":[1157,1158]}"""));
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void AcceptsOpenedContentWhenItsReturnedBookAndPageMatch()
+    {
+        var provenance = SearchShamela(
+            """{"results":[{"book_id":21592,"page_id":1157}]}""");
+        using var opened = JsonDocument.Parse(
+            """{"book_id":21592,"page_id":1157,"text":"نص الصفحة"}""");
+
+        var error = provenance.ValidateOpenedResult(
+            Tool("shamela", "shamela_open"),
+            Arguments("""{"book_id":21592,"page_id":1157}"""),
+            opened.RootElement,
+            Array.Empty<string>());
+
+        Assert.Null(error);
+    }
+
+    [Fact]
     public void RejectsOpeningWhenSearchOnlyReturnedPrintedPageNumber()
     {
         var provenance = SearchShamela(
