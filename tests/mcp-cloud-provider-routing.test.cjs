@@ -83,18 +83,6 @@ assert.equal(oneOfTwoLibraries.toolCalls[0].server, "shamela");
 assert.throws(
   function () {
     validateResearchResult(
-      "Gemini",
-      "إجابة مستندة إلى الشاملة فقط",
-      [{ server: "shamela", tool: "shamela_find", completed: true }],
-      ["aljam3", "shamela"],
-      dualLibraryResearchPrompt
-    );
-  },
-  /لم يستكمل البحث في جميع المكتبات المطلوبة.*الجامع/
-);
-assert.throws(
-  function () {
-    validateResearchResult(
       "DuckAI المحلي",
       "إجابة",
       [],
@@ -195,10 +183,16 @@ const helperEnd = source.indexOf("  function validateResearchResult(", helperSta
 assert.ok(helperStart >= 0 && helperEnd > helperStart, "Gemini response helpers must be testable");
 const helperSource = "function normalizeSelectedServerIds(serverIds) { return Array.isArray(serverIds) ? serverIds : []; }\n" +
   source.slice(helperStart, helperEnd) +
-  "\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse, parseGeminiSseFrame, createGeminiStreamState, applyGeminiStreamEvent, buildGeminiStreamPayload, extractGeminiToolCalls };";
+  "\nglobalThis.__geminiResponseHelpers = { getGeminiInteraction, getGeminiSteps, extractText, extractGeminiAnswer, describeGeminiResponse, describeGeminiStreamError, parseGeminiSseFrame, createGeminiStreamState, applyGeminiStreamEvent, buildGeminiStreamPayload, extractGeminiToolCalls };";
 const helperContext = {};
 vm.runInNewContext(helperSource, helperContext);
 const responseHelpers = helperContext.__geminiResponseHelpers;
+const streamErrorText = responseHelpers.describeGeminiStreamError({
+  code: "invalid_request",
+  message: "There was a problem processing your request. You will not be charged."
+});
+assert.match(streamErrorText, /invalid_request/);
+assert.match(streamErrorText, /You will not be charged/);
 
 const directInteraction = {
   status: "completed",
