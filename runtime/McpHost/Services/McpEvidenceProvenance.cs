@@ -358,7 +358,7 @@ internal sealed class McpEvidenceProvenance
         else if (bookId is not null)
             references.Add(new Reference(bookId, normalized, null));
         else
-            references.Add(new Reference(null, null, normalized));
+            references.Add(new Reference(null, normalized, null));
     }
 
     private static string? ReadScalar(JsonElement element, IReadOnlyCollection<string>? keys = null)
