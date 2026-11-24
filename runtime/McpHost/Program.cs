@@ -190,8 +190,6 @@ app.MapGet("/v1/mcp/sources", async (
     var status = ids.Select(id =>
     {
         var tools = discovery.Tools.Where(tool => tool.Server == id).ToArray();
-        var serverInstructions = discovery.ServerInstructions.FirstOrDefault(
-            instruction => string.Equals(instruction.Server, id, StringComparison.Ordinal));
         var warning = discovery.Warnings.FirstOrDefault(item =>
             item.StartsWith(id + ":", StringComparison.Ordinal));
         return new
@@ -201,8 +199,6 @@ app.MapGet("/v1/mcp/sources", async (
             connected = warning is null,
             toolCount = tools.Length,
             tools = tools.Select(tool => tool.Name).ToArray(),
-            serverInstructionsAvailable = serverInstructions is not null,
-            serverInstructionsCharacters = serverInstructions?.Text.Length ?? 0,
             warning
         };
     }).ToArray();
