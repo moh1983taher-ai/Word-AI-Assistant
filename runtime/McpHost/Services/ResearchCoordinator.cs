@@ -64,6 +64,7 @@ public sealed class ResearchCoordinator
         var messages = new List<DuckChatMessage>();
         var trace = new List<ToolCallTrace>();
         var evidenceLedger = new ResearchEvidenceLedger();
+        var evidenceProvenance = new McpEvidenceProvenance();
         var model = request.Model ?? string.Empty;
 
         try
@@ -127,7 +128,8 @@ public sealed class ResearchCoordinator
 
             // All selected-source tools remain visible throughout the task.
             var repairAttempted = false;
-            var sourceDecisionCorrectionAttempted = false;
+            var searchDecisionCorrectionAttempted = false;
+            var pageVerificationCorrectionAttempted = false;
             var toolCallsAttempted = 0;
 
             while (true)
@@ -221,25 +223,55 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
-                    if (ResearchIntentClassifier.MustUseMcpBeforeFinal(latestUserMessage, trace.Count))
+                    var sourceResearchRequired =
+                        ResearchIntentClassifier.RequiresMcpSources(latestUserMessage);
+                    var searchWasSkipped = ResearchIntentClassifier.MustUseMcpBeforeFinal(
+                        latestUserMessage,
+                        trace.Count);
+                    var matchingPageWasNotOpened =
+                        sourceResearchRequired &&
+                        evidenceProvenance.HasUnverifiedSearchResults;
+
+                    if (searchWasSkipped)
                     {
-                        if (!sourceDecisionCorrectionAttempted)
+                        if (!searchDecisionCorrectionAttempted)
                         {
-                            sourceDecisionCorrectionAttempted = true;
+                            searchDecisionCorrectionAttempted = true;
                             _log.Warning(
-                                $"Research premature final deferred: task={taskId}; reason=explicit_source_request_without_successful_tool_call; recovery=one_agent_correction.");
+                                $"Research premature final deferred: task={taskId}; reason=explicit_source_request_without_successful_tool_call; recovery=one_search_correction.");
 
                             messages.Add(new DuckChatMessage("assistant", decision.Raw));
                             messages.Add(new DuckChatMessage(
                                 "user",
-                                "تنبيه تحقق: طلب المستخدم صريح في البحث أو استخراج المصادر من المكتبات المختارة، لكنك أصدرت إجابة نهائية دون استدعاء ناجح لأي أداة MCP. لا تستبدل البحث المطلوب بمعلومات الذاكرة. أعد تقييم الطلب واستخدم أداة بحث مناسبة من الأدوات المتاحة، ثم قرر بنفسك هل تحتاج إلى متابعة البحث أو فتح الكتب والصفحات. لا يلزم استخدام كل المكتبات المختارة. أخرج قرار tool_call وفق المخطط، ولا تنه المهمة الآن."));
+                                "تنبيه تحقق: طلب المستخدم صريح في البحث من المكتبات المختارة، لكنك أصدرت إجابة نهائية دون تنفيذ أداة بحث ناجحة. لا تستبدل البحث بمعلومات الذاكرة. نفّذ بحثاً فعلياً أولاً، ثم افتح الصفحات المطابقة للنتائج التي ستستشهد بها."));
                             continue;
                         }
 
                         _log.Warning(
                             $"Research final rejected: task={taskId}; reason=explicit_source_request_without_successful_tool_call; correctionAttempted=true.");
                         throw new InvalidOperationException(
-                            "تعذر إتمام البحث المطلوب: أنهى النموذج المهمة دون تنفيذ استدعاء ناجح لأداة من المكتبات المختارة. لم تُعرض إجابته بوصفها بحثاً موثقاً.");
+                            "تعذر إتمام البحث المطلوب: أنهى النموذج المهمة دون تنفيذ استدعاء ناجح لأداة بحث من المكتبات المختارة. لم تُعرض إجابته بوصفها بحثاً موثقاً.");
+                    }
+
+                    if (matchingPageWasNotOpened)
+                    {
+                        if (!pageVerificationCorrectionAttempted)
+                        {
+                            pageVerificationCorrectionAttempted = true;
+                            _log.Warning(
+                                $"Research premature final deferred: task={taskId}; reason=search_results_without_verified_page_open; searchResponses={evidenceProvenance.NonEmptySearchResponseCount}; searchReferences={evidenceProvenance.SearchReferenceCount}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}; recovery=one_page_verification_correction.");
+
+                            messages.Add(new DuckChatMessage("assistant", decision.Raw));
+                            messages.Add(new DuckChatMessage(
+                                "user",
+                                "تنبيه تحقق: أعادت مكتبة واحدة أو أكثر نتائج بحث فعلية، لكن لم يُفتح موضع مطابق من كل مكتبة ظهرت منها نتائج. افتح صفحة مطابقة واحدة على الأقل من كل مكتبة ذات نتائج، مستخدماً معرّفات الكتاب والصفحة الواردة حرفياً في نتائج تلك المكتبة نفسها. افحص النص وسياقه قبل الاستشهاد. إذا لم يتوفر معرّف قابل للتحقق، فصرّح بتعذر فتح المصدر ولا تستشهد بمقتطف البحث."));
+                            continue;
+                        }
+
+                        _log.Warning(
+                            $"Research final rejected: task={taskId}; reason=search_results_without_verified_page_open; correctionAttempted=true.");
+                        throw new InvalidOperationException(
+                            "تعذر اعتماد إجابة البحث: بقيت مكتبة أعادت نتائج فعلية من دون فتح صفحة مطابقة والتحقق من معرّفها. أُوقف تمرير الإجابة غير المكتملة بدلاً من عرضها بوصفها بحثاً موثقاً.");
                     }
 
                     _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; mode=json-schema; model={model}.");
@@ -269,10 +301,30 @@ public sealed class ResearchCoordinator
                 _log.Info(
                     $"Research tool decision: task={taskId}; call={toolCallsAttempted}; source={decision.Server}; tool={decision.Tool}.");
 
+                var toolArguments = ToArguments(decision.Arguments);
+                var referenceError = evidenceProvenance.ValidateReferenceRead(
+                    descriptorForJson,
+                    toolArguments);
+                if (referenceError is not null)
+                {
+                    warnings.Add($"{descriptorForJson.Server}/{descriptorForJson.Name}: rejected unverified page reference");
+                    _log.Warning(
+                        $"MCP page reference rejected: task={taskId}; source={descriptorForJson.Server}; tool={descriptorForJson.Name}; knownReferences={evidenceProvenance.SearchReferenceCount}.");
+
+                    messages.Add(new DuckChatMessage(
+                        "user",
+                        "رفض مضيف البحث تنفيذ فتح الصفحة لأن المعرّف لم يثبت وروده في نتيجة بحث سابقة من المكتبة نفسها. " +
+                        referenceError +
+                        " أعد البحث عند الحاجة، ثم افتح مرجعاً مطابقاً تماماً لما أعادته أداة البحث."));
+
+                    continue;
+                }
+
                 var execution = await ExecuteToolAsync(
                     descriptorForJson,
-                    ToArguments(decision.Arguments),
+                    toolArguments,
                     warnings,
+                    evidenceProvenance,
                     taskId,
                     timeout.Token);
 
@@ -509,6 +561,7 @@ public sealed class ResearchCoordinator
         ToolDescriptor descriptor,
         IReadOnlyDictionary<string, object?> arguments,
         List<string> warnings,
+        McpEvidenceProvenance evidenceProvenance,
         string taskId,
         CancellationToken cancellationToken)
     {
@@ -521,27 +574,70 @@ public sealed class ResearchCoordinator
                 cancellationToken);
 
             var formattedResult = FormatToolResult(result);
+            var textBlocks = result.Content
+                .OfType<TextContentBlock>()
+                .Select(block => block.Text)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .ToArray();
+            var hasUsableContent = ResearchToolResultClassifier.HasUsableContent(result);
+            var sourceReferenceCount = evidenceProvenance.RecordSearchResult(
+                descriptor,
+                result.StructuredContent,
+                textBlocks,
+                result.IsError == true,
+                hasUsableContent);
+
+            if (ResearchToolResultClassifier.IsSearchTool(descriptor) &&
+                result.IsError != true &&
+                hasUsableContent &&
+                sourceReferenceCount == 0)
+            {
+                warnings.Add($"{descriptor.Server}/{descriptor.Name}: search response contained no recognizable page identifiers");
+                _log.Warning(
+                    $"MCP search result had no page identifiers: task={taskId}; source={descriptor.Server}; tool={descriptor.Name}.");
+            }
+
             if (result.IsError == true)
             {
                 warnings.Add($"{descriptor.Server}/{descriptor.Name}: MCP reported a tool execution error");
+                evidenceProvenance.RecordVerifiedOpen(descriptor, succeeded: false);
                 return new ToolExecutionResult(formattedResult, false);
             }
 
-            if (!ResearchToolResultClassifier.HasUsableContent(result))
+            if (!hasUsableContent)
             {
                 if (ResearchToolResultClassifier.IsCompletedSearch(descriptor, result.IsError == true))
                 {
-                    // A successful search with zero matches is still a completed search.
-                    // Keep its explicit no-result/empty response in the evidence ledger
-                    // and do not force the model to repeat that source indefinitely.
+                    // A successful search with zero matches completes the search attempt,
+                    // but it does not create a page reference that can be opened or cited.
                     warnings.Add($"{descriptor.Server}/{descriptor.Name}: search completed without usable matches");
+                    evidenceProvenance.RecordVerifiedOpen(descriptor, succeeded: false);
                     return new ToolExecutionResult(formattedResult, true);
                 }
 
                 warnings.Add($"{descriptor.Server}/{descriptor.Name}: MCP returned no usable content");
+                evidenceProvenance.RecordVerifiedOpen(descriptor, succeeded: false);
                 return new ToolExecutionResult(formattedResult, false);
             }
 
+            if (McpEvidenceProvenance.IsReferenceReadTool(descriptor))
+            {
+                var openedPageError = evidenceProvenance.ValidateOpenedResult(
+                    descriptor,
+                    arguments,
+                    result.StructuredContent,
+                    textBlocks);
+                if (openedPageError is not null)
+                {
+                    warnings.Add($"{descriptor.Server}/{descriptor.Name}: opened page identity did not match the requested result");
+                    _log.Warning(
+                        $"MCP opened page rejected: task={taskId}; source={descriptor.Server}; tool={descriptor.Name}; reason=response-reference-mismatch.");
+                    evidenceProvenance.RecordVerifiedOpen(descriptor, succeeded: false);
+                    return new ToolExecutionResult(openedPageError, false);
+                }
+            }
+
+            evidenceProvenance.RecordVerifiedOpen(descriptor, succeeded: true);
             return new ToolExecutionResult(formattedResult, true);
         }
         catch (OperationCanceledException)
