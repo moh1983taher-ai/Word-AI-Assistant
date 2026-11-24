@@ -133,7 +133,7 @@ internal sealed class McpEvidenceProvenance
             return null;
 
         var requested = new List<Reference>();
-        VisitOpenArguments(JsonSerializer.SerializeToElement(arguments), requested, inheritedBookId: null);
+        VisitOpenArguments(JsonSerializer.SerializeToElement(arguments), requested, inheritedBookId: null, descriptor.Server);
 
         if (requested.Count == 0)
             return "تعذر تحديد الصفحة المطلوبة للتحقق من نتيجة الفتح.";
@@ -255,11 +255,11 @@ internal sealed class McpEvidenceProvenance
 
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray())
-                    VisitSearchPayload(item, index, inheritedBookId);
+                    VisitSearchPayload(item, index, inheritedBookId, sourceId);
                 break;
 
             case JsonValueKind.String:
-                VisitSearchText(element.GetString(), index);
+                VisitSearchText(element.GetString(), index, sourceId);
                 break;
         }
     }
