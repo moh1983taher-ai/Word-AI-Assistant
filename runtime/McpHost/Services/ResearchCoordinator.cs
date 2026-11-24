@@ -204,7 +204,7 @@ public sealed class ResearchCoordinator
                     var minimumRequiredCharacters = fixedRequestCharacters + 2_048 + 2;
                     var configuredBudget = Environment.GetEnvironmentVariable("RESEARCHTOOLS_CONTEXT_BUDGET_CHARS");
                     _log.Error(
-                        $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; compactToolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; responseFormatCharacters={responseFormatCharacters}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
+                        $"MCP tool catalog exceeds the configured context budget: task={taskId}; model={model}; toolCount={turnTools.Count}; toolCatalogCharacters={toolCatalogCharacters}; systemPromptCharacters={turnSystemPrompt.Length}; minimumRequiredContextCharacters={minimumRequiredCharacters}; effectiveContextBudgetCharacters={contextBudget.MaxContextCharacters}; configuredContextBudget={configuredBudget ?? "(unset)"}.");
                     throw new InvalidOperationException(
                         $"تعذر تجهيز فهرس أدوات MCP وتعليماته ضمن ميزانية السياق الحالية. حجم تعليمات الأدوات ومخططاتها {turnSystemPrompt.Length:N0} حرف، والحد الفعلي {contextBudget.MaxContextCharacters:N0} حرف، والحد الأدنى اللازم مع احتياطي البروتوكول {minimumRequiredCharacters:N0} حرف. راجع سجل المضيف واضبط RESEARCHTOOLS_CONTEXT_BUDGET_CHARS فقط إذا كان النموذج والبوابة يدعمان سعة أكبر.");
                 }
@@ -709,8 +709,8 @@ public sealed class ResearchCoordinator
         IReadOnlyList<string> warnings,
         out int toolCatalogCharacters)
     {
-        // The full argument schemas are already carried by the strict response format.
-        // Keep this prompt-side directory small to avoid serializing every schema twice.
+        // Duck2API drops response_format, so the actual read-only MCP input schemas
+        // must be visible in the ordinary system prompt for model-directed page reads.
         var toolDirectory = tools.Select(tool => new
         {
             server = tool.Server,
