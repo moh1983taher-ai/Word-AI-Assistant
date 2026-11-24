@@ -97,9 +97,9 @@ jobs:
             $diagnostics = Invoke-RestMethod -Uri 'http://127.0.0.1:18082/v1/mcp/sources' -TimeoutSec 180
             $diagnostics | ConvertTo-Json -Depth 8 | Write-Host
 
-            if ($diagnostics.strictOutputReady -ne $true) {
-              $diagnostics.strictSchemaWarnings | ForEach-Object { Write-Error $_ }
-              throw 'One or more live MCP input schemas cannot be represented as strict DuckAI JSON Schema.'
+            if ($diagnostics.initialSearchReady -ne $true) {
+              $diagnostics.initialSearchWarnings | ForEach-Object { Write-Error $_ }
+              throw 'The live Aljam3/Shamela schemas could not produce a valid host-owned initial search plan.'
             }
 
             $aljam3 = $diagnostics.sources | Where-Object { $_.id -eq 'aljam3' }
@@ -111,7 +111,8 @@ jobs:
             if (-not $shamela.connected -or $shamela.toolCount -lt 4) {
               throw 'Official SDK did not discover the expected read-only Shamela catalog.'
             }
-            Write-Host 'Official MCP SDK discovered both upstream sources and all expected read-only tools.'
+            $diagnostics.initialSearchPlan | Format-Table server, tool -AutoSize | Out-String | Write-Host
+            Write-Host 'Official MCP SDK discovered both read-only catalogs and the host built a valid initial search for each real source schema.'
           }
           finally {
             if ($hostProcess -and -not $hostProcess.HasExited) {
