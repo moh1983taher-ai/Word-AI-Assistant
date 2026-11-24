@@ -173,7 +173,7 @@ assert.match(
 assert.match(source, /environment: "remote"/);
 assert.doesNotMatch(source, /\n\s*store\s*:\s*false,/);
 assert.match(source, /settingsButton\.title = "اختر الجامع أو الشاملة أو كليهما\."/);
-assert.match(source, /async function callGeminiResearchForSource[\s\S]*?postGeminiInteractionStream\([\s\S]*?tools: getGeminiTools\(serverIds\)/);
+assert.match(source, /async function callGeminiResearchForSource[\s\S]*?buildGeminiInteractionRequest\(messages, settings, serverIds\)/);
 assert.match(source, /async function callGeminiResearch\([\s\S]*?callGeminiResearchForSource/);
 assert.match(source, /sourceFailures: failures/);
 assert.match(source, /formatSourceFailures\(result\.sourceFailures\)/);
