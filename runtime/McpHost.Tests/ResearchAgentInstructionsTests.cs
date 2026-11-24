@@ -15,6 +15,7 @@ public sealed class ResearchAgentInstructionsTests
         Assert.Contains("عند طلب البحث أو التحقق من نص أو كتاب", instructions);
         Assert.Contains("تحقق من معرّفاتها عبر أدوات الفهرسة", instructions);
         Assert.Contains("لا تعتمد على مقتطفات البحث في نقل الأقوال أو الاستدلال", instructions);
+        Assert.Contains("افتح الصفحة بالمعرّف الوارد في نتيجة بحث سابقة", instructions);
         Assert.Contains("انقل النص حرفيًا", instructions);
         Assert.Contains("لا تعمم قولًا من مصدر منفرد على المذهب كله", instructions);
         Assert.Contains("الرابط المباشر إذا ورد في مخرجات الأداة", instructions);
