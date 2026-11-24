@@ -55,6 +55,22 @@ public sealed class ResearchEvidenceLedgerTests
     }
 
     [Fact]
+    public void PreservesSearchPaginationCursorAndTotalResultCount()
+    {
+        using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
+        var search = new ToolDescriptor("shamela", "المكتبة الشاملة", "shamela_find", "", schema.RootElement.Clone());
+        const string json = """{"results":[{"book_id":1,"page_id":10,"title":"نتيجة"}],"next_cursor":"cursor-abc-123","total_count":87,"has_more":true}""";
+
+        var ledger = new ResearchEvidenceLedger();
+        ledger.Add(search, json, succeeded: true);
+        var context = ledger.BuildContext(["shamela"], Array.Empty<string>(), 4_000);
+
+        Assert.Contains("next_cursor=cursor-abc-123", context);
+        Assert.Contains("total_count=87", context);
+        Assert.Contains("has_more=true", context);
+    }
+
+    [Fact]
     public void RebuildsBoundedContextWithEvidenceFromEverySelectedSource()
     {
         using var schema = JsonDocument.Parse("""{"type":"object","properties":{},"required":[]}""");
