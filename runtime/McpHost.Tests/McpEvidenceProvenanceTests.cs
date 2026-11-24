@@ -263,6 +263,99 @@ public sealed class McpEvidenceProvenanceTests
         Assert.False(provenance.HasUnverifiedSearchResults);
     }
 
+    [Fact]
+    public void AllowsOpeningAnExactAljam3FilePagePairReturnedBySearch()
+    {
+        var provenance = SearchAljam3(
+            """{"results":[{"id":501,"file_id":8291,"page_number":471,"book":{"id":3435}}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("aljam3", "get_page"),
+            Arguments("""{"file_id":8291,"page_number":471}"""));
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void RejectsAnAljam3FilePagePairNotReturnedBySearch()
+    {
+        var provenance = SearchAljam3(
+            """{"results":[{"id":501,"file_id":8291,"page_number":471}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("aljam3", "get_page"),
+            Arguments("""{"file_id":8291,"page_number":472}"""));
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void DoesNotCombineAljam3FileAndPageNumbersFromDifferentHits()
+    {
+        var provenance = SearchAljam3(
+            """{"results":[{"id":501,"file_id":10,"page_number":100},{"id":502,"file_id":20,"page_number":200}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("aljam3", "get_page"),
+            Arguments("""{"file_id":10,"page_number":200}"""));
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void AcceptsAljam3OpenedContentWhenItsFileAndPageMatchTheRequestedHit()
+    {
+        var provenance = SearchAljam3(
+            """{"results":[{"id":501,"file_id":8291,"page_number":471}]}""");
+        using var opened = JsonDocument.Parse(
+            """{"page":{"id":501,"file_id":8291,"page_number":471},"text":{"content":"نص الصفحة"}}""");
+
+        var error = provenance.ValidateOpenedResult(
+            Tool("aljam3", "get_page"),
+            Arguments("""{"file_id":8291,"page_number":471}"""),
+            opened.RootElement,
+            Array.Empty<string>());
+
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void RejectsAljam3OpenedContentWhoseFileOrPageDiffersFromTheRequestedHit()
+    {
+        var provenance = SearchAljam3(
+            """{"results":[{"id":501,"file_id":8291,"page_number":471}]}""");
+        using var opened = JsonDocument.Parse(
+            """{"page":{"id":502,"file_id":8291,"page_number":472},"text":{"content":"نص صفحة أخرى"}}""");
+
+        var error = provenance.ValidateOpenedResult(
+            Tool("aljam3", "get_page"),
+            Arguments("""{"file_id":8291,"page_number":471}"""),
+            opened.RootElement,
+            Array.Empty<string>());
+
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void DoesNotTreatAljam3SearchResultRecordIdAsTheGetPageFileId()
+    {
+        var provenance = SearchAljam3(
+            """{"results":[{"id":501,"file_id":8291,"page_number":471}]}""");
+
+        var error = provenance.ValidateReferenceRead(
+            Tool("aljam3", "get_page"),
+            Arguments("""{"file_id":501,"page_number":471}"""));
+
+        Assert.NotNull(error);
+    }
+
+    private static McpEvidenceProvenance SearchAljam3(string json)
+    {
+        var provenance = new McpEvidenceProvenance();
+        RegisterSearch(provenance, Tool("aljam3", "search"), json);
+        return provenance;
+    }
+
     private static McpEvidenceProvenance SearchShamela(string json)
     {
         var provenance = new McpEvidenceProvenance();
