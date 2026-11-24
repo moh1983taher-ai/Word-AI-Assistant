@@ -12,7 +12,7 @@ public sealed class ResearchAgentInstructionsTests
             Array.Empty<string>(),
             Array.Empty<string>());
 
-        Assert.Contains("اتبع خطة البحث", instructions);
+        Assert.Contains("افهم مقصد الباحث أولاً", instructions);
         Assert.Contains("لا تتوقف عند أول نتيجة", instructions);
         Assert.Contains("فتح الصفحة يثبت الوصول", instructions);
         Assert.Contains("ولا يثبت صلتها", instructions);
