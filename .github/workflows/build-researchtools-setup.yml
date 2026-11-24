@@ -57,7 +57,48 @@ jobs:
           foreach ($required in @('ResearchTools-MCP-Host-release.zip','ResearchTools-Launcher.vbs','-McpHostArchive','-McpHostShaFile','-LauncherFile')) {
             if ($iss -notmatch [regex]::Escape($required)) { throw "Setup script does not embed $required." }
           }
-          Write-Host 'PowerShell 5.1, Word manifest, unified launcher and Setup inputs validated.'
+          # Regression contract: the installer and Setup packager must require the
+          # exact same MCP archive entries, and the ZIP entry count must derive
+          # from that list rather than a stale hard-coded number.
+          $installerScript = Get-Content 'installer/Install-ResearchTools.ps1' -Raw
+          $installerFilesMatch = [regex]::Match(
+            $installerScript,
+            '(?s)\$requiredMcpFiles\s*=\s*@\((?<files>.*?)\)')
+          if (-not $installerFilesMatch.Success) {
+            throw 'Installer does not declare the required MCP archive file list.'
+          }
+          $installerFiles = @([regex]::Matches(
+            $installerFilesMatch.Groups['files'].Value,
+            "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+
+          $setupWorkflow = Get-Content '.github/workflows/build-researchtools-setup.yml' -Raw
+          $packageFilesMatch = [regex]::Match(
+            $setupWorkflow,
+            '(?s)\$requiredEntries\s*=\s*@\((?<files>.*?)\)')
+          if (-not $packageFilesMatch.Success) {
+            throw 'Setup workflow does not declare the MCP package entry list.'
+          }
+          $packageFiles = @([regex]::Matches(
+            $packageFilesMatch.Groups['files'].Value,
+            "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+
+          $expectedMcpFiles = @(
+            'ResearchTools.McpHost.exe',
+            'ResearchTools.McpHost.exe.sha256',
+            'Test-McpHost-Preview.ps1',
+            'Start-McpHost-Preview.ps1'
+          )
+          if (@(Compare-Object $expectedMcpFiles $installerFiles).Count -gt 0) {
+            throw 'Installer MCP archive file list differs from the four required package files.'
+          }
+          if (@(Compare-Object $expectedMcpFiles $packageFiles).Count -gt 0) {
+            throw 'Setup package MCP archive file list differs from the four required package files.'
+          }
+          if ($installerScript -notmatch '(?s)\$zip\.Entries\.Count\s*-ne\s*\$requiredMcpFiles\.Count') {
+            throw 'Installer MCP archive entry count is not derived from requiredMcpFiles.Count.'
+          }
+
+          Write-Host 'PowerShell 5.1, Word manifest, unified launcher, Setup inputs and MCP archive contract validated.'
 
       - name: Download and verify embedded runtime
         env:
