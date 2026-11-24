@@ -27,15 +27,17 @@ public sealed class ResearchContextBudgetTests
     }
 
     [Fact]
-    public void DuckAiProfileRestoresKnownCompatibleRequestCeilings()
+    public void DuckAiProfileProvidesEnoughDefaultInputBudgetForCurrentMcpCatalog()
     {
         ClearSettings();
         try
         {
             var budget = ResearchContextBudget.LoadDuckAi();
 
-            Assert.Equal(20_000, budget.MaxContextCharacters);
+            Assert.Equal(64_000, budget.MaxContextCharacters);
             Assert.Equal(5_000, budget.MaxOutputTokens);
+            Assert.True(budget.GetAvailableInputCharacters(31_376) > 25_000);
+            Assert.True(budget.GetAvailableInputCharacters(31_376) > 0);
             Assert.Equal(TimeSpan.FromMinutes(10), budget.ResearchTimeout);
             Assert.Equal(TimeSpan.FromSeconds(120), budget.ModelRequestTimeout);
         }
