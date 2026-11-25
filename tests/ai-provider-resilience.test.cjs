@@ -10,6 +10,26 @@ const source = fs.readFileSync(
     "utf8"
 );
 
+assert.ok(
+    source.includes("const DUCKAI_LOCAL_API_BASE =") &&
+        source.includes('"http://127.0.0.1:18080/v1"'),
+    "DuckAI UI must use the installed direct Duck2API port 18080"
+);
+assert.ok(
+    source.includes('const DUCKAI_MODELS_URL = DUCKAI_LOCAL_API_BASE + "/models";'),
+    "DuckAI model discovery must use the shared local API base"
+);
+assert.ok(
+    source.includes('const DUCKAI_CHAT_COMPLETIONS_URL = DUCKAI_LOCAL_API_BASE + "/chat/completions";'),
+    "all DuckAI completion calls must use the shared local API base"
+);
+assert.equal(source.includes("127.0.0.1:8080"), false,
+    "the removed legacy DuckAgent port must not remain in the UI");
+assert.equal((source.match(/DUCKAI_MODELS_URL/g) || []).length, 2,
+    "the model endpoint must be centralized and used by the model loader");
+assert.equal((source.match(/DUCKAI_CHAT_COMPLETIONS_URL/g) || []).length, 8,
+    "all seven completion call sites must use the centralized endpoint");
+
 function sectionBetween(startToken, endToken, label) {
     const start = source.indexOf(startToken);
     assert.notEqual(start, -1, label + " start must exist");

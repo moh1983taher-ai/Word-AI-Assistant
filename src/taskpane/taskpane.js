@@ -534,7 +534,9 @@ const documentTitle =
 // AI Settings Elements
 // ======================================
 const DUCKAI_LOCAL_API_BASE =
-    "http://127.0.0.1:8080/v1";
+    "http://127.0.0.1:18080/v1";
+const DUCKAI_MODELS_URL = DUCKAI_LOCAL_API_BASE + "/models";
+const DUCKAI_CHAT_COMPLETIONS_URL = DUCKAI_LOCAL_API_BASE + "/chat/completions";
 
 const settingsBtn =
     document.getElementById("settings-btn");
@@ -25882,7 +25884,7 @@ async function loadDuckAIModels() {
 
         const response =
             await fetch(
-                "http://127.0.0.1:8080/v1/models",
+                DUCKAI_MODELS_URL,
                 {
 
                     method:
@@ -26342,7 +26344,7 @@ async function testAIConnection() {
 
         const response =
             await fetch(
-                "http://127.0.0.1:8080/v1/chat/completions",
+                DUCKAI_CHAT_COMPLETIONS_URL,
                 {
 
                     method:
@@ -27349,7 +27351,7 @@ async function askAI(
 
             const response =
                 await fetch(
-                    "http://127.0.0.1:8080/v1/chat/completions",
+                    DUCKAI_CHAT_COMPLETIONS_URL,
                     {
 
                         method:
@@ -28488,7 +28490,7 @@ async function askAIForLibraryRanking(
 
                     response =
                         await fetch(
-                            "http://127.0.0.1:8080/v1/chat/completions",
+                            DUCKAI_CHAT_COMPLETIONS_URL,
                             {
 
                                 method:
@@ -30803,7 +30805,7 @@ other
     
     const endpoint =
         provider === "duckai"
-            ? "http://127.0.0.1:8080/v1/chat/completions"
+            ? DUCKAI_CHAT_COMPLETIONS_URL
             : provider === "openai"
                 ? "https://api.openai.com/v1/chat/completions"
                 : provider === "groq"
@@ -31586,7 +31588,7 @@ function parseReferenceAIJSON(
                  answer = extractGeminiAnswer(result);
              } else {
                  const endpoint = provider === "duckai"
-                     ? "http://127.0.0.1:8080/v1/chat/completions"
+                     ? DUCKAI_CHAT_COMPLETIONS_URL
                      : provider === "openai"
                          ? "https://api.openai.com/v1/chat/completions"
                          : provider === "groq"
@@ -38274,7 +38276,7 @@ async function streamDuckAI(text, onChunk) {
 
                 try {
                     response = await fetch(
-                        "http://127.0.0.1:8080/v1/chat/completions",
+                        DUCKAI_CHAT_COMPLETIONS_URL,
                         {
                             method: "POST",
                             headers: {
@@ -39398,7 +39400,7 @@ async function callLibraryAI(
             ) {
 
                 const endpoint =
-                    "http://127.0.0.1:8080/v1/chat/completions";
+                    DUCKAI_CHAT_COMPLETIONS_URL;
 
 
                 const body = {
