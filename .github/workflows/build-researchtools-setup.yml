@@ -54,9 +54,11 @@ jobs:
           $launcher = Get-Content 'installer/ResearchTools-Launcher.vbs' -Raw
           if ($launcher -notmatch 'RESEARCHTOOLS_MCPHOST_V1' -or $launcher -notmatch 'McpHost\\ResearchTools\.McpHost\.exe') { throw 'Unified launcher is missing MCP host integration.' }
           if (-not $launcher.Contains('WaitForDuckApi(120)') -or -not $launcher.Contains('/v1/models')) { throw 'Unified launcher is missing the Duck2API readiness gate.' }
-          $waitIndex = $launcher.IndexOf('If Not WaitForDuckApi(120) Then')
-          $agentIndex = $launcher.IndexOf('shell.Run Chr(34)&agentExe&Chr(34),0,False')
-          if ($waitIndex -lt 0 -or $agentIndex -lt 0 -or $waitIndex -gt $agentIndex) { throw 'Research agent starts before Duck2API readiness is verified.' }
+          if ($launcher -match 'ResearchTools-DuckAgent\.exe|agentExe') { throw 'Unified launcher must not start or require the legacy DuckAgent proxy.' }
+          if ($launcher -notmatch 'request\.SetTimeouts\s+2000,2000,2000,12000') { throw 'Duck2API readiness probe receive timeout is too short.' }
+          if ($launcher -notmatch 'ProcessExistsAtPath\(duckExe\)' -or $launcher -notmatch 'StopProcessAtPath duckExe') { throw 'Duck2API lifecycle must be scoped to the installed executable path.' }
+          if ($launcher -notmatch 'ProcessPathMatches\(process,executablePath\)') { throw 'Launcher is missing executable-path verification before process termination.' }
+          if ($launcher -notmatch 'the legacy DuckAgent proxy on 8080 is not started') { throw 'Launcher does not document direct Duck2API startup.' }
           $iss = Get-Content 'installer/ResearchToolsSetup.iss' -Raw
           foreach ($required in @('ResearchTools-MCP-Host-release.zip','ResearchTools-Launcher.vbs','-McpHostArchive','-McpHostShaFile','-LauncherFile')) {
             if ($iss -notmatch [regex]::Escape($required)) { throw "Setup script does not embed $required." }
@@ -85,6 +87,12 @@ jobs:
             "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
           if ($runtimeFiles -notcontains 'DuckAI-MCP-Bridge.ps1') {
             throw 'Installer runtime integrity list must require DuckAI-MCP-Bridge.ps1.'
+          }
+          if ($installerScript.Contains("Copy-Item -LiteralPath (Join-Path $Runtime 'ResearchTools-Launcher.vbs') -Destination $Launcher")) {
+            throw 'The legacy runtime launcher must not overwrite the unified installer launcher.'
+          }
+          if ($installerScript -notmatch '\$runtimeLauncherFile\s*=\s*Join-Path\s+\$Runtime') {
+            throw 'Installer must validate the bundled runtime launcher without installing it over the unified launcher.'
           }
 
           $setupWorkflow = Get-Content '.github/workflows/build-researchtools-setup.yml' -Raw
@@ -285,9 +293,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.14'
-          $title = 'ResearchTools Unified Setup v1.2.14'
-          $notes = 'Unified Setup v1.2.14 fixes a Windows Script Host startup failure in Setup v1.2.13: the build previously rewrote ResearchTools-Launcher.vbs with a UTF-8 BOM, which VBScript rejected as an invalid character at line 1, character 1. The build now writes the synchronized launcher as UTF-8 without BOM, verifies the first three bytes, and compiles the exact final launcher with Windows cscript before packaging. The 1.2.13 Duck2API readiness gate, stable runtime release filtering, bridge archive integrity validation, adaptive MCP research planner, and existing SHA-256 checks are retained. Does not modify C:\\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.2.15'
+          $title = 'ResearchTools Unified Setup v1.2.15'
+          $notes = 'Unified Setup v1.2.15 corrects DuckAI startup orchestration: the new .NET MCP host uses the direct Duck2API endpoint on 127.0.0.1:18080 and no longer launches or depends on the legacy DuckAgent proxy on 8080. The readiness probe allows a 12-second response window, runtime process detection and shutdown are scoped to the verified installed executable path, bridge cleanup matches its exact script path, and the runtime archive launcher can no longer overwrite the unified launcher during installation. The BOM-free VBScript packaging check, stable runtime filtering, archive integrity validation, adaptive MCP research planner, and SHA-256 checks are retained. Does not modify C:\\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
