@@ -53,6 +53,10 @@ jobs:
           if ((Get-Content 'installer/Word-AI-Assistant.xml' -Raw) -match 'localhost:3000') { throw 'Production manifest has a localhost URL.' }
           $launcher = Get-Content 'installer/ResearchTools-Launcher.vbs' -Raw
           if ($launcher -notmatch 'RESEARCHTOOLS_MCPHOST_V1' -or $launcher -notmatch 'McpHost\\ResearchTools\.McpHost\.exe') { throw 'Unified launcher is missing MCP host integration.' }
+          if (-not $launcher.Contains('WaitForDuckApi(120)') -or -not $launcher.Contains('/v1/models')) { throw 'Unified launcher is missing the Duck2API readiness gate.' }
+          $waitIndex = $launcher.IndexOf('If Not WaitForDuckApi(120) Then')
+          $agentIndex = $launcher.IndexOf('shell.Run Chr(34)&agentExe&Chr(34),0,False')
+          if ($waitIndex -lt 0 -or $agentIndex -lt 0 -or $waitIndex -gt $agentIndex) { throw 'Research agent starts before Duck2API readiness is verified.' }
           $iss = Get-Content 'installer/ResearchToolsSetup.iss' -Raw
           foreach ($required in @('ResearchTools-MCP-Host-release.zip','ResearchTools-Launcher.vbs','-McpHostArchive','-McpHostShaFile','-LauncherFile')) {
             if ($iss -notmatch [regex]::Escape($required)) { throw "Setup script does not embed $required." }
@@ -70,6 +74,9 @@ jobs:
           $installerFiles = @([regex]::Matches(
             $installerFilesMatch.Groups['files'].Value,
             "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+          if ($installerFiles -notcontains 'DuckAI-MCP-Bridge.ps1') {
+            throw 'Installer runtime integrity list must require DuckAI-MCP-Bridge.ps1.'
+          }
 
           $setupWorkflow = Get-Content '.github/workflows/build-researchtools-setup.yml' -Raw
           $packageFilesMatch = [regex]::Match(
@@ -106,9 +113,23 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          gh release download duckai-runtime-v1.0.6 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip" --dir dist
+          # PR builds use the current published runtime; main builds wait for v1.0.11.
+          $runtimeTag = 'duckai-runtime-v1.0.11'
+          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
+            $runtimeTag = 'duckai-runtime-v1.0.10'
+          }
+          else {
+            $runtimePublished = $false
+            for ($attempt = 1; $attempt -le 40; $attempt++) {
+              gh release view $runtimeTag --repo "$env:GITHUB_REPOSITORY" *> $null
+              if ($LASTEXITCODE -eq 0) { $runtimePublished = $true; break }
+              Start-Sleep -Seconds 15
+            }
+            if (-not $runtimePublished) { throw "Required DuckAI runtime release $runtimeTag was not published in time." }
+          }
+          gh release download $runtimeTag --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip" --dir dist
           if ($LASTEXITCODE -ne 0) { throw 'Runtime download failed.' }
-          gh release download duckai-runtime-v1.0.6 --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip.sha256" --dir dist
+          gh release download $runtimeTag --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip.sha256" --dir dist
           if ($LASTEXITCODE -ne 0) { throw 'Runtime checksum download failed.' }
           $sidecar = Get-Content 'dist/DuckAI-Runtime-release.zip.sha256' -Raw
           if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+DuckAI-Runtime-release\.zip\s*$') { throw 'Invalid runtime checksum file.' }
@@ -129,8 +150,11 @@ jobs:
             [IO.Compression.ZipFile]::ExtractToDirectory('dist/DuckAI-Runtime-release.zip', $stage)
             $bootstrap = Join-Path $stage 'DuckAI-Bootstrap.ps1'
             $runtimeLauncher = Join-Path $stage 'ResearchTools-Launcher.vbs'
-            if (-not (Test-Path -LiteralPath $bootstrap -PathType Leaf) -or -not (Test-Path -LiteralPath $runtimeLauncher -PathType Leaf)) {
-              throw 'Bundled DuckAI package is missing its bootstrap or launcher.'
+            $bridge = Join-Path $stage 'DuckAI-MCP-Bridge.ps1'
+            if (-not (Test-Path -LiteralPath $bootstrap -PathType Leaf) -or
+                -not (Test-Path -LiteralPath $runtimeLauncher -PathType Leaf) -or
+                -not (Test-Path -LiteralPath $bridge -PathType Leaf)) {
+              throw 'Bundled DuckAI package is missing its bootstrap, launcher or MCP bridge.'
             }
             $actualHash = (Get-FileHash -LiteralPath $bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
             $pattern = 'Const\s+BOOTSTRAP_SHA256\s*=\s*"([a-f0-9]{64})"'
@@ -234,9 +258,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.12'
-          $title = 'ResearchTools Unified Setup v1.2.12'
-          $notes = 'Unified Setup v1.2.12 introduces model-authored adaptive research planning before any MCP search; executes up to eight task-specific queries across each selected library using live MCP schemas; preserves all candidate references and pagination cursors; extracts opened-page text and citation metadata for relevance analysis; and requires an explicit classification of every planned facet as supported or unresolved. One opened page is no longer treated as completion of research: the model must review all result batches, follow pagination when useful, open relevant pages, and continue complementary searches until the plan is adequately covered. Invalid JSON repairs respect the current search state, and repeated malformed decisions or omitted coverage return a clear incomplete result instead of HTTP 502. Retains existing official MCP connections, selected-source boundaries, Aljam3 file_id/page_number validation, Shamela book_id/page_id validation, and Word add-in UI. Includes regression tests for 45 search hits, cursors, multi-query scheduling, page-text extraction, bounded evidence sampling, and coverage attestation. Does not modify C:\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.2.13'
+          $title = 'ResearchTools Unified Setup v1.2.13'
+$notes = 'Unified Setup v1.2.13 preserves the v1.2.12 adaptive MCP research planner and adds a startup readiness gate: the unified launcher verifies an HTTP 200 response containing a non-empty model list from Duck2API /v1/models before starting ResearchTools-DuckAgent. It waits up to 120 seconds, records a clear diagnostic on failure, and avoids launching the dependent agent against an unready endpoint. The installer now requires DuckAI-MCP-Bridge.ps1 in the integrity-checked runtime archive, and main builds wait for the corrected DuckAI Runtime v1.0.11 release instead of embedding the obsolete v1.0.6 package. Existing source boundaries, evidence provenance, SHA-256 validation, staged installation and rollback protections are retained. Does not modify C:\\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
