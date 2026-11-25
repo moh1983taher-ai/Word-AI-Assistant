@@ -88,7 +88,7 @@ function Show-Progress {
 function Test-FileHashes([string]$Directory) {
     $sum = Join-Path $Directory 'SHA256SUMS.txt'
     if (-not (Test-Path -LiteralPath $sum -PathType Leaf)) { return $false }
-    $required = @('BUILD-INFO.txt','ResearchTools-DuckAgent.exe','ResearchTools-Launcher.vbs','DuckAI-Bootstrap.ps1','duck2api-main.exe','manifest.xml','uninstall.ps1')
+    $required = @('BUILD-INFO.txt','ResearchTools-DuckAgent.exe','ResearchTools-Launcher.vbs','DuckAI-Bootstrap.ps1','DuckAI-MCP-Bridge.ps1','duck2api-main.exe','manifest.xml','uninstall.ps1')
     $entries = @{}
     foreach ($line in (Get-Content -LiteralPath $sum -Encoding UTF8)) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
