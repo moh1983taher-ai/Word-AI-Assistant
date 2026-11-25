@@ -36,7 +36,9 @@ scriptText = Join(Array( _
 "    $releaseUri = 'https://api.github.com/repos/' + $repo + '/releases?per_page=100'", _
 "    Write-UpdateLog ('Querying GitHub stable DuckAI runtime releases: ' + $releaseUri)", _
 "    $releases = @(Invoke-RestMethod -TimeoutSec 60 -Uri $releaseUri -Headers $headers -Method Get)", _
-"    $release = $releases | Where-Object { -not $_.draft -and -not $_.prerelease -and [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+
+"    $release = $releases | Where-Object { -not $_.draft -and -not $_.prerelease -and [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+$' -and -not [string]::IsNullOrWhiteSpace([string]$_.published_at) } | Sort-Object { [DateTime]::Parse($_.published_at).ToUniversalTime() } -Descending | Select-Object -First 1", _
+"    if (-not $release) { throw 'GitHub did not return a stable DuckAI runtime release.' }", _
+"    $releaseTag = [string]$release.tag_name", _
 "    if ([string]::IsNullOrWhiteSpace($releaseTag) -or $releaseTag -notmatch '^duckai-runtime-v\d+\.\d+\.\d+$' -or $release.draft -or $release.prerelease) { throw ('GitHub latest release is not a stable DuckAI release. Returned tag: ' + $releaseTag) }", _
 "    Write-UpdateLog ('Stable release detected: ' + $releaseTag)", _
 "    $asset = @($release.assets | Where-Object { $_.name -eq 'DuckAI-AutoRepair-Installer.zip' } | Select-Object -First 1)", _
