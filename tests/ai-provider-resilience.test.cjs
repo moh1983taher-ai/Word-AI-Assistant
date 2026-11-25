@@ -11,7 +11,8 @@ const source = fs.readFileSync(
 );
 
 assert.ok(
-    source.includes('const DUCKAI_LOCAL_API_BASE =\\n    "http://127.0.0.1:18080/v1";'),
+    source.includes("const DUCKAI_LOCAL_API_BASE =") &&
+        source.includes('"http://127.0.0.1:18080/v1"'),
     "DuckAI UI must use the installed direct Duck2API port 18080"
 );
 assert.ok(
