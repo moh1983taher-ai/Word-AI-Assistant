@@ -254,7 +254,7 @@ public sealed class McpSourceRegistryLiveIntegrationTests
                 "page_number" => new[] { "page_number", "pageNumber" },
                 "book_id" => new[] { "book_id", "bookId", "bookid" },
                 "page_id" => new[] { "page_id", "pageId", "pageid", "page", "start_page_id", "startPageId" },
-                _ => [canonicalName]
+                _ => new[] { canonicalName }
             };
 
             var actualName = properties.EnumerateObject()
