@@ -333,16 +333,167 @@ function Install-Manifest([string]$Catalog) {
     Log ('تثبيت Manifest في مجلد Word المشترك: ' + $destination)
 }
 function Stop-OldProcesses {
-    foreach ($proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
-        $name = [string]$proc.Name
-        $path = [string]$proc.ExecutablePath
-        $cmd = [string]$proc.CommandLine
-        $runtimeProc = ($name -in @('duck2api-main.exe','ResearchTools-DuckAgent.exe')) -and $path -and $path.StartsWith($Runtime,[StringComparison]::OrdinalIgnoreCase)
-        $launcherProc = ($name -ieq 'wscript.exe') -and $cmd -and $cmd.IndexOf($Launcher,[StringComparison]::OrdinalIgnoreCase) -ge 0
-        $legacyBridgeProc = ($name -ieq 'powershell.exe') -and $cmd -and $cmd.IndexOf('DuckAI-MCP-Bridge.ps1',[StringComparison]::OrdinalIgnoreCase) -ge 0
-        $mcpHostProc = ($name -ieq 'ResearchTools.McpHost.exe') -and $path -and $path.StartsWith($McpHost,[StringComparison]::OrdinalIgnoreCase)
-        if ($runtimeProc -or $launcherProc -or $legacyBridgeProc -or $mcpHostProc) { Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue }
+    # Use an elevated helper and process ancestry when WMI hides ExecutablePath
+    # or CommandLine. Never continue installation if verified cleanup fails.
+    $helperCode = @'
+$ErrorActionPreference = 'Stop'
+try {
+    $configText = [System.Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('__CONFIG_TOKEN__'))
+    $config = ConvertFrom-Json -InputObject $configText
+
+    function Write-CleanupLog([string]$Message) {
+        try { Add-Content -LiteralPath $config.LogPath -Encoding UTF8 -Value ('{0} [ProcessCleanup] {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'),$Message) } catch { }
     }
+
+    function Test-PathUnder([string]$Path,[string]$BasePath) {
+        if ([string]::IsNullOrWhiteSpace($Path) -or [string]::IsNullOrWhiteSpace($BasePath)) { return $false }
+        try {
+            $fullPath = [IO.Path]::GetFullPath($Path)
+            $prefix = [IO.Path]::GetFullPath($BasePath).TrimEnd('\') + '\'
+            return $fullPath.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)
+        }
+        catch { return $false }
+    }
+
+    $allProcesses = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)
+    $processById = @{}
+    foreach ($process in $allProcesses) { $processById[[int]$process.ProcessId] = $process }
+
+    $serviceIds = New-Object System.Collections.ArrayList
+    $launcherIds = New-Object System.Collections.ArrayList
+    $bridgeIds = New-Object System.Collections.ArrayList
+
+    foreach ($process in $allProcesses) {
+        $name = [string]$process.Name
+        $path = [string]$process.ExecutablePath
+        $parent = $null
+        if ($processById.ContainsKey([int]$process.ParentProcessId)) { $parent = $processById[[int]$process.ParentProcessId] }
+
+        $isExpectedService = $false
+        if ($name -ieq 'duck2api-main.exe') {
+            $isExpectedService = Test-PathUnder $path $config.RuntimePath
+        }
+        elseif ($name -ieq 'ResearchTools-DuckAgent.exe') {
+            $isExpectedService = Test-PathUnder $path $config.RuntimePath
+        }
+        elseif ($name -ieq 'ResearchTools.McpHost.exe') {
+            $isExpectedService = Test-PathUnder $path $config.McpHostPath
+        }
+
+        # WMI may hide the path for a child started by the product's WScript.
+        if (-not $isExpectedService -and [string]::IsNullOrWhiteSpace($path) -and $parent -and $parent.Name -ieq 'wscript.exe' -and $name -in @('duck2api-main.exe','ResearchTools-DuckAgent.exe','ResearchTools.McpHost.exe')) {
+            $isExpectedService = $true
+        }
+
+        if ($isExpectedService) {
+            if (-not ($serviceIds -contains [int]$process.ProcessId)) { [void]$serviceIds.Add([int]$process.ProcessId) }
+            if ($parent -and $parent.Name -ieq 'wscript.exe' -and -not ($launcherIds -contains [int]$parent.ProcessId)) { [void]$launcherIds.Add([int]$parent.ProcessId) }
+        }
+
+        if ($name -ieq 'wscript.exe') {
+            $commandLine = [string]$process.CommandLine
+            if (-not [string]::IsNullOrWhiteSpace($commandLine) -and $commandLine.IndexOf([string]$config.LauncherPath,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                if (-not ($launcherIds -contains [int]$process.ProcessId)) { [void]$launcherIds.Add([int]$process.ProcessId) }
+            }
+        }
+
+        if ($name -ieq 'powershell.exe') {
+            $commandLine = [string]$process.CommandLine
+            if (-not [string]::IsNullOrWhiteSpace($commandLine) -and $commandLine.IndexOf([string]$config.BridgePath,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                if (-not ($bridgeIds -contains [int]$process.ProcessId)) { [void]$bridgeIds.Add([int]$process.ProcessId) }
+            }
+        }
+    }
+
+    $taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
+
+    # Kill identified launchers as trees first, preventing their watchdog loops
+    # from respawning services while installation is replacing runtime files.
+    foreach ($launcherId in @($launcherIds | Sort-Object -Unique)) {
+        $current = Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId = " + $launcherId) -ErrorAction SilentlyContinue
+        if ($current) {
+            Write-CleanupLog ("Stopping launcher tree PID=" + $launcherId)
+            & $taskkill /F /T /PID $launcherId 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Stop-Process -Id $launcherId -Force -ErrorAction Stop }
+        }
+    }
+
+    foreach ($serviceId in @($serviceIds | Sort-Object -Unique)) {
+        $current = Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId = " + $serviceId) -ErrorAction SilentlyContinue
+        if ($current) {
+            Write-CleanupLog ("Stopping verified service " + $current.Name + " PID=" + $serviceId)
+            & $taskkill /F /PID $serviceId 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Stop-Process -Id $serviceId -Force -ErrorAction Stop }
+        }
+    }
+
+    foreach ($bridgeId in @($bridgeIds | Sort-Object -Unique)) {
+        $current = Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId = " + $bridgeId) -ErrorAction SilentlyContinue
+        if ($current) {
+            Write-CleanupLog ("Stopping verified legacy bridge PID=" + $bridgeId)
+            & $taskkill /F /PID $bridgeId 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Stop-Process -Id $bridgeId -Force -ErrorAction Stop }
+        }
+    }
+
+    Start-Sleep -Milliseconds 700
+    $remainingProcesses = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)
+    $remainingById = @{}
+    foreach ($process in $remainingProcesses) { $remainingById[[int]$process.ProcessId] = $process }
+
+    $remaining = @()
+    $allManagedIds = @($launcherIds) + @($serviceIds) + @($bridgeIds)
+    foreach ($processId in @($allManagedIds | Sort-Object -Unique)) {
+        if ($remainingById.ContainsKey([int]$processId)) {
+            $remaining += ([string]$remainingById[[int]$processId].Name + ' PID ' + $processId)
+        }
+    }
+    if ($remaining.Count -gt 0) { throw ('Could not stop all verified ResearchTools processes: ' + ($remaining -join '; ')) }
+
+    Write-CleanupLog ('Cleanup verified. Launcher trees=' + $launcherIds.Count + '; services=' + $serviceIds.Count + '; legacy bridges=' + $bridgeIds.Count + '.')
+    exit 0
+}
+catch {
+    try { Add-Content -LiteralPath $config.LogPath -Encoding UTF8 -Value ('{0} [ProcessCleanup] ERROR: {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'),$_.Exception.Message) } catch { }
+    exit 1
+}
+'@
+
+    $configuration = @{
+        RuntimePath = $Runtime
+        McpHostPath = $McpHost
+        LauncherPath = $Launcher
+        BridgePath = (Join-Path $Runtime 'DuckAI-MCP-Bridge.ps1')
+        LogPath = $Log
+    } | ConvertTo-Json -Compress
+    $configToken = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($configuration))
+    $helperCode = $helperCode.Replace('__CONFIG_TOKEN__',$configToken)
+    $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($helperCode))
+
+    $powershell = Get-PowerShell
+    $arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + $encodedCommand
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    $isAdministrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+    try {
+        if ($isAdministrator) {
+            $cleanupProcess = Start-Process -FilePath $powershell -ArgumentList $arguments -WindowStyle Hidden -Wait -PassThru
+        }
+        else {
+            Log 'Process cleanup requires elevation; requesting UAC approval before changing installed processes.'
+            $cleanupProcess = Start-Process -FilePath $powershell -ArgumentList $arguments -Verb RunAs -WindowStyle Hidden -Wait -PassThru
+        }
+    }
+    catch {
+        throw ('تعذر تنفيذ تنظيف عمليات أدوات الباحث بصلاحيات المسؤول. أُوقف التثبيت قبل استبدال الملفات. التفاصيل: ' + $_.Exception.Message)
+    }
+
+    if (-not $cleanupProcess -or $cleanupProcess.ExitCode -ne 0) {
+        throw 'فشل إيقاف جميع عمليات أدوات الباحث والتحقق من انتهائها؛ أُوقف التثبيت لحماية الملفات قيد التشغيل. راجع سجل ProcessCleanup.'
+    }
+
+    Log 'Old ResearchTools launcher trees and verified runtime processes stopped; elevated cleanup confirmed.'
 }
 function Install-Runtime {
     if (-not (Test-Path -LiteralPath $RuntimeArchive -PathType Leaf) -or -not (Test-Path -LiteralPath $RuntimeShaFile -PathType Leaf)) { throw 'ملفات الخادم المضمنة غير مكتملة.' }
