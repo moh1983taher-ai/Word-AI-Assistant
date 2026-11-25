@@ -3,8 +3,8 @@ using System.Text;
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Human-readable JSON decision protocol for Duck2API endpoints that ignore
-/// response_format. The host still validates every parsed decision and tool call.
+/// Aurora-compatible tagged tool-call protocol for DuckAI, with a guarded JSON
+/// final-answer shape. The host validates every parsed call against the live MCP schema.
 /// </summary>
 internal static class ResearchDecisionProtocol
 {
@@ -17,11 +17,13 @@ internal static class ResearchDecisionProtocol
         pendingPageSourceLabels ??= [];
 
         var builder = new StringBuilder();
-        builder.AppendLine("بروتوكول قرار البحث (JSON عادي):");
-        builder.AppendLine("أخرج كائناً واحداً فقط، دون Markdown أو أي نص خارجه.");
-        builder.AppendLine("لاستدعاء أداة MCP أخرج: {\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}.");
+        builder.AppendLine("بروتوكول البحث: استدعاء الأدوات بصيغة Aurora النصية، والإجابة النهائية بصيغة JSON.");
+        builder.AppendLine("أخرج قراراً واحداً فقط، دون Markdown أو شرح خارج الصيغة المطلوبة.");
+        builder.AppendLine("لاستدعاء أداة MCP أخرج كتلة واحدة بالصيغة الآتية، وانسخ الاسم المركب حرفياً من فهرس الأدوات:");
+        builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
+        builder.AppendLine("الاسم المركب يتكون من معرّف المكتبة ثم __ ثم اسم الأداة، مثل aljam3__search. لا تضع server أو tool في حقول منفصلة.");
         builder.AppendLine("للإجابة النهائية أخرج: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور مغطى من الخطة\"],\"uncovered\":[]}. يجب أن تكون القائمتان موجودتين دائماً.");
-        builder.AppendLine("التزم حرفياً بأسماء الأدوات ومعاملاتها في مخطط MCP، ولا تخمّن المعرّفات أو تنقلها بين المكتبات.");
+        builder.AppendLine("التزم حرفياً بمعاملات الأداة. لا تخمّن المعرّفات ولا تنقلها بين المكتبات.");
 
         if (!allowFinal)
         {
@@ -39,7 +41,7 @@ internal static class ResearchDecisionProtocol
         else
         {
             builder.AppendLine("اكتملت متطلبات الوصول الأساسية، لكن لا يعني ذلك اكتمال الاستقصاء.");
-            builder.AppendLine("راجع نتائج جميع الاستعلامات وتغطية محاور خطة البحث. إذا بقي محور غير مغطى، أو نتيجة قوية لم تُفحص، أو احتجت إلى مقارنة مراجع إضافية، فواصل باستخدام tool_call.");
+            builder.AppendLine("راجع نتائج جميع الاستعلامات وتغطية محاور خطة البحث. إذا بقي محور غير مغطى، أو نتيجة قوية لم تُفحص، أو احتجت إلى مقارنة مراجع إضافية، فواصل باستخدام كتلة <tool_call>.");
             builder.AppendLine("لا تكتف بصفحة واحدة ولا بعدد شكلي من المراجع. افتح عدداً مناسباً من الصفحات ذات الصلة بحسب نوع السؤال واتساعه، واستبعد الصفحات التي لا تتناول المسألة.");
             builder.AppendLine("في طلب النص المحدد تحقق من موضع النص وسياقه؛ وفي السؤال العام اجمع معلومات متنوعة تغطي المحاور. صنّف كل محور في covered إذا دعمته الأدلة، أو في uncovered إذا تعذر إثباته بعد استقصاء مناسب، واذكر سبب التعذر وحدود البحث في answer. لا تترك أي محور بلا تصنيف، ولا تدّع تغطية ما لم يثبت.");
         }
@@ -56,11 +58,12 @@ internal static class ResearchDecisionProtocol
         ArgumentNullException.ThrowIfNull(pendingPageSourceLabels);
 
         var builder = new StringBuilder();
-        builder.AppendLine("كان القرار السابق غير صالح بصيغة JSON. أعد قراراً واحداً صحيحاً فقط، دون Markdown أو شرح.");
-        builder.AppendLine("استعمل أسماء الخوادم والأدوات ومعاملاتها كما وردت حرفياً في فهرس MCP.");
+        builder.AppendLine("كان القرار السابق غير صالح. أعد قراراً واحداً صحيحاً فقط، دون Markdown أو شرح.");
+        builder.AppendLine("استعمل الاسم المركب للأداة كما ورد حرفياً في فهرس MCP، وأرسل الاستدعاء داخل كتلة <tool_call>.");
+        builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
         if (!allowFinal)
         {
-            builder.AppendLine("لا يُسمح الآن بقرار final؛ أخرج tool_call فقط.");
+            builder.AppendLine("لا يُسمح الآن بقرار final؛ أخرج كتلة <tool_call> فقط.");
             if (pendingSourceLabels.Count > 0)
                 builder.Append("المصادر التي لم يكتمل البحث فيها: ")
                     .Append(string.Join("، ", pendingSourceLabels)).AppendLine(".");
@@ -68,12 +71,12 @@ internal static class ResearchDecisionProtocol
                 builder.Append("مصادر أعادت نتائج وتحتاج إلى فتح مواضع مرشحة: ")
                     .Append(string.Join("، ", pendingPageSourceLabels)).AppendLine(".");
             builder.AppendLine("اختر أداة البحث أو فتح الصفحة المناسبة من المخطط، ولا تكرر فتح صفحة تم التحقق منها إذا بقي مصدر آخر غير مفحوص.");
-            builder.AppendLine("{\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}");
+            builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
         }
         else
         {
-            builder.AppendLine("يمكنك إخراج tool_call لمتابعة البحث أو final إذا غطت الأدلة المفتوحة محاور الخطة بالفعل.");
-            builder.AppendLine("{\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}");
+            builder.AppendLine("يمكنك إخراج كتلة <tool_call> لمتابعة البحث أو final إذا غطت الأدلة المفتوحة محاور الخطة بالفعل.");
+            builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
             builder.AppendLine("{\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور مغطى من الخطة\"],\"uncovered\":[]}");
         }
 
@@ -86,7 +89,7 @@ internal static class ResearchDecisionProtocol
         return "لا تعتمد الإجابة النهائية بعد؛ لم تثبت تغطية محاور الخطة الآتية: " +
             string.Join("، ", missingCoverage) +
             ". إن بقيت وسائل بحث مناسبة لم تجربها، فنفذ بحثاً تكميلياً أو افتح مراجع إضافية ذات صلة. وإن استنفدت المسارات المعقولة دون دليل، فضع المحور في uncovered واذكر سبب التعذر وحدود الاستقصاء في answer. لا تترك أي محور بلا تصنيف. " +
-            "أخرج قرار tool_call لمتابعة البحث، أو final بعد تصنيف جميع المحاور بين covered وuncovered دون ادعاء. " +
+            "أخرج كتلة <tool_call> لمتابعة البحث، أو final بعد تصنيف جميع المحاور بين covered وuncovered دون ادعاء. " +
             "صيغة final: {\"type\":\"final\",\"answer\":\"...\",\"covered\":[\"...\"],\"uncovered\":[]}.";
     }
 
