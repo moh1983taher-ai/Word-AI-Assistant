@@ -180,12 +180,22 @@ jobs:
             # its bootstrap pin to the verified archive being embedded in this build.
             $replacement = 'Const BOOTSTRAP_SHA256 = "' + $actualHash + '"'
             $syncedLauncher = [regex]::Replace($unifiedLauncherText, $pattern, $replacement, 1)
-            [IO.File]::WriteAllText($unifiedLauncherPath, $syncedLauncher, [Text.UTF8Encoding]::new($true))
+            # WSH VBScript rejects a UTF-8 BOM at the first character.
+            [IO.File]::WriteAllText($unifiedLauncherPath, $syncedLauncher, [Text.UTF8Encoding]::new($false))
+            $finalLauncherBytes = [IO.File]::ReadAllBytes($unifiedLauncherPath)
+            if ($finalLauncherBytes.Length -ge 3 -and
+                $finalLauncherBytes[0] -eq 0xEF -and
+                $finalLauncherBytes[1] -eq 0xBB -and
+                $finalLauncherBytes[2] -eq 0xBF) {
+              throw 'Unified VBScript launcher must not contain a UTF-8 BOM.'
+            }
             $verifiedUnifiedPin = [regex]::Match((Get-Content -LiteralPath $unifiedLauncherPath -Raw), $pattern)
             if (-not $verifiedUnifiedPin.Success -or $verifiedUnifiedPin.Groups[1].Value.ToLowerInvariant() -ne $actualHash) {
               throw ('Unified launcher bootstrap pin could not be synchronized. Actual=' + $actualHash)
             }
-            Write-Host ('Bootstrap pin verified across runtime and unified launcher: ' + $actualHash)
+            & cscript.exe //nologo $unifiedLauncherPath --self-test
+            if ($LASTEXITCODE -ne 0) { throw 'Windows Script Host could not parse the final unified VBScript launcher.' }
+            Write-Host ('Bootstrap pin and BOM-free VBScript launcher verified: ' + $actualHash)
           }
           finally {
             if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
@@ -275,9 +285,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.13'
-          $title = 'ResearchTools Unified Setup v1.2.13'
-          $notes = 'Unified Setup v1.2.13 preserves the v1.2.12 adaptive MCP research planner and adds a startup readiness gate: the unified launcher verifies an HTTP 200 response containing a non-empty model list from Duck2API /v1/models before starting ResearchTools-DuckAgent. It waits up to 120 seconds, records a clear diagnostic on failure, and avoids launching the dependent agent against an unready endpoint. The installer now requires DuckAI-MCP-Bridge.ps1 in the integrity-checked runtime archive, and main builds wait for the corrected DuckAI Runtime v1.0.11 release instead of embedding the obsolete v1.0.6 package. Existing source boundaries, evidence provenance, SHA-256 validation, staged installation and rollback protections are retained. Does not modify C:\\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.2.14'
+          $title = 'ResearchTools Unified Setup v1.2.14'
+          $notes = 'Unified Setup v1.2.14 fixes a Windows Script Host startup failure in Setup v1.2.13: the build previously rewrote ResearchTools-Launcher.vbs with a UTF-8 BOM, which VBScript rejected as an invalid character at line 1, character 1. The build now writes the synchronized launcher as UTF-8 without BOM, verifies the first three bytes, and compiles the exact final launcher with Windows cscript before packaging. The 1.2.13 Duck2API readiness gate, stable runtime release filtering, bridge archive integrity validation, adaptive MCP research planner, and existing SHA-256 checks are retained. Does not modify C:\\Word AI Assistant v2.'
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {

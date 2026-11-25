@@ -8,6 +8,10 @@ Dim duckExe,agentExe,bridgeScript,mcpHostExe,powershellExe,wscriptExe,runtimeRea
 Set shell=CreateObject("WScript.Shell")
 Set fso=CreateObject("Scripting.FileSystemObject")
 Set env=shell.Environment("Process")
+
+If WScript.Arguments.Count > 0 Then
+    If LCase(WScript.Arguments(0)) = "--self-test" Then WScript.Quit 0
+End If
 rootDir=shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\ResearchTools"
 installDir=rootDir & "\DuckAI"
 launcherPath=rootDir & "\ResearchTools-Launcher.vbs"
