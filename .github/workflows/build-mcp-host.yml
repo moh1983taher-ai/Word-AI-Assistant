@@ -38,7 +38,10 @@ jobs:
         run: dotnet restore runtime/McpHost.Tests/ResearchTools.McpHost.Tests.csproj
 
       - name: Build and run unit tests
-        run: dotnet test runtime/McpHost.Tests/ResearchTools.McpHost.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=mcp-host-tests.trx"
+        run: dotnet test runtime/McpHost.Tests/ResearchTools.McpHost.Tests.csproj --configuration Release --no-restore --filter "Category!=Integration" --logger "trx;LogFileName=mcp-host-tests.trx"
+
+      - name: Execute live read-only MCP search integration tests
+        run: dotnet test runtime/McpHost.Tests/ResearchTools.McpHost.Tests.csproj --configuration Release --no-restore --no-build --filter "Category=Integration" --logger "console;verbosity=normal"
 
       - name: Publish self-contained Windows x64 host
         shell: pwsh
