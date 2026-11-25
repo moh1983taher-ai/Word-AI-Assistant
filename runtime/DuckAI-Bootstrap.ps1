@@ -17,7 +17,7 @@ $RuntimeDir = Join-Path $RootDir 'DuckAI'
 $LauncherPath = Join-Path $RootDir 'ResearchTools-Launcher.vbs'
 $LogPath = Join-Path $RootDir 'DuckAI-Bootstrap.log'
 $InstalledReleasePath = Join-Path $RootDir 'DuckAI-Installed-Release.txt'
-$ReleaseApi = "https://api.github.com/repos/$Repository/releases/latest"
+$ReleaseApi = "https://api.github.com/repos/$Repository/releases?per_page=100"
 
 function Write-Log {
     param([string]$Message)
@@ -190,20 +190,26 @@ function Register-StartupTask {
 
 function Get-LatestStableRelease {
     $headers = @{
-        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.2'
+        'User-Agent' = 'ResearchTools-DuckAI-Bootstrap/3.3'
         'Accept' = 'application/vnd.github+json'
     }
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Write-Log 'بدء فحص أحدث إصدار مستقر من DuckAI عبر GitHub latest-release API.'
-    $release = Invoke-RestMethod -TimeoutSec 60 -Uri $ReleaseApi -Headers $headers -Method Get
-    $tag = [string]$release.tag_name
-    if ([string]::IsNullOrWhiteSpace($tag) -or $tag -notmatch '^duckai-runtime-v\d+\.\d+\.\d+$' -or $release.draft -or $release.prerelease) {
-        throw ("GitHub latest release is not a stable DuckAI release. Returned tag: " + $tag)
+    Write-Log 'بدء البحث عن أحدث إصدار مستقر من DuckAI بين إصدارات المستودع.'
+    $releases = @(Invoke-RestMethod -TimeoutSec 60 -Uri $ReleaseApi -Headers $headers -Method Get)
+    $release = $releases |
+        Where-Object {
+            -not $_.draft -and
+            -not $_.prerelease -and
+            [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+$' -and
+            -not [string]::IsNullOrWhiteSpace([string]$_.published_at)
+        } |
+        Sort-Object { [DateTime]::Parse($_.published_at).ToUniversalTime() } -Descending |
+        Select-Object -First 1
+
+    if (-not $release) {
+        throw 'لم يُعثر على إصدار DuckAI مستقر منشور.'
     }
-    if ([string]::IsNullOrWhiteSpace([string]$release.published_at)) {
-        throw ("GitHub returned no publication timestamp for DuckAI release: " + $tag)
-    }
-    Write-Log ("تم العثور على الإصدار المستقر: " + $tag)
+    Write-Log ("تم العثور على أحدث إصدار مستقر للمحرك: " + $release.tag_name)
     return $release
 }
 
