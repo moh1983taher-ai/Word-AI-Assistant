@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ResearchTools.McpHost.Infrastructure;
+using ResearchTools.McpHost.Models;
 using ResearchTools.McpHost.Services;
 using Xunit;
 
