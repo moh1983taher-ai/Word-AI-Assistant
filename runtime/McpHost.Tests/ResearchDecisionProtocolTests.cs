@@ -12,7 +12,7 @@ public sealed class ResearchDecisionProtocolTests
             allowFinal: true,
             pendingSourceLabels: []);
 
-        Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("<tool_call>", prompt, StringComparison.Ordinal);
         Assert.Contains("\"type\":\"final\"", prompt, StringComparison.Ordinal);
         Assert.Contains("covered", prompt, StringComparison.Ordinal);
         Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
@@ -32,7 +32,7 @@ public sealed class ResearchDecisionProtocolTests
 
         Assert.Contains("لا تُنه البحث الآن", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
-        Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("<tool_call>", prompt, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -86,7 +86,7 @@ public sealed class ResearchDecisionProtocolTests
             pendingSourceLabels: [],
             pendingPageSourceLabels: ["المكتبة الشاملة"]);
 
-        Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("<tool_call>", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("\"type\":\"final\"", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
     }
