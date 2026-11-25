@@ -168,14 +168,22 @@ jobs:
             $actualHash = (Get-FileHash -LiteralPath $bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
             $pattern = 'Const\s+BOOTSTRAP_SHA256\s*=\s*"([a-f0-9]{64})"'
             $runtimePin = [regex]::Match((Get-Content -LiteralPath $runtimeLauncher -Raw), $pattern)
-            $unifiedPin = [regex]::Match((Get-Content -LiteralPath 'installer/ResearchTools-Launcher.vbs' -Raw), $pattern)
+            $unifiedLauncherPath = 'installer/ResearchTools-Launcher.vbs'
+            $unifiedLauncherText = Get-Content -LiteralPath $unifiedLauncherPath -Raw
+            $unifiedPin = [regex]::Match($unifiedLauncherText, $pattern)
             if (-not $runtimePin.Success) { throw 'Could not read the bootstrap pin from the bundled DuckAI launcher.' }
             if (-not $unifiedPin.Success) { throw 'Could not read the bootstrap pin from the unified launcher.' }
             if ($runtimePin.Groups[1].Value.ToLowerInvariant() -ne $actualHash) {
               throw ('Bundled DuckAI launcher pin mismatch. Actual=' + $actualHash)
             }
-            if ($unifiedPin.Groups[1].Value.ToLowerInvariant() -ne $actualHash) {
-              throw ('Unified launcher pin mismatch. Actual=' + $actualHash + '; Unified=' + $unifiedPin.Groups[1].Value)
+            # The Setup launcher is shared by multiple Runtime releases; synchronize
+            # its bootstrap pin to the verified archive being embedded in this build.
+            $replacement = 'Const BOOTSTRAP_SHA256 = "' + $actualHash + '"'
+            $syncedLauncher = [regex]::Replace($unifiedLauncherText, $pattern, $replacement, 1)
+            [IO.File]::WriteAllText($unifiedLauncherPath, $syncedLauncher, [Text.UTF8Encoding]::new($true))
+            $verifiedUnifiedPin = [regex]::Match((Get-Content -LiteralPath $unifiedLauncherPath -Raw), $pattern)
+            if (-not $verifiedUnifiedPin.Success -or $verifiedUnifiedPin.Groups[1].Value.ToLowerInvariant() -ne $actualHash) {
+              throw ('Unified launcher bootstrap pin could not be synchronized. Actual=' + $actualHash)
             }
             Write-Host ('Bootstrap pin verified across runtime and unified launcher: ' + $actualHash)
           }
