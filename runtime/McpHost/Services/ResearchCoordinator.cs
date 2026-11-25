@@ -18,7 +18,7 @@ public sealed class ResearchBusyException : Exception
 public sealed class ResearchCoordinator
 {
     private const int MaxDuckAiMessageCharacters = 12_000;
-    private const int MaxDuckAiEvidenceContextCharacters = 36_000;
+    private const int MaxDuckAiEvidenceContextCharacters = 22_000;
 
     private readonly DuckAiClient _duckAi;
     private readonly McpSourceRegistry _sources;
@@ -344,7 +344,8 @@ public sealed class ResearchCoordinator
 
                 ModelDecision? parsedDecision = null;
                 if (completion.ToolCalls.Count == 0 &&
-                    ModelDecisionParser.TryParse(completion.Text, out var candidateDecision))
+                    (AuroraToolCallProtocol.TryParse(completion.Text, out var candidateDecision) ||
+                     ModelDecisionParser.TryParse(completion.Text, out candidateDecision)))
                 {
                     parsedDecision = candidateDecision;
                 }
@@ -850,24 +851,16 @@ public sealed class ResearchCoordinator
         ResearchPlan researchPlan,
         out int toolCatalogCharacters)
     {
-        // Duck2API drops response_format, so the actual read-only MCP input schemas
-        // must be visible in the ordinary system prompt for model-directed page reads.
-        var toolDirectory = tools.Select(tool => new
-        {
-            server = tool.Server,
-            source = tool.ServerLabel,
-            name = tool.Name,
-            description = tool.Description,
-            inputSchema = tool.InputSchema
-        }).ToArray();
-        var serializedTools = JsonSerializer.Serialize(toolDirectory, JsonDefaults.Web);
-        toolCatalogCharacters = serializedTools.Length;
+        // Send a compact Aurora-style catalog instead of full JSON schemas.
+        // The host still validates every call against the original MCP schema.
+        var compactToolCatalog = AuroraToolCallProtocol.BuildToolCatalog(tools);
+        toolCatalogCharacters = compactToolCatalog.Length;
 
         var builder = new System.Text.StringBuilder(
             ResearchAgentInstructions.Build(selectedLabels, warnings));
         builder.AppendLine().AppendLine(
-            "أدوات MCP المتاحة وأوصافها ومخطط inputSchema الفعلي لكل أداة. استخدم المخطط لتحديد أسماء المعاملات وأنواعها والقيم الإلزامية والافتراضية، ولا تخمّن أي معرّف أو معامل:");
-        builder.AppendLine(serializedTools);
+            "أدوات MCP المتاحة بصيغة أسماء مركبة: اسم المكتبة ثم اسم الأداة. أرسل الاستدعاء في كتلة <tool_call>، ويظل المضيف مسؤولاً عن التحقق من المخطط الأصلي قبل التنفيذ:");
+        builder.AppendLine(compactToolCatalog);
         builder.AppendLine().AppendLine("خطة البحث التي أعدها النموذج لهذه المهمة؛ راجع تغطيتها، وعدّل الاستعلامات أو وسّعها عند الحاجة:");
         builder.AppendLine(ResearchPlanningProtocol.FormatPlan(researchPlan));
         return builder.ToString();
