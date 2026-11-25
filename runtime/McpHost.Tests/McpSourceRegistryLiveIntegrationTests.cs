@@ -50,10 +50,28 @@ public sealed class McpSourceRegistryLiveIntegrationTests
 
         foreach (var invocation in plan)
         {
+            // Simulate the exact tagged text emitted by DuckAI, then pass the
+            // parsed server/tool/arguments to the live registry. This verifies
+            // the Aurora text protocol against real MCP schemas and endpoints
+            // without depending on DuckAI model availability in the CI region.
+            var taggedJson = JsonSerializer.Serialize(new
+            {
+                name = AuroraToolCallProtocol.BuildToolAlias(invocation.Tool),
+                arguments = invocation.Arguments
+            });
+            var taggedResponse = $"<tool_call>{taggedJson}</tool_call>";
+
+            Assert.True(
+                AuroraToolCallProtocol.TryParse(taggedResponse, out var decision),
+                $"Aurora tool-call protocol rejected the generated call for {invocation.Tool.Server}/{invocation.Tool.Name}.");
+            Assert.Equal(invocation.Tool.Server, decision.Server);
+            Assert.Equal(invocation.Tool.Name, decision.Tool);
+
+            var parsedArguments = ToArguments(decision.Arguments);
             var searchResult = await registry.CallToolAsync(
-                invocation.Tool.Server,
-                invocation.Tool.Name,
-                invocation.Arguments,
+                decision.Server,
+                decision.Tool,
+                parsedArguments,
                 timeout.Token);
 
             Assert.NotEqual(true, searchResult.IsError);
@@ -116,6 +134,22 @@ public sealed class McpSourceRegistryLiveIntegrationTests
 
         Assert.False(provenance.HasUnverifiedSearchResults);
         Assert.Equal(2, provenance.VerifiedPageOpenCount);
+    }
+
+    private static IReadOnlyDictionary<string, object?> ToArguments(JsonElement arguments)
+    {
+        Assert.Equal(JsonValueKind.Object, arguments.ValueKind);
+
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var property in arguments.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.Null)
+                continue;
+
+            values[property.Name] = property.Value.Clone();
+        }
+
+        return values;
     }
 
     private static string[] GetTextBlocks(CallToolResult result) =>
