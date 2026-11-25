@@ -50,6 +50,18 @@ public sealed class McpSourceRegistryLiveIntegrationTests
 
         foreach (var invocation in plan)
         {
+            // Verify that the live MCP schema rejects a malformed query argument
+            // before any request is dispatched to the upstream source.
+            var invalidSearchArguments = BuildInvalidSearchArguments(invocation);
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                registry.CallToolAsync(
+                    invocation.Tool.Server,
+                    invocation.Tool.Name,
+                    invalidSearchArguments,
+                    timeout.Token));
+            Console.WriteLine(
+                $"Live MCP schema validation succeeded: source={invocation.Tool.Server}; malformedArgumentsRejected=true.");
+
             // Simulate the exact tagged text emitted by DuckAI, then pass the
             // parsed server/tool/arguments to the live registry. This verifies
             // the Aurora text protocol against real MCP schemas and endpoints
@@ -102,6 +114,15 @@ public sealed class McpSourceRegistryLiveIntegrationTests
             Assert.NotNull(reference);
 
             var openArguments = BuildOpenArguments(openTool, reference!);
+            var pageReferenceKey = invocation.Tool.Server == "aljam3"
+                ? "page_number"
+                : "page_id";
+            var forgedArguments = new Dictionary<string, object?>(openArguments, StringComparer.Ordinal)
+            {
+                [pageReferenceKey] = "reference-not-returned-by-search"
+            };
+            Assert.NotNull(provenance.ValidateReferenceRead(openTool, forgedArguments));
+
             var referenceError = provenance.ValidateReferenceRead(openTool, openArguments);
             Assert.Null(referenceError);
 
@@ -134,6 +155,34 @@ public sealed class McpSourceRegistryLiveIntegrationTests
 
         Assert.False(provenance.HasUnverifiedSearchResults);
         Assert.Equal(2, provenance.VerifiedPageOpenCount);
+    }
+
+    private static IReadOnlyDictionary<string, object?> BuildInvalidSearchArguments(
+        ResearchSearchInvocation invocation)
+    {
+        var queryNames = new HashSet<string>(
+            ["query", "keywords", "q", "search_query", "search_term", "keyword", "text"],
+            StringComparer.OrdinalIgnoreCase);
+        var queryProperty = invocation.Tool.InputSchema
+            .GetProperty("properties")
+            .EnumerateObject()
+            .First(property => queryNames.Contains(property.Name));
+
+        var declaredType = queryProperty.Value.GetProperty("type").GetString();
+        var invalidValue = declaredType switch
+        {
+            "string" => (object)12345,
+            "array" => "not-an-array",
+            _ => throw new InvalidOperationException(
+                $"Unexpected query argument type for {invocation.Tool.Server}/{invocation.Tool.Name}: {declaredType}")
+        };
+
+        var arguments = invocation.Arguments.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.Ordinal);
+        arguments[queryProperty.Name] = invalidValue;
+        return arguments;
     }
 
     private static IReadOnlyDictionary<string, object?> ToArguments(JsonElement arguments)
