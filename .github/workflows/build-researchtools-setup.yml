@@ -74,7 +74,16 @@ jobs:
           $installerFiles = @([regex]::Matches(
             $installerFilesMatch.Groups['files'].Value,
             "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-          if ($installerFiles -notcontains 'DuckAI-MCP-Bridge.ps1') {
+          $runtimeFilesMatch = [regex]::Match(
+            $installerScript,
+            '(?s)\$required\s*=\s*@\((?<files>.*?)\)')
+          if (-not $runtimeFilesMatch.Success) {
+            throw 'Installer does not declare the required DuckAI runtime files.'
+          }
+          $runtimeFiles = @([regex]::Matches(
+            $runtimeFilesMatch.Groups['files'].Value,
+            "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+          if ($runtimeFiles -notcontains 'DuckAI-MCP-Bridge.ps1') {
             throw 'Installer runtime integrity list must require DuckAI-MCP-Bridge.ps1.'
           }
 
