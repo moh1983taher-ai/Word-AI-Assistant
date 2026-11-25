@@ -11,9 +11,9 @@ public sealed class ResearchBusyException : Exception
 }
 
 /// <summary>
-/// Orchestrates JSON-decision turns against official MCP clients. The installed DuckAI
-/// endpoint returns plain text instead of tool_calls even when a function is forced, so
-/// the host uses the explicit JSON protocol from the first model turn.
+/// Orchestrates Aurora-compatible tagged tool-call turns against official MCP clients.
+/// Duck2API returns text rather than native function calls, so the host translates
+/// the model's tagged response, validates it against MCP, and executes it locally.
 /// </summary>
 public sealed class ResearchCoordinator
 {
@@ -288,9 +288,8 @@ public sealed class ResearchCoordinator
                         pendingSourceLabels,
                         pendingPageSourceLabels);
 
-                // Tool input schemas are included in the system prompt as ordinary data.
-                // Duck2API does not enforce response_format=json_schema, so no hidden
-                // schema payload is sent or counted here.
+                // The compact tool directory is included as ordinary prompt text.
+                // The original MCP schema remains authoritative during host-side validation.
                 var fixedRequestCharacters = turnSystemPrompt.Length;
                 var availableInputCharacters = contextBudget.GetAvailableInputCharacters(fixedRequestCharacters);
                 if (availableInputCharacters <= 1)
@@ -353,7 +352,7 @@ public sealed class ResearchCoordinator
                 if (parsedDecision is null)
                 {
                     _log.Warning(
-                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; toolCalls={completion.ToolCalls.Count}; responseFormat=omitted; protocol=prompted-json; repairAttempt={invalidDecisionAttempts + 1}.");
+                        $"Research model decision invalid: task={taskId}; responseCharacters={completion.Text.Length}; toolCalls={completion.ToolCalls.Count}; responseFormat=omitted; protocol=aurora-tool-call+json-final; repairAttempt={invalidDecisionAttempts + 1}.");
 
                     if (invalidDecisionAttempts >= 2)
                     {
@@ -465,7 +464,7 @@ public sealed class ResearchCoordinator
                             "تعذر اعتماد إجابة البحث: بقيت مكتبة أعادت نتائج فعلية من دون فتح صفحة مطابقة والتحقق من معرّفها. أُوقف تمرير الإجابة غير المكتملة بدلاً من عرضها بوصفها بحثاً موثقاً.");
                     }
 
-                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; mode=prompted-json; model={model}.");
+                    _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; mode=aurora-tool-call+json-final; model={model}.");
                     return new ResearchResponse(
                         decision.Answer,
                         model,
