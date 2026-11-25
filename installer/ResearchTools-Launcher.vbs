@@ -4,7 +4,7 @@ Option Explicit
 Const BOOTSTRAP_SHA256 = "59f0a32ad419d60b0d95ab6d591ac971e7b5a7e07ab19937106ebe09a500281f"
 Const BOOTSTRAP_RAW_URL = "https://raw.githubusercontent.com/moh1983taher-ai/Word-AI-Assistant/main/runtime/DuckAI-Bootstrap.ps1"
 Dim shell,fso,env,rootDir,installDir,launcherPath,bootstrapPath
-Dim duckExe,agentExe,bridgeScript,mcpHostExe,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
+Dim duckExe,bridgeScript,mcpHostExe,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
 Set shell=CreateObject("WScript.Shell")
 Set fso=CreateObject("Scripting.FileSystemObject")
 Set env=shell.Environment("Process")
@@ -17,7 +17,6 @@ installDir=rootDir & "\DuckAI"
 launcherPath=rootDir & "\ResearchTools-Launcher.vbs"
 bootstrapPath=rootDir & "\DuckAI-Bootstrap.ps1"
 duckExe=installDir & "\duck2api-main.exe"
-agentExe=installDir & "\ResearchTools-DuckAgent.exe"
 bridgeScript=installDir & "\DuckAI-MCP-Bridge.ps1"
 mcpHostExe=rootDir & "\McpHost\ResearchTools.McpHost.exe"
 powershellExe=shell.ExpandEnvironmentStrings("%SystemRoot%") & "\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -50,27 +49,32 @@ End If
 
 Do
     If ProcessExists("WINWORD.EXE") Then
-        If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not ResearchMcpRunning() Then
+        If Not runtimeReady Or Not ProcessExistsAtPath(duckExe) Or Not ResearchMcpRunning() Then
             ensureCode=EnsureRuntime(True)
             lastEnsureAt=Now
             runtimeReady=(ensureCode=0)
-            If runtimeReady Then StartServices
+            If runtimeReady Then
+                StartServices
+                runtimeReady=(DuckApiReady() And ResearchMcpRunning())
+            End If
         End If
         Do While ProcessExists("WINWORD.EXE")
-            If Not runtimeReady Or Not ProcessExists("duck2api-main.exe") Or Not ProcessExists("ResearchTools-DuckAgent.exe") Or Not ResearchMcpRunning() Then
+            If Not runtimeReady Or Not ProcessExistsAtPath(duckExe) Or Not ResearchMcpRunning() Then
                 If DateDiff("s",lastEnsureAt,Now)>=30 Then
                     ensureCode=EnsureRuntime(False)
                     lastEnsureAt=Now
                     runtimeReady=(ensureCode=0)
-                    If runtimeReady Then StartServices
+                    If runtimeReady Then
+                StartServices
+                runtimeReady=(DuckApiReady() And ResearchMcpRunning())
+            End If
                 End If
             End If
             WScript.Sleep 3000
         Loop
         StopResearchMcp
-        StopProcess "ResearchTools-DuckAgent.exe"
         WScript.Sleep 1000
-        StopProcess "duck2api-main.exe"
+        StopProcessAtPath duckExe
         runtimeReady=False
     Else
         WScript.Sleep 3000
@@ -121,31 +125,39 @@ Function EnsureRuntime(checkUpdates)
 End Function
 Sub StartServices()
     If Not fso.FileExists(duckExe) Then
-        WriteLauncherLog "ERROR: Duck2API executable is missing; the research agent was not started."
+        WriteLauncherLog "ERROR: Duck2API executable is missing; MCP host startup was skipped."
         Exit Sub
     End If
-    If Not ProcessExists("duck2api-main.exe") Then
-        env("SERVER_HOST")="127.0.0.1"
-        env("SERVER_PORT")="18080"
-        shell.Run Chr(34)&duckExe&Chr(34),0,False
-        env("SERVER_HOST")=""
-        env("SERVER_PORT")=""
+
+    If Not ProcessExistsAtPath(duckExe) Then
+        If ProcessExists("duck2api-main.exe") Then
+            If Not DuckApiReady() Then
+                WriteLauncherLog "ERROR: another duck2api-main.exe process is present, but its installed path cannot be verified and 18080 is not ready; refusing to start a duplicate."
+                Exit Sub
+            End If
+            WriteLauncherLog "INFO: an already-running Duck2API endpoint is responding; reusing 127.0.0.1:18080."
+        Else
+            env("SERVER_HOST")="127.0.0.1"
+            env("SERVER_PORT")="18080"
+            shell.Run Chr(34)&duckExe&Chr(34),0,False
+            env("SERVER_HOST")=""
+            env("SERVER_PORT")=""
+        End If
     End If
+
     If Not WaitForDuckApi(120) Then
-        WriteLauncherLog "ERROR: Duck2API did not return a valid non-empty /v1/models response on 127.0.0.1:18080 within 120 seconds; the research agent was not started."
+        WriteLauncherLog "ERROR: Duck2API did not return a valid non-empty /v1/models response on 127.0.0.1:18080 within 120 seconds; MCP host startup was skipped."
         Exit Sub
     End If
-    If fso.FileExists(agentExe) And Not ProcessExists("ResearchTools-DuckAgent.exe") Then
-        shell.Run Chr(34)&agentExe&Chr(34),0,False
-        WScript.Sleep 1500
-    End If
+
+    WriteLauncherLog "INFO: using Duck2API directly on 127.0.0.1:18080; the legacy DuckAgent proxy on 8080 is not started."
     StartMcpHost
 End Sub
 Function WaitForDuckApi(timeoutSeconds)
     Dim startedAt
     WaitForDuckApi=False
     startedAt=Now
-    WriteLauncherLog "INFO: waiting for Duck2API /v1/models before starting the research agent."
+    WriteLauncherLog "INFO: waiting for Duck2API /v1/models before starting the MCP host."
     Do While DateDiff("s",startedAt,Now)<timeoutSeconds
         If DuckApiReady() Then
             WriteLauncherLog "SUCCESS: Duck2API /v1/models returned a non-empty model list after " & CStr(DateDiff("s",startedAt,Now)) & " seconds."
@@ -166,7 +178,7 @@ Function DuckApiReady()
         On Error GoTo 0
         Exit Function
     End If
-    request.SetTimeouts 1000,1000,1000,2000
+    request.SetTimeouts 2000,2000,2000,12000
     request.Open "GET","http://127.0.0.1:18080/v1/models",False
     request.Send
     status=0
@@ -202,16 +214,24 @@ Sub StartMcpHost()
         StopBridgeProcess
         WScript.Sleep 700
     End If
-    If ProcessExists("ResearchTools.McpHost.exe") Then
+    If ProcessExistsAtPath(mcpHostExe) Then
+        WriteLauncherLog "WARNING: the installed .NET MCP host process is present but /ping is not ready; restarting only that verified installation."
         StopMcpHostProcess
         WScript.Sleep 500
+        If ProcessExistsAtPath(mcpHostExe) Then
+            WriteLauncherLog "ERROR: the installed .NET MCP host process could not be stopped safely; no duplicate host was started."
+            Exit Sub
+        End If
+    ElseIf ProcessExists("ResearchTools.McpHost.exe") Then
+        WriteLauncherLog "ERROR: another MCP host process is present but its executable path cannot be verified; refusing to terminate it or start a duplicate."
+        Exit Sub
     End If
 
     shell.Run Chr(34)&mcpHostExe&Chr(34),0,False
     For attempt=1 To 25
         WScript.Sleep 1000
         If McpHostListening() Then
-            WriteLauncherLog "SUCCESS: .NET MCP host v1.1.7 is listening on 127.0.0.1:18081."
+            WriteLauncherLog "SUCCESS: .NET MCP host is listening on 127.0.0.1:18081."
             Exit Sub
         End If
     Next
@@ -253,9 +273,7 @@ Sub StopResearchMcp()
     StopMcpHostProcess
 End Sub
 Sub StopMcpHostProcess()
-    If ProcessExists("ResearchTools.McpHost.exe") Then
-        StopProcess "ResearchTools.McpHost.exe"
-    End If
+    StopProcessAtPath mcpHostExe
 End Sub
 Sub StartBridge()
     Dim attempt
@@ -307,7 +325,7 @@ Function BridgeProcessExists()
     Set processes=service.ExecQuery("SELECT * FROM Win32_Process WHERE Name='powershell.exe'")
     For Each process In processes
         commandLine=LCase(CStr(process.CommandLine))
-        If InStr(commandLine,LCase("DuckAI-MCP-Bridge.ps1"))>0 Then
+        If InStr(commandLine,LCase(bridgeScript))>0 Then
             BridgeProcessExists=True
             Exit For
         End If
@@ -320,8 +338,9 @@ Sub StopBridgeProcess()
     Set service=GetObject("winmgmts:\\.\root\cimv2")
     Set processes=service.ExecQuery("SELECT * FROM Win32_Process WHERE Name='powershell.exe'")
     For Each process In processes
-        commandLine=LCase(CStr(process.CommandLine))
-        If InStr(commandLine,LCase("DuckAI-MCP-Bridge.ps1"))>0 Then
+        commandLine=""
+        If Not IsNull(process.CommandLine) Then commandLine=LCase(CStr(process.CommandLine))
+        If Len(commandLine)>0 And InStr(commandLine,LCase(fso.GetAbsolutePathName(bridgeScript)))>0 Then
             shell.Run "taskkill /F /PID "&CStr(process.ProcessId),0,True
         End If
     Next
@@ -339,8 +358,48 @@ Function ProcessExists(processName)
     Next
     On Error GoTo 0
 End Function
-Sub StopProcess(processName)
+
+Function ProcessExistsAtPath(executablePath)
+    Dim service,processes,process
+    ProcessExistsAtPath=False
     On Error Resume Next
-    shell.Run "taskkill /F /IM "&processName,0,True
+    Set service=GetObject("winmgmts:\\.\root\cimv2")
+    Set processes=service.ExecQuery("SELECT * FROM Win32_Process WHERE Name='"&fso.GetFileName(executablePath)&"'")
+    For Each process In processes
+        If ProcessPathMatches(process,executablePath) Then
+            ProcessExistsAtPath=True
+            Exit For
+        End If
+    Next
+    On Error GoTo 0
+End Function
+
+Function ProcessPathMatches(process,executablePath)
+    Dim currentPath,commandLine,expectedPath
+    ProcessPathMatches=False
+    expectedPath=LCase(fso.GetAbsolutePathName(executablePath))
+    currentPath=""
+    commandLine=""
+    On Error Resume Next
+    If Not IsNull(process.ExecutablePath) Then currentPath=CStr(process.ExecutablePath)
+    If Not IsNull(process.CommandLine) Then commandLine=LCase(CStr(process.CommandLine))
+    On Error GoTo 0
+    If Len(currentPath)>0 Then
+        ProcessPathMatches=(LCase(fso.GetAbsolutePathName(currentPath))=expectedPath)
+    ElseIf Len(commandLine)>0 Then
+        ProcessPathMatches=(InStr(commandLine,expectedPath)>0)
+    End If
+End Function
+
+Sub StopProcessAtPath(executablePath)
+    Dim service,processes,process
+    On Error Resume Next
+    Set service=GetObject("winmgmts:\\.\root\cimv2")
+    Set processes=service.ExecQuery("SELECT * FROM Win32_Process WHERE Name='"&fso.GetFileName(executablePath)&"'")
+    For Each process In processes
+        If ProcessPathMatches(process,executablePath) Then
+            shell.Run "taskkill /F /PID "&CStr(process.ProcessId),0,True
+        End If
+    Next
     On Error GoTo 0
 End Sub
