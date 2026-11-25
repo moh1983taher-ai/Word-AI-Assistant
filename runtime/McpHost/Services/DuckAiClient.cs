@@ -17,10 +17,8 @@ public sealed class DuckAiClient
 {
     internal static readonly string[] CandidateBaseAddresses =
     [
-        // Use the direct DuckAI inference backend first. The local agent proxy on
-        // 8080 may answer model-list requests while stalling chat completions.
-        "http://127.0.0.1:18080",
-        "http://127.0.0.1:8080"
+        // The legacy 8080 proxy was retired. Use only the active Duck2API endpoint.
+        "http://127.0.0.1:18080"
     ];
 
     // Keep the selected endpoint stable throughout a multi-turn MCP research task.
