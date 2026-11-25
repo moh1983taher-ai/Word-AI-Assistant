@@ -414,7 +414,10 @@ try {
         if ($current) {
             Write-CleanupLog ("Stopping launcher tree PID=" + $launcherId)
             & $taskkill /F /T /PID $launcherId 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { Stop-Process -Id $launcherId -Force -ErrorAction Stop }
+            if ($LASTEXITCODE -ne 0) {
+                $stillRunning = Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId = " + $launcherId) -ErrorAction SilentlyContinue
+                if ($stillRunning) { Stop-Process -Id $launcherId -Force -ErrorAction Stop }
+            }
         }
     }
 
@@ -423,7 +426,10 @@ try {
         if ($current) {
             Write-CleanupLog ("Stopping verified service " + $current.Name + " PID=" + $serviceId)
             & $taskkill /F /PID $serviceId 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { Stop-Process -Id $serviceId -Force -ErrorAction Stop }
+            if ($LASTEXITCODE -ne 0) {
+                $stillRunning = Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId = " + $serviceId) -ErrorAction SilentlyContinue
+                if ($stillRunning) { Stop-Process -Id $serviceId -Force -ErrorAction Stop }
+            }
         }
     }
 
@@ -432,7 +438,10 @@ try {
         if ($current) {
             Write-CleanupLog ("Stopping verified legacy bridge PID=" + $bridgeId)
             & $taskkill /F /PID $bridgeId 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { Stop-Process -Id $bridgeId -Force -ErrorAction Stop }
+            if ($LASTEXITCODE -ne 0) {
+                $stillRunning = Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId = " + $bridgeId) -ErrorAction SilentlyContinue
+                if ($stillRunning) { Stop-Process -Id $bridgeId -Force -ErrorAction Stop }
+            }
         }
     }
 
