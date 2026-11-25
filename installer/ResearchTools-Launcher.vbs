@@ -49,7 +49,7 @@ End If
 
 Do
     If ProcessExists("WINWORD.EXE") Then
-        If Not runtimeReady Or Not ProcessExistsAtPath(duckExe) Or Not ResearchMcpRunning() Then
+        If Not runtimeReady Or Not DuckApiReady() Or Not ResearchMcpRunning() Then
             ensureCode=EnsureRuntime(True)
             lastEnsureAt=Now
             runtimeReady=(ensureCode=0)
@@ -59,7 +59,7 @@ Do
             End If
         End If
         Do While ProcessExists("WINWORD.EXE")
-            If Not runtimeReady Or Not ProcessExistsAtPath(duckExe) Or Not ResearchMcpRunning() Then
+            If Not runtimeReady Or Not DuckApiReady() Or Not ResearchMcpRunning() Then
                 If DateDiff("s",lastEnsureAt,Now)>=30 Then
                     ensureCode=EnsureRuntime(False)
                     lastEnsureAt=Now
