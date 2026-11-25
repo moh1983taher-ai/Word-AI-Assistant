@@ -131,7 +131,7 @@ jobs:
           if (-not $bootstrapText.Contains("/releases?per_page=100") -or -not $bootstrapText.Contains("duckai-runtime-v")) {
             throw "Runtime bootstrap must filter the repository release list to stable DuckAI runtime tags."
           }
-          if (-not $launcherText.Contains("WaitForDuckApi(120)") -or -not $launcherText.Contains("/v1/models") -or -not $launcherText.Contains("DuckAPI did not return")) {
+          if (-not $launcherText.Contains("WaitForDuckApi(120)") -or -not $launcherText.Contains("/v1/models") -or -not $launcherText.Contains("Duck2API did not return")) {
             throw "Launcher Duck2API readiness gate is missing."
           }
           $waitIndex = $launcherText.IndexOf("If Not WaitForDuckApi(120) Then")
