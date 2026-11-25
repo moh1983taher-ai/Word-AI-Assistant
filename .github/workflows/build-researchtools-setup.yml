@@ -88,7 +88,7 @@ jobs:
           if ($runtimeFiles -notcontains 'DuckAI-MCP-Bridge.ps1') {
             throw 'Installer runtime integrity list must require DuckAI-MCP-Bridge.ps1.'
           }
-          if ($installerScript.Contains("Copy-Item -LiteralPath (Join-Path $Runtime 'ResearchTools-Launcher.vbs') -Destination $Launcher")) {
+          if ($installerScript.Contains('Copy-Item -LiteralPath (Join-Path $Runtime ''ResearchTools-Launcher.vbs'') -Destination $Launcher')) {
             throw 'The legacy runtime launcher must not overwrite the unified installer launcher.'
           }
           if ($installerScript -notmatch '\$runtimeLauncherFile\s*=\s*Join-Path\s+\$Runtime') {
