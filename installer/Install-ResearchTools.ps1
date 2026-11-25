@@ -372,10 +372,11 @@ function Install-Runtime {
     finally {
         if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
     }
-    Copy-Item -LiteralPath (Join-Path $Runtime 'ResearchTools-Launcher.vbs') -Destination $Launcher -Force
+    $runtimeLauncherFile = Join-Path $Runtime 'ResearchTools-Launcher.vbs'
+    if (-not (Test-Path -LiteralPath $runtimeLauncherFile -PathType Leaf)) { throw 'ملف مشغّل DuckAI داخل الحزمة غير موجود.' }
     Copy-Item -LiteralPath (Join-Path $Runtime 'DuckAI-Bootstrap.ps1') -Destination $Bootstrap -Force
     $hash = (Get-FileHash -LiteralPath $Bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
-    if (-not (Get-Content -LiteralPath $Launcher -Raw).Contains($hash)) { throw 'بصمة Bootstrap داخل المشغّل لا تطابق الملف المثبت.' }
+    if (-not (Get-Content -LiteralPath $runtimeLauncherFile -Raw).Contains($hash)) { throw 'بصمة Bootstrap داخل مشغّل حزمة DuckAI لا تطابق الملف المثبت.' }
     if (-not (Test-FileHashes -Directory $Runtime)) { throw 'فشل التحقق النهائي من ملفات DuckAI.' }
 }
 
