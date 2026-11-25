@@ -125,13 +125,21 @@ jobs:
           if (-not $launcherText.Contains("BridgeListening()") -or -not $launcherText.Contains("/ping") -or -not $launcherText.Contains("MCP bridge is listening")) {
             throw "Launcher MCP readiness probe is missing."
           }
-          if (-not $updateText.Contains("/releases/latest") -or -not $updateText.Contains("Get-FileHash")) {
-            throw "One-click updater latest-stable-release endpoint or SHA-256 verification is missing."
+          if (-not $updateText.Contains("/releases?per_page=100") -or -not $updateText.Contains("duckai-runtime-v")) {
+            throw "One-click updater must filter the repository release list to stable DuckAI runtime tags."
           }
-          if (-not $bootstrapText.Contains("/releases/latest")) {
-            throw "Runtime bootstrap latest-stable-release endpoint is missing."
+          if (-not $bootstrapText.Contains("/releases?per_page=100") -or -not $bootstrapText.Contains("duckai-runtime-v")) {
+            throw "Runtime bootstrap must filter the repository release list to stable DuckAI runtime tags."
           }
-          Write-Host "PowerShell syntax, MCP bridge self-tests, update-flow checks and bootstrap integrity pins passed."
+          if (-not $launcherText.Contains("WaitForDuckApi(120)") -or -not $launcherText.Contains("/v1/models") -or -not $launcherText.Contains("Duck2API did not return")) {
+            throw "Launcher Duck2API readiness gate is missing."
+          }
+          $waitIndex = $launcherText.IndexOf("If Not WaitForDuckApi(120) Then")
+          $agentIndex = $launcherText.IndexOf('shell.Run Chr(34)&agentExe&Chr(34),0,False')
+          if ($waitIndex -lt 0 -or $agentIndex -lt 0 -or $waitIndex -gt $agentIndex) {
+            throw "Research agent must not start before Duck2API /v1/models is ready."
+          }
+          Write-Host "PowerShell syntax, MCP bridge self-tests, runtime-release filtering, Duck2API readiness ordering and integrity pins passed."
 
       - name: Download verified v1.0.0 baseline
         env:
@@ -181,14 +189,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="duckai-runtime-v1.0.10"
-          TITLE="DuckAI Runtime v1.0.10"
+          TAG="duckai-runtime-v1.0.11"
+          TITLE="DuckAI Runtime v1.0.11"
           NOTES="$RUNNER_TEMP/duckai-release-notes.md"
           cat > "$NOTES" <<'EOF'
           يتضمن هذا الإصدار آلية التشغيل المحلي الصامت والاستعادة الذاتية لـ DuckAI، مع وسيط MCP محلي يربط Luna بخوادم المكتبات.
 
-          - يفحص المشغّل أحدث إصدار مستقر عند بدء Word، ويقارن رقم الإصدار المحلي بالإصدار المنشور.
+          - يفحص المشغّل أحدث إصدار مستقر من DuckAI فقط، مع استبعاد إصدارات Setup الأخرى من قائمة إصدارات GitHub.
           - ينزّل الإصدار الأحدث عند توفره، ويتحقق من بصمة SHA-256 قبل التثبيت، مع الاستمرار بالنسخة المحلية السليمة عند تعذر الاتصال بـ GitHub.
+          - ينتظر المشغّل استجابة HTTP 200 وقائمة نماذج غير فارغة من Duck2API على 127.0.0.1:18080/v1/models قبل تشغيل وكيل البحث، بمهلة إقلاع مستقلة تصل إلى 120 ثانية.
           - يتحقق المشغّل من استجابة جسر MCP فعلياً على 127.0.0.1:18081، ويعيد تشغيله عند توقف الاستماع.
           - يوفر ملف DuckAI-Update.vbs مستقلاً لفحص التحديثات وتنزيلها وتثبيتها بالنقر المزدوج، مع رسالة نتيجة وسجل تشخيص.
           - يتحقق من بصمة SHA-256 التي يوفرها GitHub ومن البصمات الداخلية قبل التثبيت.

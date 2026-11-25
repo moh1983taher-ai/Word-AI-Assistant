@@ -1,6 +1,6 @@
 Option Explicit
 ' RESEARCHTOOLS_DUCKAI_BOOTSTRAP_V3
-Const BOOTSTRAP_SHA256 = "3f09a278c3170379b06fa6dbe17a80c259a8c042f5ace1d1117481b1f9bbbdbd"
+Const BOOTSTRAP_SHA256 = "3bb7a970b7a6df745322d531b90098229d60f0e92c55e82aa5dc6bc96ab57411"
 Const BOOTSTRAP_RAW_URL = "https://raw.githubusercontent.com/moh1983taher-ai/Word-AI-Assistant/main/runtime/DuckAI-Bootstrap.ps1"
 Dim shell,fso,env,rootDir,installDir,launcherPath,bootstrapPath
 Dim duckExe,agentExe,bridgeScript,powershellExe,wscriptExe,runtimeReady,lastEnsureAt,ensureCode
@@ -114,22 +114,69 @@ Function EnsureRuntime(checkUpdates)
     EnsureRuntime=RunBootstrap(False,True,checkUpdates)
 End Function
 Sub StartServices()
-    If fso.FileExists(duckExe) And Not ProcessExists("duck2api-main.exe") Then
+    If Not fso.FileExists(duckExe) Then
+        WriteLauncherLog "ERROR: Duck2API executable is missing; the research agent was not started."
+        Exit Sub
+    End If
+    If Not ProcessExists("duck2api-main.exe") Then
         env("SERVER_HOST")="127.0.0.1"
         env("SERVER_PORT")="18080"
         shell.Run Chr(34)&duckExe&Chr(34),0,False
-        WScript.Sleep 5000
         env("SERVER_HOST")=""
         env("SERVER_PORT")=""
     End If
+    If Not WaitForDuckApi(120) Then
+        WriteLauncherLog "ERROR: Duck2API did not return a valid non-empty /v1/models response on 127.0.0.1:18080 within 120 seconds; the research agent was not started."
+        Exit Sub
+    End If
     If fso.FileExists(agentExe) And Not ProcessExists("ResearchTools-DuckAgent.exe") Then
-        env("SERVER_HOST")=""
-        env("SERVER_PORT")=""
         shell.Run Chr(34)&agentExe&Chr(34),0,False
         WScript.Sleep 1500
     End If
     StartBridge
 End Sub
+Function WaitForDuckApi(timeoutSeconds)
+    Dim startedAt
+    WaitForDuckApi=False
+    startedAt=Now
+    WriteLauncherLog "INFO: waiting for Duck2API /v1/models before starting the research agent."
+    Do While DateDiff("s",startedAt,Now)<timeoutSeconds
+        If DuckApiReady() Then
+            WriteLauncherLog "SUCCESS: Duck2API /v1/models returned a non-empty model list after " & CStr(DateDiff("s",startedAt,Now)) & " seconds."
+            WaitForDuckApi=True
+            Exit Function
+        End If
+        WScript.Sleep 2000
+    Loop
+End Function
+
+Function DuckApiReady()
+    Dim request,status,responseBody
+    DuckApiReady=False
+    On Error Resume Next
+    Set request=CreateObject("WinHttp.WinHttpRequest.5.1")
+    If Err.Number<>0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    request.SetTimeouts 1000,1000,1000,2000
+    request.Open "GET","http://127.0.0.1:18080/v1/models",False
+    request.Send
+    status=0
+    responseBody=""
+    If Err.Number=0 Then
+        status=request.Status
+        If status=200 Then responseBody=request.ResponseText
+    End If
+    Err.Clear
+    If status=200 Then
+        DuckApiReady=(InStr(1,responseBody,"""data""",vbTextCompare)>0 And InStr(1,responseBody,"""id""",vbTextCompare)>0)
+    End If
+    Set request=Nothing
+    On Error GoTo 0
+End Function
+
 Sub StartBridge()
     Dim attempt
     If Not fso.FileExists(bridgeScript) Then

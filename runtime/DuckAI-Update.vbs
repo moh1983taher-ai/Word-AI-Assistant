@@ -33,9 +33,11 @@ scriptText = Join(Array( _
 "try {", _
 "    if (Get-Process -Name 'WINWORD' -ErrorAction SilentlyContinue) { throw 'Close all Microsoft Word windows before updating.' }", _
 "    $headers = @{ 'User-Agent' = 'ResearchTools-DuckAI-OneClickUpdater/1.0'; 'Accept' = 'application/vnd.github+json' }", _
-"    $releaseUri = 'https://api.github.com/repos/' + $repo + '/releases/latest'", _
-"    Write-UpdateLog ('Querying GitHub stable release: ' + $releaseUri)", _
-"    $release = Invoke-RestMethod -TimeoutSec 60 -Uri $releaseUri -Headers $headers -Method Get", _
+"    $releaseUri = 'https://api.github.com/repos/' + $repo + '/releases?per_page=100'", _
+"    Write-UpdateLog ('Querying GitHub stable DuckAI runtime releases: ' + $releaseUri)", _
+"    $releases = @(Invoke-RestMethod -TimeoutSec 60 -Uri $releaseUri -Headers $headers -Method Get)", _
+"    $release = $releases | Where-Object { -not $_.draft -and -not $_.prerelease -and [string]$_.tag_name -match '^duckai-runtime-v\d+\.\d+\.\d+$' -and -not [string]::IsNullOrWhiteSpace([string]$_.published_at) } | Sort-Object { [DateTime]::Parse($_.published_at).ToUniversalTime() } -Descending | Select-Object -First 1", _
+"    if (-not $release) { throw 'GitHub did not return a stable DuckAI runtime release.' }", _
 "    $releaseTag = [string]$release.tag_name", _
 "    if ([string]::IsNullOrWhiteSpace($releaseTag) -or $releaseTag -notmatch '^duckai-runtime-v\d+\.\d+\.\d+$' -or $release.draft -or $release.prerelease) { throw ('GitHub latest release is not a stable DuckAI release. Returned tag: ' + $releaseTag) }", _
 "    Write-UpdateLog ('Stable release detected: ' + $releaseTag)", _
