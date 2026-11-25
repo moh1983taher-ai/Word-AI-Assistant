@@ -11,14 +11,15 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class DuckAiEndpointSelectionTests
 {
     [Fact]
-    public void PrefersDirectBackendBeforeLocalAgentProxyForInitialDiscovery()
+    public void UsesOnlyTheActiveDuck2ApiEndpoint()
     {
-        Assert.Equal("http://127.0.0.1:18080", DuckAiClient.CandidateBaseAddresses[0]);
-        Assert.Equal("http://127.0.0.1:8080", DuckAiClient.CandidateBaseAddresses[1]);
+        Assert.Equal(
+            new[] { "http://127.0.0.1:18080" },
+            DuckAiClient.CandidateBaseAddresses);
     }
 
     [Fact]
-    public async Task RetriesGenerationOnAlternateEndpointAfterBadGateway()
+    public async Task DoesNotRetryAgainstRetiredProxyWhenActiveEndpointReturnsBadGateway()
     {
         var visited = new ConcurrentQueue<string>();
         var handler = new StubHandler(request =>
@@ -34,38 +35,26 @@ public sealed class DuckAiEndpointSelectionTests
                 request.RequestUri.AbsolutePath == "/v1/chat/completions")
                 return Json(HttpStatusCode.BadGateway, """{"error":"Duck.ai request failed after retries"}""");
 
-            if (request.Method == HttpMethod.Post &&
-                address == "http://127.0.0.1:8080" &&
-                request.RequestUri.AbsolutePath == "/v1/chat/completions")
-            {
-                return Json(
-                    HttpStatusCode.OK,
-                    """{"choices":[{"message":{"content":"{\"type\":\"final\",\"answer\":\"نجح التحويل إلى المنفذ البديل\"}"}}]}""");
-            }
-
-            return Json(HttpStatusCode.NotFound, """{"error":"not found"}""");
+            return Json(HttpStatusCode.NotFound, """{"error":"unexpected endpoint"}""");
         });
 
         var client = new DuckAiClient(new StubHttpClientFactory(handler), new HostLog());
-        var completion = await client.CompleteAsync(
-            requestedModel: "",
-            messages: [new DuckChatMessage("user", "اختبار توليد")],
-            functionTools: null,
-            cancellationToken: CancellationToken.None);
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            client.CompleteAsync(
+                requestedModel: "",
+                messages: [new DuckChatMessage("user", "اختبار توليد")],
+                functionTools: null,
+                cancellationToken: CancellationToken.None));
 
-        Assert.Contains("نجح التحويل إلى المنفذ البديل", completion.Text);
+        Assert.Contains("HTTP 502", exception.Message);
         Assert.Equal(
             new[]
             {
                 "GET http://127.0.0.1:18080/v1/models",
-                "POST http://127.0.0.1:18080/v1/chat/completions",
-                "GET http://127.0.0.1:8080/v1/models",
-                "POST http://127.0.0.1:8080/v1/chat/completions"
+                "POST http://127.0.0.1:18080/v1/chat/completions"
             },
             visited.ToArray());
-
-        var selected = await client.GetModelsAsync(CancellationToken.None);
-        Assert.Equal("http://127.0.0.1:8080", selected.BaseAddress);
+        Assert.DoesNotContain(visited, item => item.Contains(":8080", StringComparison.Ordinal));
     }
 
     [Fact]
