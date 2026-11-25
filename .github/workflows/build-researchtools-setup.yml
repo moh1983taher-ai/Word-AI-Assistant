@@ -180,12 +180,22 @@ jobs:
             # its bootstrap pin to the verified archive being embedded in this build.
             $replacement = 'Const BOOTSTRAP_SHA256 = "' + $actualHash + '"'
             $syncedLauncher = [regex]::Replace($unifiedLauncherText, $pattern, $replacement, 1)
-            [IO.File]::WriteAllText($unifiedLauncherPath, $syncedLauncher, [Text.UTF8Encoding]::new($true))
+            # WSH VBScript rejects a UTF-8 BOM at the first character.
+            [IO.File]::WriteAllText($unifiedLauncherPath, $syncedLauncher, [Text.UTF8Encoding]::new($false))
+            $finalLauncherBytes = [IO.File]::ReadAllBytes($unifiedLauncherPath)
+            if ($finalLauncherBytes.Length -ge 3 -and
+                $finalLauncherBytes[0] -eq 0xEF -and
+                $finalLauncherBytes[1] -eq 0xBB -and
+                $finalLauncherBytes[2] -eq 0xBF) {
+              throw 'Unified VBScript launcher must not contain a UTF-8 BOM.'
+            }
             $verifiedUnifiedPin = [regex]::Match((Get-Content -LiteralPath $unifiedLauncherPath -Raw), $pattern)
             if (-not $verifiedUnifiedPin.Success -or $verifiedUnifiedPin.Groups[1].Value.ToLowerInvariant() -ne $actualHash) {
               throw ('Unified launcher bootstrap pin could not be synchronized. Actual=' + $actualHash)
             }
-            Write-Host ('Bootstrap pin verified across runtime and unified launcher: ' + $actualHash)
+            & cscript.exe //nologo $unifiedLauncherPath --self-test
+            if ($LASTEXITCODE -ne 0) { throw 'Windows Script Host could not parse the final unified VBScript launcher.' }
+            Write-Host ('Bootstrap pin and BOM-free VBScript launcher verified: ' + $actualHash)
           }
           finally {
             if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
