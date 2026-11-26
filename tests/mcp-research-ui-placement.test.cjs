@@ -57,8 +57,8 @@ assert.match(
   /bridge\.addPendingMessage\([\s\S]*?bridge\.removePendingMessage\(pending\)/,
   "The pending indicator must be rendered in the native chat."
 );
-assert.match(uiSource, /window\.addEventListener\("click"[\s\S]*?shouldRouteToSources\(input\.value\)/);
-assert.match(uiSource, /event\.key !== "Enter"[\s\S]*?shouldRouteToSources\(input\.value\)/);
+assert.match(uiSource, /window\.addEventListener\("click"[\s\S]*?shouldRouteToSources\(\)/);
+assert.match(uiSource, /event\.key !== "Enter"[\s\S]*?shouldRouteToSources\(\)/);
 
 assert.match(uiSource, /const LEGACY_THREAD_KEY = ["']AR_MCP_RESEARCH_THREAD["']/);
 assert.match(uiSource, /bridge\.importLegacyThread\(legacyThread\)/);
