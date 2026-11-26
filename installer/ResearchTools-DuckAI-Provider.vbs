@@ -1,7 +1,7 @@
 Option Explicit
 Const DUCKAI_API_URL = "http://127.0.0.1:18080/v1/models"
 
-Dim shell, fso, env, rootDir, runtimeDir, duckExe
+Dim shell, fso, env, rootDir, runtimeDir, duckExe, attempt
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set env = shell.Environment("Process")
