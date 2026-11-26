@@ -26,7 +26,7 @@ public static class ModelDecisionParser
     {
         decision = new ModelDecision("invalid", string.Empty, string.Empty, string.Empty, default, response ?? string.Empty);
         if (!TryExtractJsonObject(response, out var candidate))
-            return false;
+            return TryParseFinalText(response, out decision);
 
         try
         {
@@ -60,9 +60,8 @@ public static class ModelDecisionParser
                 if (string.IsNullOrWhiteSpace(answer))
                     return false;
 
-                if (!TryReadStringArray(root, "covered", out var covered) ||
-                    !TryReadStringArray(root, "uncovered", out var uncovered))
-                    return false;
+                TryReadStringArray(root, "covered", out var covered);
+                TryReadStringArray(root, "uncovered", out var uncovered);
 
                 decision = new ModelDecision("final", answer.Trim(), string.Empty, string.Empty, default, response ?? string.Empty)
                 {
@@ -103,13 +102,36 @@ public static class ModelDecisionParser
                 };
                 return true;
             }
+
+            // Planning is no longer a required interaction mode. Keep valid legacy
+            // plan parsing for compatibility, but never treat an invalid plan object
+            // as a natural-language final answer.
+            if (type == "plan")
+                return false;
         }
         catch (JsonException)
         {
+            return TryParseFinalText(response, out decision);
+        }
+
+        // DuckAI is text-based: a natural-language answer is a valid final response.
+        // Tagged tool calls are parsed separately and malformed tool tags are never treated as answers.
+        return TryParseFinalText(response, out decision);
+    }
+
+    private static bool TryParseFinalText(string? response, out ModelDecision decision)
+    {
+        var text = response?.Trim() ?? string.Empty;
+        if (text.Length == 0 ||
+            text.Contains("<tool_call>", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("</tool_call>", StringComparison.OrdinalIgnoreCase))
+        {
+            decision = new ModelDecision("invalid", string.Empty, string.Empty, string.Empty, default, response ?? string.Empty);
             return false;
         }
 
-        return false;
+        decision = new ModelDecision("final", text, string.Empty, string.Empty, default, response ?? string.Empty);
+        return true;
     }
 
     private static bool TryParsePlan(JsonElement root, out ResearchPlan plan)

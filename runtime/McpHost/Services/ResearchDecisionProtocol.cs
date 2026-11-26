@@ -3,8 +3,8 @@ using System.Text;
 namespace ResearchTools.McpHost.Services;
 
 /// <summary>
-/// Human-readable JSON decision protocol for Duck2API endpoints that ignore
-/// response_format. The host still validates every parsed decision and tool call.
+/// Minimal transport instructions for the text-based Aurora/MCP bridge.
+/// Research choices and answer structure are left to the model and the user request.
 /// </summary>
 internal static class ResearchDecisionProtocol
 {
@@ -17,31 +17,26 @@ internal static class ResearchDecisionProtocol
         pendingPageSourceLabels ??= [];
 
         var builder = new StringBuilder();
-        builder.AppendLine("بروتوكول قرار البحث (JSON عادي):");
-        builder.AppendLine("أخرج كائناً واحداً فقط، دون Markdown أو أي نص خارجه.");
-        builder.AppendLine("لاستدعاء أداة MCP أخرج: {\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}.");
-        builder.AppendLine("للإجابة النهائية أخرج: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور مغطى من الخطة\"],\"uncovered\":[]}. يجب أن تكون القائمتان موجودتين دائماً.");
-        builder.AppendLine("التزم حرفياً بأسماء الأدوات ومعاملاتها في مخطط MCP، ولا تخمّن المعرّفات أو تنقلها بين المكتبات.");
+        builder.AppendLine("إذا طلب الباحث البحث في مكتبة مختارة، فابدأ باستدعاء أداة بحث ولا تستبدل الاستدعاء بإجابة أو تعليق.");
+        builder.AppendLine("لاستدعاء أداة MCP، أرسل كتلة واحدة مع نسخ الاسم والمعاملات من الفهرس:");
+        builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
+        builder.AppendLine("بعد فحص الأدلة، اكتب الإجابة مباشرة بالطريقة التي طلبها الباحث، دون قالب مفروض.");
 
         if (!allowFinal)
         {
-            builder.AppendLine("لا تُنه البحث الآن.");
+            builder.AppendLine("لا تنه المهمة الآن؛ أكمل متطلبات الوصول إلى المصادر:");
             if (pendingSourceLabels.Count > 0)
-                builder.Append("لم يكتمل البحث الأولي في: ")
+                builder.Append("نفّذ بحثاً في المصادر التي لم تُبحث بعد: ")
                     .Append(string.Join("، ", pendingSourceLabels))
-                    .AppendLine(". نفّذ الاستعلامات المخططة في كل مصدر متبقٍ.");
+                    .AppendLine(".");
             if (pendingPageSourceLabels.Count > 0)
-                builder.Append("توجد نتائج تحتاج إلى فحص صفحاتها في: ")
+                builder.Append("افتح صفحة مناسبة من نتائج البحث في: ")
                     .Append(string.Join("، ", pendingPageSourceLabels))
-                    .AppendLine(". اختر المواضع الأوثق صلة وفق خطة البحث وافتحها من نتائج المكتبة نفسها؛ لا تفتح كل النتائج بلا تمييز.");
-            builder.AppendLine("لا تصدر final قبل اكتمال متطلبات الوصول الأساسية، ثم تابع فحص الأدلة وتغطية الخطة قبل تقرير كفاية البحث.");
+                    .AppendLine(".");
         }
         else
         {
-            builder.AppendLine("اكتملت متطلبات الوصول الأساسية، لكن لا يعني ذلك اكتمال الاستقصاء.");
-            builder.AppendLine("راجع نتائج جميع الاستعلامات وتغطية محاور خطة البحث. إذا بقي محور غير مغطى، أو نتيجة قوية لم تُفحص، أو احتجت إلى مقارنة مراجع إضافية، فواصل باستخدام tool_call.");
-            builder.AppendLine("لا تكتف بصفحة واحدة ولا بعدد شكلي من المراجع. افتح عدداً مناسباً من الصفحات ذات الصلة بحسب نوع السؤال واتساعه، واستبعد الصفحات التي لا تتناول المسألة.");
-            builder.AppendLine("في طلب النص المحدد تحقق من موضع النص وسياقه؛ وفي السؤال العام اجمع معلومات متنوعة تغطي المحاور. صنّف كل محور في covered إذا دعمته الأدلة، أو في uncovered إذا تعذر إثباته بعد استقصاء مناسب، واذكر سبب التعذر وحدود البحث في answer. لا تترك أي محور بلا تصنيف، ولا تدّع تغطية ما لم يثبت.");
+            builder.AppendLine("اكتملت متطلبات الوصول الأساسية. أجب الآن إن كانت الأدلة كافية، أو واصل البحث وفتح الصفحات إن احتاج السؤال إلى مزيد.");
         }
 
         return builder.ToString();
@@ -56,43 +51,25 @@ internal static class ResearchDecisionProtocol
         ArgumentNullException.ThrowIfNull(pendingPageSourceLabels);
 
         var builder = new StringBuilder();
-        builder.AppendLine("كان القرار السابق غير صالح بصيغة JSON. أعد قراراً واحداً صحيحاً فقط، دون Markdown أو شرح.");
-        builder.AppendLine("استعمل أسماء الخوادم والأدوات ومعاملاتها كما وردت حرفياً في فهرس MCP.");
+        builder.AppendLine("لم أتمكن من فهم القرار السابق. أعده بصيغة صحيحة واحدة.");
         if (!allowFinal)
         {
-            builder.AppendLine("لا يُسمح الآن بقرار final؛ أخرج tool_call فقط.");
+            builder.AppendLine("لا تكتب الإجابة النهائية بعد؛ استخدم كتلة <tool_call> صحيحة لإكمال البحث أو فتح الصفحات المطلوبة.");
             if (pendingSourceLabels.Count > 0)
-                builder.Append("المصادر التي لم يكتمل البحث فيها: ")
-                    .Append(string.Join("، ", pendingSourceLabels)).AppendLine(".");
+                builder.Append("المصادر التي لم تُبحث: ").Append(string.Join("، ", pendingSourceLabels)).AppendLine(".");
             if (pendingPageSourceLabels.Count > 0)
-                builder.Append("مصادر أعادت نتائج وتحتاج إلى فتح مواضع مرشحة: ")
-                    .Append(string.Join("، ", pendingPageSourceLabels)).AppendLine(".");
-            builder.AppendLine("اختر أداة البحث أو فتح الصفحة المناسبة من المخطط، ولا تكرر فتح صفحة تم التحقق منها إذا بقي مصدر آخر غير مفحوص.");
-            builder.AppendLine("{\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}");
+                builder.Append("الصفحات التي يلزم فتحها: ").Append(string.Join("، ", pendingPageSourceLabels)).AppendLine(".");
+            builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
         }
         else
         {
-            builder.AppendLine("يمكنك إخراج tool_call لمتابعة البحث أو final إذا غطت الأدلة المفتوحة محاور الخطة بالفعل.");
-            builder.AppendLine("{\"type\":\"tool_call\",\"server\":\"aljam3 أو shamela\",\"tool\":\"اسم الأداة\",\"arguments\":{...}}");
-            builder.AppendLine("{\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور مغطى من الخطة\"],\"uncovered\":[]}");
+            builder.AppendLine("يمكنك متابعة البحث بكتلة <tool_call> صحيحة أو تقديم الإجابة مباشرة.");
+            builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
         }
 
         return builder.ToString();
     }
 
-    internal static string BuildCoverageCorrection(IReadOnlyList<string> missingCoverage)
-    {
-        ArgumentNullException.ThrowIfNull(missingCoverage);
-        return "لا تعتمد الإجابة النهائية بعد؛ لم تثبت تغطية محاور الخطة الآتية: " +
-            string.Join("، ", missingCoverage) +
-            ". إن بقيت وسائل بحث مناسبة لم تجربها، فنفذ بحثاً تكميلياً أو افتح مراجع إضافية ذات صلة. وإن استنفدت المسارات المعقولة دون دليل، فضع المحور في uncovered واذكر سبب التعذر وحدود الاستقصاء في answer. لا تترك أي محور بلا تصنيف. " +
-            "أخرج قرار tool_call لمتابعة البحث، أو final بعد تصنيف جميع المحاور بين covered وuncovered دون ادعاء. " +
-            "صيغة final: {\"type\":\"final\",\"answer\":\"...\",\"covered\":[\"...\"],\"uncovered\":[]}.";
-    }
-
     internal static string BuildTimeoutFinalInstructions() =>
-        "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. " +
-        "اعرض ما تسمح به الأدلة المفتوحة وبيّن المحاور التي لم يكتمل التحقق منها. " +
-            "أخرج كائناً واحداً فقط: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور تحقق\"],\"uncovered\":[\"محور لم يكتمل\"]}. " +
-        "لا تضف شرحاً أو Markdown خارج JSON.";
+        "انتهت مهلة البحث. أجب الآن بما تثبته الصفحات التي فُتحت فعلاً، وميّز ما تحقق مما تعذر التحقق منه. لا تستدعِ أدوات جديدة.";
 }

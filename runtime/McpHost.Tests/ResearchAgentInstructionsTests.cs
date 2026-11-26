@@ -6,32 +6,32 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class ResearchAgentInstructionsTests
 {
     [Fact]
-    public void IncludesConciseOperationalRulesAfterPlanIsAuthored()
+    public void UsesBriefGuidanceThatLeavesResearchChoicesToTheModel()
     {
         var instructions = ResearchAgentInstructions.Build(
             Array.Empty<string>(),
             Array.Empty<string>());
 
-        Assert.Contains("افهم مقصد الباحث أولاً", instructions);
-        Assert.Contains("لا تتوقف عند أول نتيجة", instructions);
-        Assert.Contains("فتح الصفحة يثبت الوصول", instructions);
-        Assert.Contains("ولا يثبت صلتها", instructions);
-        Assert.Contains("لا تكتف بصفحة واحدة", instructions);
-        Assert.True(instructions.Length < 1_800,
-            $"Operational instructions unexpectedly grew to {instructions.Length:N0} characters.");
+        Assert.Contains("افهم السؤال كما قصده صاحبه", instructions);
+        Assert.Contains("اختر بنفسك أدوات MCP", instructions);
+        Assert.Contains("لا تضف أهدافاً أو قوالب", instructions);
+        Assert.Contains("لا تختلق معلومة", instructions);
+        Assert.Contains("بالشكل واللغة والحجم الذي طلبه الباحث", instructions);
+        Assert.True(instructions.Length < 1_000,
+            $"Standing instructions unexpectedly grew to {instructions.Length:N0} characters.");
     }
 
     [Fact]
-    public void UsesShortOperationalInstructionsFocusedOnUnderstandingAndCoverage()
+    public void DoesNotHardcodePlansOrCoverageRequirements()
     {
         var instructions = ResearchAgentInstructions.Build(
             ["الجامع", "المكتبة الشاملة"],
             Array.Empty<string>());
 
-        Assert.Contains("افهم مقصد الباحث أولاً", instructions);
-        Assert.Contains("لا تتوقف عند أول نتيجة", instructions);
-        Assert.Contains("ولا يثبت صلتها", instructions);
-        Assert.DoesNotContain("التزم بمنهجية المستخدم وهيكله", instructions);
+        Assert.Contains("الجامع، المكتبة الشاملة", instructions);
+        Assert.DoesNotContain("خطة البحث", instructions);
+        Assert.DoesNotContain("محاور التغطية", instructions);
+        Assert.DoesNotContain("لا تكتف بصفحة واحدة", instructions);
     }
 
     [Fact]

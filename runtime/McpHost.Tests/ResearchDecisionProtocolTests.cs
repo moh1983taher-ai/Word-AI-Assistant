@@ -6,21 +6,32 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class ResearchDecisionProtocolTests
 {
     [Fact]
-    public void DescribesExactJsonShapesWithoutDependingOnResponseFormat()
+    public void RequiresAnActualToolCallWhenResearchInSelectedLibrariesWasRequested()
+    {
+        var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
+            allowFinal: false,
+            pendingSourceLabels: ["الجامع", "المكتبة الشاملة"]);
+
+        Assert.Contains("فابدأ باستدعاء أداة بحث", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تستبدل الاستدعاء بإجابة أو تعليق", prompt, StringComparison.Ordinal);
+        Assert.Contains("<tool_call>", prompt, StringComparison.Ordinal);
+        Assert.Contains("الجامع، المكتبة الشاملة", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KeepsOnlyTheMinimalToolTransportInstructions()
     {
         var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
             allowFinal: true,
             pendingSourceLabels: []);
 
-        Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
-        Assert.Contains("\"type\":\"final\"", prompt, StringComparison.Ordinal);
-        Assert.Contains("covered", prompt, StringComparison.Ordinal);
-        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
-        Assert.Contains("arguments", prompt, StringComparison.Ordinal);
-        Assert.Contains("covered", prompt, StringComparison.Ordinal);
-        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
-        Assert.DoesNotContain("response_format", prompt, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("json_schema", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<tool_call>", prompt, StringComparison.Ordinal);
+        Assert.Contains("server__tool_name", prompt, StringComparison.Ordinal);
+        Assert.Contains("اكتب الإجابة مباشرة", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("covered", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("uncovered", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("C1", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("خطة بحث", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -30,52 +41,34 @@ public sealed class ResearchDecisionProtocolTests
             allowFinal: false,
             pendingSourceLabels: ["المكتبة الشاملة"]);
 
-        Assert.Contains("لا تُنه البحث الآن", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تنه المهمة الآن", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
-        Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(0, 0, true)]
-    [InlineData(1, 0, false)]
-    [InlineData(0, 1, false)]
-    [InlineData(2, 3, false)]
-    public void AllowsFinalOnlyWhenSearchAndPageVerificationAreComplete(
-        int pendingSearchSourceCount,
-        int unverifiedPageSourceCount,
-        bool expected)
-    {
-        Assert.Equal(
-            expected,
-            ResearchFinalizationPolicy.CanFinalize(
-                pendingSearchSourceCount,
-                unverifiedPageSourceCount));
+        Assert.Contains("<tool_call>", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void GivesPageVerificationInstructionsWhenNoSearchSourceRemainsPending()
+    public void GivesPageVerificationInstructionsWhenSearchSourcesAreComplete()
     {
         var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
             allowFinal: false,
             pendingSourceLabels: [],
             pendingPageSourceLabels: ["المكتبة الشاملة"]);
 
-        Assert.Contains("لا تُنه البحث الآن", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تنه المهمة الآن", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
-        Assert.Contains("افتحها", prompt, StringComparison.Ordinal);
-        Assert.DoesNotContain("لم يكتمل البحث في:", prompt, StringComparison.Ordinal);
+        Assert.Contains("افتح صفحة", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("نفّذ بحثاً في المصادر", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void DoesNotTreatOneOpenedPageAsEvidenceThatResearchIsComplete()
+    public void AllowsTheModelToContinueResearchAfterMinimumAccessChecks()
     {
         var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
             allowFinal: true,
             pendingSourceLabels: []);
 
-        Assert.Contains("لا يعني ذلك اكتمال الاستقصاء", prompt, StringComparison.Ordinal);
-        Assert.Contains("لا تكتف بصفحة واحدة", prompt, StringComparison.Ordinal);
-        Assert.Contains("تغطية محاور خطة البحث", prompt, StringComparison.Ordinal);
+        Assert.Contains("أجب الآن إن كانت الأدلة كافية", prompt, StringComparison.Ordinal);
+        Assert.Contains("واصل البحث", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -86,27 +79,19 @@ public sealed class ResearchDecisionProtocolTests
             pendingSourceLabels: [],
             pendingPageSourceLabels: ["المكتبة الشاملة"]);
 
-        Assert.Contains("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("<tool_call>", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("\"type\":\"final\"", prompt, StringComparison.Ordinal);
         Assert.Contains("المكتبة الشاملة", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void CoverageCorrectionAllowsAnExplicitUnresolvedFacetAfterReasonableSearch()
-    {
-        var prompt = ResearchDecisionProtocol.BuildCoverageCorrection(["نسبة الصيغة إلى مصدرها"]);
-
-        Assert.Contains("استنفدت المسارات المعقولة", prompt, StringComparison.Ordinal);
-        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
-        Assert.Contains("سبب التعذر", prompt, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void TimeoutFinalizationOnlyPermitsFinalJson()
+    public void TimeoutInstructionsAllowOnlyEvidenceBoundNaturalLanguage()
     {
         var prompt = ResearchDecisionProtocol.BuildTimeoutFinalInstructions();
 
-        Assert.Contains("\"type\":\"final\"", prompt, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"type\":\"tool_call\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("أجب الآن", prompt, StringComparison.Ordinal);
+        Assert.Contains("الصفحات التي فُتحت فعلاً", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("<tool_call>", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON", prompt, StringComparison.Ordinal);
     }
 }
