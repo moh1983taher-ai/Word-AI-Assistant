@@ -33,6 +33,7 @@
     Object.freeze({
       id: "shamela",
       label: "المكتبة الشاملة",
+      mentionLabel: "الشاملة",
       url: "https://mcp.shamela.ws",
       description: "المكتبة الشاملة: البحث في النصوص التراثية وفتح النتائج والصفحات ذات الصلة.",
       tools: Object.freeze([
@@ -254,15 +255,16 @@
     if (!context) return;
     const before = input.value.slice(0, context.start);
     const after = input.value.slice(input.selectionStart);
-    const token = server.label + " ";
+    const tokenLabel = server.mentionLabel || server.label;
+    const token = tokenLabel + " ";
     const tokenStart = before.length;
     input.value = before + token + after;
     state.sourceTokens = state.sourceTokens.filter(function (item) { return item.id !== server.id; });
     state.sourceTokens.push({
       id: server.id,
-      label: server.label,
+      label: tokenLabel,
       start: tokenStart,
-      end: tokenStart + server.label.length
+      end: tokenStart + tokenLabel.length
     });
     state.lastComposerValue = input.value;
     const cursor = before.length + token.length;
