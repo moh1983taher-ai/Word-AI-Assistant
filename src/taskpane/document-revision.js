@@ -1079,7 +1079,7 @@
             const documentTarget = Boolean(pendingTarget && pendingTarget.targetType === "document");
             if (documentTarget && !activeRequestMetadata) {
                 throw new Error(
-                    "بيانات دفعة المستند غير متاحة لتحديد الفقرات؛ أُوقف التصحيح بدل البحث العام عن عبارات قد تتكرر."
+                    "بيانات طلب المستند غير متاحة للتحقق من مصدر التصحيحات؛ أُوقف التجهيز بدل قبول تعديلات غير مرتبطة بطلب موثوق."
                 );
             }
             const useParagraphScopedParsing = Boolean(
