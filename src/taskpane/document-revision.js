@@ -139,8 +139,10 @@
         return segments;
     }
 
-    // Validate each proposed correction independently. Linguistic diagnosis and
-    // contextual judgment belong to the model; this layer only verifies anchors.
+    // Validate each proposed correction independently. A correction for an
+    // exact source phrase applies to every exact occurrence of that phrase.
+    // The model owns linguistic/contextual diagnosis; this layer verifies that
+    // every occurrence exists and that each mapped range is safe to edit.
     function parseUnscopedCorrectionEdits(items, source, maskState) {
         const sourceText = String(source || "");
         const matchingSource = maskState && typeof maskState.text === "string" ? maskState.text : sourceText;
@@ -165,7 +167,7 @@
                 reject(item, "invalid_edit", "بيانات التصحيح غير مكتملة.");
                 return;
             }
-            if (/[\r\n]/.test(original + replacement)) {
+            if (/[\\r\\n]/.test(original + replacement)) {
                 reject(item, "cross_paragraph_edit", "يمتد التصحيح المقترح عبر فاصل فقرة؛ عُزل هذا التصحيح وحده.");
                 return;
             }
@@ -173,60 +175,71 @@
                 reject(item, "no_op", "النص البديل مطابق للنص الأصلي ولا ينتج عنه تصحيح فعلي.");
                 return;
             }
+
             const exactMatches = [];
-            const exactContextMatches = [];
             let cursor = 0;
             while ((cursor = matchingSource.indexOf(original, cursor)) !== -1) {
                 exactMatches.push(cursor);
-                const before = matchingSource.slice(Math.max(0, cursor - contextBefore.length), cursor);
-                const after = matchingSource.slice(cursor + original.length, cursor + original.length + contextAfter.length);
-                if ((!contextBefore || before === contextBefore) && (!contextAfter || after === contextAfter)) {
-                    exactContextMatches.push(cursor);
-                }
                 cursor += original.length;
             }
-            const resolvedMaskedStart = resolveCorrectionOccurrence(
-                matchingSource, original, contextBefore, contextAfter, exactMatches, exactContextMatches
-            );
-            if (resolvedMaskedStart < 0) {
-                reject(
-                    item,
-                    exactMatches.length ? "ambiguous_occurrence" : "source_text_not_found",
-                    exactMatches.length
-                        ? "لم يتحدد موضع واحد لهذا التصحيح؛ تُرك الموضع دون تغيير."
-                        : "لم يُعثر على العبارة المقترحة في النص المرسل؛ تُرك هذا التصحيح دون تغيير."
-                );
+            if (!exactMatches.length) {
+                reject(item, "source_text_not_found", "لم يُعثر على العبارة المقترحة في النص المرسل؛ تُرك هذا التصحيح دون تغيير.");
                 return;
             }
-            let mapped;
-            try {
-                mapped = DocumentRevisionPreflight.mapMaskedRangeToSource(maskState, resolvedMaskedStart, original.length);
-            } catch (error) {
-                reject(item, "protected_range", String(error && error.message || error));
-                return;
-            }
-            if (sourceText.slice(mapped.start, mapped.end) !== original) {
-                reject(item, "source_offset_mismatch", "لم يتطابق موضع التصحيح مع النص الأصلي؛ عُزل هذا التصحيح.");
-                return;
-            }
-            candidates.push({
-                start: mapped.start, original: original, replacement: replacement,
-                reason: reason, contextBefore: contextBefore, contextAfter: contextAfter
+
+            // Do not discard a repeated correction merely because the same
+            // source phrase appears in several places. Apply it to every exact
+            // occurrence; duplicate model entries are collapsed below.
+            exactMatches.forEach(function (resolvedMaskedStart) {
+                let mapped;
+                try {
+                    mapped = DocumentRevisionPreflight.mapMaskedRangeToSource(
+                        maskState, resolvedMaskedStart, original.length
+                    );
+                } catch (error) {
+                    reject(item, "protected_range", String(error && error.message || error));
+                    return;
+                }
+                if (sourceText.slice(mapped.start, mapped.end) !== original) {
+                    reject(item, "source_offset_mismatch", "لم يتطابق موضع التصحيح مع النص الأصلي؛ عُزل هذا الموضع.");
+                    return;
+                }
+                candidates.push({
+                    start: mapped.start,
+                    original: original,
+                    replacement: replacement,
+                    reason: reason,
+                    contextBefore: contextBefore,
+                    contextAfter: contextAfter
+                });
             });
         });
+
         candidates.sort(function (a, b) {
             return a.start - b.start || a.original.length - b.original.length;
         });
+
+        // Some models emit one identical correction per occurrence while
+        // others emit it once. Both representations mean the same operation.
+        const uniqueCandidates = [];
+        const seenCandidates = new Set();
+        candidates.forEach(function (edit) {
+            const key = JSON.stringify([edit.start, edit.original, edit.replacement]);
+            if (seenCandidates.has(key)) return;
+            seenCandidates.add(key);
+            uniqueCandidates.push(edit);
+        });
+
         const conflicted = new Set();
-        for (let i = 0; i < candidates.length; i++) {
-            const currentEnd = candidates[i].start + candidates[i].original.length;
-            for (let j = i + 1; j < candidates.length && candidates[j].start < currentEnd; j++) {
+        for (let i = 0; i < uniqueCandidates.length; i++) {
+            const currentEnd = uniqueCandidates[i].start + uniqueCandidates[i].original.length;
+            for (let j = i + 1; j < uniqueCandidates.length && uniqueCandidates[j].start < currentEnd; j++) {
                 conflicted.add(i);
                 conflicted.add(j);
             }
         }
         const safeEdits = [];
-        candidates.forEach(function (edit, index) {
+        uniqueCandidates.forEach(function (edit, index) {
             if (conflicted.has(index)) {
                 reject(edit, "overlapping_edit", "يتداخل هذا التصحيح مع تصحيح آخر؛ عُزل التصحيحان.");
                 return;
@@ -238,9 +251,11 @@
                 reject(edit, "protected_edit", String(error && error.message || error));
             }
         });
+
         let revised = sourceText;
         safeEdits.slice().reverse().forEach(function (edit) {
-            revised = revised.slice(0, edit.start) + edit.replacement + revised.slice(edit.start + edit.original.length);
+            revised = revised.slice(0, edit.start) + edit.replacement +
+                revised.slice(edit.start + edit.original.length);
         });
         return { status: "ready", mode: "correction", text: revised, edits: safeEdits, rejected: rejected };
     }
@@ -700,76 +715,6 @@
             }
             throw firstError;
         }
-    }
-
-    function normalizeContextWord(value) {
-        return String(value || "")
-            .normalize("NFD")
-            .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640\u200E\u200F]/g, "")
-            .normalize("NFC");
-    }
-
-    function getContextWords(value) {
-        const matches = String(value || "").match(/[\p{L}\p{M}\p{N}_]+/gu) || [];
-        return matches.map(normalizeContextWord).filter(Boolean);
-    }
-
-    function countBoundaryWordMatches(expectedWords, actualWords, fromEnd) {
-        let matched = 0;
-        while (matched < expectedWords.length && matched < actualWords.length) {
-            const expectedIndex = fromEnd ? expectedWords.length - 1 - matched : matched;
-            const actualIndex = fromEnd ? actualWords.length - 1 - matched : matched;
-            if (expectedWords[expectedIndex] !== actualWords[actualIndex]) break;
-            matched++;
-        }
-        return matched;
-    }
-
-    // Resolve a repeated phrase only when the adjacent word context identifies
-    // one occurrence with a clear margin. Context farther from the edited phrase
-    // may contain a model typo; therefore compare contiguous words outward from
-    // the phrase boundary instead of requiring the entire context string to match.
-    function scoreContextOccurrence(source, start, original, contextBefore, contextAfter) {
-        const beforeText = source.slice(Math.max(0, start - 320), start);
-        const afterStart = start + original.length;
-        const afterText = source.slice(afterStart, Math.min(source.length, afterStart + 320));
-        const expectedBefore = getContextWords(contextBefore).slice(-6);
-        const expectedAfter = getContextWords(contextAfter).slice(0, 6);
-        const actualBefore = getContextWords(beforeText);
-        const actualAfter = getContextWords(afterText);
-        const matchedBefore = countBoundaryWordMatches(expectedBefore, actualBefore, true);
-        const matchedAfter = countBoundaryWordMatches(expectedAfter, actualAfter, false);
-
-        return {
-            start: start,
-            matchedBefore: matchedBefore,
-            matchedAfter: matchedAfter,
-            score: matchedBefore + matchedAfter
-        };
-    }
-
-    function resolveCorrectionOccurrence(source, original, contextBefore, contextAfter, exactMatches, exactContextMatches) {
-        if (exactContextMatches.length === 1) return exactContextMatches[0];
-        if (exactMatches.length === 1) return exactMatches[0];
-
-        const ranked = exactMatches.map(function (start) {
-            return scoreContextOccurrence(source, start, original, contextBefore, contextAfter);
-        }).sort(function (a, b) {
-            return b.score - a.score ||
-                Math.max(b.matchedBefore, b.matchedAfter) - Math.max(a.matchedBefore, a.matchedAfter) ||
-                a.start - b.start;
-        });
-
-        const best = ranked[0];
-        const runnerUp = ranked[1];
-        if (!best) return -1;
-
-        const strongestSide = Math.max(best.matchedBefore, best.matchedAfter);
-        const hasReliableBoundary = strongestSide >= 3 ||
-            (best.matchedBefore >= 2 && best.matchedAfter >= 2);
-        const hasClearLead = !runnerUp || best.score - runnerUp.score >= 2;
-
-        return hasReliableBoundary && hasClearLead ? best.start : -1;
     }
 
     function reconstructRewriteText(parsed, sourceText, requestMetadata) {
