@@ -7,7 +7,7 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-const taskpane = read("src/taskpane/taskpane.js");
+const taskpane = read("src/taskpane/taskpane.js").replace(/\r\n/g, "\n");
 const taskpaneHtml = read("src/taskpane/taskpane.html");
 const runtimeSource = read("src/taskpane/orama-runtime.js");
 const mcpSource = read("src/taskpane/mcp-research-assistant.js");

@@ -5,7 +5,7 @@ const path = require("node:path");
 const source = fs.readFileSync(
     path.join(__dirname, "../src/taskpane/taskpane.js"),
     "utf8"
-);
+).replace(/\r\n/g, "\n");
 
 const normalizeFunction = source.indexOf("async function canonicalizeReferenceNamesWithAI(");
 const normalizeCall = source.indexOf("await canonicalizeReferenceNamesWithAI(");
