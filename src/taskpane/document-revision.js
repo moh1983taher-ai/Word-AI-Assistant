@@ -438,23 +438,7 @@
         const paragraphBaseIndex = requestOptions && Number.isInteger(Number(requestOptions.paragraphBaseIndex))
             ? Math.max(0, Number(requestOptions.paragraphBaseIndex))
             : 0;
-        const paragraphRecords = structuredCorrection
-            ? buildParagraphRecords(requestText, paragraphBaseIndex)
-            : [];
-        if (structuredCorrection && maskState && Array.isArray(maskState.segments)) {
-            const noteTokens = maskState.segments
-                .filter(function (segment) { return segment.kind === "note-reference"; })
-                .map(function (segment) { return segment.token; });
-            if (noteTokens.length) {
-                paragraphRecords.forEach(function (record) {
-                    let lockProbe = String(record.text || "");
-                    noteTokens.forEach(function (token) {
-                        lockProbe = lockProbe.split(token).join("");
-                    });
-                    record.locked = /\[\[WB_KEEP_[^\]]+\]\]/.test(lockProbe);
-                });
-            }
-        }
+        const paragraphRecords = [];
         const rewriteSegments = correctionOnly ? [] : buildRewriteSegments(requestText);
         const structuredParagraphText = structuredCorrection
             ? JSON.stringify({
@@ -534,8 +518,8 @@
     }
 
     // Build one compact proofreading request for several independently
-    // addressable notes. Each note part keeps its own source offsets, paragraph
-    // identities, and protected Word reference ranges.
+    // addressable notes. The model receives each note as plain text; only the
+    // note and chunk identifiers remain as output-routing fields.
     function buildNotesBatchRequest(userInstruction, noteParts) {
         if (!pendingTarget || !Array.isArray(pendingTarget.notes)) {
             throw new Error("لا توجد حواشٍ ملتقطة مرتبطة بالمستند الحالي.");
@@ -576,23 +560,6 @@
                 requestText = maskState.text;
             }
 
-            const paragraphBaseIndex = countParagraphsBefore(note.originalText, sourceOffset);
-            const paragraphRecords = buildParagraphRecords(requestText, paragraphBaseIndex);
-            if (maskState && Array.isArray(maskState.segments)) {
-                const protectedTokens = maskState.segments
-                    .filter(function (segment) { return segment.kind === "note-reference"; })
-                    .map(function (segment) { return segment.token; });
-                if (protectedTokens.length) {
-                    paragraphRecords.forEach(function (record) {
-                        let probe = String(record.text || "");
-                        protectedTokens.forEach(function (token) {
-                            probe = probe.split(token).join("");
-                        });
-                        record.locked = /\[\[WB_KEEP_[^\]]+\]\]/.test(probe);
-                    });
-                }
-            }
-
             return {
                 noteId: noteId,
                 notePartId: notePartId,
@@ -601,9 +568,7 @@
                 sourceOffset: sourceOffset,
                 sourceText: sourceText,
                 requestText: requestText,
-                maskState: maskState,
-                paragraphBaseIndex: paragraphBaseIndex,
-                paragraphRecords: paragraphRecords
+                maskState: maskState
             };
         });
 
