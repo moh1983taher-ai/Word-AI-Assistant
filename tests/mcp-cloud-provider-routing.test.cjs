@@ -55,7 +55,7 @@ const validatorSource = [
 vm.runInNewContext(validatorSource, validatorContext);
 const validateResearchResult = validatorContext.__validateResearchResult;
 const oneOfTwoLibraries = validateResearchResult(
-  "DuckAI المحلي",
+  "Groq",
   "إجابة مستندة إلى البحث",
   [{ server: "shamela", tool: "shamela_find", completed: true }],
   ["aljam3", "shamela"],
@@ -67,7 +67,7 @@ assert.equal(oneOfTwoLibraries.toolCalls[0].server, "shamela");
 assert.throws(
   function () {
     validateResearchResult(
-      "DuckAI المحلي",
+      "Groq",
       "إجابة",
       [],
       ["aljam3", "shamela"],
@@ -77,7 +77,7 @@ assert.throws(
   /لم يُظهر أي استدعاء فعلي/
 );
 const generalAnswer = validateResearchResult(
-  "DuckAI المحلي",
+  "Groq",
   "شرح موجز لمعنى الاجتهاد",
   [],
   ["aljam3", "shamela"],
@@ -87,7 +87,7 @@ assert.equal(generalAnswer.answer, "شرح موجز لمعنى الاجتهاد"
 assert.equal(generalAnswer.toolCalls.length, 0);
 
 const ordinaryBookQuestion = validateResearchResult(
-  "DuckAI المحلي",
+  "Groq",
   "المقصود بالموافقات",
   [],
   ["aljam3", "shamela"],
@@ -98,7 +98,7 @@ assert.equal(ordinaryBookQuestion.toolCalls.length, 0);
 assert.throws(
   function () {
     validateResearchResult(
-      "DuckAI المحلي",
+      "Groq",
       "إجابة",
       [{ server: "shamela", tool: "shamela_find", completed: false }],
       ["aljam3", "shamela"],
@@ -111,7 +111,7 @@ assert.throws(
 assert.throws(
   function () {
     validateResearchResult(
-      "DuckAI المحلي",
+      "Groq",
       "إجابة",
       [{ server: "unselected", tool: "search", completed: true }],
       ["aljam3", "shamela"]
@@ -282,12 +282,15 @@ assert.match(
   /const history = bridge\.getMessages\(chatId\)[\s\S]*?callSelectedResearch\(history, settings, selectedServerIds\)/,
   "MCP must use the active ordinary chat history rather than an independent source transcript."
 );
-assert.match(source, /const LOCAL_MCP_HOST_URL = ["']http:\/\/127\.0\.0\.1:18081["']/);
-assert.match(source, /servers: selected/);
-assert.match(source, /function callLocalResearch[\s\S]*?validateResearchResult/);
-assert.match(source, /function callSelectedResearch[\s\S]*?callLocalResearch[\s\S]*?callCloudResearch/);
-assert.match(source, /const RESEARCH_ENGINE_KEY = ["']AR_MCP_RESEARCH_ENGINE["']/);
-assert.match(source, /targetAddressSpace = "loopback"/);
+assert.doesNotMatch(
+  source,
+  /LOCAL_MCP_HOST_URL|127\.0\.0\.1:18081|callLocalResearch|fetchLocalHostJson|checkLocalHost|DuckAI المحلي|targetAddressSpace|RESEARCH_ENGINE_KEY|loadResearchEngine|saveResearchEngine/,
+  "MCP research must not keep a local host route, runtime selector or local fallback."
+);
+assert.match(
+  source,
+  /function callSelectedResearch\(messages, settings, selectedServerIds\)[\s\S]*?return callCloudResearch\(messages, settings, selectedServerIds\)/
+);
 
 
 const mcpConfigStart = source.indexOf("  const MCP_SERVERS = Object.freeze([");

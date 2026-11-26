@@ -40,13 +40,15 @@ assert.match(uiSource, /localStorage\.getItem\(AI_SETTINGS_KEY\)/);
 assert.doesNotMatch(
   uiSource,
   /AR_MCP_RESEARCH_SETTINGS|AR_MCP_RESEARCH_THREAD.*key/,
-  "The local MCP route must not create a second key or provider-settings store."
+  "MCP search must reuse the existing cloud provider key and settings."
 );
 assert.match(uiSource, /const AI_SETTINGS_KEY = ["']AI_SETTINGS["']/);
-assert.match(uiSource, /const LOCAL_MCP_HOST_URL = ["']http:\/\/127\.0\.0\.1:18081["']/);
-assert.match(uiSource, /function callSelectedResearch/);
-assert.match(uiSource, /servers: selected/);
-assert.match(uiSource, /const RESEARCH_ENGINE_KEY = ["']AR_MCP_RESEARCH_ENGINE["']/);
+assert.doesNotMatch(
+  uiSource,
+  /LOCAL_MCP_HOST_URL|127\.0\.0\.1:18081|callLocalResearch|fetchLocalHostJson|checkLocalHost|DuckAI المحلي|mcp-research-test-local|RESEARCH_ENGINE_KEY|loadResearchEngine|saveResearchEngine|mcp-research-engine|طريقة تنفيذ البحث|تلقائي \(المحلي أولاً\)|mcp-research-panel select/,
+  "MCP source search must expose only the cloud route."
+);
+assert.match(uiSource, /بحث سحابي مباشر عبر Groq أو Gemini/);
 assert.match(uiSource, /heading\.textContent = "إعدادات البحث"/);
 assert.match(uiSource, /sourceTitle\.textContent = "مصادر البحث"/);
 assert.match(uiSource, /fontSize = "12px"/);
@@ -137,4 +139,4 @@ assert.match(
   "The MCP control must initialize only after the native chat bridge is ready."
 );
 
-console.log("Unified MCP and native chat history tests passed.");
+console.log("Cloud MCP and native chat history tests passed.");
