@@ -353,7 +353,8 @@ const repeatedResult = revision.parseResponse(JSON.stringify({
         reason: "تصحيح الفصل"
     }]
 }), repeatedSource);
-assert.equal(repeatedResult.text, "هذا خطأ لايمكن قبوله، وموضع آخر لا يمكن إغفاله.");
+assert.equal(repeatedResult.edits.length, 2);
+assert.equal(repeatedResult.text, "هذا خطأ لا يمكن قبوله، وموضع آخر لا يمكن إغفاله.");
 const uniqueWithImpreciseContext = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
