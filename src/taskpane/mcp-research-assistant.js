@@ -1159,6 +1159,7 @@
       if (event.target !== input) return;
       if (event.key === "Escape" && state.mentionMenu && !state.mentionMenu.hidden) {
         event.preventDefault();
+        event.stopPropagation();
         hideMentionMenu();
         return;
       }
@@ -1167,6 +1168,8 @@
         const firstOption = state.mentionMenu.querySelector(".mcp-mention-option");
         if (firstOption) {
           event.preventDefault();
+          event.stopPropagation();
+          if (event.stopImmediatePropagation) event.stopImmediatePropagation();
           firstOption.click();
           return;
         }
