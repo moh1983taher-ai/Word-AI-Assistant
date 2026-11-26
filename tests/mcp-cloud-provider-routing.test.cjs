@@ -312,7 +312,7 @@ const mentionEnd = source.indexOf("  function getCloudProviderStatus(settings) {
 assert.ok(mentionStart >= 0 && mentionEnd > mentionStart, "Composer selection helpers must be testable");
 const mentionContext = {};
 vm.runInNewContext(
-  "function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? Array.from(new Set(ids)).filter(function (id) { return id === \"aljam3\" || id === \"shamela\"; }) : []; }\\n" +
+  "function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? Array.from(new Set(ids)).filter(function (id) { return id === 'aljam3' || id === 'shamela'; }) : []; }\\n" +
   source.slice(mentionStart, mentionEnd) +
   "\\nglobalThis.__mentionHelpers = { getMentionContext, updateSourceTokenRanges, getSelectedServerIds, stripSelectedSourceLabels };",
   mentionContext
