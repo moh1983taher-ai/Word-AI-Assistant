@@ -60,9 +60,8 @@ public static class ModelDecisionParser
                 if (string.IsNullOrWhiteSpace(answer))
                     return false;
 
-                if (!TryReadStringArray(root, "covered", out var covered) ||
-                    !TryReadStringArray(root, "uncovered", out var uncovered))
-                    return false;
+                TryReadStringArray(root, "covered", out var covered);
+                TryReadStringArray(root, "uncovered", out var uncovered);
 
                 decision = new ModelDecision("final", answer.Trim(), string.Empty, string.Empty, default, response ?? string.Empty)
                 {
@@ -109,7 +108,24 @@ public static class ModelDecisionParser
             return false;
         }
 
-        return false;
+        // DuckAI is text-based: a natural-language answer is a valid final response.
+        // Tagged tool calls are parsed separately and malformed tool tags are never treated as answers.
+        return TryParseFinalText(response, out decision);
+    }
+
+    private static bool TryParseFinalText(string? response, out ModelDecision decision)
+    {
+        var text = response?.Trim() ?? string.Empty;
+        if (text.Length == 0 ||
+            text.Contains("<tool_call>", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("</tool_call>", StringComparison.OrdinalIgnoreCase))
+        {
+            decision = new ModelDecision("invalid", string.Empty, string.Empty, string.Empty, default, response ?? string.Empty);
+            return false;
+        }
+
+        decision = new ModelDecision("final", text, string.Empty, string.Empty, default, response ?? string.Empty);
+        return true;
     }
 
     private static bool TryParsePlan(JsonElement root, out ResearchPlan plan)

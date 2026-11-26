@@ -132,132 +132,12 @@ public sealed class ResearchCoordinator
                 .Select(ResearchSourceSelection.GetLabel)
                 .ToArray();
 
-            // The model must understand the request and author a task-specific plan
-            // before the host executes any search. The host then validates arguments
-            // against the live schemas and executes every planned query in each selected
-            // library; it does not invent a generic query plan.
-            var planningInstructions = ResearchPlanningProtocol.BuildInitialInstructions(selectedLabels);
-            var planningAttempts = 0;
-            ResearchPlan? researchPlan = null;
-            while (researchPlan is null)
-            {
-                var planningMessages = new List<DuckChatMessage>
-                {
-                    new("system", planningInstructions)
-                };
-                var planningInputBudget = contextBudget.GetAvailableInputCharacters(planningInstructions.Length);
-                if (planningInputBudget <= 1)
-                {
-                    return new ResearchResponse(
-                        "تعذر إعداد مرحلة فهم السؤال ضمن ميزانية السياق الحالية؛ لم يبدأ البحث.",
-                        model,
-                        trace.ToArray(),
-                        warnings.ToArray());
-                }
-
-                var planningConversation = ResearchContextWindow.Compact(
-                    messages.ToArray(),
-                    planningInputBudget,
-                    MaxDuckAiMessageCharacters,
-                    currentUserMessageIndex);
-                planningMessages.AddRange(planningConversation);
-
-                _log.Info(
-                    $"Research planning prompt prepared: task={taskId}; attempt={planningAttempts + 1}; selectedSources={selectedServerIds.Count}; messages={planningMessages.Count}; promptCharacters={planningInstructions.Length}; historyCharacters={planningConversation.Sum(message => message.Content?.Length ?? 0)}.");
-
-                var planningCompletion = await _duckAi.CompleteAsync(
-                    model,
-                    planningMessages,
-                    functionTools: null,
-                    cancellationToken: timeout.Token);
-                model = planningCompletion.Model;
-
-                ModelDecision? acceptedPlanDecision = null;
-                if (planningCompletion.ToolCalls.Count == 0 &&
-                    ModelDecisionParser.TryParse(planningCompletion.Text, out var parsedPlanDecision) &&
-                    parsedPlanDecision.Type == "plan" &&
-                    parsedPlanDecision.Plan is not null)
-                {
-                    acceptedPlanDecision = parsedPlanDecision;
-                }
-
-                if (acceptedPlanDecision?.Plan is not null)
-                {
-                    researchPlan = acceptedPlanDecision.Plan;
-                    messages.Add(new DuckChatMessage("assistant", planningCompletion.Text));
-                    _log.Info(
-                        $"Research plan accepted: task={taskId}; kind={researchPlan.Kind}; queries={researchPlan.Queries.Count}; coverageItems={researchPlan.Coverage.Count}.");
-                    break;
-                }
-
-                _log.Warning(
-                    $"Research planning decision invalid: task={taskId}; attempt={planningAttempts + 1}; responseCharacters={planningCompletion.Text.Length}; toolCalls={planningCompletion.ToolCalls.Count}; protocol=model-authored-plan.");
-
-                if (planningAttempts >= 2)
-                {
-                    warnings.Add("تعذر استخراج خطة بحث سليمة من استجابة النموذج؛ لم تُنفذ استعلامات ولم تُنشأ إحالات غير متحققة.");
-                    return new ResearchResponse(
-                        "تعذر إعداد خطة بحث صالحة من استجابة النموذج. لم يبدأ البحث، ولم تُعرض نتائج أو إحالات غير متحققة. أعد الطلب أو جرّب نموذجاً آخر.",
-                        model,
-                        trace.ToArray(),
-                        warnings.ToArray());
-                }
-
-                messages.Add(new DuckChatMessage("assistant", planningCompletion.Text));
-                messages.Add(new DuckChatMessage("user", ResearchPlanningProtocol.BuildRepairInstructions()));
-                planningAttempts++;
-            }
-
-            // Plan queries are authored by the model. The host only maps them to the
-            // selected libraries' live input schemas and validates the resulting calls.
+            // Give the model the user's request directly. It chooses when and how to use MCP.
             var invalidDecisionAttempts = 0;
             var searchDecisionCorrectionAttempted = false;
             var pageVerificationCorrectionAttempted = false;
-            var coverageCorrectionAttempts = 0;
             var toolCallsAttempted = 0;
-            var completedSearchCalls = 0;
             var searchedSourceIds = new HashSet<string>(StringComparer.Ordinal);
-            var initialSearchPlan = ResearchSearchBootstrap.BuildInitialPlan(
-                activeTools,
-                selectedServerIds,
-                researchPlan!.Queries);
-
-            _log.Info(
-                $"Research host search plan: task={taskId}; selectedSources={string.Join(",", selectedServerIds)}; modelQueries={researchPlan.Queries.Count}; calls={initialSearchPlan.Count}; protocol=model-authored.");
-
-            foreach (var invocation in initialSearchPlan)
-            {
-                toolCallsAttempted++;
-                _log.Info(
-                    $"Research host search dispatch: task={taskId}; call={toolCallsAttempted}; queryIndex={invocation.QueryIndex}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; purposeCharacters={invocation.Purpose.Length}.");
-
-                var execution = await ExecuteToolAsync(
-                    invocation.Tool,
-                    invocation.Arguments,
-                    warnings,
-                    evidenceProvenance,
-                    taskId,
-                    timeout.Token);
-
-                evidenceLedger.Add(invocation.Tool, execution.Content, execution.Succeeded);
-
-                var completedSearch = execution.Succeeded &&
-                    ResearchToolResultClassifier.IsCompletedSearch(invocation.Tool, isError: false);
-                if (completedSearch)
-                {
-                    completedSearchCalls++;
-                    searchedSourceIds.Add(invocation.Tool.Server);
-                }
-
-                if (execution.Succeeded)
-                    trace.Add(new ToolCallTrace(
-                        invocation.Tool.Server,
-                        invocation.Tool.ServerLabel,
-                        invocation.Tool.Name));
-
-                _log.Info(
-                    $"Research host search result: task={taskId}; queryIndex={invocation.QueryIndex}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; success={execution.Succeeded}; completedSearch={completedSearch}; completedSearchCalls={completedSearchCalls}/{initialSearchPlan.Count}; searchCoverage={searchedSourceIds.Count}/{selectedServerIds.Count}; references={evidenceProvenance.SearchReferenceCount}; evidenceEntries={evidenceLedger.Entries.Count}.");
-            }
 
             while (true)
             {
@@ -280,14 +160,12 @@ public sealed class ResearchCoordinator
                     turnTools,
                     selectedLabels,
                     warnings,
-                    researchPlan!,
                     out var toolCatalogCharacters) +
                     Environment.NewLine + Environment.NewLine +
                     ResearchDecisionProtocol.BuildTurnInstructions(
                         allowFinal,
                         pendingSourceLabels,
-                        pendingPageSourceLabels,
-                        researchPlan!.Coverage);
+                        pendingPageSourceLabels);
 
                 // The compact tool directory is included as ordinary prompt text.
                 // The original MCP schema remains authoritative during host-side validation.
@@ -383,38 +261,6 @@ public sealed class ResearchCoordinator
 
                 if (decision.Type == "final")
                 {
-                    var unreportedCoverage = ResearchCoveragePolicy.GetUnreportedCoverage(
-                        researchPlan!.Coverage,
-                        decision.Covered,
-                        decision.Uncovered);
-
-                    if (unreportedCoverage.Count > 0)
-                    {
-                        if (coverageCorrectionAttempts >= 2)
-                        {
-                            warnings.Add("لم يصنف النموذج جميع محاور الخطة تصنيفاً واضحاً بين ما غُطي وما تعذر إثباته؛ أُعيدت المهمة بوصفها غير مكتملة.");
-                            _log.Warning(
-                                $"Research final coverage incomplete: task={taskId}; unreportedCoverageItems={unreportedCoverage.Count}; evidenceEntries={evidenceLedger.Entries.Count}.");
-                            return new ResearchResponse(
-                                "لم يكتمل تقرير تغطية خطة المهمة؛ بقيت محاور لم يصنفها النموذج: " +
-                                string.Join("، ", unreportedCoverage) +
-                                ". لم تُعتمد إجابة نهائية بوصفها بحثاً مكتملاً. أعد المحاولة أو وسّع خطة البحث.",
-                                model,
-                                trace.ToArray(),
-                                warnings.ToArray());
-                        }
-
-                        coverageCorrectionAttempts++;
-                        _log.Warning(
-                            $"Research final coverage deferred: task={taskId}; attempt={coverageCorrectionAttempts}; missingCoverageItems={unreportedCoverage.Count}; recovery=targeted_research.");
-                        messages.Add(new DuckChatMessage("assistant", decision.Raw));
-                        messages.Add(new DuckChatMessage(
-                            "user",
-                            ResearchDecisionProtocol.BuildCoverageCorrection(researchPlan!.Coverage, unreportedCoverage)));
-                        continue;
-                    }
-
-                    coverageCorrectionAttempts = 0;
                     var searchWasSkipped = pendingSearchSources.Count > 0;
                     // Every request reaching this coordinator is an explicit source-research
                     // request. Verify opened pages regardless of the wording used by the user.
@@ -848,7 +694,6 @@ public sealed class ResearchCoordinator
         IReadOnlyList<ToolDescriptor> tools,
         IReadOnlyList<string> selectedLabels,
         IReadOnlyList<string> warnings,
-        ResearchPlan researchPlan,
         out int toolCatalogCharacters)
     {
         // Send a compact Aurora-style catalog instead of full JSON schemas.
@@ -861,8 +706,6 @@ public sealed class ResearchCoordinator
         builder.AppendLine().AppendLine(
             "أدوات MCP المتاحة بصيغة أسماء مركبة: اسم المكتبة ثم اسم الأداة. أرسل الاستدعاء في كتلة <tool_call>، ويظل المضيف مسؤولاً عن التحقق من المخطط الأصلي قبل التنفيذ:");
         builder.AppendLine(compactToolCatalog);
-        builder.AppendLine().AppendLine("خطة البحث التي أعدها النموذج لهذه المهمة؛ راجع تغطيتها، وعدّل الاستعلامات أو وسّعها عند الحاجة:");
-        builder.AppendLine(ResearchPlanningProtocol.FormatPlan(researchPlan));
         return builder.ToString();
     }
 

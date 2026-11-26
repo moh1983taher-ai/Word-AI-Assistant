@@ -16,11 +16,33 @@ public sealed class ModelDecisionParserTests
     }
 
     [Fact]
-    public void RejectsFinalWithoutExplicitCoverageAttestation()
+    public void AcceptsFinalWithoutForcedCoverageFields()
     {
         const string json = """{"type":"final","answer":"النتيجة"}""";
 
-        Assert.False(ModelDecisionParser.TryParse(json, out _));
+        Assert.True(ModelDecisionParser.TryParse(json, out var decision));
+        Assert.Equal("final", decision.Type);
+        Assert.Equal("النتيجة", decision.Answer);
+        Assert.Empty(decision.Covered);
+        Assert.Empty(decision.Uncovered);
+    }
+
+    [Fact]
+    public void AcceptsNaturalLanguageFinalAnswerWithoutJsonEnvelope()
+    {
+        const string answer = "وجدت النص في المصدر وفتحت الصفحة للتحقق منه.";
+
+        Assert.True(ModelDecisionParser.TryParse(answer, out var decision));
+        Assert.Equal("final", decision.Type);
+        Assert.Equal(answer, decision.Answer);
+    }
+
+    [Fact]
+    public void DoesNotTreatMalformedToolCallAsNaturalLanguageFinal()
+    {
+        const string response = "<tool_call>{broken}</tool_call>";
+
+        Assert.False(ModelDecisionParser.TryParse(response, out _));
     }
 
     [Fact]
