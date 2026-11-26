@@ -483,6 +483,22 @@ assert.equal(
     "هذا خطأ لا يمكن قبوله، وموضع آخر لا يمكن إغفاله."
 );
 
+// Repeated matches are exact lexical occurrences, not substrings embedded
+// inside longer words.
+const wordBoundaryResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [{
+        original: "علم",
+        replacement: "فهم",
+        contextBefore: "",
+        contextAfter: "",
+        reason: "اختبار حدود الكلمة"
+    }]
+}), "العلم علم");
+assert.equal(wordBoundaryResult.edits.length, 1);
+assert.equal(wordBoundaryResult.text, "العلم فهم");
+
 const crossParagraphEdit = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
