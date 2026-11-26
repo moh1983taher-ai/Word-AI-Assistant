@@ -85,7 +85,7 @@ jobs:
       - name: Publish setup release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          GH_TOKEN: \${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
           $tag = 'researchtools-setup-v1.3.0'

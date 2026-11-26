@@ -43,13 +43,13 @@ function Remove-LegacyLocalMcpServices {
         $exe = [string]$process.ExecutablePath
         $cmd = [string]$process.CommandLine
         $duck = ($name -in @('duck2api-main.exe','ResearchTools-DuckAgent.exe')) -and (Test-PathWithin $exe $DuckRuntime)
-        $host = ($name -ieq 'ResearchTools.McpHost.exe') -and (Test-PathWithin $exe $McpHost)
+        $mcpHostProcess = ($name -ieq 'ResearchTools.McpHost.exe') -and (Test-PathWithin $exe $McpHost)
         $bridge = ($name -ieq 'powershell.exe') -and $cmd.IndexOf('DuckAI-MCP-Bridge.ps1',[StringComparison]::OrdinalIgnoreCase) -ge 0 -and $cmd.IndexOf($Root,[StringComparison]::OrdinalIgnoreCase) -ge 0
         $launcher = $false
         if ($name -ieq 'wscript.exe') {
             foreach ($path in $launchers) { if ($cmd.IndexOf($path,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $launcher = $true; break } }
         }
-        if ($duck -or $host -or $bridge -or $launcher) {
+        if ($duck -or $mcpHostProcess -or $bridge -or $launcher) {
             try { Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction Stop; $stopped++ }
             catch { Log ('تعذر إيقاف PID=' + $process.ProcessId + ': ' + $_.Exception.Message) }
         }
@@ -65,6 +65,8 @@ function Remove-LegacyLocalMcpServices {
         $path = Join-Path $Root $name
         if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
     }
+$oldRootBackup = Join-Path $Root 'DuckAI-old-backup'
+    if (Test-Path -LiteralPath $oldRootBackup -PathType Container) { Remove-Item -LiteralPath $oldRootBackup -Recurse -Force }
     foreach ($pattern in @('DuckAI-Previous-*','McpHost-Previous-*','DuckAI-old-backup')) {
         foreach ($old in @(Get-ChildItem -LiteralPath $Backup -Directory -Filter $pattern -ErrorAction SilentlyContinue)) {
             Remove-Item -LiteralPath $old.FullName -Recurse -Force
