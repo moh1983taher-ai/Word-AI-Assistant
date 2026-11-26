@@ -15,7 +15,7 @@ assert.match(uiSource, /function updateSourceTokenRanges\(previousValue, current
 assert.match(uiSource, /function getMentionContext\(value, cursorPosition\)/);
 assert.match(uiSource, /function createMentionMenu\(inputArea, input\)/);
 assert.match(uiSource, /function insertSourceMention\(input, server\)/);
-assert.match(uiSource, /const token = server\.label \+ " "/);
+assert.match(uiSource, /const tokenLabel = server\.mentionLabel \|\| server\.label/);
 assert.doesNotMatch(uiSource, /@الجامع |@الشاملة /);
 assert.match(uiSource, /input\.placeholder = "اكتب سؤالك، أو اكتب @ لاختيار مصدر\.\.\."/);
 assert.match(uiSource, /if \(!shouldRouteToSources\(\)\) return;/);
