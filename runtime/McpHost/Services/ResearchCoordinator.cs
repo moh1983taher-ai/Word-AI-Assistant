@@ -19,6 +19,7 @@ public sealed class ResearchCoordinator
 {
     private const int MaxDuckAiMessageCharacters = 12_000;
     private const int MaxDuckAiEvidenceContextCharacters = 22_000;
+    private const int MaxFallbackPageCandidatesPerSource = 3;
 
     private readonly DuckAiClient _duckAi;
     private readonly McpSourceRegistry _sources;
@@ -373,43 +374,63 @@ public sealed class ResearchCoordinator
                                     (sourceId == "aljam3"
                                         ? tool.Name == "get_page"
                                         : tool.Name == "shamela_open"));
-                                if (openTool is null ||
-                                    !evidenceProvenance.TryBuildVerifiedReadArguments(openTool, out var openArguments))
+                                if (openTool is null)
                                 {
                                     _log.Warning(
-                                        $"Research page-open recovery unavailable: task={taskId}; source={sourceId}; reason=no_schema_valid_verified_reference.");
+                                        $"Research page-open recovery unavailable: task={taskId}; source={sourceId}; reason=read_tool_unavailable.");
                                     continue;
                                 }
 
-                                var fallbackReferenceError = evidenceProvenance.ValidateReferenceRead(openTool, openArguments);
-                                if (fallbackReferenceError is not null)
+                                var openedCandidates = 0;
+                                for (var candidateIndex = 0;
+                                     candidateIndex < MaxFallbackPageCandidatesPerSource;
+                                     candidateIndex++)
                                 {
-                                    _log.Warning(
-                                        $"Research page-open recovery rejected: task={taskId}; source={sourceId}; reason=reference_validation_failed.");
-                                    continue;
+                                    if (!evidenceProvenance.TryBuildVerifiedReadArguments(
+                                            openTool,
+                                            candidateIndex,
+                                            out var openArguments))
+                                        break;
+
+                                    var fallbackReferenceError = evidenceProvenance.ValidateReferenceRead(openTool, openArguments);
+                                    if (fallbackReferenceError is not null)
+                                    {
+                                        _log.Warning(
+                                            $"Research page-open recovery rejected: task={taskId}; source={sourceId}; candidate={candidateIndex + 1}; reason=reference_validation_failed.");
+                                        continue;
+                                    }
+
+                                    toolCallsAttempted++;
+                                    _log.Info(
+                                        $"Research page-open recovery dispatch: task={taskId}; source={sourceId}; tool={openTool.Name}; candidate={candidateIndex + 1}; candidateLimit={MaxFallbackPageCandidatesPerSource}; reference=verified_search_hit.");
+
+                                    var openExecution = await ExecuteToolAsync(
+                                        openTool,
+                                        openArguments,
+                                        warnings,
+                                        evidenceProvenance,
+                                        taskId,
+                                        timeout.Token);
+                                    evidenceLedger.Add(openTool, openExecution.Content, openExecution.Succeeded);
+
+                                    if (openExecution.Succeeded)
+                                    {
+                                        openedCandidates++;
+                                        trace.Add(new ToolCallTrace(
+                                            openTool.Server,
+                                            openTool.ServerLabel,
+                                            openTool.Name));
+                                    }
+
+                                    _log.Info(
+                                        $"Research page-open recovery result: task={taskId}; source={sourceId}; tool={openTool.Name}; candidate={candidateIndex + 1}; success={openExecution.Succeeded}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}.");
                                 }
 
-                                toolCallsAttempted++;
-                                _log.Info(
-                                    $"Research page-open recovery dispatch: task={taskId}; source={sourceId}; tool={openTool.Name}; reference=first_verified_search_hit.");
-
-                                var openExecution = await ExecuteToolAsync(
-                                    openTool,
-                                    openArguments,
-                                    warnings,
-                                    evidenceProvenance,
-                                    taskId,
-                                    timeout.Token);
-                                evidenceLedger.Add(openTool, openExecution.Content, openExecution.Succeeded);
-
-                                if (openExecution.Succeeded)
-                                    trace.Add(new ToolCallTrace(
-                                        openTool.Server,
-                                        openTool.ServerLabel,
-                                        openTool.Name));
-
-                                _log.Info(
-                                    $"Research page-open recovery result: task={taskId}; source={sourceId}; tool={openTool.Name}; success={openExecution.Succeeded}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}.");
+                                if (openedCandidates == 0)
+                                {
+                                    _log.Warning(
+                                        $"Research page-open recovery unavailable: task={taskId}; source={sourceId}; reason=no_candidate_page_opened; candidatesChecked={MaxFallbackPageCandidatesPerSource}.");
+                                }
                             }
 
                             var stillUnverifiedSources = evidenceProvenance.GetUnverifiedSearchSources();
@@ -417,7 +438,7 @@ public sealed class ResearchCoordinator
                             {
                                 messages.Add(new DuckChatMessage(
                                     "user",
-                                    "فتح المضيف موضعاً أصلياً مطابقاً من نتائج كل مكتبة كانت تحتاج إلى تحقق. اقرأ النصوص المفتوحة وسياقها، واختر بنفسك ما إذا كان يلزم بحث أو فتح مراجع إضافية، ثم أجب عن سؤال الباحث كما طلبه."));
+                                    "فتح المضيف عدداً محدوداً من المواضع الأصلية المطابقة لمعرّفات نتائج البحث في كل مكتبة كانت تحتاج إلى تحقق. لا يعني نجاح فتح الصفحة أنها متصلة بالمسألة؛ افحص عناوين المواضع ونصوصها وسياقها، ولا تستشهد إلا بما يثبت صلته بالسؤال. إذا لم تكن النتائج المفتوحة ذات صلة، فأجر بحثاً أو افتح مراجع أخرى قبل الإجابة."));
                                 _log.Info(
                                     $"Research page-open recovery completed: task={taskId}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}; handoff=model.");
                                 continue;
