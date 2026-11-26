@@ -33,6 +33,7 @@
     Object.freeze({
       id: "shamela",
       label: "المكتبة الشاملة",
+      mentionLabel: "الشاملة",
       url: "https://mcp.shamela.ws",
       description: "المكتبة الشاملة: البحث في النصوص التراثية وفتح النتائج والصفحات ذات الصلة.",
       tools: Object.freeze([
@@ -47,7 +48,9 @@
     initializing: false,
     mentionMenu: null,
     notice: null,
-    mentionStart: -1
+    mentionStart: -1,
+    sourceTokens: [],
+    lastComposerValue: ""
   };
 
   function safeJson(value, fallback) {
@@ -81,17 +84,6 @@
     return MCP_SERVERS.filter(function (server) { return selected.indexOf(server.id) >= 0; });
   }
 
-  function extractSourceMentions(value) {
-    const selectedServerIds = [];
-    const pattern = /(^|\s)@(الجامع|الشاملة)(?=$|\s|[،,])/g;
-    const visiblePrompt = String(value || "").replace(pattern, function (match, leading, label) {
-      const id = label === "الجامع" ? "aljam3" : "shamela";
-      if (selectedServerIds.indexOf(id) < 0) selectedServerIds.push(id);
-      return leading || "";
-    }).replace(/[ \t]{2,}/g, " ").trim();
-    return { prompt: visiblePrompt, selectedServerIds: selectedServerIds };
-  }
-
   function getMentionContext(value, cursorPosition) {
     const text = String(value || "");
     const cursor = typeof cursorPosition === "number" ? cursorPosition : text.length;
@@ -99,6 +91,69 @@
     if (!match) return null;
     return { start: cursor - match[1].length - 1, query: match[1] };
   }
+
+  function updateSourceTokenRanges(previousValue, currentValue, sourceTokens) {
+    const previous = String(previousValue || "");
+    const current = String(currentValue || "");
+    let prefix = 0;
+    while (prefix < previous.length && prefix < current.length &&
+      previous.charAt(prefix) === current.charAt(prefix)) prefix += 1;
+
+    let suffix = 0;
+    while (suffix < previous.length - prefix && suffix < current.length - prefix &&
+      previous.charAt(previous.length - 1 - suffix) === current.charAt(current.length - 1 - suffix)) {
+      suffix += 1;
+    }
+
+    const previousEnd = previous.length - suffix;
+    const insertedLength = current.length - prefix - suffix;
+    const delta = insertedLength - (previousEnd - prefix);
+    return (Array.isArray(sourceTokens) ? sourceTokens : []).reduce(function (updated, token) {
+      if (!token || typeof token.start !== "number" || typeof token.end !== "number") return updated;
+      const overlapsChangedText = previousEnd > prefix &&
+        prefix < token.end && previousEnd > token.start;
+      const insertsInsideToken = previousEnd === prefix &&
+        prefix > token.start && prefix < token.end;
+      if (overlapsChangedText || insertsInsideToken) return updated;
+
+      const nextToken = Object.assign({}, token);
+      if (previousEnd <= token.start && prefix <= token.start) {
+        nextToken.start += delta;
+        nextToken.end += delta;
+      }
+      if (nextToken.start < 0 || nextToken.end > current.length ||
+        current.slice(nextToken.start, nextToken.end) !== nextToken.label) return updated;
+      const wordCharacter = /[A-Za-z0-9\u0600-\u06FF]/;
+      const beforeLabel = current.charAt(nextToken.start - 1);
+      const afterLabel = current.charAt(nextToken.end);
+      if ((beforeLabel && wordCharacter.test(beforeLabel)) ||
+        (afterLabel && wordCharacter.test(afterLabel))) return updated;
+      updated.push(nextToken);
+      return updated;
+    }, []);
+  }
+
+  function getSelectedServerIds(sourceTokens) {
+    const ids = (Array.isArray(sourceTokens) ? sourceTokens : []).map(function (token) {
+      return token && token.id;
+    });
+    return normalizeSelectedServerIds(ids);
+  }
+
+  function stripSelectedSourceLabels(value, sourceTokens) {
+    let prompt = String(value || "");
+    const tokens = (Array.isArray(sourceTokens) ? sourceTokens : []).slice().sort(function (a, b) {
+      return b.start - a.start;
+    });
+    tokens.forEach(function (token) {
+      if (!token || typeof token.start !== "number" || typeof token.end !== "number") return;
+      if (prompt.slice(token.start, token.end) === token.label) {
+        prompt = prompt.slice(0, token.start) + " " + prompt.slice(token.end);
+      }
+    });
+    return prompt.replace(/[ \t]{2,}/g, " ").trim();
+  }
+
   function getCloudProviderStatus(settings) {
     const current = settings || loadSettings();
     if (!current.provider) {
@@ -186,7 +241,7 @@
   function getMentionOptions(input) {
     const context = getMentionContext(input.value, input.selectionStart);
     if (!context) return null;
-    const alreadySelected = extractSourceMentions(input.value).selectedServerIds;
+    const alreadySelected = getSelectedServerIds(state.sourceTokens);
     const query = context.query.toLocaleLowerCase();
     const options = MCP_SERVERS.filter(function (server) {
       if (alreadySelected.indexOf(server.id) >= 0) return false;
@@ -200,8 +255,18 @@
     if (!context) return;
     const before = input.value.slice(0, context.start);
     const after = input.value.slice(input.selectionStart);
-    const token = server.id === "aljam3" ? "@الجامع " : "@الشاملة ";
+    const tokenLabel = server.mentionLabel || server.label;
+    const token = tokenLabel + " ";
+    const tokenStart = before.length;
     input.value = before + token + after;
+    state.sourceTokens = state.sourceTokens.filter(function (item) { return item.id !== server.id; });
+    state.sourceTokens.push({
+      id: server.id,
+      label: tokenLabel,
+      start: tokenStart,
+      end: tokenStart + tokenLabel.length
+    });
+    state.lastComposerValue = input.value;
     const cursor = before.length + token.length;
     input.focus();
     input.setSelectionRange(cursor, cursor);
@@ -272,7 +337,10 @@
     input.setAttribute("aria-haspopup", "listbox");
     input.setAttribute("aria-controls", menu.id);
     input.placeholder = "اكتب سؤالك، أو اكتب @ لاختيار مصدر...";
+    state.lastComposerValue = input.value;
     input.addEventListener("input", function () {
+      state.sourceTokens = updateSourceTokenRanges(state.lastComposerValue, input.value, state.sourceTokens);
+      state.lastComposerValue = input.value;
       hideNotice();
       updateMentionMenu(input);
     });
@@ -1062,13 +1130,20 @@
   }
 
   async function sendMessage(rawText) {
-    const visiblePrompt = String(rawText || "").trim();
+    const rawPrompt = String(rawText || "");
+    const visiblePrompt = rawPrompt.trim();
     if (!visiblePrompt || state.busy) return;
 
-    const mentionSelection = extractSourceMentions(visiblePrompt);
-    const selectedServerIds = normalizeSelectedServerIds(mentionSelection.selectedServerIds);
+    const selectedServerIds = getSelectedServerIds(state.sourceTokens);
     if (!selectedServerIds.length) return;
-    if (!mentionSelection.prompt) {
+    const leadingTrim = rawPrompt.length - rawPrompt.trimStart().length;
+    const submissionTokens = state.sourceTokens.map(function (token) {
+      return Object.assign({}, token, {
+        start: token.start - leadingTrim,
+        end: token.end - leadingTrim
+      });
+    });
+    if (!stripSelectedSourceLabels(visiblePrompt, submissionTokens)) {
       showNotice("اكتب السؤال بعد اختيار مصدر البحث.");
       return;
     }
@@ -1094,6 +1169,8 @@
     }
 
     const input = document.getElementById("user-input");
+    state.sourceTokens = [];
+    state.lastComposerValue = "";
     if (input) {
       input.value = "";
       input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1139,8 +1216,8 @@
     }
   }
 
-  function shouldRouteToSources(value) {
-    return extractSourceMentions(value).selectedServerIds.length > 0;
+  function shouldRouteToSources() {
+    return getSelectedServerIds(state.sourceTokens).length > 0;
   }
 
   function initializeComposerRouting(inputArea, input) {
@@ -1148,7 +1225,7 @@
 
     window.addEventListener("click", function (event) {
       const target = event.target && event.target.closest ? event.target.closest("#send-btn") : null;
-      if (!target || !shouldRouteToSources(input.value)) return;
+      if (!target || !shouldRouteToSources()) return;
       event.preventDefault();
       event.stopPropagation();
       if (event.stopImmediatePropagation) event.stopImmediatePropagation();
@@ -1175,7 +1252,7 @@
         }
         hideMentionMenu();
       }
-      if (!shouldRouteToSources(input.value)) return;
+      if (!shouldRouteToSources()) return;
       event.preventDefault();
       event.stopPropagation();
       if (event.stopImmediatePropagation) event.stopImmediatePropagation();

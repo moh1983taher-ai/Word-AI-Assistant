@@ -11,15 +11,16 @@ const taskpaneHtml = fs.readFileSync(path.join(root, "src/taskpane/taskpane.html
 
 assert.match(taskpaneHtml, /id="user-input"/, "The native message composer must remain the interaction point.");
 assert.match(taskpaneHtml, /id="send-btn"/, "The native send button must remain unchanged.");
-assert.match(uiSource, /function extractSourceMentions\(value\)/);
+assert.match(uiSource, /function updateSourceTokenRanges\(previousValue, currentValue, sourceTokens\)/);
 assert.match(uiSource, /function getMentionContext\(value, cursorPosition\)/);
 assert.match(uiSource, /function createMentionMenu\(inputArea, input\)/);
 assert.match(uiSource, /function insertSourceMention\(input, server\)/);
-assert.match(uiSource, /@الجامع/);
-assert.match(uiSource, /@الشاملة/);
+assert.match(uiSource, /const tokenLabel = server\.mentionLabel \|\| server\.label/);
+assert.doesNotMatch(uiSource, /@الجامع |@الشاملة /);
 assert.match(uiSource, /input\.placeholder = "اكتب سؤالك، أو اكتب @ لاختيار مصدر\.\.\."/);
-assert.match(uiSource, /if \(!shouldRouteToSources\(input\.value\)\) return;/);
-assert.match(uiSource, /function shouldRouteToSources\(value\)/);
+assert.match(uiSource, /if \(!shouldRouteToSources\(\)\) return;/);
+assert.match(uiSource, /function shouldRouteToSources\(\)/);
+assert.match(uiSource, /getSelectedServerIds\(state\.sourceTokens\)/);
 
 assert.doesNotMatch(
   uiSource,
@@ -56,8 +57,8 @@ assert.match(
   /bridge\.addPendingMessage\([\s\S]*?bridge\.removePendingMessage\(pending\)/,
   "The pending indicator must be rendered in the native chat."
 );
-assert.match(uiSource, /window\.addEventListener\("click"[\s\S]*?shouldRouteToSources\(input\.value\)/);
-assert.match(uiSource, /event\.key !== "Enter"[\s\S]*?shouldRouteToSources\(input\.value\)/);
+assert.match(uiSource, /window\.addEventListener\("click"[\s\S]*?shouldRouteToSources\(\)/);
+assert.match(uiSource, /event\.key !== "Enter"[\s\S]*?shouldRouteToSources\(\)/);
 
 assert.match(uiSource, /const LEGACY_THREAD_KEY = ["']AR_MCP_RESEARCH_THREAD["']/);
 assert.match(uiSource, /bridge\.importLegacyThread\(legacyThread\)/);

@@ -17,10 +17,12 @@ assert.match(source, /function loadSettings\(\)[\s\S]*?provider:[\s\S]*?key:[\s\
 assert.doesNotMatch(source, /AR_MCP_RESEARCH_SETTINGS|AR_MCP_RESEARCH_THREAD.*key/);
 
 assert.match(source, /https:\/\/api\.groq\.com\/openai\/v1\/responses/);
-assert.match(source, /function extractSourceMentions\(value\)/);
+assert.match(source, /function updateSourceTokenRanges\(previousValue, currentValue, sourceTokens\)/);
 assert.match(source, /function getMentionContext\(value, cursorPosition\)/);
 assert.match(source, /function createMentionMenu\(inputArea, input\)/);
-assert.match(source, /const token = server\.id === "aljam3" \? "@الجامع " : "@الشاملة "/);
+assert.match(source, /const tokenLabel = server\.mentionLabel \|\| server\.label/);
+assert.match(source, /mentionLabel: "الشاملة"/);
+assert.doesNotMatch(source, /@الجامع |@الشاملة /, "Selected source labels must be inserted without an @ marker.");
 assert.match(source, /function getGroqTools\(selectedServerIds\)[\s\S]*?getSelectedMcpServers\(selectedServerIds\)/);
 assert.match(source, /عند طلب البحث أو التحقق من نص أو كتاب، أو في المسائل التخصصية/);
 assert.match(source, /نوّع صيغ المصطلح وألفاظه القريبة/);
@@ -301,29 +303,59 @@ assert.doesNotMatch(
   /LOCAL_MCP_HOST_URL|127\.0\.0\.1:18081|callLocalResearch|fetchLocalHostJson|checkLocalHost|DuckAI المحلي|targetAddressSpace|RESEARCH_ENGINE_KEY|loadResearchEngine|saveResearchEngine/,
   "MCP research must not keep a local host route, runtime selector or local fallback."
 );
-assert.match(source, /function shouldRouteToSources\(value\)/);
-assert.match(source, /if \(!shouldRouteToSources\(input\.value\)\) return;/);
+assert.match(source, /function shouldRouteToSources\(\)/);
+assert.match(source, /getSelectedServerIds\(state\.sourceTokens\)/);
+assert.match(source, /if \(!shouldRouteToSources\(\)\) return;/);
 assert.doesNotMatch(source, /loadSelectedServerIds|saveSelectedServerIds|SELECTED_SERVERS_KEY/);
 
-const mentionStart = source.indexOf("  function extractSourceMentions(value) {");
+const mentionStart = source.indexOf("  function getMentionContext(value, cursorPosition) {");
 const mentionEnd = source.indexOf("  function getCloudProviderStatus(settings) {", mentionStart);
-assert.ok(mentionStart >= 0 && mentionEnd > mentionStart, "Mention parsing helpers must be testable");
+assert.ok(mentionStart >= 0 && mentionEnd > mentionStart, "Composer selection helpers must be testable");
 const mentionContext = {};
 vm.runInNewContext(
-  source.slice(mentionStart, mentionEnd) +
-  "\nglobalThis.__mentionHelpers = { extractSourceMentions, getMentionContext };",
+  `function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? Array.from(new Set(ids)).filter(function (id) { return id === 'aljam3' || id === 'shamela'; }) : []; }
+${source.slice(mentionStart, mentionEnd)}
+globalThis.__mentionHelpers = { getMentionContext, updateSourceTokenRanges, getSelectedServerIds, stripSelectedSourceLabels };`,
   mentionContext
 );
 const mentions = mentionContext.__mentionHelpers;
-const bothSources = mentions.extractSourceMentions("@الجامع ابحث في المسألة @الشاملة");
-assert.deepEqual(Array.from(bothSources.selectedServerIds), ["aljam3", "shamela"]);
-assert.equal(bothSources.prompt, "ابحث في المسألة");
-const duplicateSources = mentions.extractSourceMentions("@الجامع سؤال @الجامع");
-assert.deepEqual(Array.from(duplicateSources.selectedServerIds), ["aljam3"]);
-assert.equal(duplicateSources.prompt, "سؤال");
 const mentionContextAtCursor = mentions.getMentionContext("ابحث في @الجام", "ابحث في @الجام".length);
 assert.equal(mentionContextAtCursor.query, "الجام");
 assert.equal(mentions.getMentionContext("ابحث @الجامع ", "ابحث @الجامع ".length), null);
+
+// Selection metadata, not the visible word, activates a source.
+assert.deepEqual(Array.from(mentions.getSelectedServerIds([])), []);
+const bareWord = "الجامع ما حكم المسألة؟";
+assert.deepEqual(Array.from(mentions.getSelectedServerIds([])), []);
+const sourceToken = { id: "aljam3", label: "الجامع", start: 0, end: "الجامع".length };
+assert.deepEqual(Array.from(mentions.getSelectedServerIds([sourceToken])), ["aljam3"]);
+assert.equal(mentions.stripSelectedSourceLabels(bareWord, [sourceToken]), "ما حكم المسألة؟");
+
+// Edits after a selected label preserve the selection.
+const editedQuestion = "الجامع أبحث في المسألة";
+const preserved = mentions.updateSourceTokenRanges(
+  "الجامع ابحث في المسألة",
+  editedQuestion,
+  [sourceToken]
+);
+assert.equal(preserved.length, 1);
+assert.equal(preserved[0].start, 0);
+assert.equal(preserved[0].end, "الجامع".length);
+
+// Inserting text before the selected label shifts its metadata.
+const shifted = mentions.updateSourceTokenRanges(
+  "الجامع ابحث",
+  "سؤال: الجامع ابحث",
+  [sourceToken]
+);
+assert.equal(shifted.length, 1);
+assert.equal(shifted[0].start, "سؤال: ".length);
+
+// Deleting or editing the selected label cancels its activation.
+const deleted = mentions.updateSourceTokenRanges("الجامع ابحث", "ابحث", [sourceToken]);
+assert.equal(deleted.length, 0);
+const altered = mentions.updateSourceTokenRanges("الجامع ابحث", "الجامعX ابحث", [sourceToken]);
+assert.equal(altered.length, 0);
 
 const mcpConfigStart = source.indexOf("  const MCP_SERVERS = Object.freeze([");
 const mcpToolsEnd = source.indexOf("\n  async function postCloudJson", mcpConfigStart);
