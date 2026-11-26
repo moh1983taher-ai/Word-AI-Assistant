@@ -630,8 +630,8 @@ assert.equal(
     "بسم الله الرحمن الرحيم\r\nالحمد لله رب العلمين الرحمن الرحيم"
 );
 
-// An ambiguous item is reported separately; valid corrections in the same
-// response remain available for preview and application.
+// Repeated identical corrections are expanded to all exact occurrences,
+// while independent valid corrections remain available in the same response.
 const independentEditsSource = "تكرر الخطأ هنا، وتكرر الخطأ ثانية، وظهر خطا واضح في موضع آخر.";
 const independentEditsResult = revision.parseResponse(JSON.stringify({
     status: "ready",
@@ -642,7 +642,7 @@ const independentEditsResult = revision.parseResponse(JSON.stringify({
             replacement: "الصواب",
             contextBefore: "",
             contextAfter: "",
-            reason: "اختبار الغموض"
+            reason: "تصحيح متكرر"
         },
         {
             original: "خطا",
@@ -653,10 +653,9 @@ const independentEditsResult = revision.parseResponse(JSON.stringify({
         }
     ]
 }), independentEditsSource);
-assert.equal(independentEditsResult.edits.length, 1);
-assert.equal(independentEditsResult.rejected.length, 1);
-assert.equal(independentEditsResult.rejected[0].rejectionCode, "ambiguous_occurrence");
-assert.equal(independentEditsResult.text, "تكرر الخطأ هنا، وتكرر الخطأ ثانية، وظهر خطأ واضح في موضع آخر.");
+assert.equal(independentEditsResult.edits.length, 3);
+assert.equal(independentEditsResult.rejected.length, 0);
+assert.equal(independentEditsResult.text, "تكرر الصواب هنا، وتكرر الصواب ثانية، وظهر خطأ واضح في موضع آخر.");
 
 // A model-proposed phrase crossing a paragraph separator is rejected alone.
 const crossingOnlyResult = revision.parseResponse(JSON.stringify({
