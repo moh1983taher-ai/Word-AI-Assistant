@@ -136,6 +136,7 @@ public sealed class ResearchCoordinator
             var invalidDecisionAttempts = 0;
             var searchDecisionCorrectionAttempted = false;
             var pageVerificationCorrectionAttempted = false;
+            var pageReadFallbackAttempted = false;
             var toolCallsAttempted = 0;
             var searchedSourceIds = new HashSet<string>(StringComparer.Ordinal);
 
@@ -359,10 +360,81 @@ public sealed class ResearchCoordinator
                             continue;
                         }
 
+                        if (!pageReadFallbackAttempted)
+                        {
+                            pageReadFallbackAttempted = true;
+                            _log.Warning(
+                                $"Research page-open recovery started: task={taskId}; pendingPageSources={string.Join(",", pendingPageSources)}; recovery=first_verified_search_hit.");
+
+                            foreach (var sourceId in pendingPageSources)
+                            {
+                                var openTool = activeTools.FirstOrDefault(tool =>
+                                    tool.Server == sourceId &&
+                                    (sourceId == "aljam3"
+                                        ? tool.Name == "get_page"
+                                        : tool.Name == "shamela_open"));
+                                if (openTool is null ||
+                                    !evidenceProvenance.TryBuildVerifiedReadArguments(openTool, out var openArguments))
+                                {
+                                    _log.Warning(
+                                        $"Research page-open recovery unavailable: task={taskId}; source={sourceId}; reason=no_schema_valid_verified_reference.");
+                                    continue;
+                                }
+
+                                var referenceError = evidenceProvenance.ValidateReferenceRead(openTool, openArguments);
+                                if (referenceError is not null)
+                                {
+                                    _log.Warning(
+                                        $"Research page-open recovery rejected: task={taskId}; source={sourceId}; reason=reference_validation_failed.");
+                                    continue;
+                                }
+
+                                toolCallsAttempted++;
+                                _log.Info(
+                                    $"Research page-open recovery dispatch: task={taskId}; source={sourceId}; tool={openTool.Name}; reference=first_verified_search_hit.");
+
+                                var openExecution = await ExecuteToolAsync(
+                                    openTool,
+                                    openArguments,
+                                    warnings,
+                                    evidenceProvenance,
+                                    taskId,
+                                    timeout.Token);
+                                evidenceLedger.Add(openTool, openExecution.Content, openExecution.Succeeded);
+
+                                if (openExecution.Succeeded)
+                                    trace.Add(new ToolCallTrace(
+                                        openTool.Server,
+                                        openTool.ServerLabel,
+                                        openTool.Name));
+
+                                _log.Info(
+                                    $"Research page-open recovery result: task={taskId}; source={sourceId}; tool={openTool.Name}; success={openExecution.Succeeded}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}.");
+                            }
+
+                            var stillUnverifiedSources = evidenceProvenance.GetUnverifiedSearchSources();
+                            if (stillUnverifiedSources.Count == 0)
+                            {
+                                messages.Add(new DuckChatMessage(
+                                    "user",
+                                    "فتح المضيف موضعاً أصلياً مطابقاً من نتائج كل مكتبة كانت تحتاج إلى تحقق. اقرأ النصوص المفتوحة وسياقها، واختر بنفسك ما إذا كان يلزم بحث أو فتح مراجع إضافية، ثم أجب عن سؤال الباحث كما طلبه."));
+                                _log.Info(
+                                    $"Research page-open recovery completed: task={taskId}; verifiedOpens={evidenceProvenance.VerifiedPageOpenCount}; handoff=model.");
+                                continue;
+                            }
+
+                            _log.Warning(
+                                $"Research page-open recovery incomplete: task={taskId}; pendingPageSources={string.Join(",", stillUnverifiedSources)}.");
+                            throw new InvalidOperationException(
+                                "تعذر فتح صفحة مطابقة من المكتبات الآتية رغم الاسترداد المحدود: " +
+                                string.Join("، ", stillUnverifiedSources.Select(ResearchSourceSelection.GetLabel)) +
+                                ". لم تُعتمد إجابة غير موثقة.");
+                        }
+
                         _log.Warning(
-                            $"Research final rejected: task={taskId}; reason=search_results_without_verified_page_open; finalAllowed={allowFinal}; pendingPageSources={string.Join(",", pendingPageSources)}; correctionAttempted=true.");
+                            $"Research final rejected: task={taskId}; reason=search_results_without_verified_page_open; finalAllowed={allowFinal}; fallbackAttempted=true.");
                         throw new InvalidOperationException(
-                            "تعذر اعتماد إجابة البحث: بقيت مكتبة أعادت نتائج فعلية من دون فتح صفحة مطابقة والتحقق من معرّفها. أُوقف تمرير الإجابة غير المكتملة بدلاً من عرضها بوصفها بحثاً موثقاً.");
+                            "تعذر اعتماد إجابة البحث بعد محاولة فتح الصفحات الاحتياطية؛ لم تُمرر إجابة غير موثقة.");
                     }
 
                     _log.Info($"Research completed: task={taskId}; toolCalls={trace.Count}; evidenceEntries={evidenceLedger.Entries.Count}; mode=aurora-tool-call+json-final; model={model}.");

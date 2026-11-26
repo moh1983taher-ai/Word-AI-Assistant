@@ -310,6 +310,62 @@ public sealed class McpEvidenceProvenanceTests
     }
 
     [Fact]
+    public void BuildsSchemaValidatedFallbackOpenArgumentsFromExactShamelaHit()
+    {
+        var provenance = SearchShamela(
+            """{"results":[{"book_id":21592,"page_id":1157},{"book_id":21592,"page_id":1158}]}""");
+        var open = ToolWithSchema(
+            "shamela",
+            "shamela_open",
+            """{"type":"object","properties":{"book_id":{"type":"integer"},"page_id":{"type":"integer"}},"required":["book_id","page_id"],"additionalProperties":false}""");
+
+        Assert.True(provenance.TryBuildVerifiedReadArguments(open, out var arguments));
+        Assert.Equal(21592L, Assert.IsType<JsonElement>(arguments["book_id"]).GetInt64());
+        Assert.Equal(1157L, Assert.IsType<JsonElement>(arguments["page_id"]).GetInt64());
+        Assert.Null(provenance.ValidateReferenceRead(open, arguments));
+    }
+
+    [Fact]
+    public void BuildsSchemaValidatedFallbackOpenArgumentsFromExactAljam3Hit()
+    {
+        var provenance = SearchAljam3(
+            """{"results":[{"file_id":8291,"page_number":471},{"file_id":8291,"page_number":472}]}""");
+        var open = ToolWithSchema(
+            "aljam3",
+            "get_page",
+            """{"type":"object","properties":{"file_id":{"type":"integer"},"page_number":{"type":"integer"}},"required":["file_id","page_number"],"additionalProperties":false}""");
+
+        Assert.True(provenance.TryBuildVerifiedReadArguments(open, out var arguments));
+        Assert.Equal(8291L, Assert.IsType<JsonElement>(arguments["file_id"]).GetInt64());
+        Assert.Equal(471L, Assert.IsType<JsonElement>(arguments["page_number"]).GetInt64());
+        Assert.Null(provenance.ValidateReferenceRead(open, arguments));
+    }
+
+    [Fact]
+    public void DoesNotInventFallbackPageWhenNoSearchPagePairExists()
+    {
+        var provenance = SearchShamela(
+            """{"results":[{"book_id":21592,"title":"كتاب بلا معرّف صفحة"}]}""");
+        var open = ToolWithSchema(
+            "shamela",
+            "shamela_open",
+            """{"type":"object","properties":{"book_id":{"type":"integer"},"page_id":{"type":"integer"}},"required":["book_id","page_id"],"additionalProperties":false}""");
+
+        Assert.False(provenance.TryBuildVerifiedReadArguments(open, out _));
+    }
+
+    private static ToolDescriptor ToolWithSchema(string server, string name, string schemaText)
+    {
+        using var schema = JsonDocument.Parse(schemaText);
+        return new ToolDescriptor(
+            server,
+            server == "aljam3" ? "الجامع" : "المكتبة الشاملة",
+            name,
+            string.Empty,
+            schema.RootElement.Clone());
+    }
+
+    [Fact]
     public void AllowsOpeningAnExactAljam3FilePagePairReturnedBySearch()
     {
         var provenance = SearchAljam3(

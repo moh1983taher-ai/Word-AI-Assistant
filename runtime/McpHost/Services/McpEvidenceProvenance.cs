@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Globalization;
+using ResearchTools.McpHost.Security;
 using System.Text.RegularExpressions;
 using ResearchTools.McpHost.Models;
 
@@ -90,6 +92,170 @@ internal sealed class McpEvidenceProvenance
         }
 
         return index.ReferenceCount;
+    }
+
+    /// <summary>
+    /// Builds one conservative page-open request from the first exact book/page
+    /// pair returned by this same source's search, matching the live MCP schema.
+    /// Used only as a bounded recovery when the model repeatedly returns a final
+    /// answer without opening any of the pages it searched for.
+    /// </summary>
+    internal bool TryBuildVerifiedReadArguments(
+        ToolDescriptor descriptor,
+        out IReadOnlyDictionary<string, object?> arguments)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        arguments = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (!IsReferenceReadTool(descriptor) ||
+            !_sources.TryGetValue(descriptor.Server, out var index))
+            return false;
+
+        string? firstReference = descriptor.Server switch
+        {
+            "aljam3" => index.OrderedFilePagePairs.FirstOrDefault(),
+            "shamela" when descriptor.Name == "shamela_open" => index.OrderedBookPagePairs.FirstOrDefault(),
+            _ => null
+        };
+        if (string.IsNullOrWhiteSpace(firstReference))
+            return false;
+
+        var separator = firstReference.IndexOf('/');
+        if (separator <= 0 || separator == firstReference.Length - 1)
+            return false;
+
+        var canonicalFields = descriptor.Server == "aljam3"
+            ? new[]
+            {
+                (Aliases: FileKeys, Value: firstReference[..separator]),
+                (Aliases: FilePageNumberKeys, Value: firstReference[(separator + 1)..])
+            }
+            : new[]
+            {
+                (Aliases: BookKeys, Value: firstReference[..separator]),
+                (Aliases: OpenPageKeys, Value: firstReference[(separator + 1)..])
+            };
+
+        if (!TryGetProperty(descriptor.InputSchema, "properties", out var properties) ||
+            properties.ValueKind != JsonValueKind.Object)
+            return false;
+
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var field in canonicalFields)
+        {
+            var schemaProperty = properties.EnumerateObject()
+                .FirstOrDefault(property => field.Aliases.Contains(
+                    property.Name,
+                    StringComparer.OrdinalIgnoreCase));
+            if (string.IsNullOrEmpty(schemaProperty.Name) ||
+                !TryCreateTypedScalar(field.Value, schemaProperty.Value, out var typedValue))
+                return false;
+
+            values[schemaProperty.Name] = typedValue;
+        }
+
+        // Satisfy only schema-declared defaults or nullable required fields; never guess.
+        if (TryGetProperty(descriptor.InputSchema, "required", out var required) &&
+            required.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in required.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String)
+                    continue;
+
+                var requiredName = item.GetString();
+                if (string.IsNullOrWhiteSpace(requiredName) || values.ContainsKey(requiredName))
+                    continue;
+                var property = properties.EnumerateObject()
+                    .FirstOrDefault(candidate => string.Equals(
+                        candidate.Name,
+                        requiredName,
+                        StringComparison.OrdinalIgnoreCase));
+                if (string.IsNullOrEmpty(property.Name))
+                    return false;
+
+                if (TryGetProperty(property.Value, "default", out var defaultValue))
+                    values[property.Name] = defaultValue.Clone();
+                else if (AllowsNull(property.Value))
+                    values[property.Name] = JsonDocument.Parse("null").RootElement.Clone();
+                else
+                    return false;
+            }
+        }
+
+        var json = JsonSerializer.SerializeToElement(values);
+        if (ToolArgumentValidator.Validate(descriptor.InputSchema, json) is not null)
+            return false;
+
+        arguments = values;
+        return ValidateReferenceRead(descriptor, arguments) is null;
+    }
+
+    private static bool TryCreateTypedScalar(
+        string rawValue,
+        JsonElement propertySchema,
+        out object? value)
+    {
+        value = null;
+        var type = ReadSchemaType(propertySchema);
+        switch (type)
+        {
+            case "integer":
+                if (!long.TryParse(rawValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer))
+                    return false;
+                value = JsonSerializer.SerializeToElement(integer);
+                return true;
+            case "number":
+                if (!decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
+                    return false;
+                value = JsonSerializer.SerializeToElement(number);
+                return true;
+            case "string":
+                value = JsonSerializer.SerializeToElement(rawValue);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static string? ReadSchemaType(JsonElement schema)
+    {
+        if (TryGetProperty(schema, "type", out var type))
+        {
+            if (type.ValueKind == JsonValueKind.String)
+                return type.GetString();
+            if (type.ValueKind == JsonValueKind.Array)
+                return type.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString())
+                    .FirstOrDefault(item => item is "integer" or "number" or "string");
+        }
+        if (TryGetProperty(schema, "anyOf", out var anyOf) &&
+            anyOf.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var option in anyOf.EnumerateArray())
+            {
+                var candidate = ReadSchemaType(option);
+                if (candidate is "integer" or "number" or "string")
+                    return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static bool AllowsNull(JsonElement schema)
+    {
+        if (TryGetProperty(schema, "type", out var type))
+        {
+            if (type.ValueKind == JsonValueKind.String && type.GetString() == "null")
+                return true;
+            if (type.ValueKind == JsonValueKind.Array &&
+                type.EnumerateArray().Any(item =>
+                    item.ValueKind == JsonValueKind.String && item.GetString() == "null"))
+                return true;
+        }
+        return TryGetProperty(schema, "anyOf", out var anyOf) &&
+               anyOf.ValueKind == JsonValueKind.Array &&
+               anyOf.EnumerateArray().Any(AllowsNull);
     }
 
     internal string? ValidateReferenceRead(
@@ -471,9 +637,14 @@ internal sealed class McpEvidenceProvenance
         private Dictionary<string, HashSet<string>> PageBooks { get; } = new(StringComparer.Ordinal);
         internal int ReferenceCount => PageIds.Count + OpaqueIds.Count + BookPagePairs.Count + FilePagePairs.Count;
 
+        internal List<string> OrderedBookPagePairs { get; } = [];
+        internal List<string> OrderedFilePagePairs { get; } = [];
+
         internal void AddBookPagePair(string bookId, string pageId)
         {
-            BookPagePairs.Add(Pair(bookId, pageId));
+            var pair = Pair(bookId, pageId);
+            if (BookPagePairs.Add(pair))
+                OrderedBookPagePairs.Add(pair);
             if (!PageBooks.TryGetValue(pageId, out var books))
             {
                 books = new HashSet<string>(StringComparer.Ordinal);
@@ -483,8 +654,12 @@ internal sealed class McpEvidenceProvenance
             books.Add(bookId);
         }
 
-        internal void AddFilePagePair(string fileId, string pageNumber) =>
-            FilePagePairs.Add(Pair(fileId, pageNumber));
+        internal void AddFilePagePair(string fileId, string pageNumber)
+        {
+            var pair = Pair(fileId, pageNumber);
+            if (FilePagePairs.Add(pair))
+                OrderedFilePagePairs.Add(pair);
+        }
 
         internal bool HasUnambiguousPageId(string pageId) =>
             PageBooks.TryGetValue(pageId, out var books) && books.Count == 1;
