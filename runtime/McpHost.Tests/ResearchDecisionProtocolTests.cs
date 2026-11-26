@@ -17,10 +17,22 @@ public sealed class ResearchDecisionProtocolTests
         Assert.Contains("covered", prompt, StringComparison.Ordinal);
         Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
         Assert.Contains("arguments", prompt, StringComparison.Ordinal);
-        Assert.Contains("covered", prompt, StringComparison.Ordinal);
-        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("response_format", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("json_schema", prompt, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void IncludesStableCoverageIdsAndExactArabicPlanLabels()
+    {
+        var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
+            allowFinal: true,
+            pendingSourceLabels: [],
+            plannedCoverage: ["الموضع الأصلي", "بيانات المصدر"]);
+
+        Assert.Contains("C1 = \"الموضع الأصلي\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("C2 = \"بيانات المصدر\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("استخدم رمزه فقط", prompt, StringComparison.Ordinal);
+        Assert.Contains("\"covered\":[\"C1\"]", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -92,13 +104,15 @@ public sealed class ResearchDecisionProtocolTests
     }
 
     [Fact]
-    public void CoverageCorrectionAllowsAnExplicitUnresolvedFacetAfterReasonableSearch()
+    public void CoverageCorrectionIncludesStableCodesForRemainingPlanItems()
     {
-        var prompt = ResearchDecisionProtocol.BuildCoverageCorrection(["نسبة الصيغة إلى مصدرها"]);
+        var prompt = ResearchDecisionProtocol.BuildCoverageCorrection(
+            ["الموضع الأصلي", "نص القاعدة", "بيانات المصدر"],
+            ["نص القاعدة", "بيانات المصدر"]);
 
-        Assert.Contains("استنفدت المسارات المعقولة", prompt, StringComparison.Ordinal);
-        Assert.Contains("uncovered", prompt, StringComparison.Ordinal);
-        Assert.Contains("سبب التعذر", prompt, StringComparison.Ordinal);
+        Assert.Contains("C2، C3", prompt, StringComparison.Ordinal);
+        Assert.Contains("C1 = \"الموضع الأصلي\"", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تضف عبارات أخرى", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
