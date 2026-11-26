@@ -286,7 +286,8 @@ public sealed class ResearchCoordinator
                     ResearchDecisionProtocol.BuildTurnInstructions(
                         allowFinal,
                         pendingSourceLabels,
-                        pendingPageSourceLabels);
+                        pendingPageSourceLabels,
+                        researchPlan!.Coverage);
 
                 // The compact tool directory is included as ordinary prompt text.
                 // The original MCP schema remains authoritative during host-side validation.
@@ -409,7 +410,7 @@ public sealed class ResearchCoordinator
                         messages.Add(new DuckChatMessage("assistant", decision.Raw));
                         messages.Add(new DuckChatMessage(
                             "user",
-                            ResearchDecisionProtocol.BuildCoverageCorrection(unreportedCoverage)));
+                            ResearchDecisionProtocol.BuildCoverageCorrection(researchPlan!.Coverage, unreportedCoverage)));
                         continue;
                     }
 
