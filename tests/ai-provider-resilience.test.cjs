@@ -8,7 +8,7 @@ const vm = require("node:vm");
 const source = fs.readFileSync(
     path.join(__dirname, "../src/taskpane/taskpane.js"),
     "utf8"
-);
+).replace(/\r\n/g, "\n");
 
 assert.ok(
     source.includes("const DUCKAI_LOCAL_API_BASE =") &&

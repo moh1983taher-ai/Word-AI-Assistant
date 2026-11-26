@@ -6,7 +6,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const uiSource = fs.readFileSync(path.join(root, "src/taskpane/mcp-research-assistant.js"), "utf8");
-const appSource = fs.readFileSync(path.join(root, "src/taskpane/taskpane.js"), "utf8");
+const appSource = fs.readFileSync(path.join(root, "src/taskpane/taskpane.js"), "utf8").replace(/\r\n/g, "\n");
 const taskpaneHtml = fs.readFileSync(path.join(root, "src/taskpane/taskpane.html"), "utf8");
 
 assert.match(taskpaneHtml, /id="user-input"/, "The native message composer must remain the interaction point.");
