@@ -305,7 +305,7 @@ assert.doesNotMatch(
 );
 assert.match(source, /function shouldRouteToSources\(\)/);
 assert.match(source, /getSelectedServerIds\(state\.sourceTokens\)/);
-assert.match(source, /if \(!shouldRouteToSources\(input\.value\)\) return;/);
+assert.match(source, /if \(!shouldRouteToSources\(\)\) return;/);
 assert.doesNotMatch(source, /loadSelectedServerIds|saveSelectedServerIds|SELECTED_SERVERS_KEY/);
 
 const mentionStart = source.indexOf("  function getMentionContext(value, cursorPosition) {");
