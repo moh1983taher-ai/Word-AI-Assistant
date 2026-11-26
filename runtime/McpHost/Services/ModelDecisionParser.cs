@@ -26,7 +26,7 @@ public static class ModelDecisionParser
     {
         decision = new ModelDecision("invalid", string.Empty, string.Empty, string.Empty, default, response ?? string.Empty);
         if (!TryExtractJsonObject(response, out var candidate))
-            return false;
+            return TryParseFinalText(response, out decision);
 
         try
         {
@@ -105,7 +105,7 @@ public static class ModelDecisionParser
         }
         catch (JsonException)
         {
-            return false;
+            return TryParseFinalText(response, out decision);
         }
 
         // DuckAI is text-based: a natural-language answer is a valid final response.
