@@ -167,7 +167,7 @@
                 reject(item, "invalid_edit", "بيانات التصحيح غير مكتملة.");
                 return;
             }
-            if (/[\\r\\n]/.test(original + replacement)) {
+            if (/[\r\n]/.test(original + replacement)) {
                 reject(item, "cross_paragraph_edit", "يمتد التصحيح المقترح عبر فاصل فقرة؛ عُزل هذا التصحيح وحده.");
                 return;
             }
