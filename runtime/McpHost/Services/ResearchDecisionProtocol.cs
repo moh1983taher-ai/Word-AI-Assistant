@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 
 namespace ResearchTools.McpHost.Services;
 
@@ -11,10 +13,12 @@ internal static class ResearchDecisionProtocol
     internal static string BuildTurnInstructions(
         bool allowFinal,
         IReadOnlyList<string> pendingSourceLabels,
-        IReadOnlyList<string>? pendingPageSourceLabels = null)
+        IReadOnlyList<string>? pendingPageSourceLabels = null,
+        IReadOnlyList<string>? plannedCoverage = null)
     {
         ArgumentNullException.ThrowIfNull(pendingSourceLabels);
         pendingPageSourceLabels ??= [];
+        plannedCoverage ??= [];
 
         var builder = new StringBuilder();
         builder.AppendLine("بروتوكول البحث: استدعاء الأدوات بصيغة Aurora النصية، والإجابة النهائية بصيغة JSON.");
@@ -22,8 +26,10 @@ internal static class ResearchDecisionProtocol
         builder.AppendLine("لاستدعاء أداة MCP أخرج كتلة واحدة بالصيغة الآتية، وانسخ الاسم المركب حرفياً من فهرس الأدوات:");
         builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
         builder.AppendLine("الاسم المركب يتكون من معرّف المكتبة ثم __ ثم اسم الأداة، مثل aljam3__search. لا تضع server أو tool في حقول منفصلة.");
-        builder.AppendLine("للإجابة النهائية أخرج: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور مغطى من الخطة\"],\"uncovered\":[]}. يجب أن تكون القائمتان موجودتين دائماً.");
+        builder.AppendLine("للإجابة النهائية أخرج: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"C1\"],\"uncovered\":[\"C2\"]}. يجب أن تكون القائمتان موجودتين دائماً.");
         builder.AppendLine("التزم حرفياً بمعاملات الأداة. لا تخمّن المعرّفات ولا تنقلها بين المكتبات.");
+
+        AppendCoverageMap(builder, plannedCoverage);
 
         if (!allowFinal)
         {
@@ -43,7 +49,7 @@ internal static class ResearchDecisionProtocol
             builder.AppendLine("اكتملت متطلبات الوصول الأساسية، لكن لا يعني ذلك اكتمال الاستقصاء.");
             builder.AppendLine("راجع نتائج جميع الاستعلامات وتغطية محاور خطة البحث. إذا بقي محور غير مغطى، أو نتيجة قوية لم تُفحص، أو احتجت إلى مقارنة مراجع إضافية، فواصل باستخدام كتلة <tool_call>.");
             builder.AppendLine("لا تكتف بصفحة واحدة ولا بعدد شكلي من المراجع. افتح عدداً مناسباً من الصفحات ذات الصلة بحسب نوع السؤال واتساعه، واستبعد الصفحات التي لا تتناول المسألة.");
-            builder.AppendLine("في طلب النص المحدد تحقق من موضع النص وسياقه؛ وفي السؤال العام اجمع معلومات متنوعة تغطي المحاور. صنّف كل محور في covered إذا دعمته الأدلة، أو في uncovered إذا تعذر إثباته بعد استقصاء مناسب، واذكر سبب التعذر وحدود البحث في answer. لا تترك أي محور بلا تصنيف، ولا تدّع تغطية ما لم يثبت.");
+            builder.AppendLine("صنّف كل محور من قائمة التغطية باستخدام رمزه فقط: covered إذا دعمته الأدلة، أو uncovered إذا تعذر إثباته بعد استقصاء مناسب. لا تعِد صياغة المحاور ولا تنشئ محاور جديدة. اذكر أسباب التعذر وحدود البحث في answer، ولا تدّع تغطية ما لم يثبت.");
         }
 
         return builder.ToString();
@@ -75,27 +81,65 @@ internal static class ResearchDecisionProtocol
         }
         else
         {
-            builder.AppendLine("يمكنك إخراج كتلة <tool_call> لمتابعة البحث أو final إذا غطت الأدلة المفتوحة محاور الخطة بالفعل.");
+            builder.AppendLine("يمكنك إخراج كتلة <tool_call> لمتابعة البحث أو final بعد تصنيف جميع محاور الخطة برموزها الثابتة.");
             builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
-            builder.AppendLine("{\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور مغطى من الخطة\"],\"uncovered\":[]}");
+            builder.AppendLine("{\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"C1\"],\"uncovered\":[\"C2\"]}");
         }
 
         return builder.ToString();
     }
 
-    internal static string BuildCoverageCorrection(IReadOnlyList<string> missingCoverage)
+    internal static string BuildCoverageCorrection(
+        IReadOnlyList<string> plannedCoverage,
+        IReadOnlyList<string> missingCoverage)
     {
+        ArgumentNullException.ThrowIfNull(plannedCoverage);
         ArgumentNullException.ThrowIfNull(missingCoverage);
-        return "لا تعتمد الإجابة النهائية بعد؛ لم تثبت تغطية محاور الخطة الآتية: " +
-            string.Join("، ", missingCoverage) +
-            ". إن بقيت وسائل بحث مناسبة لم تجربها، فنفذ بحثاً تكميلياً أو افتح مراجع إضافية ذات صلة. وإن استنفدت المسارات المعقولة دون دليل، فضع المحور في uncovered واذكر سبب التعذر وحدود الاستقصاء في answer. لا تترك أي محور بلا تصنيف. " +
-            "أخرج كتلة <tool_call> لمتابعة البحث، أو final بعد تصنيف جميع المحاور بين covered وuncovered دون ادعاء. " +
-            "صيغة final: {\"type\":\"final\",\"answer\":\"...\",\"covered\":[\"...\"],\"uncovered\":[]}.";
+
+        var missing = missingCoverage.Select(Normalize)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missingIds = plannedCoverage
+            .Select((item, index) => new { Item = item, Id = $"C{index + 1}" })
+            .Where(entry => missing.Contains(Normalize(entry.Item)))
+            .Select(entry => entry.Id)
+            .ToArray();
+
+        var builder = new StringBuilder();
+        builder.AppendLine("لم يعتمد المضيف التصنيف السابق؛ لأن حقلي covered وuncovered يجب أن يحتويَا رموز المحاور لا صياغات من إنشائك.");
+        AppendCoverageMap(builder, plannedCoverage);
+        if (missingIds.Length > 0)
+            builder.Append("المحاور التي يلزم تصنيفها الآن: ")
+                .Append(string.Join("، ", missingIds))
+                .AppendLine(".");
+        builder.AppendLine("أعد قراراً نهائياً بعد وضع كل رمز أصلي مرة واحدة فقط في covered أو uncovered. لا تضف عبارات أخرى إلى القائمتين، ولا تغيّر معرّفات المحاور. إذا لم يثبت محور، ضعه في uncovered وبيّن السبب في answer.");
+        builder.AppendLine("صيغة final: {\"type\":\"final\",\"answer\":\"...\",\"covered\":[\"C1\"],\"uncovered\":[\"C2\"]}.");
+        return builder.ToString();
     }
 
     internal static string BuildTimeoutFinalInstructions() =>
         "انتهت مهلة البحث؛ هذه مرحلة صياغة نهائية ولا تتاح فيها استدعاءات أدوات جديدة. " +
         "اعرض ما تسمح به الأدلة المفتوحة وبيّن المحاور التي لم يكتمل التحقق منها. " +
-            "أخرج كائناً واحداً فقط: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"محور تحقق\"],\"uncovered\":[\"محور لم يكتمل\"]}. " +
+        "أخرج كائناً واحداً فقط: {\"type\":\"final\",\"answer\":\"نص الإجابة\",\"covered\":[\"C1\"],\"uncovered\":[\"C2\"]}. " +
         "لا تضف شرحاً أو Markdown خارج JSON.";
+
+    private static void AppendCoverageMap(StringBuilder builder, IReadOnlyList<string> plannedCoverage)
+    {
+        if (plannedCoverage.Count == 0)
+            return;
+
+        builder.AppendLine("قائمة المحاور الأصلية ورموزها الثابتة (انسخ الرمز فقط داخل covered أو uncovered):");
+        for (var index = 0; index < plannedCoverage.Count; index++)
+        {
+            var serialized = JsonSerializer.Serialize(
+                plannedCoverage[index],
+                new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+            builder.Append("C").Append(index + 1).Append(" = ")
+                .AppendLine(serialized);
+        }
+        builder.AppendLine("يجب تصنيف كل رمز من هذه الرموز مرة واحدة بالضبط؛ لا تستخدم نص المحور بدلاً من الرمز، ولا تنشئ رمزاً أو محوراً جديداً.");
+    }
+
+    private static string Normalize(string value) =>
+        string.Join(' ', (value ?? string.Empty)
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 }
