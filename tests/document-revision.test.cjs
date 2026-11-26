@@ -369,9 +369,8 @@ assert.equal(uniqueWithImpreciseContext.text, "وتبين الدراسة أن ا
 assert.equal(uniqueWithImpreciseContext.edits[0].start, "وتبين الدراسة أن المصلحة العامة تقتضي ذلك.".indexOf("أن المصلحة"));
 
 
-// Regression: a phrase can occur more than once in a full-document batch.
-// A slightly inaccurate long context must not abort the whole batch when the
-// adjacent boundary words uniquely identify the intended occurrence.
+// Repeated identical errors are corrected at every exact occurrence,
+// even when the model supplies context around only one of those occurrences.
 const repeatedPhrase = "أن تعارف الناس أمراً ما";
 const repeatedPhraseSource =
     "كان من عادة أهل القرية أن تعارف الناس أمراً ما في المجالس القديمة، ثم يتناقلونه. " +
@@ -387,15 +386,23 @@ const repeatedPhraseResult = revision.parseResponse(JSON.stringify({
         reason: "تصحيح التركيب النحوي"
     }]
 }), repeatedPhraseSource);
-const firstRepeatedPhraseStart = repeatedPhraseSource.indexOf(repeatedPhrase);
-assert.equal(repeatedPhraseResult.edits.length, 1);
-assert.equal(repeatedPhraseResult.edits[0].start, firstRepeatedPhraseStart);
-assert.ok(repeatedPhraseResult.text.startsWith(
-    "كان من عادة أهل القرية أن يتعارف الناس على أمر ما في المجالس القديمة"
-));
+assert.equal(repeatedPhraseResult.edits.length, 2);
+assert.deepEqual(
+    repeatedPhraseResult.edits.map(edit => edit.start).sort((a, b) => a - b),
+    [
+        repeatedPhraseSource.indexOf(repeatedPhrase),
+        repeatedPhraseSource.lastIndexOf(repeatedPhrase)
+    ]
+);
+assert.equal(
+    repeatedPhraseResult.text,
+    "كان من عادة أهل القرية أن يتعارف الناس على أمر ما في المجالس القديمة، ثم يتناقلونه. " +
+    "وفي سياق آخر، سمعنا عبارة أن يتعارف الناس على أمر ما بين الأصدقاء، فتنتشر سريعاً."
+);
+assert.deepEqual(repeatedPhraseResult.rejected, []);
 
-// Arabic diacritics in the model's boundary context do not prevent locating
-// the exact undiacritized source phrase.
+// Diacritics or an imprecise context must not cause repeated exact source text
+// to be isolated; every exact occurrence is still validated independently.
 const diacriticContextResult = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
@@ -407,10 +414,34 @@ const diacriticContextResult = revision.parseResponse(JSON.stringify({
         reason: "تصحيح اختباري"
     }]
 }), repeatedPhraseSource);
-assert.equal(diacriticContextResult.edits[0].start, firstRepeatedPhraseStart);
+assert.equal(diacriticContextResult.edits.length, 2);
 
-// When two identical phrases also have indistinguishable adjacent context,
-// the resolver must refuse rather than choose the first occurrence.
+// Identical model entries for separate occurrences must not multiply edits.
+const duplicateModelEntriesResult = revision.parseResponse(JSON.stringify({
+    status: "ready",
+    mode: "correction",
+    edits: [
+        {
+            original: repeatedPhrase,
+            replacement: "أن يتعارف الناس أمراً ما",
+            contextBefore: "من عادة أهل القرية",
+            contextAfter: "في المجالس القديمة",
+            reason: "تصحيح الموضع الأول"
+        },
+        {
+            original: repeatedPhrase,
+            replacement: "أن يتعارف الناس أمراً ما",
+            contextBefore: "سمعنا عبارة",
+            contextAfter: "بين الأصدقاء",
+            reason: "تصحيح الموضع الثاني"
+        }
+    ]
+}), repeatedPhraseSource);
+assert.equal(duplicateModelEntriesResult.edits.length, 2);
+assert.deepEqual(duplicateModelEntriesResult.rejected, []);
+
+// Even indistinguishable repeated contexts are no longer a reason to reject
+// an otherwise valid identical correction.
 const indistinguishableSource =
     "وكان أهل القرية يرون أن تعارف الناس أمراً ما بينهم. " +
     "وكان أهل القرية يرون أن تعارف الناس أمراً ما بينهم.";
@@ -425,10 +456,15 @@ const indistinguishableResult = revision.parseResponse(JSON.stringify({
         reason: "تصحيح اختباري"
     }]
 }), indistinguishableSource);
-assert.equal(indistinguishableResult.edits.length, 0);
-assert.equal(indistinguishableResult.rejected[0].rejectionCode, "ambiguous_occurrence");
-assert.equal(indistinguishableResult.text, indistinguishableSource);
+assert.equal(indistinguishableResult.edits.length, 2);
+assert.deepEqual(indistinguishableResult.rejected, []);
+assert.equal(
+    indistinguishableResult.text,
+    "وكان أهل القرية يرون أن يتعارف الناس أمراً ما بينهم. " +
+    "وكان أهل القرية يرون أن يتعارف الناس أمراً ما بينهم."
+);
 
+// A repeated spelling error with no context is also corrected everywhere.
 const ambiguousRepeatedResult = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
@@ -440,8 +476,12 @@ const ambiguousRepeatedResult = revision.parseResponse(JSON.stringify({
         reason: "تصحيح"
     }]
 }), repeatedSource);
-assert.equal(ambiguousRepeatedResult.edits.length, 0);
-assert.equal(ambiguousRepeatedResult.rejected[0].rejectionCode, "ambiguous_occurrence");
+assert.equal(ambiguousRepeatedResult.edits.length, 2);
+assert.deepEqual(ambiguousRepeatedResult.rejected, []);
+assert.equal(
+    ambiguousRepeatedResult.text,
+    "هذا خطأ لا يمكن قبوله، وموضع آخر لا يمكن إغفاله."
+);
 
 const crossParagraphEdit = revision.parseResponse(JSON.stringify({
     status: "ready",
