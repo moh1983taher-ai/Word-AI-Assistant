@@ -465,7 +465,8 @@ assert.deepEqual(revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
     text: "نص سليم.",
-    edits: []
+    edits: [],
+    rejected: []
 });
 
 // Response parser regressions: tolerate harmless wrappers and trailing commas,
@@ -591,7 +592,7 @@ assert.equal(
 
 // An ambiguous item is reported separately; valid corrections in the same
 // response remain available for preview and application.
-const independentEditsSource = "تكرر الخطأ هنا، وظهر خطا واضح في موضع آخر.";
+const independentEditsSource = "تكرر الخطأ هنا، وتكرر الخطأ ثانية، وظهر خطا واضح في موضع آخر.";
 const independentEditsResult = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
@@ -615,7 +616,7 @@ const independentEditsResult = revision.parseResponse(JSON.stringify({
 assert.equal(independentEditsResult.edits.length, 1);
 assert.equal(independentEditsResult.rejected.length, 1);
 assert.equal(independentEditsResult.rejected[0].rejectionCode, "ambiguous_occurrence");
-assert.equal(independentEditsResult.text, "تكرر الخطأ هنا، وظهر خطأ واضح في موضع آخر.");
+assert.equal(independentEditsResult.text, "تكرر الخطأ هنا، وتكرر الخطأ ثانية، وظهر خطأ واضح في موضع آخر.");
 
 // A model-proposed phrase crossing a paragraph separator is rejected alone.
 const crossingOnlyResult = revision.parseResponse(JSON.stringify({
