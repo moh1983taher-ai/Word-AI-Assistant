@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([Parameter(Mandatory = $true)][string]$ManifestFile)
+param(
+    [Parameter(Mandatory = $true)][string]$ManifestFile,
+    [Parameter(Mandatory = $true)][string]$ProviderLauncherFile
+)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Root = Join-Path $env:LOCALAPPDATA 'ResearchTools'
@@ -8,7 +11,9 @@ $McpHost = Join-Path $Root 'McpHost'
 $Backup = Join-Path $Root 'Backup'
 $Logs = Join-Path $Root 'Logs'
 $Log = Join-Path $Logs 'ResearchTools-Setup.log'
-$TaskName = 'ResearchTools DuckAI Agent'
+$LegacyTaskName = 'ResearchTools DuckAI Agent'
+$ProviderTaskName = 'ResearchTools DuckAI Provider'
+$ProviderLauncher = Join-Path $Root 'ResearchTools-DuckAI-Provider.vbs'
 $AppId = 'f8a582b1-eaf2-44f9-8166-d034255586ad'
 $PreferredCatalog = '7A4F5D92-3C81-4B6E-9D27-51C8A6E4F103'
 New-Item -ItemType Directory -Path $Root,$Backup,$Logs -Force | Out-Null
@@ -30,50 +35,108 @@ function Test-PathWithin([string]$Candidate,[string]$Directory) {
         $candidatePath = [IO.Path]::GetFullPath($Candidate)
         $directoryPath = [IO.Path]::GetFullPath($Directory).TrimEnd('\') + '\'
         return $candidatePath.StartsWith($directoryPath,[StringComparison]::OrdinalIgnoreCase)
-    }
-    catch { return $false }
+    } catch { return $false }
 }
+
 function Remove-LegacyLocalMcpServices {
-    $launchers = @((Join-Path $Root 'ResearchTools-Launcher.vbs'),(Join-Path $DuckRuntime 'ResearchTools-Launcher.vbs'))
-    try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue } catch { Log $_.Exception.Message }
-    try { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue } catch { Log $_.Exception.Message }
+    $legacyLaunchers = @(
+        (Join-Path $Root 'ResearchTools-Launcher.vbs'),
+        (Join-Path $DuckRuntime 'ResearchTools-Launcher.vbs')
+    )
+    foreach ($taskName in @($LegacyTaskName,$ProviderTaskName)) {
+        try { Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue } catch { Log $_.Exception.Message }
+        try { Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue } catch { Log $_.Exception.Message }
+    }
+
     $stopped = 0
     foreach ($process in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)) {
         $name = [string]$process.Name
         $exe = [string]$process.ExecutablePath
         $cmd = [string]$process.CommandLine
-        $duck = ($name -in @('duck2api-main.exe','ResearchTools-DuckAgent.exe')) -and (Test-PathWithin $exe $DuckRuntime)
+        $legacyAgent = ($name -ieq 'ResearchTools-DuckAgent.exe') -and (Test-PathWithin $exe $DuckRuntime)
         $mcpHostProcess = ($name -ieq 'ResearchTools.McpHost.exe') -and (Test-PathWithin $exe $McpHost)
-        $bridge = ($name -ieq 'powershell.exe') -and $cmd.IndexOf('DuckAI-MCP-Bridge.ps1',[StringComparison]::OrdinalIgnoreCase) -ge 0 -and $cmd.IndexOf($Root,[StringComparison]::OrdinalIgnoreCase) -ge 0
-        $launcher = $false
+        $bridge = ($name -ieq 'powershell.exe') -and
+            $cmd.IndexOf('DuckAI-MCP-Bridge.ps1',[StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+            $cmd.IndexOf($Root,[StringComparison]::OrdinalIgnoreCase) -ge 0
+        $legacyLauncher = $false
         if ($name -ieq 'wscript.exe') {
-            foreach ($path in $launchers) { if ($cmd.IndexOf($path,[StringComparison]::OrdinalIgnoreCase) -ge 0) { $launcher = $true; break } }
+            foreach ($legacyLauncherPath in $legacyLaunchers) {
+                if ($cmd.IndexOf($legacyLauncherPath,[StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                    $legacyLauncher = $true
+                    break
+                }
+            }
         }
-        if ($duck -or $mcpHostProcess -or $bridge -or $launcher) {
-            try { Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction Stop; $stopped++ }
-            catch { Log ('تعذر إيقاف PID=' + $process.ProcessId + ': ' + $_.Exception.Message) }
+        if ($legacyAgent -or $mcpHostProcess -or $bridge -or $legacyLauncher) {
+            try {
+                Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction Stop
+                $stopped++
+            } catch { Log ('تعذر إيقاف عملية MCP محلية PID=' + $process.ProcessId + ': ' + $_.Exception.Message) }
         }
     }
-    Start-Sleep -Milliseconds 700
-    foreach ($dir in @($DuckRuntime,$McpHost)) {
-        if (Test-Path -LiteralPath $dir -PathType Container) {
-            Remove-Item -LiteralPath $dir -Recurse -Force
-            if (Test-Path -LiteralPath $dir -PathType Container) { throw ('تعذر إزالة المجلد المحلي: ' + $dir) }
-        }
+
+    Start-Sleep -Milliseconds 500
+    if (Test-Path -LiteralPath $McpHost -PathType Container) {
+        Remove-Item -LiteralPath $McpHost -Recurse -Force
+        if (Test-Path -LiteralPath $McpHost -PathType Container) { throw ('تعذر إزالة مجلد مضيف MCP المحلي: ' + $McpHost) }
     }
-    foreach ($name in @('ResearchTools-Launcher.vbs','DuckAI-Bootstrap.ps1','DuckAI-Bootstrap.log','DuckAI-Installed-Release.txt','DuckAI-Update.vbs','DuckAI-Update.log','DuckAI-Update-Result.txt','DuckAI-MCP-Bridge.log','DuckAI-MCP-Bridge.pid','DuckAI-AutoRepair-Install.log','DuckAI-AutoRepair-PowerShell.log')) {
+
+    $runtimeMcpFiles = @(
+        'ResearchTools-DuckAgent.exe',
+        'ResearchTools-Launcher.vbs',
+        'DuckAI-MCP-Bridge.ps1',
+        'DuckAI-MCP-Bridge.log',
+        'DuckAI-Bootstrap.ps1',
+        'Apply-DuckAI-AutoRepair.ps1',
+        'Install-DuckAI-AutoRepair.vbs',
+        'DuckAI-Update.vbs'
+    )
+    foreach ($name in $runtimeMcpFiles) {
+        $path = Join-Path $DuckRuntime $name
+        if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
+    }
+
+    foreach ($name in @(
+        'ResearchTools-Launcher.vbs','DuckAI-Bootstrap.ps1','DuckAI-Bootstrap.log',
+        'DuckAI-Installed-Release.txt','DuckAI-Update.vbs','DuckAI-Update.log',
+        'DuckAI-Update-Result.txt','DuckAI-MCP-Bridge.log','DuckAI-MCP-Bridge.pid',
+        'DuckAI-AutoRepair-Install.log','DuckAI-AutoRepair-PowerShell.log'
+    )) {
         $path = Join-Path $Root $name
         if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
     }
-$oldRootBackup = Join-Path $Root 'DuckAI-old-backup'
+
+    $oldRootBackup = Join-Path $Root 'DuckAI-old-backup'
     if (Test-Path -LiteralPath $oldRootBackup -PathType Container) { Remove-Item -LiteralPath $oldRootBackup -Recurse -Force }
-    foreach ($pattern in @('DuckAI-Previous-*','McpHost-Previous-*','DuckAI-old-backup')) {
+    foreach ($pattern in @('DuckAI-Previous-*','McpHost-Previous-*')) {
         foreach ($old in @(Get-ChildItem -LiteralPath $Backup -Directory -Filter $pattern -ErrorAction SilentlyContinue)) {
             Remove-Item -LiteralPath $old.FullName -Recurse -Force
         }
     }
-    Log ('تم حذف خدمات MCP المحلية ومهمة التشغيل التلقائي. العمليات الموقوفة: ' + $stopped)
+    Log ('أزيل مضيف MCP وجسره والوكيل القديم، وحُفظ محرك Duck2API العام. العمليات الموقوفة: ' + $stopped)
 }
+
+function Install-DuckAIProvider {
+    $duckExe = Join-Path $DuckRuntime 'duck2api-main.exe'
+    if (-not (Test-Path -LiteralPath $ProviderLauncherFile -PathType Leaf)) { throw 'ملف تشغيل مزود Duck.ai العام غير موجود.' }
+    if (-not (Test-Path -LiteralPath $duckExe -PathType Leaf)) {
+        if (Test-Path -LiteralPath $ProviderLauncher -PathType Leaf) { Remove-Item -LiteralPath $ProviderLauncher -Force }
+        Log 'لم يعثر المثبت على duck2api-main.exe؛ لم يسجل مهمة تشغيل Duck.ai. تظل مزودات السحابة متاحة.'
+        return
+    }
+
+    Copy-Item -LiteralPath $ProviderLauncherFile -Destination $ProviderLauncher -Force
+    $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $action = New-ScheduledTaskAction -Execute $wscript -Argument ('"' + $ProviderLauncher + '"')
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $currentUser
+    $principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::FromMinutes(2))
+    Register-ScheduledTask -TaskName $ProviderTaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Starts the standalone Duck.ai model endpoint only; it does not start local MCP services.' -Force | Out-Null
+    Start-ScheduledTask -TaskName $ProviderTaskName
+    Log 'سجل المثبت مهمة واحدة لمزود Duck.ai العام فقط؛ لا تشغل مضيف MCP أو جسره.'
+}
+
 function Test-Writable([string]$Path) {
     try {
         if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
@@ -81,8 +144,7 @@ function Test-Writable([string]$Path) {
         [IO.File]::WriteAllText($probe,'ok')
         Remove-Item -LiteralPath $probe -Force
         return $true
-    }
-    catch { return $false }
+    } catch { return $false }
 }
 function Create-Share([string]$Name,[string]$Path) {
     $account = [Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -101,8 +163,7 @@ if ($existing) {
         $args = '-NoProfile -ExecutionPolicy Bypass -File "' + $helper + '" -ShareName "' + $Name + '" -SharePath "' + $Path + '" -Account "' + $account + '"'
         $p = Start-Process -FilePath (Get-PowerShell) -Verb RunAs -ArgumentList $args -Wait -PassThru
         if ($p.ExitCode -ne 0) { throw ('تعذر إنشاء مجلد المشاركة. ExitCode=' + $p.ExitCode) }
-    }
-    finally { Remove-Item -LiteralPath $helper -Force -ErrorAction SilentlyContinue }
+    } finally { Remove-Item -LiteralPath $helper -Force -ErrorAction SilentlyContinue }
 }
 function Get-Catalog {
     $registry = 'HKCU:\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs'
@@ -172,14 +233,17 @@ function Install-Manifest([string]$Catalog) {
     Move-Item -LiteralPath $temp -Destination $destination -Force
     Log ('تثبيت Manifest في مجلد Word المشترك: ' + $destination)
 }
+
 try {
     if (@(Get-Process -Name WINWORD -ErrorAction SilentlyContinue).Count -gt 0) { throw 'أغلق Microsoft Word بالكامل ثم أعد تشغيل Setup.' }
     if (-not (Test-Path -LiteralPath $ManifestFile -PathType Leaf)) { throw 'ملف Manifest غير موجود.' }
-    Log 'بدء تثبيت إضافة Word وتنظيف مكونات البحث المحلي المتوقفة.'
+    if (-not (Test-Path -LiteralPath $ProviderLauncherFile -PathType Leaf)) { throw 'ملف تشغيل Duck.ai العام غير موجود.' }
+    Log 'بدء تثبيت إضافة Word وتنظيف مكونات MCP المحلية مع الحفاظ على مزود Duck.ai العام.'
     Remove-LegacyLocalMcpServices
+    Install-DuckAIProvider
     $catalog = Get-Catalog
     Install-Manifest -Catalog $catalog
-    Log 'اكتمل تثبيت إضافة Word. البحث في المصادر يعمل عبر Groq أو Gemini وخادمي MCP السحابيين فقط.'
+    Log 'اكتمل التثبيت. البحث في المصادر عبر خادمي MCP السحابيين؛ مزود Duck.ai العام مستقل عن مسار البحث.'
     exit 0
 }
 catch {

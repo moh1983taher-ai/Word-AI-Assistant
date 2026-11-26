@@ -36,7 +36,7 @@ jobs:
         run: npm test
       - name: Build Word add-in
         run: npm run build
-      - name: Validate Word manifest and cloud-only installer
+      - name: Validate Word manifest, cloud MCP routing and standalone DuckAI provider
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -45,17 +45,33 @@ jobs:
           $source = $manifest.SelectSingleNode("//*[local-name()='DefaultSettings']/*[local-name()='SourceLocation']")
           if (-not $id -or $id.InnerText -ne 'f8a582b1-eaf2-44f9-8166-d034255586ad') { throw 'Invalid Word add-in ID.' }
           if (-not $source -or $source.GetAttribute('DefaultValue') -ne 'https://moh1983taher-ai.github.io/Word-AI-Assistant/taskpane.html') { throw 'Invalid production task pane URL.' }
+
           $iss = Get-Content 'installer/ResearchToolsSetup.iss' -Raw
-          if ($iss -match 'DuckAI-Runtime|ResearchTools-MCP-Host|RuntimeArchive|McpHostArchive|ResearchTools-Launcher') { throw 'Installer still packages local research runtimes.' }
-          if ($iss -notmatch 'Install-ResearchTools\.ps1' -or $iss -notmatch 'Word-AI-Assistant\.xml') { throw 'Missing Word add-in setup inputs.' }
+          if ($iss -match 'DuckAI-Runtime-release|ResearchTools-MCP-Host-release|McpHostArchive|RuntimeArchive') { throw 'Installer must not package the retired local MCP runtime.' }
+          if ($iss -notmatch 'ResearchTools-DuckAI-Provider\.vbs' -or $iss -notmatch 'Install-ResearchTools\.ps1') { throw 'Setup is missing the standalone DuckAI provider launcher or installer.' }
+
           $install = Get-Content 'installer/Install-ResearchTools.ps1' -Raw
-          if ($install -match 'RuntimeArchive|McpHostArchive|Start-McpHost|duck2api-main\.exe') { throw 'Installer still deploys the local MCP stack.' }
-          if ($install -notmatch 'Unregister-ScheduledTask' -or $install -notmatch 'Remove-LegacyLocalMcpServices') { throw 'Legacy runtime cleanup is missing.' }
+          if ($install -match 'McpHostArchive|Start-McpHost|Install-McpHost') { throw 'Installer still deploys or starts the local MCP host.' }
+          if ($install -match 'Remove-Item -LiteralPath \$DuckRuntime -Recurse') { throw 'Installer must preserve the general DuckAI provider runtime.' }
+          if ($install -notmatch 'Install-DuckAIProvider' -or $install -notmatch 'ResearchTools DuckAI Provider') { throw 'Standalone DuckAI provider task registration is missing.' }
+          if ($install -notmatch 'ResearchTools\.McpHost\.exe' -or $install -notmatch 'DuckAI-MCP-Bridge\.ps1') { throw 'Legacy MCP artifacts are not enumerated for cleanup.' }
+
+          $launcher = Get-Content 'installer/ResearchTools-DuckAI-Provider.vbs' -Raw
+          if ($launcher -match 'McpHost|MCP-Bridge|ResearchTools-DuckAgent') { throw 'Provider launcher must not start any MCP service or legacy agent.' }
+          foreach ($required in @('duck2api-main.exe','127.0.0.1','18080','/v1/models','SERVER_HOST','SERVER_PORT')) {
+            if ($launcher -notmatch [regex]::Escape($required)) { throw "Provider launcher is missing $required." }
+          }
+          if ($launcher -notmatch '--self-test') { throw 'Provider launcher self-test is missing.' }
+
           $tokens = $null
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile('installer/Install-ResearchTools.ps1',[ref]$tokens,[ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; throw 'Installer PowerShell syntax validation failed.' }
-          Write-Host 'Cloud-only installer inputs and cleanup script validated.'
+
+          & cscript.exe //nologo 'installer/ResearchTools-DuckAI-Provider.vbs' --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'DuckAI provider launcher self-test failed.' }
+          Write-Host 'Cloud-only MCP source routing, preserved DuckAI provider and cleanup scripts validated.'
+
       - name: Install Inno Setup
         shell: pwsh
         run: |
@@ -73,28 +89,29 @@ jobs:
           if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Setup EXE was not generated.' }
           $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content -LiteralPath ($setup + '.sha256') -Value ($hash + '  ResearchTools-Setup.exe') -Encoding ASCII
+
       - name: Upload setup artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ResearchTools-Setup-cloud-only
+          name: ResearchTools-Setup-cloud-mcp
           path: |
             dist/ResearchTools-Setup.exe
             dist/ResearchTools-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 30
+
       - name: Publish setup release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.3.0'
-          $title = 'ResearchTools Cloud-only Setup v1.3.0'
+          $tag = 'researchtools-setup-v1.3.1'
+          $title = 'ResearchTools Cloud MCP Setup v1.3.1'
           $notes = @'
-          يثبت هذا الإصدار إضافة Word وكتالوج Office الموثوق فقط.
-          أزيل محرك DuckAI المحلي ومضيف MCP والجسر ومشغّل الخلفية ومهام التشغيل التلقائي من حزمة التثبيت.
-          عند التثبيت، تزال آثار المكونات المحلية القديمة التي أنشأتها الإصدارات السابقة، مع الحفاظ على ملفات الإضافة ومحادثاتها وكتالوج Word.
-          يستمر البحث في الجامع والمكتبة الشاملة عبر خادمي MCP السحابيين باستخدام Groq أو Gemini.
+          جعل البحث في الجامع والمكتبة الشاملة سحابيًا بالكامل عبر Groq وGemini، وأزيل مضيف MCP المحلي وجسر DuckAI-MCP ووكيل DuckAgent.
+          حافظ هذا الإصدار على مزود Duck.ai العام المستخدم في وظائف Word الأخرى؛ واستبدل المشغّل الموحد القديم بمشغّل خفيف لنقطة Duck2API العامة فقط على 127.0.0.1:18080.
+          لا يثبت هذا الإصدار حزمة DuckAI جديدة ولا يعيد تثبيت أي طبقة MCP محلية.
           لا يغيّر هذا الإصدار ملفات التطوير في C:\Word AI Assistant v2.
           '@
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
