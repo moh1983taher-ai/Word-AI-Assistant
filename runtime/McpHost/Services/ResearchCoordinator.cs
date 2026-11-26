@@ -381,8 +381,8 @@ public sealed class ResearchCoordinator
                                     continue;
                                 }
 
-                                var referenceError = evidenceProvenance.ValidateReferenceRead(openTool, openArguments);
-                                if (referenceError is not null)
+                                var fallbackReferenceError = evidenceProvenance.ValidateReferenceRead(openTool, openArguments);
+                                if (fallbackReferenceError is not null)
                                 {
                                     _log.Warning(
                                         $"Research page-open recovery rejected: task={taskId}; source={sourceId}; reason=reference_validation_failed.");
