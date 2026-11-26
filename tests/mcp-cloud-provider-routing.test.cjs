@@ -17,8 +17,10 @@ assert.match(source, /function loadSettings\(\)[\s\S]*?provider:[\s\S]*?key:[\s\
 assert.doesNotMatch(source, /AR_MCP_RESEARCH_SETTINGS|AR_MCP_RESEARCH_THREAD.*key/);
 
 assert.match(source, /https:\/\/api\.groq\.com\/openai\/v1\/responses/);
-assert.match(source, /const SELECTED_SERVERS_KEY = ["']AR_MCP_SELECTED_SERVERS["']/);
-assert.match(source, /function loadSelectedServerIds\(\)[\s\S]*?DEFAULT_SELECTED_SERVER_IDS\.slice\(\)/);
+assert.match(source, /function extractSourceMentions\(value\)/);
+assert.match(source, /function getMentionContext\(value, cursorPosition\)/);
+assert.match(source, /function createMentionMenu\(inputArea, input\)/);
+assert.match(source, /const token = server\.id === "aljam3" \? "@الجامع " : "@الشاملة "/);
 assert.match(source, /function getGroqTools\(selectedServerIds\)[\s\S]*?getSelectedMcpServers\(selectedServerIds\)/);
 assert.match(source, /عند طلب البحث أو التحقق من نص أو كتاب، أو في المسائل التخصصية/);
 assert.match(source, /نوّع صيغ المصطلح وألفاظه القريبة/);
@@ -80,7 +82,7 @@ const generalAnswer = validateResearchResult(
   "Groq",
   "شرح موجز لمعنى الاجتهاد",
   [],
-  ["aljam3", "shamela"],
+  [],
   [{ role: "user", text: "ما معنى الاجتهاد؟" }]
 );
 assert.equal(generalAnswer.answer, "شرح موجز لمعنى الاجتهاد");
@@ -90,10 +92,23 @@ const ordinaryBookQuestion = validateResearchResult(
   "Groq",
   "المقصود بالموافقات",
   [],
-  ["aljam3", "shamela"],
+  [],
   [{ role: "user", text: "ما المقصود بكتاب الموافقات؟" }]
 );
 assert.equal(ordinaryBookQuestion.toolCalls.length, 0);
+
+assert.throws(
+  function () {
+    validateResearchResult(
+      "Groq",
+      "إجابة لا تستند إلى بحث فعلي",
+      [],
+      ["aljam3"],
+      [{ role: "user", text: "@الجامع ما حكم المسألة؟" }]
+    );
+  },
+  /لم يُظهر أي استدعاء فعلي/
+);
 
 assert.throws(
   function () {
@@ -276,48 +291,54 @@ assert.match(source, /https:\/\/mcp\.shamela\.ws/);
 assert.match(source, /mcp_server_tool_call/);
 assert.match(source, /mcp_server_tool_result/);
 assert.match(source, /resultCallId !== callId/);
-assert.match(source, /function validateResearchResult[\s\S]*?toolCalls\.length === 0[\s\S]*?المكتبات التي اخترتها/);
+assert.match(source, /function validateResearchResult[\s\S]*?allowedServers\.length > 0[\s\S]*?toolCalls\.length === 0/);
 assert.match(
   source,
-  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callSelectedResearch\(history, settings, selectedServerIds\)/,
-  "MCP must use the active ordinary chat history rather than an independent source transcript."
+  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callCloudResearch\(history, settings, selectedServerIds\)/,
+  "MCP must use the active ordinary chat history and call the cloud provider directly."
 );
 assert.doesNotMatch(
   source,
   /LOCAL_MCP_HOST_URL|127\.0\.0\.1:18081|callLocalResearch|fetchLocalHostJson|checkLocalHost|DuckAI المحلي|targetAddressSpace|RESEARCH_ENGINE_KEY|loadResearchEngine|saveResearchEngine/,
   "MCP research must not keep a local host route, runtime selector or local fallback."
 );
-assert.match(
-  source,
-  /function callSelectedResearch\(messages, settings, selectedServerIds\)[\s\S]*?return callCloudResearch\(messages, settings, selectedServerIds\)/
-);
+assert.match(source, /function shouldRouteToSources\(value\)/);
+assert.match(source, /if \(!shouldRouteToSources\(input\.value\)\) return;/);
+assert.doesNotMatch(source, /loadSelectedServerIds|saveSelectedServerIds|SELECTED_SERVERS_KEY/);
 
+const mentionStart = source.indexOf("  function extractSourceMentions(value) {");
+const mentionEnd = source.indexOf("  function getCloudProviderStatus(settings) {", mentionStart);
+assert.ok(mentionStart >= 0 && mentionEnd > mentionStart, "Mention parsing helpers must be testable");
+const mentionContext = {};
+vm.runInNewContext(
+  source.slice(mentionStart, mentionEnd) +
+  "\nglobalThis.__mentionHelpers = { extractSourceMentions, getMentionContext };",
+  mentionContext
+);
+const mentions = mentionContext.__mentionHelpers;
+const bothSources = mentions.extractSourceMentions("@الجامع ابحث في المسألة @الشاملة");
+assert.deepEqual(Array.from(bothSources.selectedServerIds), ["aljam3", "shamela"]);
+assert.equal(bothSources.prompt, "ابحث في المسألة");
+const duplicateSources = mentions.extractSourceMentions("@الجامع سؤال @الجامع");
+assert.deepEqual(Array.from(duplicateSources.selectedServerIds), ["aljam3"]);
+assert.equal(duplicateSources.prompt, "سؤال");
+const mentionContextAtCursor = mentions.getMentionContext("ابحث في @الجام", "ابحث في @الجام".length);
+assert.equal(mentionContextAtCursor.query, "الجام");
+assert.equal(mentions.getMentionContext("ابحث @الجامع ", "ابحث @الجامع ".length), null);
 
 const mcpConfigStart = source.indexOf("  const MCP_SERVERS = Object.freeze([");
 const mcpToolsEnd = source.indexOf("\n  async function postCloudJson", mcpConfigStart);
 assert.ok(mcpConfigStart >= 0 && mcpToolsEnd > mcpConfigStart, "MCP selection helpers must be testable");
 const selectionHelperSource = [
-  'const SELECTED_SERVERS_KEY = "AR_MCP_SELECTED_SERVERS";',
-  'const DEFAULT_SELECTED_SERVER_IDS = Object.freeze(["aljam3", "shamela"]);',
-  'function safeJson(value, fallback) { try { return value ? JSON.parse(value) : fallback; } catch (_) { return fallback; } }',
   source.slice(mcpConfigStart, mcpToolsEnd),
-  'globalThis.__mcpSelectionHelpers = { normalizeSelectedServerIds, loadSelectedServerIds, saveSelectedServerIds, getSelectedMcpServers, getGroqTools, getGeminiTools };'
+  'globalThis.__mcpSelectionHelpers = { normalizeSelectedServerIds, getSelectedMcpServers, getGroqTools, getGeminiTools };'
 ].join("\n");
-const selectionContext = {
-  localStorage: {
-    value: null,
-    getItem: function () { return this.value; },
-    setItem: function (_key, value) { this.value = value; }
-  }
-};
+const selectionContext = {};
 vm.runInNewContext(selectionHelperSource, selectionContext);
 const selectionHelpers = selectionContext.__mcpSelectionHelpers;
-assert.equal(JSON.stringify(selectionHelpers.loadSelectedServerIds()), JSON.stringify(["aljam3", "shamela"]));
 assert.equal(JSON.stringify(selectionHelpers.normalizeSelectedServerIds(["shamela", "unknown", "shamela"])), JSON.stringify(["shamela"]));
 assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3"]));
 assert.equal(JSON.stringify(selectionHelpers.getGeminiTools(["shamela"]).map(function (tool) { return tool.name; })), JSON.stringify(["shamela"]));
 assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3", "shamela"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3", "shamela"]));
-selectionHelpers.saveSelectedServerIds(["shamela"]);
-assert.equal(JSON.stringify(selectionHelpers.loadSelectedServerIds()), JSON.stringify(["shamela"]));
 
 console.log("Cloud MCP provider routing tests passed.");

@@ -4,8 +4,6 @@
 
   const AI_SETTINGS_KEY = "AI_SETTINGS";
   const LEGACY_THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
-  const SELECTED_SERVERS_KEY = "AR_MCP_SELECTED_SERVERS";
-  const DEFAULT_SELECTED_SERVER_IDS = Object.freeze(["aljam3", "shamela"]);
   const DEFAULT_TIMEOUT_MS = 300000;
   const GROQ_RESPONSES_URL = "https://api.groq.com/openai/v1/responses";
   const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
@@ -44,14 +42,12 @@
   ]);
 
   const state = {
-    enabled: false,
     busy: false,
     initialized: false,
     initializing: false,
-    settings: null,
-    panel: null,
-    modeButton: null,
-    modeStatus: null,
+    mentionMenu: null,
+    notice: null,
+    mentionStart: -1
   };
 
   function safeJson(value, fallback) {
@@ -80,23 +76,29 @@
     }).map(function (server) { return server.id; });
   }
 
-  function loadSelectedServerIds() {
-    const saved = localStorage.getItem(SELECTED_SERVERS_KEY);
-    if (saved === null) return DEFAULT_SELECTED_SERVER_IDS.slice();
-    return normalizeSelectedServerIds(safeJson(saved, DEFAULT_SELECTED_SERVER_IDS));
-  }
-
-  function saveSelectedServerIds(serverIds) {
-    const selected = normalizeSelectedServerIds(serverIds);
-    localStorage.setItem(SELECTED_SERVERS_KEY, JSON.stringify(selected));
-    return selected;
-  }
-
   function getSelectedMcpServers(serverIds) {
     const selected = normalizeSelectedServerIds(serverIds);
     return MCP_SERVERS.filter(function (server) { return selected.indexOf(server.id) >= 0; });
   }
 
+  function extractSourceMentions(value) {
+    const selectedServerIds = [];
+    const pattern = /(^|\s)@(الجامع|الشاملة)(?=$|\s|[،,])/g;
+    const visiblePrompt = String(value || "").replace(pattern, function (match, leading, label) {
+      const id = label === "الجامع" ? "aljam3" : "shamela";
+      if (selectedServerIds.indexOf(id) < 0) selectedServerIds.push(id);
+      return leading || "";
+    }).replace(/[ \t]{2,}/g, " ").trim();
+    return { prompt: visiblePrompt, selectedServerIds: selectedServerIds };
+  }
+
+  function getMentionContext(value, cursorPosition) {
+    const text = String(value || "");
+    const cursor = typeof cursorPosition === "number" ? cursorPosition : text.length;
+    const match = text.slice(0, cursor).match(/(?:^|\s)@([^\s@]*)$/);
+    if (!match) return null;
+    return { start: cursor - match[1].length - 1, query: match[1] };
+  }
   function getCloudProviderStatus(settings) {
     const current = settings || loadSettings();
     if (!current.provider) {
@@ -146,198 +148,143 @@
     const style = document.createElement("style");
     style.id = "mcp-research-styles";
     style.textContent = [
-      ".mcp-research-entry{grid-column:1/-1;display:flex;align-items:stretch;gap:7px;min-width:0;margin-top:2px;}",
-      ".mcp-research-option{flex:1;min-width:0;min-height:58px;display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid #d8dfd8;border-radius:12px;background:#fffdf8;color:#0b5553;cursor:pointer;text-align:right;direction:rtl;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease;}",
-      ".mcp-research-option:hover{background:#f5f8f4;border-color:#aebfb5;}",
-      ".mcp-research-option[aria-pressed='true']{background:#edf5f0;border-color:#8ba99a;box-shadow:inset 0 0 0 1px rgba(11,85,83,.08);}",
-      ".mcp-research-option:disabled{opacity:.65;cursor:wait;}",
-      ".mcp-research-option:focus-visible,.mcp-research-settings-option:focus-visible{outline:2px solid #72a49b;outline-offset:2px;}",
-      ".mcp-research-option-icon{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 22px;color:#0b5553;}",
-      ".mcp-research-option-icon svg{width:20px;height:20px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}",
-      ".mcp-research-option-copy{display:flex;flex-direction:column;gap:2px;min-width:0;}",
-      ".mcp-research-option-title{font-size:13px;font-weight:650;color:#174b46;line-height:1.35;}",
-      ".mcp-research-option-description{font-size:10.5px;font-weight:400;color:#718078;line-height:1.4;white-space:normal;}",
-      ".mcp-research-option-state{margin-inline-start:auto;flex:0 0 auto;font-size:10px;color:#718078;padding:3px 7px;border-radius:20px;background:#f1f3ef;}",
-      ".mcp-research-option[aria-pressed='true'] .mcp-research-option-state{background:#dcebe1;color:#225b48;}",
-      ".mcp-research-settings-option{width:42px;min-width:42px;display:flex;align-items:center;justify-content:center;border:1px solid #e2e7e0;border-radius:11px;background:#fffdf8;color:#52645c;cursor:pointer;transition:background .15s ease,border-color .15s ease;}",
-      ".mcp-research-settings-option:hover{background:#f5f8f4;border-color:#b8c8be;}",
-      ".mcp-research-settings-option svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}",
-      ".mcp-research-panel{position:absolute;z-index:4500;right:12px;bottom:76px;width:min(370px,calc(100vw - 90px));padding:15px;background:#fffdf8;border:1px solid #d8dfd8;border-radius:12px;box-shadow:0 10px 35px rgba(5,45,43,.16);color:#173e3d;direction:rtl;}",
-      ".mcp-research-panel[hidden]{display:none;}",
-      ".mcp-research-panel h3{font-size:14px;margin:0 0 10px;font-weight:650;}",
-      ".mcp-research-panel label{display:block;font-size:12px;margin:9px 0 4px;color:#405b58;}",
-      ".mcp-research-panel input{box-sizing:border-box;width:100%;height:34px;border:1px solid #ccd7d1;border-radius:7px;padding:6px 9px;background:#fff;color:#183c3b;direction:ltr;text-align:left;}",
-      ".mcp-source-selection{margin:12px 0;padding:10px 11px;border:1px solid #e0e7df;border-radius:9px;background:#fbfcf8;}",
-      ".mcp-source-selection-title{font-size:12px;font-weight:650;color:#244b48;margin-bottom:3px;}",
-      ".mcp-source-selection-note{font-size:10.5px;line-height:1.55;color:#718078;margin-bottom:6px;}",
-      ".mcp-source-choice{display:flex!important;align-items:center;gap:8px;margin:8px 0!important;font-size:12px;color:#284b46;cursor:pointer;}",
-      ".mcp-research-panel .mcp-source-choice input{width:16px;height:16px;flex:0 0 16px;margin:0;padding:0;direction:rtl;accent-color:#0b5553;}",
-      ".mcp-research-panel .mcp-note{font-size:11px;line-height:1.7;color:#667772;margin:9px 0;}",
-      ".mcp-research-panel .mcp-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap;}",
-      ".mcp-research-panel button{border:1px solid #ccd7d1;border-radius:7px;background:#f7f8f3;padding:7px 12px;color:#244b48;cursor:pointer;font-size:12px;}",
-      ".mcp-research-panel button.primary{background:#0b5553;color:white;border-color:#0b5553;}",
-      ".mcp-research-panel button:disabled{opacity:.55;cursor:wait;}",
-      ".mcp-research-health{font-size:11px;line-height:1.6;margin-top:9px;color:#667772;white-space:pre-wrap;}",
-      ".mcp-research-pending{white-space:pre-wrap;}",
-      ".mcp-research-panel input:focus,.mcp-research-mode:focus-visible,.mcp-research-settings:focus-visible{outline:2px solid #72a49b;outline-offset:1px;}"
+      ".input-area{position:relative;}",
+      ".mcp-mention-menu{position:absolute;z-index:4600;right:12px;bottom:74px;width:min(300px,calc(100% - 24px));padding:7px;background:#fffdf8;border:1px solid #d8dfd8;border-radius:12px;box-shadow:0 10px 30px rgba(5,45,43,.16);direction:rtl;}",
+      ".mcp-mention-menu[hidden]{display:none;}",
+      ".mcp-mention-title{padding:5px 9px 7px;color:#718078;font-size:10.5px;}",
+      ".mcp-mention-option{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:0;border-radius:8px;background:transparent;color:#214b46;text-align:right;cursor:pointer;font:inherit;}",
+      ".mcp-mention-option:hover,.mcp-mention-option:focus-visible{background:#edf5f0;outline:none;}",
+      ".mcp-mention-symbol{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px;border-radius:7px;background:#e8f0e9;color:#0b5553;font-size:12px;font-weight:700;direction:ltr;}",
+      ".mcp-mention-copy{display:flex;flex-direction:column;gap:2px;min-width:0;}",
+      ".mcp-mention-name{font-size:12px;font-weight:650;}",
+      ".mcp-mention-description{font-size:10px;color:#718078;}",
+      ".mcp-mention-empty{padding:10px;color:#718078;font-size:11px;}",
+      ".mcp-research-notice{margin:5px 12px 0;color:#8b5a2b;font-size:11px;line-height:1.6;}",
+      ".mcp-research-notice[hidden]{display:none;}",
+      ".mcp-research-pending{white-space:pre-wrap;}"
     ].join("\n");
     document.head.appendChild(style);
   }
 
-  function createButton(label, id, className, title) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.id = id;
-    button.className = className;
-    button.textContent = label;
-    button.title = title || label;
-    return button;
-  }
-
-  function makeField(labelText, id, type, placeholder, value) {
-    const wrapper = document.createElement("div");
-    const label = document.createElement("label");
-    label.htmlFor = id;
-    label.textContent = labelText;
-    const input = document.createElement("input");
-    input.id = id;
-    input.type = type;
-    input.placeholder = placeholder || "";
-    input.value = value || "";
-    wrapper.appendChild(label);
-    wrapper.appendChild(input);
-    return { wrapper: wrapper, input: input };
-  }
-
-  function renderProviderStatus(target) {
-    const health = target || document.getElementById("mcp-research-health");
-    if (!health) return;
-    const settings = loadSettings();
-    state.settings = settings;
-    const status = getCloudProviderStatus(settings);
-    const selectedNames = getSelectedMcpServers(loadSelectedServerIds()).map(function (server) {
-      return server.label;
-    });
-    health.textContent = "مصادر البحث: " +
-      (selectedNames.length ? selectedNames.join(" + ") : "لم تُحدد") +
-      "\n" + status.title +
-      (status.detail ? "\n" + status.detail : "");
-  }
-
-  function buildSettingsPanel(parent) {
-    const panel = document.createElement("section");
-    panel.className = "mcp-research-panel";
-    panel.id = "mcp-research-settings-panel";
-    panel.hidden = true;
-    panel.setAttribute("aria-label", "إعدادات مصادر البحث");
-
-    const heading = document.createElement("h3");
-    heading.textContent = "إعدادات البحث";
-    panel.appendChild(heading);
-
-    const sourceSelection = document.createElement("div");
-    sourceSelection.className = "mcp-source-selection";
-    const sourceTitle = document.createElement("div");
-    sourceTitle.className = "mcp-source-selection-title";
-    sourceTitle.textContent = "مصادر البحث";
-    sourceSelection.appendChild(sourceTitle);
-
-    const sourceHelp = document.createElement("div");
-    sourceHelp.className = "mcp-source-selection-note";
-    sourceHelp.textContent = "اختر الجامع أو الشاملة أو كليهما.";
-    sourceSelection.appendChild(sourceHelp);
-
-    MCP_SERVERS.forEach(function (server) {
-      const choice = document.createElement("label");
-      choice.className = "mcp-source-choice";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.id = "mcp-source-" + server.id;
-      checkbox.checked = loadSelectedServerIds().indexOf(server.id) >= 0;
-      checkbox.addEventListener("change", function () {
-        const selected = MCP_SERVERS.filter(function (item) {
-          const control = document.getElementById("mcp-source-" + item.id);
-          return control && control.checked;
-        }).map(function (item) { return item.id; });
-        saveSelectedServerIds(selected);
-        renderProviderStatus(health);
-        updateModeButton();
-      });
-      const labelText = document.createElement("span");
-      labelText.textContent = server.label;
-      choice.appendChild(checkbox);
-      choice.appendChild(labelText);
-      sourceSelection.appendChild(choice);
-    });
-    panel.appendChild(sourceSelection);
-
-    const health = document.createElement("div");
-    health.id = "mcp-research-health";
-    health.className = "mcp-research-health";
-    health.setAttribute("role", "status");
-    panel.appendChild(health);
-
-    const actions = document.createElement("div");
-    actions.className = "mcp-actions";
-    const refresh = createButton("تحديث الحالة", "mcp-research-refresh-settings", "");
-    const close = createButton("إغلاق", "mcp-research-close-settings", "");
-    actions.appendChild(refresh);
-    actions.appendChild(close);
-    panel.appendChild(actions);
-    parent.appendChild(panel);
-
-    refresh.addEventListener("click", function () {
-      renderProviderStatus(health);
-    });
-    close.addEventListener("click", function () {
-      panel.hidden = true;
-    });
-
-    state.panel = panel;
-    renderProviderStatus(health);
-  }
-
   function showNotice(message) {
-    const notice = String(message || "");
-    if (state.modeStatus) {
-      state.modeStatus.textContent = "غير جاهز";
+    if (state.notice) {
+      state.notice.textContent = String(message || "");
+      state.notice.hidden = !state.notice.textContent;
     }
-    if (state.modeButton) {
-      state.modeButton.title = notice;
-      state.modeButton.setAttribute("aria-invalid", "true");
-    }
-    console.warn("[MCP research]", notice);
+    console.warn("[MCP research]", String(message || ""));
   }
 
-  function updateModeButton() {
-    if (!state.modeButton) return;
-    state.modeButton.setAttribute("aria-pressed", state.enabled ? "true" : "false");
-    state.modeButton.disabled = state.busy;
-    state.modeButton.removeAttribute("aria-invalid");
-    state.modeButton.title = state.enabled
-      ? "البحث بالمصادر مفعّل للرسالة التالية؛ اضغط لإيقافه"
-      : "استخدم مصادر MCP في الرسالة التالية";
-    if (state.modeStatus) {
-      state.modeStatus.textContent = state.busy
-        ? "جارٍ البحث"
-        : (state.enabled ? "مفعّل" : "غير مفعّل");
-    }
+  function hideNotice() {
+    if (state.notice) { state.notice.textContent = ""; state.notice.hidden = true; }
   }
 
-  function closeScopePanel() {
-    const panel = document.getElementById("scope-panel");
-    if (panel) {
-      panel.classList.remove("open");
-      panel.setAttribute("aria-hidden", "true");
-    }
-    const trigger = document.getElementById("scope-btn");
-    if (trigger) trigger.setAttribute("aria-expanded", "false");
+  function hideMentionMenu() {
+    if (state.mentionMenu) state.mentionMenu.hidden = true;
+    state.mentionStart = -1;
   }
 
+  function getMentionOptions(input) {
+    const context = getMentionContext(input.value, input.selectionStart);
+    if (!context) return null;
+    const alreadySelected = extractSourceMentions(input.value).selectedServerIds;
+    const query = context.query.toLocaleLowerCase();
+    const options = MCP_SERVERS.filter(function (server) {
+      if (alreadySelected.indexOf(server.id) >= 0) return false;
+      return !query || server.label.toLocaleLowerCase().indexOf(query) >= 0 || server.id.toLocaleLowerCase().indexOf(query) >= 0;
+    });
+    return { context: context, options: options };
+  }
+
+  function insertSourceMention(input, server) {
+    const context = getMentionContext(input.value, input.selectionStart);
+    if (!context) return;
+    const before = input.value.slice(0, context.start);
+    const after = input.value.slice(input.selectionStart);
+    const token = server.id === "aljam3" ? "@الجامع " : "@الشاملة ";
+    input.value = before + token + after;
+    const cursor = before.length + token.length;
+    input.focus();
+    input.setSelectionRange(cursor, cursor);
+    hideMentionMenu();
+    hideNotice();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function updateMentionMenu(input) {
+    if (!state.mentionMenu) return;
+    const result = getMentionOptions(input);
+    if (!result) { hideMentionMenu(); return; }
+    state.mentionStart = result.context.start;
+    const menu = state.mentionMenu;
+    menu.textContent = "";
+    const title = document.createElement("div");
+    title.className = "mcp-mention-title";
+    title.textContent = "اختر مصدر البحث";
+    menu.appendChild(title);
+    if (!result.options.length) {
+      const empty = document.createElement("div");
+      empty.className = "mcp-mention-empty";
+      empty.textContent = "لا يوجد مصدر آخر مطابق للاختيار.";
+      menu.appendChild(empty);
+    } else {
+      result.options.forEach(function (server) {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "mcp-mention-option";
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-label", "اختيار " + server.label);
+        const symbol = document.createElement("span");
+        symbol.className = "mcp-mention-symbol";
+        symbol.textContent = "@";
+        const copy = document.createElement("span");
+        copy.className = "mcp-mention-copy";
+        const name = document.createElement("span");
+        name.className = "mcp-mention-name";
+        name.textContent = server.label;
+        const description = document.createElement("span");
+        description.className = "mcp-mention-description";
+        description.textContent = "استدعاء خادم MCP السحابي لهذا المصدر";
+        copy.appendChild(name);
+        copy.appendChild(description);
+        option.appendChild(symbol);
+        option.appendChild(copy);
+        option.addEventListener("mousedown", function (event) { event.preventDefault(); });
+        option.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          insertSourceMention(input, server);
+        });
+        menu.appendChild(option);
+      });
+    }
+    menu.hidden = false;
+  }
+
+  function createMentionMenu(inputArea, input) {
+    const menu = document.createElement("div");
+    menu.id = "mcp-mention-menu";
+    menu.className = "mcp-mention-menu";
+    menu.setAttribute("role", "listbox");
+    menu.setAttribute("aria-label", "مصادر البحث");
+    menu.hidden = true;
+    inputArea.appendChild(menu);
+    state.mentionMenu = menu;
+    input.setAttribute("aria-haspopup", "listbox");
+    input.setAttribute("aria-controls", menu.id);
+    input.placeholder = "اكتب سؤالك، أو اكتب @ لاختيار مصدر...";
+    input.addEventListener("input", function () {
+      hideNotice();
+      updateMentionMenu(input);
+    });
+    input.addEventListener("click", function () { updateMentionMenu(input); });
+    input.addEventListener("keyup", function (event) {
+      if (!["Shift","Control","Alt"].includes(event.key)) updateMentionMenu(input);
+    });
+  }
   function buildResearchInput(messages, selectedServerIds) {
     const selectedServers = getSelectedMcpServers(selectedServerIds);
     if (!selectedServers.length) {
-      throw new Error("لم تختر أي مكتبة للبحث. اختر الجامع أو المكتبة الشاملة أو كليهما من إعدادات المصادر.");
+      throw new Error("لم تحدد مصدرًا. اكتب @ في مربع المراسلة واختر الجامع أو المكتبة الشاملة.");
     }
     const selectedLabels = selectedServers.map(function (server) { return server.label; });
     const history = (Array.isArray(messages) ? messages : [])
@@ -991,7 +938,7 @@
       "bibliography", "sources", "search for", "search in", "find studies",
       "research sources"
     ];
-    const requiresMcpSources = sourceIndicators.some(function (indicator) {
+    const requiresMcpSources = allowedServers.length > 0 || sourceIndicators.some(function (indicator) {
       return latestUserPrompt.toLowerCase().indexOf(indicator.toLowerCase()) >= 0;
     });
 
@@ -1083,15 +1030,11 @@
     };
   }
 
-  async function callSelectedResearch(messages, settings, selectedServerIds) {
-    return callCloudResearch(messages, settings, selectedServerIds);
-  }
-
   async function callCloudResearch(messages, settings, selectedServerIds) {
     const active = validateProviderSettings(settings);
     const selected = normalizeSelectedServerIds(selectedServerIds);
     if (!selected.length) {
-      throw new Error("لم تختر أي مكتبة للبحث. افتح إعدادات المصادر واختر الجامع أو المكتبة الشاملة أو كليهما.");
+      throw new Error("لم تحدد مصدرًا للبحث. اكتب @ واختر الجامع أو المكتبة الشاملة.");
     }
     if (active.provider === "groq") return callGroqResearch(messages, active, selected);
     if (active.provider === "gemini") return callGeminiResearch(messages, active, selected);
@@ -1119,8 +1062,16 @@
   }
 
   async function sendMessage(rawText) {
-    const prompt = String(rawText || "").trim();
-    if (!prompt || state.busy) return;
+    const visiblePrompt = String(rawText || "").trim();
+    if (!visiblePrompt || state.busy) return;
+
+    const mentionSelection = extractSourceMentions(visiblePrompt);
+    const selectedServerIds = normalizeSelectedServerIds(mentionSelection.selectedServerIds);
+    if (!selectedServerIds.length) return;
+    if (!mentionSelection.prompt) {
+      showNotice("اكتب السؤال بعد اختيار مصدر البحث.");
+      return;
+    }
 
     const bridge = window.WordAIChatBridge;
     if (!bridge || bridge.ready !== true) {
@@ -1129,19 +1080,14 @@
     }
 
     const settings = loadSettings();
-    const selectedServerIds = loadSelectedServerIds();
-    state.settings = settings;
     try {
       validateProviderSettings(settings);
-      if (!selectedServerIds.length) {
-        throw new Error("لم تختر أي مكتبة للبحث. اختر الجامع أو المكتبة الشاملة أو كليهما من إعدادات المصادر.");
-      }
     } catch (error) {
       showNotice(error.message);
       return;
     }
 
-    const chatId = bridge.appendUserMessage(prompt);
+    const chatId = bridge.appendUserMessage(visiblePrompt);
     if (!chatId) {
       showNotice("تعذر إضافة السؤال إلى المحادثة الحالية.");
       return;
@@ -1152,188 +1098,127 @@
       input.value = "";
       input.dispatchEvent(new Event("input", { bubbles: true }));
     }
+    hideMentionMenu();
+    hideNotice();
 
     const history = bridge.getMessages(chatId);
-    const providerName = settings.provider === "groq" ? "Groq" : "Gemini";
     const selectedServerLabels = getSelectedMcpServers(selectedServerIds).map(function (server) {
       return server.label;
     }).join(" + ");
+    const providerName = settings.provider === "groq" ? "Groq" : "Gemini";
     const pending = bridge.addPendingMessage(
       chatId,
       "ينفّذ البحث في " + selectedServerLabels + " عبر " + providerName + "…"
     );
 
     state.busy = true;
-    updateModeButton();
+    const sendButton = document.getElementById("send-btn");
+    if (sendButton) sendButton.disabled = true;
 
     try {
-      const result = await callSelectedResearch(history, settings, selectedServerIds);
+      const result = await callCloudResearch(history, settings, selectedServerIds);
       const sources = normalizeToolCalls(result.toolCalls);
       const answer = result.answer.trim() + formatToolTrace(result);
       bridge.removePendingMessage(pending);
       bridge.appendAssistantMessage(chatId, answer, {
         sources: sources,
-        provider: result.provider || settings.provider || "duckai",
+        provider: result.provider || settings.provider,
         model: result.model || settings.model
       });
     } catch (error) {
       bridge.removePendingMessage(pending);
-      const message = error && error.message
-        ? error.message
-        : "حدث خطأ غير متوقع أثناء البحث السحابي.";
+      const message = error && error.message ? error.message : "حدث خطأ غير متوقع أثناء البحث السحابي.";
       bridge.appendAssistantMessage(chatId, message, {
-        provider: settings.provider || "duckai",
+        provider: settings.provider,
         model: settings.model,
         isError: true
       });
     } finally {
       state.busy = false;
-      updateModeButton();
+      if (sendButton) sendButton.disabled = false;
     }
   }
 
-  function toggleMode() {
-    if (!state.enabled) {
-      if (!loadSelectedServerIds().length) {
-        showNotice("اختر مكتبة واحدة على الأقل من إعدادات المصادر قبل تفعيل البحث.");
-        return;
-      }
-      const settings = loadSettings();
-      const status = getCloudProviderStatus(settings);
-      if (!status.ready) {
-        showNotice(status.title + ". " + status.detail);
-        return;
-      }
-      state.settings = settings;
-    }
-
-    // The source switch changes only how the next message is processed.
-    // It never creates, opens, clears, or restores a separate conversation.
-    state.enabled = !state.enabled;
-    updateModeButton();
+  function shouldRouteToSources(value) {
+    return extractSourceMentions(value).selectedServerIds.length > 0;
   }
 
+  function initializeComposerRouting(inputArea, input) {
+    createMentionMenu(inputArea, input);
+
+    window.addEventListener("click", function (event) {
+      const target = event.target && event.target.closest ? event.target.closest("#send-btn") : null;
+      if (!target || !shouldRouteToSources(input.value)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+      sendMessage(input.value);
+    }, true);
+
+    window.addEventListener("keydown", function (event) {
+      if (event.target !== input) return;
+      if (event.key === "Escape" && state.mentionMenu && !state.mentionMenu.hidden) {
+        event.preventDefault();
+        hideMentionMenu();
+        return;
+      }
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+      if (state.mentionMenu && !state.mentionMenu.hidden) {
+        const firstOption = state.mentionMenu.querySelector(".mcp-mention-option");
+        if (firstOption) {
+          event.preventDefault();
+          firstOption.click();
+          return;
+        }
+        hideMentionMenu();
+      }
+      if (!shouldRouteToSources(input.value)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+      sendMessage(input.value);
+    }, true);
+
+    window.addEventListener("click", function (event) {
+      if (!state.mentionMenu || state.mentionMenu.hidden) return;
+      if (event.target === input || state.mentionMenu.contains(event.target)) return;
+      hideMentionMenu();
+    });
+  }
   async function initialize() {
-    if (state.initialized || state.initializing || document.getElementById("mcp-research-entry")) return;
-
+    if (state.initialized || state.initializing) return;
     const bridge = window.WordAIChatBridge;
     if (!bridge || bridge.ready !== true) return;
-
-    const scopeMenu = document.querySelector("#scope-panel .scope-panel-content");
     const inputArea = document.querySelector(".input-area");
-    if (!scopeMenu || !inputArea || !document.getElementById("send-btn")) return;
+    const input = document.getElementById("user-input");
+    if (!inputArea || !input || !document.getElementById("send-btn")) return;
 
     state.initializing = true;
     try {
-      // Remove the obsolete local/cloud engine preference from earlier versions.
       localStorage.removeItem("AR_MCP_RESEARCH_ENGINE");
+      localStorage.removeItem("AR_MCP_SELECTED_SERVERS");
       const legacyThread = safeJson(localStorage.getItem(LEGACY_THREAD_KEY), null);
       if (legacyThread) {
         const migrated = await bridge.importLegacyThread(legacyThread);
-        if (!migrated) {
-          console.warn("سيُعاد لاحقاً ترحيل سجل بحث المصادر القديم إلى المحادثات العادية.");
-        }
+        if (!migrated) console.warn("سيُعاد لاحقاً ترحيل سجل المصادر القديم إلى المحادثات العادية.");
       }
     } catch (error) {
       console.warn("تعذر ترحيل سجل المصادر القديم:", error);
     }
-    state.settings = loadSettings();
+
     addStyles();
-
-    const entry = document.createElement("div");
-    entry.className = "mcp-research-entry";
-    entry.id = "mcp-research-entry";
-
-    const modeButton = createButton(
-      "",
-      "mcp-research-mode-option",
-      "mcp-research-option",
-      "تفعيل البحث بالمصادر عبر Groq أو Gemini باستخدام خادمي MCP السحابيين"
-    );
-    modeButton.setAttribute("aria-pressed", "false");
-
-    const modeIcon = document.createElement("span");
-    modeIcon.className = "mcp-research-option-icon";
-    modeIcon.setAttribute("aria-hidden", "true");
-    modeIcon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 1 4 17.5z"/><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20"/><path d="M8 7h8M8 10h6"/></svg>';
-
-    const copy = document.createElement("span");
-    copy.className = "mcp-research-option-copy";
-    const modeLabel = document.createElement("span");
-    modeLabel.className = "mcp-research-option-title";
-    modeLabel.textContent = "بحث في المصادر المتصلة";
-    const modeDescription = document.createElement("span");
-    modeDescription.className = "mcp-research-option-description";
-    modeDescription.textContent = "بحث سحابي مباشر في الجامع والمكتبة الشاملة عبر Groq أو Gemini";
-    copy.appendChild(modeLabel);
-    copy.appendChild(modeDescription);
-
-    const modeStatus = document.createElement("span");
-    modeStatus.className = "mcp-research-option-state";
-    modeStatus.textContent = "غير مفعّل";
-    copy.setAttribute("aria-live", "polite");
-
-    modeButton.appendChild(modeIcon);
-    modeButton.appendChild(copy);
-    modeButton.appendChild(modeStatus);
-
-    const settingsButton = createButton(
-      "",
-      "mcp-research-settings-option",
-      "mcp-research-settings-option",
-      "إعدادات البحث بالمصادر"
-    );
-    settingsButton.setAttribute("aria-label", "إعدادات البحث بالمصادر");
-    settingsButton.title = "اختر الجامع أو الشاملة أو كليهما.";
-    settingsButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 0 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3.1a2 2 0 0 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5v-.2a2 2 0 0 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.2a2 2 0 0 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>';
-
-    entry.appendChild(modeButton);
-    entry.appendChild(settingsButton);
-    scopeMenu.appendChild(entry);
-    state.modeButton = modeButton;
-    state.modeStatus = modeStatus;
-
-    buildSettingsPanel(inputArea);
-    modeButton.addEventListener("click", function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleMode();
-      closeScopePanel();
-    });
-    settingsButton.addEventListener("click", function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      renderProviderStatus();
-      closeScopePanel();
-      if (state.panel) state.panel.hidden = !state.panel.hidden;
-    });
-
-    updateModeButton();
+    const notice = document.createElement("div");
+    notice.id = "mcp-research-notice";
+    notice.className = "mcp-research-notice";
+    notice.setAttribute("role", "status");
+    notice.setAttribute("aria-live", "polite");
+    notice.hidden = true;
+    inputArea.appendChild(notice);
+    state.notice = notice;
+    initializeComposerRouting(inputArea, input);
     state.initialized = true;
     state.initializing = false;
-
-    window.addEventListener("click", function (event) {
-      if (!state.enabled) return;
-      const target = event.target && event.target.closest ? event.target.closest("#send-btn") : null;
-      if (!target) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-      const messageInput = document.getElementById("user-input");
-      sendMessage(messageInput ? messageInput.value : "");
-    }, true);
-
-    window.addEventListener("keydown", function (event) {
-      if (!state.enabled || event.key !== "Enter" || event.shiftKey || event.isComposing) return;
-      if (!event.target || event.target.id !== "user-input") return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-      sendMessage(event.target.value);
-    }, true);
-
   }
-
   window.addEventListener("word-ai-chat-ready", initialize);
 
   if (document.readyState === "loading") {
