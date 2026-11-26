@@ -295,7 +295,7 @@ public sealed class ResearchCoordinator
                                 _log.Info(
                                     $"Research fallback search dispatch: task={taskId}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; querySource=user_request; queryCharacters={invocation.Query.Length}.");
 
-                                var execution = await ExecuteToolAsync(
+                                var recoveryExecution = await ExecuteToolAsync(
                                     invocation.Tool,
                                     invocation.Arguments,
                                     warnings,
@@ -303,21 +303,21 @@ public sealed class ResearchCoordinator
                                     taskId,
                                     timeout.Token);
 
-                                evidenceLedger.Add(invocation.Tool, execution.Content, execution.Succeeded);
+                                evidenceLedger.Add(invocation.Tool, recoveryExecution.Content, recoveryExecution.Succeeded);
 
-                                var completedSearch = execution.Succeeded &&
+                                var recoveryCompletedSearch = recoveryExecution.Succeeded &&
                                     ResearchToolResultClassifier.IsCompletedSearch(invocation.Tool, isError: false);
-                                if (completedSearch)
+                                if (recoveryCompletedSearch)
                                     searchedSourceIds.Add(invocation.Tool.Server);
 
-                                if (execution.Succeeded)
+                                if (recoveryExecution.Succeeded)
                                     trace.Add(new ToolCallTrace(
                                         invocation.Tool.Server,
                                         invocation.Tool.ServerLabel,
                                         invocation.Tool.Name));
 
                                 _log.Info(
-                                    $"Research fallback search result: task={taskId}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; success={execution.Succeeded}; completedSearch={completedSearch}; references={evidenceProvenance.SearchReferenceCount}; evidenceEntries={evidenceLedger.Entries.Count}.");
+                                    $"Research fallback search result: task={taskId}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; success={recoveryExecution.Succeeded}; completedSearch={recoveryCompletedSearch}; references={evidenceProvenance.SearchReferenceCount}; evidenceEntries={evidenceLedger.Entries.Count}.");
                             }
 
                             var stillPending = pendingSearchSources
