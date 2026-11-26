@@ -1128,12 +1128,20 @@
   }
 
   async function sendMessage(rawText) {
-    const visiblePrompt = String(rawText || "").trim();
+    const rawPrompt = String(rawText || "");
+    const visiblePrompt = rawPrompt.trim();
     if (!visiblePrompt || state.busy) return;
 
     const selectedServerIds = getSelectedServerIds(state.sourceTokens);
     if (!selectedServerIds.length) return;
-    if (!stripSelectedSourceLabels(visiblePrompt, state.sourceTokens)) {
+    const leadingTrim = rawPrompt.length - rawPrompt.trimStart().length;
+    const submissionTokens = state.sourceTokens.map(function (token) {
+      return Object.assign({}, token, {
+        start: token.start - leadingTrim,
+        end: token.end - leadingTrim
+      });
+    });
+    if (!stripSelectedSourceLabels(visiblePrompt, submissionTokens)) {
       showNotice("اكتب السؤال بعد اختيار مصدر البحث.");
       return;
     }
