@@ -102,20 +102,31 @@ internal sealed class McpEvidenceProvenance
     /// </summary>
     internal bool TryBuildVerifiedReadArguments(
         ToolDescriptor descriptor,
+        out IReadOnlyDictionary<string, object?> arguments) =>
+        TryBuildVerifiedReadArguments(descriptor, candidateIndex: 0, out arguments);
+
+    internal bool TryBuildVerifiedReadArguments(
+        ToolDescriptor descriptor,
+        int candidateIndex,
         out IReadOnlyDictionary<string, object?> arguments)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         arguments = new Dictionary<string, object?>(StringComparer.Ordinal);
-        if (!IsReferenceReadTool(descriptor) ||
+        if (candidateIndex < 0 ||
+            !IsReferenceReadTool(descriptor) ||
             !_sources.TryGetValue(descriptor.Server, out var index))
             return false;
 
-        string? firstReference = descriptor.Server switch
+        IReadOnlyList<string> orderedReferences = descriptor.Server switch
         {
-            "aljam3" => index.OrderedFilePagePairs.FirstOrDefault(),
-            "shamela" when descriptor.Name == "shamela_open" => index.OrderedBookPagePairs.FirstOrDefault(),
-            _ => null
+            "aljam3" => index.OrderedFilePagePairs,
+            "shamela" when descriptor.Name == "shamela_open" => index.OrderedBookPagePairs,
+            _ => Array.Empty<string>()
         };
+        if (candidateIndex >= orderedReferences.Count)
+            return false;
+
+        var firstReference = orderedReferences[candidateIndex];
         if (string.IsNullOrWhiteSpace(firstReference))
             return false;
 
