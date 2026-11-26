@@ -52,8 +52,7 @@ assert.match(uiSource, /بحث سحابي مباشر عبر Groq أو Gemini/);
 assert.match(uiSource, /heading\.textContent = "إعدادات البحث"/);
 assert.match(uiSource, /sourceTitle\.textContent = "مصادر البحث"/);
 assert.match(uiSource, /fontSize = "12px"/);
-assert.match(uiSource, /mcp-research-panel select,\.mcp-research-panel select option|mcp-research-panel select,\.mcp-research-panel select option/);
-assert.match(uiSource, /تلقائي \(المحلي أولاً\)/);
+assert.doesNotMatch(uiSource, /mcp-research-panel select|تلقائي \(المحلي أولاً\)/);
 assert.doesNotMatch(uiSource, /المكتبات التي سيبحث فيها النموذج|فحص التوليد الفعلي يتم عند تنفيذ البحث/);
 
 

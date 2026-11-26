@@ -1,310 +1,109 @@
 name: Build and publish ResearchTools Setup
-
 on:
   push:
-    branches: [main, feature/mcp-host-dotnet10, feat/unified-local-mcp-host-20261121]
+    branches: [main]
     paths:
       - 'installer/**'
-      - 'runtime/McpHost/**'
-      - 'runtime/ResearchTools-Launcher.vbs'
+      - 'src/taskpane/mcp-research-assistant.js'
+      - 'tests/mcp-cloud-provider-routing.test.cjs'
+      - 'tests/mcp-research-ui-placement.test.cjs'
       - '.github/workflows/build-researchtools-setup.yml'
   pull_request:
     branches: [main]
     paths:
       - 'installer/**'
-      - 'runtime/McpHost/**'
-      - 'runtime/ResearchTools-Launcher.vbs'
+      - 'src/taskpane/mcp-research-assistant.js'
+      - 'tests/mcp-cloud-provider-routing.test.cjs'
+      - 'tests/mcp-research-ui-placement.test.cjs'
       - '.github/workflows/build-researchtools-setup.yml'
   workflow_dispatch:
-
 permissions:
   contents: write
-
-concurrency:
-  group: researchtools-unified-setup
-  cancel-in-progress: false
-
 jobs:
-  build-setup:
+  build-installer:
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Validate Windows PowerShell and manifest
-        shell: powershell
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run regression tests
+        run: npm test
+      - name: Build Word add-in
+        run: npm run build
+      - name: Validate Word manifest and cloud-only installer
+        shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $path = 'installer/Install-ResearchTools.ps1'
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path), [ref]$tokens, [ref]$errors) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error ('{0}:{1}: {2}' -f $path, $_.Extent.StartLineNumber, $_.Message) }
-            throw 'PowerShell 5.1 parser validation failed.'
-          }
-          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $path))
-          if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) { throw 'UTF-8 BOM missing.' }
           [xml]$manifest = Get-Content 'installer/Word-AI-Assistant.xml' -Raw
           $id = $manifest.SelectSingleNode("//*[local-name()='Id']")
           $source = $manifest.SelectSingleNode("//*[local-name()='DefaultSettings']/*[local-name()='SourceLocation']")
           if (-not $id -or $id.InnerText -ne 'f8a582b1-eaf2-44f9-8166-d034255586ad') { throw 'Invalid Word add-in ID.' }
           if (-not $source -or $source.GetAttribute('DefaultValue') -ne 'https://moh1983taher-ai.github.io/Word-AI-Assistant/taskpane.html') { throw 'Invalid production task pane URL.' }
-          if ((Get-Content 'installer/Word-AI-Assistant.xml' -Raw) -match 'localhost:3000') { throw 'Production manifest has a localhost URL.' }
-          $launcher = Get-Content 'installer/ResearchTools-Launcher.vbs' -Raw
-          if ($launcher -notmatch 'RESEARCHTOOLS_MCPHOST_V1' -or $launcher -notmatch 'McpHost\\ResearchTools\.McpHost\.exe') { throw 'Unified launcher is missing MCP host integration.' }
-          if (-not $launcher.Contains('WaitForDuckApi(120)') -or -not $launcher.Contains('/v1/models')) { throw 'Unified launcher is missing the Duck2API readiness gate.' }
-          if ($launcher -match 'ResearchTools-DuckAgent\.exe|agentExe') { throw 'Unified launcher must not start or require the legacy DuckAgent proxy.' }
-          if ($launcher -notmatch 'request\.SetTimeouts\s+2000,2000,2000,12000') { throw 'Duck2API readiness probe receive timeout is too short.' }
-          if ($launcher -notmatch 'ProcessExistsAtPath\(duckExe\)' -or $launcher -notmatch 'StopProcessAtPath duckExe') { throw 'Duck2API lifecycle must be scoped to the installed executable path.' }
-          if ($launcher -notmatch 'ProcessPathMatches\(process,executablePath\)') { throw 'Launcher is missing executable-path verification before process termination.' }
-          if ($launcher -notmatch 'the legacy DuckAgent proxy on 8080 is not started') { throw 'Launcher does not document direct Duck2API startup.' }
           $iss = Get-Content 'installer/ResearchToolsSetup.iss' -Raw
-          foreach ($required in @('ResearchTools-MCP-Host-release.zip','ResearchTools-Launcher.vbs','-McpHostArchive','-McpHostShaFile','-LauncherFile')) {
-            if ($iss -notmatch [regex]::Escape($required)) { throw "Setup script does not embed $required." }
-          }
-          # Regression contract: the installer and Setup packager must require the
-          # exact same MCP archive entries, and the ZIP entry count must derive
-          # from that list rather than a stale hard-coded number.
-          $installerScript = Get-Content 'installer/Install-ResearchTools.ps1' -Raw
-          $installerFilesMatch = [regex]::Match(
-            $installerScript,
-            '(?s)\$requiredMcpFiles\s*=\s*@\((?<files>.*?)\)')
-          if (-not $installerFilesMatch.Success) {
-            throw 'Installer does not declare the required MCP archive file list.'
-          }
-          $installerFiles = @([regex]::Matches(
-            $installerFilesMatch.Groups['files'].Value,
-            "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-          $runtimeFilesMatch = [regex]::Match(
-            $installerScript,
-            '(?s)\$required\s*=\s*@\((?<files>.*?)\)')
-          if (-not $runtimeFilesMatch.Success) {
-            throw 'Installer does not declare the required DuckAI runtime files.'
-          }
-          $runtimeFiles = @([regex]::Matches(
-            $runtimeFilesMatch.Groups['files'].Value,
-            "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-          if ($runtimeFiles -notcontains 'DuckAI-MCP-Bridge.ps1') {
-            throw 'Installer runtime integrity list must require DuckAI-MCP-Bridge.ps1.'
-          }
-          if ($installerScript.Contains('Copy-Item -LiteralPath (Join-Path $Runtime ''ResearchTools-Launcher.vbs'') -Destination $Launcher')) {
-            throw 'The legacy runtime launcher must not overwrite the unified installer launcher.'
-          }
-          if ($installerScript -notmatch '\$runtimeLauncherFile\s*=\s*Join-Path\s+\$Runtime') {
-            throw 'Installer must validate the bundled runtime launcher without installing it over the unified launcher.'
-          }
-
-          $setupWorkflow = Get-Content '.github/workflows/build-researchtools-setup.yml' -Raw
-          $packageFilesMatch = [regex]::Match(
-            $setupWorkflow,
-            '(?s)\$requiredEntries\s*=\s*@\((?<files>.*?)\)')
-          if (-not $packageFilesMatch.Success) {
-            throw 'Setup workflow does not declare the MCP package entry list.'
-          }
-          $packageFiles = @([regex]::Matches(
-            $packageFilesMatch.Groups['files'].Value,
-            "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
-
-          $expectedMcpFiles = @(
-            'ResearchTools.McpHost.exe',
-            'ResearchTools.McpHost.exe.sha256',
-            'Test-McpHost-Preview.ps1',
-            'Start-McpHost-Preview.ps1'
-          )
-          if (@(Compare-Object $expectedMcpFiles $installerFiles).Count -gt 0) {
-            throw 'Installer MCP archive file list differs from the four required package files.'
-          }
-          if (@(Compare-Object $expectedMcpFiles $packageFiles).Count -gt 0) {
-            throw 'Setup package MCP archive file list differs from the four required package files.'
-          }
-          if ($installerScript -notmatch '(?s)\$zip\.Entries\.Count\s*-ne\s*\$requiredMcpFiles\.Count') {
-            throw 'Installer MCP archive entry count is not derived from requiredMcpFiles.Count.'
-          }
-
-          Write-Host 'PowerShell 5.1, Word manifest, unified launcher, Setup inputs and MCP archive contract validated.'
-
-      - name: Download and verify embedded runtime
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          # PR builds use the current published runtime; main builds wait for v1.0.11.
-          $runtimeTag = 'duckai-runtime-v1.0.11'
-          if ($env:GITHUB_EVENT_NAME -eq 'pull_request') {
-            $runtimeTag = 'duckai-runtime-v1.0.10'
-          }
-          else {
-            $runtimePublished = $false
-            for ($attempt = 1; $attempt -le 40; $attempt++) {
-              gh release view $runtimeTag --repo "$env:GITHUB_REPOSITORY" *> $null
-              if ($LASTEXITCODE -eq 0) { $runtimePublished = $true; break }
-              Start-Sleep -Seconds 15
-            }
-            if (-not $runtimePublished) { throw "Required DuckAI runtime release $runtimeTag was not published in time." }
-          }
-          gh release download $runtimeTag --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip" --dir dist
-          if ($LASTEXITCODE -ne 0) { throw 'Runtime download failed.' }
-          gh release download $runtimeTag --repo "$env:GITHUB_REPOSITORY" --pattern "DuckAI-Runtime-release.zip.sha256" --dir dist
-          if ($LASTEXITCODE -ne 0) { throw 'Runtime checksum download failed.' }
-          $sidecar = Get-Content 'dist/DuckAI-Runtime-release.zip.sha256' -Raw
-          if ($sidecar -notmatch '(?i)^\s*([a-f0-9]{64})\s+DuckAI-Runtime-release\.zip\s*$') { throw 'Invalid runtime checksum file.' }
-          $expected = $matches[1].ToUpperInvariant()
-          $actual = (Get-FileHash 'dist/DuckAI-Runtime-release.zip' -Algorithm SHA256).Hash.ToUpperInvariant()
-          if ($actual -ne $expected) { throw 'Embedded runtime SHA-256 mismatch.' }
-          Write-Host "Runtime verified: $actual"
-
-      - name: Validate DuckAI bootstrap pin across bundled components
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $stage = 'dist/runtime-pin-check'
-          if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
-          New-Item -ItemType Directory -Path $stage -Force | Out-Null
-          try {
-            [IO.Compression.ZipFile]::ExtractToDirectory('dist/DuckAI-Runtime-release.zip', $stage)
-            $bootstrap = Join-Path $stage 'DuckAI-Bootstrap.ps1'
-            $runtimeLauncher = Join-Path $stage 'ResearchTools-Launcher.vbs'
-            $bridge = Join-Path $stage 'DuckAI-MCP-Bridge.ps1'
-            if (-not (Test-Path -LiteralPath $bootstrap -PathType Leaf) -or
-                -not (Test-Path -LiteralPath $runtimeLauncher -PathType Leaf) -or
-                -not (Test-Path -LiteralPath $bridge -PathType Leaf)) {
-              throw 'Bundled DuckAI package is missing its bootstrap, launcher or MCP bridge.'
-            }
-            $actualHash = (Get-FileHash -LiteralPath $bootstrap -Algorithm SHA256).Hash.ToLowerInvariant()
-            $pattern = 'Const\s+BOOTSTRAP_SHA256\s*=\s*"([a-f0-9]{64})"'
-            $runtimePin = [regex]::Match((Get-Content -LiteralPath $runtimeLauncher -Raw), $pattern)
-            $unifiedLauncherPath = 'installer/ResearchTools-Launcher.vbs'
-            $unifiedLauncherText = Get-Content -LiteralPath $unifiedLauncherPath -Raw
-            $unifiedPin = [regex]::Match($unifiedLauncherText, $pattern)
-            if (-not $runtimePin.Success) { throw 'Could not read the bootstrap pin from the bundled DuckAI launcher.' }
-            if (-not $unifiedPin.Success) { throw 'Could not read the bootstrap pin from the unified launcher.' }
-            if ($runtimePin.Groups[1].Value.ToLowerInvariant() -ne $actualHash) {
-              throw ('Bundled DuckAI launcher pin mismatch. Actual=' + $actualHash)
-            }
-            # The Setup launcher is shared by multiple Runtime releases; synchronize
-            # its bootstrap pin to the verified archive being embedded in this build.
-            $replacement = 'Const BOOTSTRAP_SHA256 = "' + $actualHash + '"'
-            $syncedLauncher = [regex]::Replace($unifiedLauncherText, $pattern, $replacement, 1)
-            # WSH VBScript rejects a UTF-8 BOM at the first character.
-            [IO.File]::WriteAllText($unifiedLauncherPath, $syncedLauncher, [Text.UTF8Encoding]::new($false))
-            $finalLauncherBytes = [IO.File]::ReadAllBytes($unifiedLauncherPath)
-            if ($finalLauncherBytes.Length -ge 3 -and
-                $finalLauncherBytes[0] -eq 0xEF -and
-                $finalLauncherBytes[1] -eq 0xBB -and
-                $finalLauncherBytes[2] -eq 0xBF) {
-              throw 'Unified VBScript launcher must not contain a UTF-8 BOM.'
-            }
-            $verifiedUnifiedPin = [regex]::Match((Get-Content -LiteralPath $unifiedLauncherPath -Raw), $pattern)
-            if (-not $verifiedUnifiedPin.Success -or $verifiedUnifiedPin.Groups[1].Value.ToLowerInvariant() -ne $actualHash) {
-              throw ('Unified launcher bootstrap pin could not be synchronized. Actual=' + $actualHash)
-            }
-            & cscript.exe //nologo $unifiedLauncherPath --self-test
-            if ($LASTEXITCODE -ne 0) { throw 'Windows Script Host could not parse the final unified VBScript launcher.' }
-            Write-Host ('Bootstrap pin and BOM-free VBScript launcher verified: ' + $actualHash)
-          }
-          finally {
-            if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
-          }
-
-      - name: Install .NET 10 SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Publish self-contained .NET 10 MCP host package
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          dotnet --info
-          dotnet publish runtime/McpHost/ResearchTools.McpHost.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false --output dist/mcp-host-win-x64
-          if ($LASTEXITCODE -ne 0) { throw "MCP host publish failed: $LASTEXITCODE" }
-
-          $exe = 'dist/mcp-host-win-x64/ResearchTools.McpHost.exe'
-          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Self-contained MCP host executable is missing.' }
-          $exeHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content -LiteralPath ($exe + '.sha256') -Value ($exeHash + '  ResearchTools.McpHost.exe') -Encoding ASCII
-
-          $package = 'dist/mcp-host-package'
-          New-Item -ItemType Directory -Path $package -Force | Out-Null
-          Copy-Item -LiteralPath $exe -Destination $package
-          Copy-Item -LiteralPath ($exe + '.sha256') -Destination $package
-          Copy-Item -LiteralPath 'runtime/McpHost/Test-McpHost-Preview.ps1' -Destination $package
-          Copy-Item -LiteralPath 'runtime/McpHost/Start-McpHost-Preview.ps1' -Destination $package
-          $archive = 'dist/ResearchTools-MCP-Host-release.zip'
-          Compress-Archive -Path (Join-Path $package '*') -DestinationPath $archive -CompressionLevel Optimal -Force
-          $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content -LiteralPath ($archive + '.sha256') -Value ($archiveHash + '  ResearchTools-MCP-Host-release.zip') -Encoding ASCII
-
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [IO.Compression.ZipFile]::OpenRead($archive)
-          try {
-            $names = @($zip.Entries | ForEach-Object { $_.FullName })
-            $requiredEntries = @(
-              'ResearchTools.McpHost.exe',
-              'ResearchTools.McpHost.exe.sha256',
-              'Test-McpHost-Preview.ps1',
-              'Start-McpHost-Preview.ps1'
-            )
-            if ($names.Count -ne $requiredEntries.Count -or
-                @($requiredEntries | Where-Object { $names -notcontains $_ }).Count -gt 0) {
-              throw 'MCP host installer archive layout is invalid.'
-            }
-          }
-          finally { $zip.Dispose() }
-          Write-Host "MCP host published and checksummed: $exeHash; archive=$archiveHash"
-
+          if ($iss -match 'DuckAI-Runtime|ResearchTools-MCP-Host|RuntimeArchive|McpHostArchive|ResearchTools-Launcher') { throw 'Installer still packages local research runtimes.' }
+          if ($iss -notmatch 'Install-ResearchTools\.ps1' -or $iss -notmatch 'Word-AI-Assistant\.xml') { throw 'Missing Word add-in setup inputs.' }
+          $install = Get-Content 'installer/Install-ResearchTools.ps1' -Raw
+          if ($install -match 'RuntimeArchive|McpHostArchive|Start-McpHost|duck2api-main\.exe') { throw 'Installer still deploys the local MCP stack.' }
+          if ($install -notmatch 'Unregister-ScheduledTask' -or $install -notmatch 'Remove-LegacyLocalMcpServices') { throw 'Legacy runtime cleanup is missing.' }
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile('installer/Install-ResearchTools.ps1',[ref]$tokens,[ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; throw 'Installer PowerShell syntax validation failed.' }
+          Write-Host 'Cloud-only installer inputs and cleanup script validated.'
       - name: Install Inno Setup
         shell: pwsh
         run: |
           $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
           $compiler = Join-Path $pf86 'Inno Setup 6\ISCC.exe'
-          if (-not (Test-Path -LiteralPath $compiler)) { choco install innosetup -y --no-progress }
-          if (-not (Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler unavailable.' }
-
-      - name: Compile installer
-        shell: pwsh
-        run: |
-          $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+          if (-not (Test-Path -LiteralPath $compiler)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed: $LASTEXITCODE" }
+          }
           $compiler = Join-Path $pf86 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $compiler)) { throw 'Inno Setup compiler unavailable.' }
           & $compiler 'installer/ResearchToolsSetup.iss'
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed: $LASTEXITCODE" }
           $setup = 'dist/ResearchTools-Setup.exe'
           if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Setup EXE was not generated.' }
           $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content -LiteralPath ($setup + '.sha256') -Value ($hash + '  ResearchTools-Setup.exe') -Encoding ASCII
-          Write-Host "Built $setup, $((Get-Item $setup).Length) bytes, SHA256 $hash"
-
-      - name: Upload unified Setup preview artifact
+      - name: Upload setup artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ResearchTools-Unified-Setup
+          name: ResearchTools-Setup-cloud-only
           path: |
             dist/ResearchTools-Setup.exe
             dist/ResearchTools-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 30
-
-      - name: Publish release
-        if: github.ref == 'refs/heads/main'
+      - name: Publish setup release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: \${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'researchtools-setup-v1.2.15'
-          $title = 'ResearchTools Unified Setup v1.2.15'
-          $notes = 'Unified Setup v1.2.15 corrects DuckAI startup orchestration: the new .NET MCP host uses the direct Duck2API endpoint on 127.0.0.1:18080 and no longer launches or depends on the legacy DuckAgent proxy on 8080. The readiness probe allows a 12-second response window, runtime process detection and shutdown are scoped to the verified installed executable path, bridge cleanup matches its exact script path, and the runtime archive launcher can no longer overwrite the unified launcher during installation. The BOM-free VBScript packaging check, stable runtime filtering, archive integrity validation, adaptive MCP research planner, and SHA-256 checks are retained. Does not modify C:\\Word AI Assistant v2.'
+          $tag = 'researchtools-setup-v1.3.0'
+          $title = 'ResearchTools Cloud-only Setup v1.3.0'
+          $notes = @'
+          يثبت هذا الإصدار إضافة Word وكتالوج Office الموثوق فقط.
+          أزيل محرك DuckAI المحلي ومضيف MCP والجسر ومشغّل الخلفية ومهام التشغيل التلقائي من حزمة التثبيت.
+          عند التثبيت، تزال آثار المكونات المحلية القديمة التي أنشأتها الإصدارات السابقة، مع الحفاظ على ملفات الإضافة ومحادثاتها وكتالوج Word.
+          يستمر البحث في الجامع والمكتبة الشاملة عبر خادمي MCP السحابيين باستخدام Groq أو Gemini.
+          لا يغيّر هذا الإصدار ملفات التطوير في C:\Word AI Assistant v2.
+          '@
           Set-Content -LiteralPath 'release-notes.txt' -Value $notes -Encoding UTF8
           gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag dist/ResearchTools-Setup.exe dist/ResearchTools-Setup.exe.sha256 --repo "$env:GITHUB_REPOSITORY" --clobber
             if ($LASTEXITCODE -ne 0) { throw 'Release upload failed.' }
             gh release edit $tag --repo "$env:GITHUB_REPOSITORY" --title $title --notes-file 'release-notes.txt' --latest
+          } else {
+            gh release create $tag dist/ResearchTools-Setup.exe dist/ResearchTools-Setup.exe.sha256 --repo "$env:GITHUB_REPOSITORY" --title $title --notes-file 'release-notes.txt' --latest
+            if ($LASTEXITCODE -ne 0) { throw 'Release creation failed.' }
           }
-          else {
-            gh release create $tag dist/ResearchTools-Setup.exe dist/ResearchTools-Setup.exe.sha256 --repo "$env:GITHUB_REPOSITORY" --title $title --notes-file 'release-notes.txt' --target main --latest
-          }
-          if ($LASTEXITCODE -ne 0) { throw 'Release publishing failed.' }
-          Write-Host "Published https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
