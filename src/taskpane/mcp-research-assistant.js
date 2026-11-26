@@ -86,7 +86,7 @@
   function getMentionContext(value, cursorPosition) {
     const text = String(value || "");
     const cursor = typeof cursorPosition === "number" ? cursorPosition : text.length;
-    const match = text.slice(0, cursor).match(/(?:^|\\s)@([^\\s@]*)$/);
+    const match = text.slice(0, cursor).match(/(?:^|\s)@([^\s@]*)$/);
     if (!match) return null;
     return { start: cursor - match[1].length - 1, query: match[1] };
   }
@@ -122,6 +122,11 @@
       }
       if (nextToken.start < 0 || nextToken.end > current.length ||
         current.slice(nextToken.start, nextToken.end) !== nextToken.label) return updated;
+      const wordCharacter = /[A-Za-z0-9\u0600-\u06FF]/;
+      const beforeLabel = current.charAt(nextToken.start - 1);
+      const afterLabel = current.charAt(nextToken.end);
+      if ((beforeLabel && wordCharacter.test(beforeLabel)) ||
+        (afterLabel && wordCharacter.test(afterLabel))) return updated;
       updated.push(nextToken);
       return updated;
     }, []);
@@ -145,7 +150,7 @@
         prompt = prompt.slice(0, token.start) + " " + prompt.slice(token.end);
       }
     });
-    return prompt.replace(/[ \\t]{2,}/g, " ").trim();
+    return prompt.replace(/[ \t]{2,}/g, " ").trim();
   }
 
   function getCloudProviderStatus(settings) {
@@ -1210,7 +1215,7 @@
 
     window.addEventListener("click", function (event) {
       const target = event.target && event.target.closest ? event.target.closest("#send-btn") : null;
-      if (!target || !shouldRouteToSources(input.value)) return;
+      if (!target || !shouldRouteToSources()) return;
       event.preventDefault();
       event.stopPropagation();
       if (event.stopImmediatePropagation) event.stopImmediatePropagation();
@@ -1237,7 +1242,7 @@
         }
         hideMentionMenu();
       }
-      if (!shouldRouteToSources(input.value)) return;
+      if (!shouldRouteToSources()) return;
       event.preventDefault();
       event.stopPropagation();
       if (event.stopImmediatePropagation) event.stopImmediatePropagation();
