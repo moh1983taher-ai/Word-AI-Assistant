@@ -273,21 +273,75 @@ public sealed class ResearchCoordinator
                         {
                             searchDecisionCorrectionAttempted = true;
                             _log.Warning(
-                                $"Research premature final deferred: task={taskId}; reason=explicit_source_request_without_successful_tool_call; recovery=one_search_correction.");
+                                $"Research premature final deferred: task={taskId}; reason=model_final_before_tool_call; recovery=host_exact_request_search; pendingSources={string.Join(",", pendingSearchSources)}.");
 
+                            // Recovery only: if the model returns text instead of its first MCP
+                            // tool call, search the exact user request in the still-pending
+                            // selected sources, then return control to the model for page choice,
+                            // evidence assessment, any further searches, and final writing.
                             messages.Add(new DuckChatMessage("assistant", decision.Raw));
-                            messages.Add(new DuckChatMessage(
-                                "user",
-                                "تنبيه تحقق: لا يزال البحث غير منفذ في المكتبات الآتية: " +
-                                string.Join("، ", pendingSearchSources.Select(ResearchSourceSelection.GetLabel)) +
-                                ". لا تصدر إجابة نهائية ولا تعتمد على الذاكرة. نفّذ أداة البحث الصحيحة في كل مكتبة متبقية، ثم افتح الصفحات المطابقة للنتائج التي ستستشهد بها."));
+                            if (string.IsNullOrWhiteSpace(latestUserMessage))
+                                throw new InvalidOperationException(
+                                    "تعذر بدء البحث الاحتياطي؛ لم يُعثر على نص سؤال الباحث.");
+
+                            var recoveryPlan = ResearchSearchBootstrap.BuildInitialPlan(
+                                activeTools,
+                                pendingSearchSources,
+                                latestUserMessage);
+
+                            foreach (var invocation in recoveryPlan)
+                            {
+                                toolCallsAttempted++;
+                                _log.Info(
+                                    $"Research fallback search dispatch: task={taskId}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; querySource=user_request; queryCharacters={invocation.Query.Length}.");
+
+                                var execution = await ExecuteToolAsync(
+                                    invocation.Tool,
+                                    invocation.Arguments,
+                                    warnings,
+                                    evidenceProvenance,
+                                    taskId,
+                                    timeout.Token);
+
+                                evidenceLedger.Add(invocation.Tool, execution.Content, execution.Succeeded);
+
+                                var completedSearch = execution.Succeeded &&
+                                    ResearchToolResultClassifier.IsCompletedSearch(invocation.Tool, isError: false);
+                                if (completedSearch)
+                                    searchedSourceIds.Add(invocation.Tool.Server);
+
+                                if (execution.Succeeded)
+                                    trace.Add(new ToolCallTrace(
+                                        invocation.Tool.Server,
+                                        invocation.Tool.ServerLabel,
+                                        invocation.Tool.Name));
+
+                                _log.Info(
+                                    $"Research fallback search result: task={taskId}; source={invocation.Tool.Server}; tool={invocation.Tool.Name}; success={execution.Succeeded}; completedSearch={completedSearch}; references={evidenceProvenance.SearchReferenceCount}; evidenceEntries={evidenceLedger.Entries.Count}.");
+                            }
+
+                            var stillPending = pendingSearchSources
+                                .Where(source => !searchedSourceIds.Contains(source))
+                                .ToArray();
+                            if (stillPending.Length > 0)
+                            {
+                                _log.Warning(
+                                    $"Research fallback search incomplete: task={taskId}; pendingSources={string.Join(",", stillPending)}.");
+                                throw new InvalidOperationException(
+                                    "تعذر تنفيذ البحث الأولي بنجاح في جميع المكتبات المختارة: " +
+                                    string.Join("، ", stillPending.Select(ResearchSourceSelection.GetLabel)) +
+                                    ". لم تُعتمد إجابة النموذج بوصفها بحثاً موثقاً.");
+                            }
+
+                            _log.Info(
+                                $"Research fallback search completed: task={taskId}; sources={pendingSearchSources.Count}; querySource=user_request; handoff=model.");
                             continue;
                         }
 
                         _log.Warning(
-                            $"Research final rejected: task={taskId}; reason=explicit_source_request_without_successful_tool_call; correctionAttempted=true.");
+                            $"Research final rejected: task={taskId}; reason=explicit_source_request_without_successful_tool_call; fallbackAttempted=true.");
                         throw new InvalidOperationException(
-                            "تعذر إتمام البحث المطلوب: أنهى النموذج المهمة دون تنفيذ استدعاء ناجح لأداة بحث من المكتبات المختارة. لم تُعرض إجابته بوصفها بحثاً موثقاً.");
+                            "تعذر إتمام البحث المطلوب: لم ينتج النموذج قراراً صالحاً لمتابعة البحث بعد تنفيذ البحث الاحتياطي. لم تُعرض إجابته بوصفها بحثاً موثقاً.");
                     }
 
                     if (matchingPageWasNotOpened)

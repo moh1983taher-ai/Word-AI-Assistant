@@ -6,6 +6,19 @@ namespace ResearchTools.McpHost.Tests;
 public sealed class ResearchDecisionProtocolTests
 {
     [Fact]
+    public void RequiresAnActualToolCallWhenResearchInSelectedLibrariesWasRequested()
+    {
+        var prompt = ResearchDecisionProtocol.BuildTurnInstructions(
+            allowFinal: false,
+            pendingSourceLabels: ["الجامع", "المكتبة الشاملة"]);
+
+        Assert.Contains("فابدأ باستدعاء أداة بحث", prompt, StringComparison.Ordinal);
+        Assert.Contains("لا تستبدل الاستدعاء بإجابة أو تعليق", prompt, StringComparison.Ordinal);
+        Assert.Contains("<tool_call>", prompt, StringComparison.Ordinal);
+        Assert.Contains("الجامع، المكتبة الشاملة", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void KeepsOnlyTheMinimalToolTransportInstructions()
     {
         var prompt = ResearchDecisionProtocol.BuildTurnInstructions(

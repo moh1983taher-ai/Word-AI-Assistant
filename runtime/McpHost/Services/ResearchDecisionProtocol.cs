@@ -17,9 +17,10 @@ internal static class ResearchDecisionProtocol
         pendingPageSourceLabels ??= [];
 
         var builder = new StringBuilder();
-        builder.AppendLine("استخدم أدوات MCP عند الحاجة. لاستدعاء أداة، أرسل كتلة واحدة بالصيغة التالية، مع نسخ الاسم والمعاملات من فهرس الأدوات:");
+        builder.AppendLine("إذا طلب الباحث البحث في مكتبة مختارة، فابدأ باستدعاء أداة بحث ولا تستبدل الاستدعاء بإجابة أو تعليق.");
+        builder.AppendLine("لاستدعاء أداة MCP، أرسل كتلة واحدة مع نسخ الاسم والمعاملات من الفهرس:");
         builder.AppendLine("<tool_call>{\"name\":\"server__tool_name\",\"arguments\":{...}}</tool_call>");
-        builder.AppendLine("بعد انتهاء البحث، اكتب الإجابة مباشرة وبالطريقة التي طلبها الباحث، دون قالب بحثي مفروض.");
+        builder.AppendLine("بعد فحص الأدلة، اكتب الإجابة مباشرة بالطريقة التي طلبها الباحث، دون قالب مفروض.");
 
         if (!allowFinal)
         {
