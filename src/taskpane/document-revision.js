@@ -177,9 +177,16 @@
             }
 
             const exactMatches = [];
+            const startsWithWordChar = /^[\\p{L}\\p{M}\\p{N}_]/u.test(original);
+            const endsWithWordChar = /[\\p{L}\\p{M}\\p{N}_]$/u.test(original);
             let cursor = 0;
             while ((cursor = matchingSource.indexOf(original, cursor)) !== -1) {
-                exactMatches.push(cursor);
+                const end = cursor + original.length;
+                const hasLeftBoundary = !startsWithWordChar || cursor === 0 ||
+                    !/[\\p{L}\\p{M}\\p{N}_]/u.test(matchingSource.charAt(cursor - 1));
+                const hasRightBoundary = !endsWithWordChar || end === matchingSource.length ||
+                    !/[\\p{L}\\p{M}\\p{N}_]/u.test(matchingSource.charAt(end));
+                if (hasLeftBoundary && hasRightBoundary) exactMatches.push(cursor);
                 cursor += original.length;
             }
             if (!exactMatches.length) {
