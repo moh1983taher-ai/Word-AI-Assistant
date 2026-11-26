@@ -622,11 +622,11 @@ const crossingOnlyResult = revision.parseResponse(JSON.stringify({
     status: "ready",
     mode: "correction",
     edits: [{
-        original: "فقرة أولى\\r\\nفقرة ثانية",
+        original: "فقرة أولى\r\nفقرة ثانية",
         replacement: "فقرتان",
         reason: "تصحيح غير صالح"
     }]
-}), "فقرة أولى\\r\\nفقرة ثانية");
+}), "فقرة أولى\r\nفقرة ثانية");
 assert.equal(crossingOnlyResult.edits.length, 0);
 assert.equal(crossingOnlyResult.rejected[0].rejectionCode, "cross_paragraph_edit");
 
