@@ -139,153 +139,6 @@
         return segments;
     }
 
-    function parseParagraphScopedEdits(items, source, maskState, paragraphRecords) {
-        const records = Array.isArray(paragraphRecords) ? paragraphRecords : [];
-        const byId = new Map(records.map(function (record) {
-            return [String(record.paragraphId), record];
-        }));
-        const candidates = [];
-        const rejected = [];
-
-        function reject(item, code, message) {
-            rejected.push({
-                paragraphId: String(item && item.paragraphId || ""),
-                original: String(item && item.original || ""),
-                replacement: String(item && item.replacement || ""),
-                reason: String(item && item.reason || ""),
-                rejectionCode: code,
-                rejectionReason: message
-            });
-        }
-
-        items.forEach(function (item) {
-            const paragraphId = String(item && item.paragraphId || "").trim();
-            const original = String(item && item.original || "");
-            const replacement = String(item && item.replacement || "");
-            const contextBefore = String(item && item.contextBefore || "");
-            const contextAfter = String(item && item.contextAfter || "");
-            const reason = String(item && item.reason || "").trim();
-
-            if (!paragraphId) {
-                reject(item, "missing_paragraph_id", "لم يحدد النموذج معرف الفقرة التي ينتمي إليها التصحيح.");
-                return;
-            }
-            const paragraph = byId.get(paragraphId);
-            if (!paragraph) {
-                reject(item, "unknown_paragraph", "معرف الفقرة غير موجود في الدفعة الحالية.");
-                return;
-            }
-            if (paragraph.locked) {
-                reject(item, "protected_paragraph", "الفقرة محمية بسبب تغييرات متعقبة سابقة.");
-                return;
-            }
-            if (!original || !reason || /[\r\n]/.test(original + replacement)) {
-                reject(item, "invalid_edit", "بيانات التصحيح ناقصة أو تمتد عبر فاصل فقرة.");
-                return;
-            }
-            if (original === replacement) {
-                reject(item, "no_op", "النص البديل مطابق للنص الأصلي ولا ينتج عنه تصحيح فعلي.");
-                return;
-            }
-
-            const paragraphText = String(paragraph.text || "");
-            const exactMatches = [];
-            const exactContextMatches = [];
-            let cursor = 0;
-            while ((cursor = paragraphText.indexOf(original, cursor)) !== -1) {
-                exactMatches.push(cursor);
-                const before = paragraphText.slice(Math.max(0, cursor - contextBefore.length), cursor);
-                const after = paragraphText.slice(cursor + original.length, cursor + original.length + contextAfter.length);
-                if ((!contextBefore || before === contextBefore) && (!contextAfter || after === contextAfter)) {
-                    exactContextMatches.push(cursor);
-                }
-                cursor += original.length;
-            }
-
-            const localStart = resolveCorrectionOccurrence(
-                paragraphText,
-                original,
-                contextBefore,
-                contextAfter,
-                exactMatches,
-                exactContextMatches
-            );
-            if (localStart < 0) {
-                reject(
-                    item,
-                    exactMatches.length ? "ambiguous_occurrence" : "source_text_not_found",
-                    exactMatches.length
-                        ? "تكررت العبارة داخل الفقرة نفسها ولم يكفِ السياق لتعيين موضع واحد."
-                        : "لم يُعثر على النص الأصلي داخل الفقرة المحددة."
-                );
-                return;
-            }
-
-            const maskedStart = Number(paragraph.start) + localStart;
-            let mapped;
-            try {
-                mapped = DocumentRevisionPreflight.mapMaskedRangeToSource(maskState, maskedStart, original.length);
-            } catch (error) {
-                reject(item, "protected_range", String(error && error.message || error));
-                return;
-            }
-
-            if (source.slice(mapped.start, mapped.end) !== original) {
-                reject(item, "source_offset_mismatch", "لم يتطابق الموضع المحسوب مع النص الأصلي في الدفعة.");
-                return;
-            }
-
-            candidates.push({
-                start: mapped.start,
-                original: original,
-                replacement: replacement,
-                reason: reason,
-                paragraphId: paragraphId,
-                paragraphIndex: paragraph.paragraphIndex,
-                contextBefore: contextBefore,
-                contextAfter: contextAfter
-            });
-        });
-
-        candidates.sort(function (a, b) {
-            return a.start - b.start || a.original.length - b.original.length;
-        });
-
-        const conflicted = new Set();
-        for (let i = 0; i < candidates.length; i++) {
-            const currentEnd = candidates[i].start + candidates[i].original.length;
-            for (let j = i + 1; j < candidates.length && candidates[j].start < currentEnd; j++) {
-                conflicted.add(i);
-                conflicted.add(j);
-            }
-        }
-
-        const edits = [];
-        candidates.forEach(function (edit, index) {
-            if (conflicted.has(index)) {
-                reject(edit, "overlapping_edit", "يتداخل هذا التصحيح مع تصحيح آخر؛ عُزل التصحيحان لتجنب تعديل النص مرتين.");
-            } else {
-                edits.push(edit);
-            }
-        });
-
-        DocumentRevisionPreflight.assertNoProtectedEdits(edits, maskState);
-
-        let revised = source;
-        edits.slice().reverse().forEach(function (edit) {
-            revised = revised.slice(0, edit.start) + edit.replacement +
-                revised.slice(edit.start + edit.original.length);
-        });
-
-        return {
-            status: "ready",
-            mode: "correction",
-            text: revised,
-            edits: edits,
-            rejected: rejected
-        };
-    }
-
     // Validate each proposed correction independently. Linguistic diagnosis and
     // contextual judgment belong to the model; this layer only verifies anchors.
     function parseUnscopedCorrectionEdits(items, source, maskState) {
@@ -440,28 +293,17 @@
             : 0;
         const paragraphRecords = [];
         const rewriteSegments = correctionOnly ? [] : buildRewriteSegments(requestText);
-        const structuredParagraphText = structuredCorrection
-            ? JSON.stringify({
-                paragraphs: paragraphRecords.map(function (record) {
+        const structuredParagraphText = correctionOnly
+            ? requestText
+            : JSON.stringify({
+                paragraphs: rewriteSegments.map(function (segment) {
                     return {
-                        paragraphId: record.paragraphId,
-                        paragraphIndex: record.paragraphIndex,
-                        locked: record.locked,
-                        text: record.text
+                        segmentId: segment.segmentId,
+                        locked: segment.locked,
+                        text: segment.text
                     };
                 })
-            })
-            : correctionOnly
-                ? requestText
-                : JSON.stringify({
-                    paragraphs: rewriteSegments.map(function (segment) {
-                        return {
-                            segmentId: segment.segmentId,
-                            locked: segment.locked,
-                            text: segment.text
-                        };
-                    })
-                });
+            });
 
         const revisionMetadata = {
             structuredCorrection: structuredCorrection,
@@ -607,7 +449,7 @@
                 "أعد النتيجة في كائن JSON وفق هيئة edits المحددة في تعليمات النظام."
             ].join("\n"),
             revision: {
-                structuredCorrection: true,
+                structuredCorrection: false,
                 userInstruction: String(userInstruction || ""),
                 targetType: "notes",
                 noteParts: preparedParts
@@ -1074,43 +916,11 @@
                 throw new Error("لم تُرجع المراجعة قائمة تصحيحات موضعية صالحة.");
             }
             const source = sourceText;
-            const matchingSource = maskState ? maskState.text : source;
-
             const documentTarget = Boolean(pendingTarget && pendingTarget.targetType === "document");
             if (documentTarget && !activeRequestMetadata) {
                 throw new Error(
                     "بيانات طلب المستند غير متاحة للتحقق من مصدر التصحيحات؛ أُوقف التجهيز بدل قبول تعديلات غير مرتبطة بطلب موثوق."
                 );
-            }
-            const useParagraphScopedParsing = Boolean(
-                activeRequestMetadata && activeRequestMetadata.structuredCorrection === true
-            );
-            if (useParagraphScopedParsing) {
-                const fallbackOffset = Number.isFinite(Number(activeRequestMetadata.sourceOffset))
-                    ? Number(activeRequestMetadata.sourceOffset)
-                    : (pendingTarget
-                        ? Math.max(0, (Number(pendingTarget.requestCursor) || source.length) - source.length)
-                        : 0);
-                const fallbackParagraphBase = Number.isInteger(Number(activeRequestMetadata.paragraphBaseIndex))
-                    ? Number(activeRequestMetadata.paragraphBaseIndex)
-                    : (pendingTarget && pendingTarget.originalText
-                        ? countParagraphsBefore(pendingTarget.originalText, fallbackOffset)
-                        : 0);
-                const paragraphRecords = Array.isArray(activeRequestMetadata.paragraphRecords) &&
-                    activeRequestMetadata.paragraphRecords.length
-                    ? activeRequestMetadata.paragraphRecords
-                    : buildParagraphRecords(matchingSource, fallbackParagraphBase);
-                const structuredResult = parseParagraphScopedEdits(
-                    parsed.edits,
-                    source,
-                    maskState,
-                    paragraphRecords
-                );
-                if (pendingTarget) {
-                    pendingTarget.lastMaskedChunk = null;
-                    pendingTarget.lastRevisionMetadata = null;
-                }
-                return structuredResult;
             }
 
             const flatResult = parseUnscopedCorrectionEdits(
