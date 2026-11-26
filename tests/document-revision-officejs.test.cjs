@@ -603,11 +603,9 @@ global.Word = {
         footnoteCapture.originalText,
         { sourceOffset: 0, paragraphBaseIndex: 0 }
     );
-    assert.equal(
-        footnoteProofreadingRequest.revision.paragraphRecords[0].locked,
-        false,
-        "a note reference must not lock the whole paragraph against proofreading"
-    );
+    assert.equal(footnoteProofreadingRequest.revision.structuredCorrection, false);
+    assert.doesNotMatch(footnoteProofreadingRequest.systemPrompt, /paragraphId/);
+    assert.ok(footnoteProofreadingRequest.userPrompt.includes("هذه فقرة أصلية تنتهي بحاشية."));
     const footnoteRequest = revision.buildRequest(
         "أعد صياغة المستند كاملًا بأسلوب أكاديمي",
         footnoteCapture.originalText,
@@ -681,14 +679,12 @@ global.Word = {
         correctionNoteCapture.originalText,
         { sourceOffset: 0, paragraphBaseIndex: 0 }
     );
-    const correctionParagraphId = correctionNoteRequest.revision.paragraphRecords[0].paragraphId;
-    assert.equal(correctionNoteRequest.revision.structuredCorrection, true);
-    assert.equal(correctionNoteRequest.revision.paragraphRecords[0].locked, false);
+    assert.equal(correctionNoteRequest.revision.structuredCorrection, false);
+    assert.doesNotMatch(correctionNoteRequest.systemPrompt, /paragraphId/);
     const correctionNoteParsed = revision.parseResponse(JSON.stringify({
         status: "ready",
         mode: "review",
         edits: [{
-            paragraphId: correctionParagraphId,
             original: "خطا",
             replacement: "خطأ",
             contextBefore: "هذه فقرة فيها ",
@@ -721,13 +717,10 @@ global.Word = {
             paragraphBaseIndex: 0
         }
     );
-    const documentParagraphId = documentRequest.revision.paragraphRecords[0].paragraphId;
-
     const documentParsed = revision.parseResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
         edits: [{
-            paragraphId: documentParagraphId,
             original: "واضح",
             replacement: "بيّن",
             contextBefore: "هذا خطأ ",
@@ -763,18 +756,14 @@ global.Word = {
             )
         }
     );
-    const ids = multiParagraphRequest.revision.paragraphRecords.map(item => item.paragraphId);
-    assert.match(
-        multiParagraphRequest.systemPrompt,
-        /paragraphId/,
-        "full-document correction prompts must retain the paragraph-identifier contract"
-    );
+    assert.equal(multiParagraphRequest.revision.structuredCorrection, false);
+    assert.doesNotMatch(multiParagraphRequest.systemPrompt, /paragraphId/);
+    assert.doesNotMatch(multiParagraphRequest.userPrompt, /paragraphId/);
     const multiParagraphParsed = revision.parseResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
         edits: [
             {
-                paragraphId: ids[0],
                 original: "الأطراد",
                 replacement: "الاطراد",
                 contextBefore: "هذا ",
@@ -782,7 +771,6 @@ global.Word = {
                 reason: "تصويب إملائي"
             },
             {
-                paragraphId: ids[1],
                 original: "الأطراد",
                 replacement: "الاطراد",
                 contextBefore: "وتكرر ",
@@ -858,12 +846,10 @@ global.Word = {
             sourceOffset: 0
         }
     ]);
-    assert.match(noteBatchRequest.systemPrompt, /جميع الحواشي الواردة في الطلب دفعة واحدة/);
+    assert.match(noteBatchRequest.systemPrompt, /notePartId/);
+    assert.doesNotMatch(noteBatchRequest.systemPrompt, /paragraphId|من كلمتين إلى ست كلمات/);
     assert.match(noteBatchRequest.userPrompt, /BEGIN_NOTES/);
     assert.equal(noteBatchRequest.revision.noteParts.length, 2);
-
-    const footnoteParagraphId = noteBatchRequest.revision.noteParts[0].paragraphRecords[0].paragraphId;
-    const endnoteParagraphId = noteBatchRequest.revision.noteParts[1].paragraphRecords[0].paragraphId;
     const noteBatchParsed = revision.parseNotesBatchResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
@@ -871,7 +857,6 @@ global.Word = {
             {
                 noteId: capturedFootnote.id,
                 notePartId: capturedFootnote.id + "-part-1",
-                paragraphId: footnoteParagraphId,
                 original: "خطا",
                 replacement: "خطأ",
                 contextBefore: "حاشية سفلية قديمة فيها ",
@@ -881,7 +866,6 @@ global.Word = {
             {
                 noteId: capturedEndnote.id,
                 notePartId: capturedEndnote.id + "-part-1",
-                paragraphId: endnoteParagraphId,
                 original: "خطا",
                 replacement: "خطأ",
                 contextBefore: "حاشية ختامية قديمة فيها ",
@@ -896,20 +880,22 @@ global.Word = {
     assert.equal(noteBatchParsed.parts[0].edits[0].noteId, capturedFootnote.id);
     assert.equal(noteBatchParsed.parts[1].edits[0].noteId, capturedEndnote.id);
 
-    assert.throws(() => revision.parseNotesBatchResponse(JSON.stringify({
+    const badRouteResult = revision.parseNotesBatchResponse(JSON.stringify({
         status: "ready",
         mode: "correction",
         edits: [{
             noteId: capturedEndnote.id,
             notePartId: capturedFootnote.id + "-part-1",
-            paragraphId: footnoteParagraphId,
             original: "خطا",
             replacement: "خطأ",
             contextBefore: "حاشية سفلية قديمة فيها ",
             contextAfter: ".",
             reason: "محاولة إسناد خاطئة"
         }]
-    }), noteBatchRequest.revision), /إسناد أحد تصحيحات النموذج/);
+    }), noteBatchRequest.revision);
+    assert.equal(badRouteResult.parts[0].edits.length, 0);
+    assert.equal(badRouteResult.rejected.length, 1);
+    assert.equal(badRouteResult.rejected[0].rejectionCode, "invalid_note_target");
 
     assert.throws(() => revision.parseNotesBatchResponse(JSON.stringify({
         status: "partial",
