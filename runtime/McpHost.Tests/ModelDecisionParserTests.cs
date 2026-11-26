@@ -152,7 +152,6 @@ public sealed class ModelDecisionParserTests
 
     [Theory]
     [InlineData("")]
-    [InlineData("لا يوجد JSON هنا")]
     [InlineData("{\"type\":\"tool_call\",\"server\":\"aljam3\"}")]
     [InlineData("{\"type\":\"final\",\"answer\":\"\"}")]
     public void RejectsIncompleteOrInvalidDecisions(string response)

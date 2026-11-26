@@ -102,6 +102,12 @@ public static class ModelDecisionParser
                 };
                 return true;
             }
+
+            // Planning is no longer a required interaction mode. Keep valid legacy
+            // plan parsing for compatibility, but never treat an invalid plan object
+            // as a natural-language final answer.
+            if (type == "plan")
+                return false;
         }
         catch (JsonException)
         {
