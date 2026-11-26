@@ -31,7 +31,7 @@ public sealed class ResearchDecisionProtocolTests
 
         Assert.Contains("C1 = \"الموضع الأصلي\"", prompt, StringComparison.Ordinal);
         Assert.Contains("C2 = \"بيانات المصدر\"", prompt, StringComparison.Ordinal);
-        Assert.Contains("استخدم رمزه فقط", prompt, StringComparison.Ordinal);
+        Assert.Contains("باستخدام رمزه فقط", prompt, StringComparison.Ordinal);
         Assert.Contains("\"covered\":[\"C1\"]", prompt, StringComparison.Ordinal);
     }
 
