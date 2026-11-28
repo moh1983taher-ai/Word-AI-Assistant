@@ -507,7 +507,9 @@
     const indicator = document.createElement("div");
     indicator.id = "mcp-active-source-indicator";
     indicator.className = "mcp-active-source-indicator";
-    inputArea.appendChild(indicator);
+    const messageBox = inputArea.querySelector(".message-box");
+    if (messageBox) inputArea.insertBefore(indicator, messageBox);
+    else inputArea.appendChild(indicator);
     state.activeSourceIndicator = indicator;
     refreshActiveSourceIndicator();
 
