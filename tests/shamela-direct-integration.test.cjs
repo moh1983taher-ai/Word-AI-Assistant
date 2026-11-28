@@ -22,8 +22,8 @@ assert.doesNotMatch(adapter, /document\.cookie|readCsrfToken|X-CSRFToken|Authori
 assert.match(routing, /id: "shamela_direct"/);
 assert.match(routing, /transport: "local"/);
 assert.match(routing, /getSelectedMcpServers\(serverIds\)[\s\S]*?server\.transport !== "local"/);
-assert.match(routing, /window\.ShamelaWordBridge\.askShamela/);
-assert.match(routing, /window\.ShamelaWordBridge\.getStatus/);
+assert.match(routing, /directBridge\.askShamela/);
+assert.match(routing, /directBridge\.getStatus/);
 assert.match(routing, /bridge\.updatePendingMessage/);
 assert.match(routing, /formatShamelaSources/);
 assert.match(routing, /formatShamelaSourceAudit/);
