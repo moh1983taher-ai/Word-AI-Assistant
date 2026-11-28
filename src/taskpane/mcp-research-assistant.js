@@ -1148,32 +1148,91 @@
     return "\n\n---\n\n**المصادر التي جرى الرجوع إليها والأدوات المستخدمة:**\n\n" + lines.join("\n");
   }
 
+  function showShamelaConnectionNotice(message) {
+    showNotice(message);
+    if (!state.notice) return;
+    const link = document.createElement("a");
+    link.href = "https://shamela.ws/ai";
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "فتح الشاملة وتسجيل الدخول";
+    link.style.display = "inline-block";
+    link.style.marginInlineStart = "7px";
+    link.style.textDecoration = "underline";
+    state.notice.appendChild(document.createTextNode(" "));
+    state.notice.appendChild(link);
+  }
+
+  function buildShamelaPrompt(messages, currentQuestion) {
+    const history = Array.isArray(messages) ? messages : [];
+    const previous = history.slice(0, -1).slice(-8).map(function (message) {
+      const role = message && message.role === "assistant" ? "المساعد" : "الباحث";
+      return role + ": " + String(message && message.text || "").trim();
+    }).filter(Boolean).join("\n\n");
+    const question = String(currentQuestion || "").trim();
+    if (!previous) return question;
+    const prefix = "سياق المحادثة السابقة للاستفادة منه عند الحاجة، مع تقديم السؤال الحالي بوصفه المطلوب الأساسي:\n";
+    const suffix = "\n\nالسؤال الحالي:\n" + question;
+    const availableContext = Math.max(0, 11500 - prefix.length - suffix.length);
+    return prefix + previous.slice(-availableContext) + suffix;
+  }
+
+  function formatShamelaSources(sources) {
+    const rows = Array.isArray(sources) ? sources : [];
+    if (!rows.length) return "\n\n**المصادر المسترجعة:** لم تُرجع الشاملة سجلات مصادر.";
+    const lines = rows.map(function (source) {
+      const citation = String(source.citation || (source.ref_id ? "[#" + source.ref_id + "]" : ""));
+      const title = String(source.title || source.book_name || "مصدر غير معنون");
+      const author = String(source.author_name || source.attribution || "");
+      const volume = String(source.volume || "");
+      const page = String(source.printed_page || source.page || "");
+      const location = [volume ? "ج " + volume : "", page ? "ص " + page : ""].filter(Boolean).join("، ");
+      let readerUrl = "";
+      const readerPath = String(source.reader_path || "");
+      if (/^\/book\/\d+(?:\/\d+)?(?:\?.*)?$/.test(readerPath)) {
+        readerUrl = "https://shamela.ws" + readerPath;
+      } else if (source.url) {
+        try {
+          const parsed = new URL(String(source.url));
+          if (parsed.hostname === "shamela.ws" || parsed.hostname === "www.shamela.ws") readerUrl = parsed.href;
+        } catch (_) { /* Ignore untrusted or malformed source URLs. */ }
+      }
+      const details = [author, location].filter(Boolean).join("؛ ");
+      const link = readerUrl ? " — [فتح موضع المصدر](" + readerUrl + ")" : "";
+      return "- " + (citation ? citation + " — " : "") + "**" + title + "**" +
+        (details ? "، " + details : "") + link;
+    });
+    return "\n\n**المصادر المسترجعة من الشاملة:**\n\n" + lines.join("\n");
+  }
+
+  function formatShamelaSourceAudit(audit) {
+    if (!audit || typeof audit !== "object") return "";
+    if (audit.passed === true) return "\n\n**فحص مطابقة الإحالات والمصادر:** اجتاز الفحص الأولي.";
+    const issues = Array.isArray(audit.issues) ? audit.issues : [];
+    if (!issues.length) return "";
+    return "\n\n**ملاحظات توثيقية للمراجعة:**\n" + issues.map(function (issue) {
+      return "- " + String(issue);
+    }).join("\n");
+  }
+
   async function sendMessage(rawText) {
     const rawPrompt = String(rawText || "");
     const visiblePrompt = rawPrompt.trim();
     if (!visiblePrompt || state.busy) return;
-
     const selectedServerIds = getSelectedServerIds(state.sourceTokens);
     if (!selectedServerIds.length) return;
     const leadingTrim = rawPrompt.length - rawPrompt.trimStart().length;
     const submissionTokens = state.sourceTokens.map(function (token) {
-      return Object.assign({}, token, {
-        start: token.start - leadingTrim,
-        end: token.end - leadingTrim
-      });
+      return Object.assign({}, token, { start: token.start - leadingTrim, end: token.end - leadingTrim });
     });
     const question = stripSelectedSourceLabels(visiblePrompt, submissionTokens);
-    if (!question) {
-      showNotice("اكتب السؤال بعد اختيار مصدر البحث.");
-      return;
-    }
+    if (!question) { showNotice("اكتب السؤال بعد اختيار مصدر البحث."); return; }
 
     const bridge = window.WordAIChatBridge;
     if (!bridge || bridge.ready !== true) {
       showNotice("تعذر الوصول إلى سجل المحادثات الأصلي في أدوات الباحث. أعد فتح الأداة وحاول مرة أخرى.");
       return;
     }
-
     const useShamelaDirect = selectedServerIds.indexOf("shamela_direct") >= 0;
     const cloudServerIds = selectedServerIds.filter(function (id) { return id !== "shamela_direct"; });
     const settings = loadSettings();
@@ -1181,12 +1240,10 @@
     state.busy = true;
     const sendButton = document.getElementById("send-btn");
     if (sendButton) sendButton.disabled = true;
-
     let chatId = "";
     let pending = null;
     try {
       if (cloudServerIds.length) validateProviderSettings(settings);
-
       if (useShamelaDirect) {
         const directBridge = window.ShamelaWordBridge;
         if (!directBridge || typeof directBridge.getStatus !== "function" ||
@@ -1195,12 +1252,9 @@
           return;
         }
         let status;
-        try {
-          status = await directBridge.getStatus();
-        } catch (error) {
-          showShamelaConnectionNotice(
-            "تعذر الاتصال بالوسيط المحلي للشاملة. تأكد من تشغيل Shamela Bridge ثم أعد المحاولة."
-          );
+        try { status = await directBridge.getStatus(); }
+        catch (_) {
+          showShamelaConnectionNotice("تعذر الاتصال بالوسيط المحلي للشاملة. تأكد من تشغيل Shamela Bridge ثم أعد المحاولة.");
           return;
         }
         if (!status || status.extensionSeen !== true) {
@@ -1214,11 +1268,7 @@
       }
 
       chatId = bridge.appendUserMessage(visiblePrompt);
-      if (!chatId) {
-        showNotice("تعذر إضافة السؤال إلى المحادثة الحالية.");
-        return;
-      }
-
+      if (!chatId) { showNotice("تعذر إضافة السؤال إلى المحادثة الحالية."); return; }
       const input = document.getElementById("user-input");
       state.sourceTokens = [];
       state.lastComposerValue = "";
@@ -1232,92 +1282,59 @@
       const history = bridge.getMessages(chatId);
       const selectedServerLabels = getSelectedSourceLabels(selectedServerIds).join(" + ");
       const providerName = cloudServerIds.length
-        ? (useShamelaDirect
-          ? "الشاملة المباشرة و" + (settings.provider === "groq" ? "Groq" : "Gemini")
+        ? (useShamelaDirect ? "الشاملة المباشرة و" + (settings.provider === "groq" ? "Groq" : "Gemini")
           : (settings.provider === "groq" ? "Groq" : "Gemini"))
         : "الشاملة المباشرة";
-      pending = bridge.addPendingMessage(
-        chatId,
-        "يُنفّذ البحث في " + selectedServerLabels + " عبر " + providerName + "…"
-      );
+      pending = bridge.addPendingMessage(chatId,
+        "يُنفّذ البحث في " + selectedServerLabels + " عبر " + providerName + "…");
 
       const onShamelaProgress = function (update) {
         if (!pending || typeof bridge.updatePendingMessage !== "function") return;
         const progress = String(update && update.progress || "تبحث الشاملة...");
         const answer = String(update && update.answer || "");
-        const display = answer
-          ? progress + "\n\n" + answer
-          : progress;
-        bridge.updatePendingMessage(pending, display);
+        bridge.updatePendingMessage(pending, answer ? progress + "\n\n" + answer : progress);
       };
 
       const cloudPromise = cloudServerIds.length
         ? callCloudResearch(history, settings, cloudServerIds)
         : Promise.resolve(null);
       const directPromise = useShamelaDirect
-        ? window.ShamelaWordBridge.askShamela(buildShamelaPrompt(history, question), {
-            onProgress: onShamelaProgress
-          })
+        ? window.ShamelaWordBridge.askShamela(buildShamelaPrompt(history, question), { onProgress: onShamelaProgress })
         : Promise.resolve(null);
-
       const outcomes = await Promise.all([
-        Promise.resolve(cloudPromise).then(function (value) { return { value: value }; },
-          function (error) { return { error: error }; }),
-        Promise.resolve(directPromise).then(function (value) { return { value: value }; },
-          function (error) { return { error: error }; })
+        Promise.resolve(cloudPromise).then(value => ({ value }), error => ({ error })),
+        Promise.resolve(directPromise).then(value => ({ value }), error => ({ error }))
       ]);
       const cloudOutcome = outcomes[0];
       const directOutcome = outcomes[1];
-
       const directError = directOutcome.error || null;
       const directResult = directOutcome.value || null;
       const partialAnswer = directError ? String(directError.partialAnswer || "") : "";
       const partialSources = directError && Array.isArray(directError.sources) ? directError.sources : [];
 
       if (!cloudOutcome.value && !directResult && !partialAnswer) {
-        const failure = directError || cloudOutcome.error || new Error("تعذر إكمال البحث في المصادر المختارة.");
-        throw failure;
+        throw directError || cloudOutcome.error || new Error("تعذر إكمال البحث في المصادر المختارة.");
       }
 
       const sections = [];
       const allSources = [];
-
       if (directResult) {
-        sections.push(
-          "### إجابة الشاملة المباشرة\n\n" +
+        sections.push("### إجابة الشاملة المباشرة\n\n" +
           String(directResult.answer || "").trim() +
           formatShamelaSources(directResult.sources) +
-          formatShamelaSourceAudit(directResult.sourceAudit)
-        );
-        allSources.push({
-          server: "shamela_direct",
-          label: "الشاملة المباشرة",
-          tool: "Shamela AI"
-        });
+          formatShamelaSourceAudit(directResult.sourceAudit));
+        allSources.push({ server: "shamela_direct", label: "الشاملة المباشرة", tool: "Shamela AI" });
       } else if (partialAnswer) {
-        sections.push(
-          "### إجابة جزئية من الشاملة المباشرة\n\n" +
-          partialAnswer +
+        sections.push("### إجابة جزئية من الشاملة المباشرة\n\n" + partialAnswer +
           formatShamelaSources(partialSources) +
-          "\n\n**تنبيه:** لم يصل حدث اكتمال الإجابة من الشاملة: " +
-          String(directError.message || directError)
-        );
-        allSources.push({
-          server: "shamela_direct",
-          label: "الشاملة المباشرة",
-          tool: "Shamela AI"
-        });
+          "\n\n**تنبيه:** لم يصل حدث اكتمال الإجابة من الشاملة: " + String(directError.message || directError));
+        allSources.push({ server: "shamela_direct", label: "الشاملة المباشرة", tool: "Shamela AI" });
       }
-
       if (cloudOutcome.value) {
-        sections.push(
-          "### نتائج البحث السحابي\n\n" +
-          cloudOutcome.value.answer.trim() +
-          formatToolTrace(cloudOutcome.value)
-        );
+        sections.push("### نتائج البحث السحابي\n\n" +
+          cloudOutcome.value.answer.trim() + formatToolTrace(cloudOutcome.value));
         allSources.push.apply(allSources, normalizeToolCalls(cloudOutcome.value.toolCalls));
       }
-
       const warnings = [];
       if (directError && !partialAnswer && cloudOutcome.value) {
         warnings.push("تعذر إكمال طلب الشاملة المباشرة: " + String(directError.message || directError));
@@ -1325,10 +1342,10 @@
       if (cloudOutcome.error && directResult) {
         warnings.push("تعذر إكمال مصدر البحث السحابي: " + String(cloudOutcome.error.message || cloudOutcome.error));
       }
-      if (warnings.length) sections.push("**تنبيهات:**\n" + warnings.map(function (item) { return "- " + item; }).join("\n"));
+      if (warnings.length) sections.push("**تنبيهات:**\n" + warnings.map(item => "- " + item).join("\n"));
 
       const answer = sections.join("\n\n---\n\n");
-      bridge.removePendingMessage(pending);
+      if (pending) bridge.removePendingMessage(pending);
       pending = null;
       bridge.appendAssistantMessage(chatId, answer, {
         sources: allSources,
@@ -1347,112 +1364,13 @@
           model: cloudServerIds.length ? settings.model : "",
           isError: true
         });
-      } else if (!state.notice || state.notice.hidden) {
-        showNotice(message);
-      }
+      } else if (!state.notice || state.notice.hidden) showNotice(message);
     } finally {
       state.busy = false;
       if (sendButton) sendButton.disabled = false;
     }
   }
-tShamelaSourceAudit(audit) {
-    if (!audit || typeof audit !== "object") return "";
-    if (audit.passed === true) {
-      return "\n\n**فحص مطابقة الإحالات والمصادر:** اجتاز الفحص الأولي.";
-    }
-    const issues = Array.isArray(audit.issues) ? audit.issues : [];
-    if (!issues.length) return "";
-    return "\n\n**ملاحظات توثيقية للمراجعة:**\n" + issues.map(function (issue) {
-      return "- " + String(issue);
-    }).join("\n");
-  }
 
-  async function sendMessage(rawText) {
-    const rawPrompt = String(rawText || "");
-    const visiblePrompt = rawPrompt.trim();
-    if (!visiblePrompt || state.busy) return;
-
-    const selectedServerIds = getSelectedServerIds(state.sourceTokens);
-    if (!selectedServerIds.length) return;
-    const leadingTrim = rawPrompt.length - rawPrompt.trimStart().length;
-    const submissionTokens = state.sourceTokens.map(function (token) {
-      return Object.assign({}, token, {
-        start: token.start - leadingTrim,
-        end: token.end - leadingTrim
-      });
-    });
-    if (!stripSelectedSourceLabels(visiblePrompt, submissionTokens)) {
-      showNotice("اكتب السؤال بعد اختيار مصدر البحث.");
-      return;
-    }
-
-    const bridge = window.WordAIChatBridge;
-    if (!bridge || bridge.ready !== true) {
-      showNotice("تعذر الوصول إلى سجل المحادثات الأصلي في أدوات الباحث. أعد فتح الأداة وحاول مرة أخرى.");
-      return;
-    }
-
-    const settings = loadSettings();
-    try {
-      validateProviderSettings(settings);
-    } catch (error) {
-      showNotice(error.message);
-      return;
-    }
-
-    const chatId = bridge.appendUserMessage(visiblePrompt);
-    if (!chatId) {
-      showNotice("تعذر إضافة السؤال إلى المحادثة الحالية.");
-      return;
-    }
-
-    const input = document.getElementById("user-input");
-    state.sourceTokens = [];
-    state.lastComposerValue = "";
-    if (input) {
-      input.value = "";
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    hideMentionMenu();
-    hideNotice();
-
-    const history = bridge.getMessages(chatId);
-    const selectedServerLabels = getSelectedMcpServers(selectedServerIds).map(function (server) {
-      return server.label;
-    }).join(" + ");
-    const providerName = settings.provider === "groq" ? "Groq" : "Gemini";
-    const pending = bridge.addPendingMessage(
-      chatId,
-      "ينفّذ البحث في " + selectedServerLabels + " عبر " + providerName + "…"
-    );
-
-    state.busy = true;
-    const sendButton = document.getElementById("send-btn");
-    if (sendButton) sendButton.disabled = true;
-
-    try {
-      const result = await callCloudResearch(history, settings, selectedServerIds);
-      const sources = normalizeToolCalls(result.toolCalls);
-      const answer = result.answer.trim() + formatToolTrace(result);
-      bridge.removePendingMessage(pending);
-      bridge.appendAssistantMessage(chatId, answer, {
-        sources: sources,
-        provider: result.provider || settings.provider,
-        model: result.model || settings.model
-      });
-    } catch (error) {
-      bridge.removePendingMessage(pending);
-      const message = error && error.message ? error.message : "حدث خطأ غير متوقع أثناء البحث السحابي.";
-      bridge.appendAssistantMessage(chatId, message, {
-        provider: settings.provider,
-        model: settings.model,
-        isError: true
-      });
-    } finally {
-      state.busy = false;
-      if (sendButton) sendButton.disabled = false;
-    }
-  }
 
   function shouldRouteToSources() {
     return getSelectedServerIds(state.sourceTokens).length > 0;
