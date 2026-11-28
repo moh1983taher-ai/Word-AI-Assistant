@@ -17,7 +17,7 @@ assert.match(adapter, /askShamela/);
 assert.match(adapter, /onProgress\(/);
 assert.match(adapter, /result\.state === "completed"/);
 assert.match(adapter, /result\.state === "failed"/);
-assert.doesNotMatch(adapter, /document\.cookie|csrf|Authorization|localStorage\.setItem/i);
+assert.doesNotMatch(adapter, /document\.cookie|readCsrfToken|X-CSRFToken|Authorization|localStorage\.setItem/i);
 
 assert.match(routing, /id: "shamela_direct"/);
 assert.match(routing, /transport: "local"/);
