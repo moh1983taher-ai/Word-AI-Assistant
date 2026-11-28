@@ -12,6 +12,7 @@ const webpack = fs.readFileSync(path.join(root, "webpack.config.js"), "utf8");
 
 assert.match(adapter, /http:\/\/127\.0\.0\.1:18765/);
 assert.match(adapter, /credentials:\s*"omit"/);
+assert.match(adapter, /targetAddressSpace:\s*"loopback"/);
 assert.match(adapter, /getStatus/);
 assert.match(adapter, /askShamela/);
 assert.match(adapter, /threadId:\s*String\(settings\.threadId\s*\|\|\s*""\)\.trim\(\)\s*\|\|\s*null/);
