@@ -57019,9 +57019,18 @@ function addMcpPendingMessage(chatId, text) {
     const pending = document.createElement("div");
     pending.className = "message ai-message mcp-research-pending";
     pending.textContent = String(text || "جارٍ البحث في المصادر…");
+    pending.style.whiteSpace = "pre-wrap";
     chatArea.appendChild(pending);
     chatArea.scrollTop = chatArea.scrollHeight;
     return pending;
+}
+
+function updateMcpPendingMessage(pending, text) {
+    if (!pending || !pending.parentNode) return false;
+    pending.textContent = String(text || "جارٍ البحث في المصادر…");
+    pending.style.whiteSpace = "pre-wrap";
+    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+    return true;
 }
 
 function removeMcpPendingMessage(pending) {
@@ -57123,6 +57132,7 @@ window.WordAIChatBridge = Object.freeze({
     getMessages: getMcpChatMessages,
     appendAssistantMessage: appendMcpAssistantMessage,
     addPendingMessage: addMcpPendingMessage,
+    updatePendingMessage: updateMcpPendingMessage,
     removePendingMessage: removeMcpPendingMessage,
     importLegacyThread: importLegacyMcpThread
 });
