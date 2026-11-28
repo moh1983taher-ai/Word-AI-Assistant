@@ -27,6 +27,8 @@ assert.match(routing, /getSelectedMcpServers\(serverIds\)[\s\S]*?server\.transpo
 assert.match(routing, /directBridge\.askShamela/);
 assert.match(routing, /SHAMELA_THREAD_MAP_KEY/);
 assert.match(routing, /CHAT_SOURCE_MAP_KEY/);
+assert.match(routing, /setChatSourceIds\(getCurrentWordChatId\(\), getSelectedServerIds\(state\.sourceTokens\)\)/);
+assert.match(routing, /setChatSourceIds\(getCurrentWordChatId\(\), \[\]\)/);
 assert.match(routing, /getChatSourceIds\(getCurrentWordChatId\(\)\)/);
 assert.match(routing, /server\.transport === "normal"/);
 assert.match(routing, /المحادثة العادية/);
