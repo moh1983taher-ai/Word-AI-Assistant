@@ -5,6 +5,7 @@
   const AI_SETTINGS_KEY = "AI_SETTINGS";
   const LEGACY_THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
   const SHAMELA_THREAD_MAP_KEY = "AR_SHAMELA_DIRECT_THREADS_V1";
+  const CHAT_SOURCE_MAP_KEY = "AR_MCP_CHAT_SOURCES_V1";
   const FALLBACK_SHAMELA_RUNS_PER_THREAD = 5;
   const DEFAULT_TIMEOUT_MS = 300000;
   const GROQ_RESPONSES_URL = "https://api.groq.com/openai/v1/responses";
@@ -49,6 +50,14 @@
       transport: "local",
       description: "ذكاء الشاملة مباشرة عبر جلسة الدخول المفتوحة في Chrome.",
       tools: Object.freeze([])
+    }),
+    Object.freeze({
+      id: "normal_chat",
+      label: "المحادثة العادية",
+      mentionLabel: "المحادثة العادية",
+      transport: "normal",
+      description: "العودة إلى المساعد الذكي الافتراضي دون البحث في المصادر.",
+      tools: Object.freeze([])
     })
   ]);
 
@@ -60,7 +69,8 @@
     notice: null,
     mentionStart: -1,
     sourceTokens: [],
-    lastComposerValue: ""
+    lastComposerValue: "",
+    activeSourceIndicator: null
   };
 
   function safeJson(value, fallback) {
@@ -68,6 +78,62 @@
       return value ? JSON.parse(value) : fallback;
     } catch (_) {
       return fallback;
+    }
+  }
+
+  function getCurrentWordChatId() {
+    const bridge = window.WordAIChatBridge;
+    if (!bridge || typeof bridge.getCurrentChatId !== "function") return "";
+    try { return String(bridge.getCurrentChatId() || ""); }
+    catch (_) { return ""; }
+  }
+
+  function readChatSourceMap() {
+    try {
+      const saved = safeJson(localStorage.getItem(CHAT_SOURCE_MAP_KEY), {});
+      return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function getChatSourceIds(chatId) {
+    if (!chatId) return [];
+    const ids = readChatSourceMap()[String(chatId)];
+    return normalizeSelectedServerIds(Array.isArray(ids) ? ids : []).filter(function (id) {
+      const server = MCP_SERVERS.find(function (item) { return item.id === id; });
+      return server && server.transport !== "normal";
+    });
+  }
+
+  function setChatSourceIds(chatId, serverIds) {
+    if (!chatId) return;
+    try {
+      const map = readChatSourceMap();
+      const ids = normalizeSelectedServerIds(serverIds).filter(function (id) {
+        const server = MCP_SERVERS.find(function (item) { return item.id === id; });
+        return server && server.transport !== "normal";
+      });
+      if (ids.length) map[String(chatId)] = ids;
+      else delete map[String(chatId)];
+      localStorage.setItem(CHAT_SOURCE_MAP_KEY, JSON.stringify(map));
+    } catch (error) {
+      console.warn("تعذر حفظ مصدر المحادثة النشط:", error);
+    }
+  }
+
+  function refreshActiveSourceIndicator() {
+    if (!state.activeSourceIndicator) return;
+    const ids = getChatSourceIds(getCurrentWordChatId());
+    if (ids.length) {
+      state.activeSourceIndicator.textContent =
+        "المصدر النشط: " + getSelectedSourceLabels(ids).join(" + ") +
+        " — اكتب @ للتغيير أو للعودة إلى المحادثة العادية";
+      state.activeSourceIndicator.classList.add("has-source");
+    } else {
+      state.activeSourceIndicator.textContent =
+        "المحادثة العادية — اكتب @ لاختيار مصدر بحث";
+      state.activeSourceIndicator.classList.remove("has-source");
     }
   }
 
@@ -146,7 +212,8 @@
   function getSelectedMcpServers(serverIds) {
     const selected = normalizeSelectedServerIds(serverIds);
     return MCP_SERVERS.filter(function (server) {
-      return server.transport !== "local" && selected.indexOf(server.id) >= 0;
+      return server.transport !== "local" && server.transport !== "normal" &&
+        selected.indexOf(server.id) >= 0;
     });
   }
 
@@ -277,6 +344,8 @@
     style.id = "mcp-research-styles";
     style.textContent = [
       ".input-area{position:relative;}",
+      ".mcp-active-source-indicator{margin:4px 12px 0;color:#718078;font-size:10.5px;line-height:1.5;direction:rtl;}",
+      ".mcp-active-source-indicator.has-source{color:#245a52;font-weight:600;}",
       ".mcp-mention-menu{position:absolute;z-index:4600;right:12px;bottom:74px;width:min(300px,calc(100% - 24px));padding:7px;background:#fffdf8;border:1px solid #d8dfd8;border-radius:12px;box-shadow:0 10px 30px rgba(5,45,43,.16);direction:rtl;}",
       ".mcp-mention-menu[hidden]{display:none;}",
       ".mcp-mention-title{padding:5px 9px 7px;color:#718078;font-size:10.5px;}",
@@ -326,6 +395,33 @@
   function insertSourceMention(input, server) {
     const context = getMentionContext(input.value, input.selectionStart);
     if (!context) return;
+
+    if (server.transport === "normal") {
+      const ranges = state.sourceTokens.map(function (token) {
+        return { start: token.start, end: token.end };
+      });
+      ranges.push({ start: context.start, end: input.selectionStart });
+      ranges.sort(function (a, b) { return b.start - a.start; });
+      let cleaned = input.value;
+      ranges.forEach(function (range) {
+        if (range.start >= 0 && range.end >= range.start && range.end <= cleaned.length) {
+          cleaned = cleaned.slice(0, range.start) + " " + cleaned.slice(range.end);
+        }
+      });
+      input.value = cleaned.replace(/[ \\t]{2,}/g, " ").trimStart();
+      state.sourceTokens = [];
+      state.lastComposerValue = input.value;
+      setChatSourceIds(getCurrentWordChatId(), []);
+      input.focus();
+      const cursor = Math.min(input.value.length, context.start);
+      input.setSelectionRange(cursor, cursor);
+      hideMentionMenu();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      refreshActiveSourceIndicator();
+      showNotice("عادت المحادثة إلى المساعد الذكي الافتراضي. لن يُرسل السؤال إلى مصادر البحث.");
+      return;
+    }
+
     const before = input.value.slice(0, context.start);
     const after = input.value.slice(input.selectionStart);
     const tokenLabel = server.mentionLabel || server.label;
@@ -339,6 +435,7 @@
       start: tokenStart,
       end: tokenStart + tokenLabel.length
     });
+    setChatSourceIds(getCurrentWordChatId(), getSelectedServerIds(state.sourceTokens));
     state.lastComposerValue = input.value;
     const cursor = before.length + token.length;
     input.focus();
@@ -346,6 +443,7 @@
     hideMentionMenu();
     hideNotice();
     input.dispatchEvent(new Event("input", { bubbles: true }));
+    refreshActiveSourceIndicator();
   }
 
   function updateMentionMenu(input) {
@@ -383,7 +481,9 @@
         description.className = "mcp-mention-description";
         description.textContent = server.transport === "local"
           ? "عبر جلسة الشاملة المفتوحة والمسجل الدخول إليها في Chrome"
-          : "استدعاء خادم MCP السحابي لهذا المصدر";
+          : server.transport === "normal"
+            ? "إيقاف توجيه المصادر والعودة إلى الدردشة المعتادة"
+            : "استدعاء خادم MCP السحابي لهذا المصدر";
         copy.appendChild(name);
         copy.appendChild(description);
         option.appendChild(symbol);
@@ -401,6 +501,13 @@
   }
 
   function createMentionMenu(inputArea, input) {
+    const indicator = document.createElement("div");
+    indicator.id = "mcp-active-source-indicator";
+    indicator.className = "mcp-active-source-indicator";
+    inputArea.appendChild(indicator);
+    state.activeSourceIndicator = indicator;
+    refreshActiveSourceIndicator();
+
     const menu = document.createElement("div");
     menu.id = "mcp-mention-menu";
     menu.className = "mcp-mention-menu";
@@ -417,9 +524,13 @@
       state.sourceTokens = updateSourceTokenRanges(state.lastComposerValue, input.value, state.sourceTokens);
       state.lastComposerValue = input.value;
       hideNotice();
+      refreshActiveSourceIndicator();
       updateMentionMenu(input);
     });
-    input.addEventListener("click", function () { updateMentionMenu(input); });
+    input.addEventListener("click", function () {
+      refreshActiveSourceIndicator();
+      updateMentionMenu(input);
+    });
     input.addEventListener("keyup", function (event) {
       if (!["Shift","Control","Alt"].includes(event.key)) updateMentionMenu(input);
     });
@@ -1275,7 +1386,15 @@
     const rawPrompt = String(rawText || "");
     const visiblePrompt = rawPrompt.trim();
     if (!visiblePrompt || state.busy) return;
-    const selectedServerIds = getSelectedServerIds(state.sourceTokens);
+    const bridge = window.WordAIChatBridge;
+    if (!bridge || bridge.ready !== true) {
+      showNotice("تعذر الوصول إلى سجل المحادثات الأصلي في أدوات الباحث. أعد فتح الأداة وحاول مرة أخرى.");
+      return;
+    }
+    const composerServerIds = getSelectedServerIds(state.sourceTokens);
+    const selectedServerIds = composerServerIds.length
+      ? composerServerIds
+      : getChatSourceIds(getCurrentWordChatId());
     if (!selectedServerIds.length) return;
     const leadingTrim = rawPrompt.length - rawPrompt.trimStart().length;
     const submissionTokens = state.sourceTokens.map(function (token) {
@@ -1284,11 +1403,6 @@
     const question = stripSelectedSourceLabels(visiblePrompt, submissionTokens);
     if (!question) { showNotice("اكتب السؤال بعد اختيار مصدر البحث."); return; }
 
-    const bridge = window.WordAIChatBridge;
-    if (!bridge || bridge.ready !== true) {
-      showNotice("تعذر الوصول إلى سجل المحادثات الأصلي في أدوات الباحث. أعد فتح الأداة وحاول مرة أخرى.");
-      return;
-    }
     const useShamelaDirect = selectedServerIds.indexOf("shamela_direct") >= 0;
     const cloudServerIds = selectedServerIds.filter(function (id) { return id !== "shamela_direct"; });
     const settings = loadSettings();
@@ -1327,6 +1441,7 @@
 
       chatId = bridge.appendUserMessage(visiblePrompt);
       if (!chatId) { showNotice("تعذر إضافة السؤال إلى المحادثة الحالية."); return; }
+      if (composerServerIds.length) setChatSourceIds(chatId, composerServerIds);
       const input = document.getElementById("user-input");
       state.sourceTokens = [];
       state.lastComposerValue = "";
@@ -1460,7 +1575,8 @@
 
 
   function shouldRouteToSources() {
-    return getSelectedServerIds(state.sourceTokens).length > 0;
+    if (getSelectedServerIds(state.sourceTokens).length > 0) return true;
+    return getChatSourceIds(getCurrentWordChatId()).length > 0;
   }
 
   function initializeComposerRouting(inputArea, input) {
@@ -1506,6 +1622,12 @@
       if (!state.mentionMenu || state.mentionMenu.hidden) return;
       if (event.target === input || state.mentionMenu.contains(event.target)) return;
       hideMentionMenu();
+    });
+
+    // The main taskpane switches currentChat in its own click handlers.
+    // Refresh after those handlers have finished.
+    window.addEventListener("click", function () {
+      window.setTimeout(refreshActiveSourceIndicator, 0);
     });
   }
   async function initialize() {
