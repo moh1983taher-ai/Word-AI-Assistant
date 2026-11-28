@@ -4,6 +4,8 @@
 
   const AI_SETTINGS_KEY = "AI_SETTINGS";
   const LEGACY_THREAD_KEY = "AR_MCP_RESEARCH_THREAD";
+  const SHAMELA_THREAD_MAP_KEY = "AR_SHAMELA_DIRECT_THREADS_V1";
+  const FALLBACK_SHAMELA_RUNS_PER_THREAD = 5;
   const DEFAULT_TIMEOUT_MS = 300000;
   const GROQ_RESPONSES_URL = "https://api.groq.com/openai/v1/responses";
   const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
@@ -67,6 +69,60 @@
     } catch (_) {
       return fallback;
     }
+  }
+
+  // Store only the Shamela thread ID and local turn counters per Word chat.
+  // Authentication data, cookies, CSRF values and passwords are never stored here.
+  function readShamelaThreadMap() {
+    try {
+      const saved = safeJson(localStorage.getItem(SHAMELA_THREAD_MAP_KEY), {});
+      return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function getShamelaThreadRecord(chatId) {
+    if (!chatId) return null;
+    const record = readShamelaThreadMap()[String(chatId)];
+    if (!record || typeof record.threadId !== "string" || !record.threadId.trim()) return null;
+    return {
+      threadId: record.threadId.trim(),
+      runsUsed: Math.max(0, Number(record.runsUsed) || 0),
+      lastMessageCount: Math.max(0, Number(record.lastMessageCount) || 0)
+    };
+  }
+
+  function saveShamelaThreadRecord(chatId, record) {
+    if (!chatId || !record || !record.threadId) return;
+    try {
+      const map = readShamelaThreadMap();
+      map[String(chatId)] = {
+        threadId: String(record.threadId),
+        runsUsed: Math.max(1, Number(record.runsUsed) || 1),
+        lastMessageCount: Math.max(0, Number(record.lastMessageCount) || 0),
+        updatedAt: Date.now()
+      };
+      localStorage.setItem(SHAMELA_THREAD_MAP_KEY, JSON.stringify(map));
+    } catch (error) {
+      console.warn("تعذر حفظ معرّف محادثة الشاملة:", error);
+    }
+  }
+
+  function persistShamelaThreadRecord(chatId, plan, outcome, bridge) {
+    const threadId = String(outcome && outcome.threadId || "").trim();
+    if (!chatId || !plan || !threadId) return;
+    let messageCount = 0;
+    try {
+      const messages = bridge && typeof bridge.getMessages === "function" ? bridge.getMessages(chatId) : [];
+      messageCount = Array.isArray(messages) ? messages.length : 0;
+    } catch (_) { /* The thread ID is still worth preserving after a completed run. */ }
+    const priorRuns = plan.previous ? plan.previous.runsUsed : 0;
+    saveShamelaThreadRecord(chatId, {
+      threadId: threadId,
+      runsUsed: plan.startsNewThread ? 1 : priorRuns + 1,
+      lastMessageCount: messageCount
+    });
   }
 
   // Reuse the provider, API key and model already saved by the main AI settings.
@@ -1242,6 +1298,8 @@
     if (sendButton) sendButton.disabled = true;
     let chatId = "";
     let pending = null;
+    let shamelaStatus = null;
+    let shamelaThreadPlan = null;
     try {
       if (cloudServerIds.length) validateProviderSettings(settings);
       if (useShamelaDirect) {
@@ -1252,7 +1310,7 @@
           return;
         }
         let status;
-        try { status = await directBridge.getStatus(); }
+        try { status = await directBridge.getStatus(); shamelaStatus = status; }
         catch (_) {
           showShamelaConnectionNotice("تعذر الاتصال بالوسيط المحلي للشاملة. تأكد من تشغيل Shamela Bridge ثم أعد المحاولة.");
           return;
@@ -1280,6 +1338,30 @@
       hideNotice();
 
       const history = bridge.getMessages(chatId);
+      let shamelaQuery = question;
+      if (useShamelaDirect) {
+        const previousThread = getShamelaThreadRecord(chatId);
+        const advertisedLimit = Number(shamelaStatus && shamelaStatus.limits && shamelaStatus.limits.runsPerThread);
+        const maxRunsPerThread = Number.isFinite(advertisedLimit) && advertisedLimit > 0
+          ? Math.floor(advertisedLimit)
+          : FALLBACK_SHAMELA_RUNS_PER_THREAD;
+        const startsNewThread = !previousThread || previousThread.runsUsed >= maxRunsPerThread;
+        const hasInterveningMessages = Boolean(previousThread &&
+          previousThread.lastMessageCount > 0 &&
+          history.length > previousThread.lastMessageCount + 1);
+        shamelaThreadPlan = {
+          previous: previousThread,
+          threadId: startsNewThread ? null : previousThread.threadId,
+          startsNewThread: startsNewThread,
+          maxRunsPerThread: maxRunsPerThread
+        };
+        // Reuse Shamela's own history for normal follow-ups. Only copy recent
+        // Word context when starting/rolling over a Shamela thread or when
+        // messages in Word occurred without sending them to Shamela.
+        if (startsNewThread || hasInterveningMessages) {
+          shamelaQuery = buildShamelaPrompt(history, question);
+        }
+      }
       const selectedServerLabels = getSelectedSourceLabels(selectedServerIds).join(" + ");
       const providerName = cloudServerIds.length
         ? (useShamelaDirect ? "الشاملة المباشرة و" + (settings.provider === "groq" ? "Groq" : "Gemini")
@@ -1299,7 +1381,10 @@
         ? callCloudResearch(history, settings, cloudServerIds)
         : Promise.resolve(null);
       const directPromise = useShamelaDirect
-        ? window.ShamelaWordBridge.askShamela(buildShamelaPrompt(history, question), { onProgress: onShamelaProgress })
+        ? window.ShamelaWordBridge.askShamela(shamelaQuery, {
+            threadId: shamelaThreadPlan ? shamelaThreadPlan.threadId : null,
+            onProgress: onShamelaProgress
+          })
         : Promise.resolve(null);
       const outcomes = await Promise.all([
         Promise.resolve(cloudPromise).then(value => ({ value }), error => ({ error })),
@@ -1355,6 +1440,7 @@
         model: cloudOutcome.value ? (cloudOutcome.value.model || settings.model) : "",
         isError: Boolean(partialAnswer && !directResult)
       });
+      if (useShamelaDirect) persistShamelaThreadRecord(chatId, shamelaThreadPlan, directResult || directError, bridge);
     } catch (error) {
       if (pending) bridge.removePendingMessage(pending);
       const message = error && error.message ? error.message : "حدث خطأ غير متوقع أثناء البحث في المصادر.";
@@ -1364,6 +1450,7 @@
           model: cloudServerIds.length ? settings.model : "",
           isError: true
         });
+        if (useShamelaDirect) persistShamelaThreadRecord(chatId, shamelaThreadPlan, error, bridge);
       } else if (!state.notice || state.notice.hidden) showNotice(message);
     } finally {
       state.busy = false;
