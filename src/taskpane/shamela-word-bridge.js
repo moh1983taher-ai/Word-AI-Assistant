@@ -15,7 +15,8 @@
     const response = await fetch(BASE_URL + path, Object.assign({
       mode: "cors",
       credentials: "omit",
-      cache: "no-store"
+      cache: "no-store",
+      targetAddressSpace: "loopback"
     }, options || {}));
     const data = await response.json().catch(function () { return {}; });
     if (!response.ok) {
