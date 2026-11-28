@@ -44,7 +44,7 @@
     const accepted = await request("/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: text })
+      body: JSON.stringify({ query: text, threadId: String(settings.threadId || "").trim() || null })
     });
     if (!accepted.jobId) throw new Error("لم يُرجع الوسيط المحلي معرّف الطلب.");
 
@@ -83,7 +83,8 @@
           sources: Array.isArray(finalResult.sources) ? finalResult.sources : [],
           sourceAudit: finalResult.sourceAudit || null,
           runId: String(finalResult.runId || ""),
-          terminal: String(finalResult.terminal || "run_completed")
+          terminal: String(finalResult.terminal || "run_completed"),
+          threadId: String(finalResult.threadId || result.threadId || "").trim() || null
         };
       }
 
@@ -91,6 +92,7 @@
         const error = new Error(String(result.error || "تعذر إكمال طلب الشاملة."));
         error.partialAnswer = partialAnswer;
         error.sources = Array.isArray(result.sources) ? result.sources : [];
+        error.threadId = String(result.threadId || "").trim() || null;
         throw error;
       }
     }
