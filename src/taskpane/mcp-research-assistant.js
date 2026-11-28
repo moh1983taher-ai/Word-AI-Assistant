@@ -401,6 +401,9 @@
         return { start: token.start, end: token.end };
       });
       ranges.push({ start: context.start, end: input.selectionStart });
+      const cursorShift = ranges.reduce(function (total, range) {
+        return total + (range.start < context.start ? Math.max(0, range.end - range.start - 1) : 0);
+      }, 0);
       ranges.sort(function (a, b) { return b.start - a.start; });
       let cleaned = input.value;
       ranges.forEach(function (range) {
@@ -413,7 +416,7 @@
       state.lastComposerValue = input.value;
       setChatSourceIds(getCurrentWordChatId(), []);
       input.focus();
-      const cursor = Math.min(input.value.length, context.start);
+      const cursor = Math.max(0, Math.min(input.value.length, context.start - cursorShift));
       input.setSelectionRange(cursor, cursor);
       hideMentionMenu();
       input.dispatchEvent(new Event("input", { bubbles: true }));
