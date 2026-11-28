@@ -26,6 +26,11 @@ assert.match(routing, /transport: "local"/);
 assert.match(routing, /getSelectedMcpServers\(serverIds\)[\s\S]*?server\.transport !== "local"/);
 assert.match(routing, /directBridge\.askShamela/);
 assert.match(routing, /SHAMELA_THREAD_MAP_KEY/);
+assert.match(routing, /CHAT_SOURCE_MAP_KEY/);
+assert.match(routing, /getChatSourceIds\(getCurrentWordChatId\(\)\)/);
+assert.match(routing, /server\.transport === "normal"/);
+assert.match(routing, /المحادثة العادية/);
+assert.match(routing, /المصدر النشط:/);
 assert.match(routing, /getShamelaThreadRecord\(chatId\)/);
 assert.match(routing, /runsUsed >= maxRunsPerThread/);
 assert.match(routing, /threadId: shamelaThreadPlan \? shamelaThreadPlan\.threadId : null/);
@@ -37,6 +42,7 @@ assert.match(routing, /formatShamelaSourceAudit/);
 
 assert.match(app, /function updateMcpPendingMessage\(pending, text\)/);
 assert.match(app, /updatePendingMessage: updateMcpPendingMessage/);
+assert.match(app, /getCurrentChatId: function \(\)/);
 assert.match(webpack, /\.\/src\/taskpane\/shamela-word-bridge\.js/);
 
 console.log("Shamela direct Word bridge integration tests passed.");
