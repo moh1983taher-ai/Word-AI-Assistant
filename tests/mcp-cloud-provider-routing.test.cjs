@@ -295,7 +295,7 @@ assert.match(source, /resultCallId !== callId/);
 assert.match(source, /function validateResearchResult[\s\S]*?allowedServers\.length > 0[\s\S]*?toolCalls\.length === 0/);
 assert.match(
   source,
-  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callCloudResearch\(history, settings, selectedServerIds\)/,
+  /const history = bridge\.getMessages\(chatId\)[\s\S]*?callCloudResearch\(history, settings, cloudServerIds\)/,
   "MCP must use the active ordinary chat history and call the cloud provider directly."
 );
 assert.doesNotMatch(
@@ -313,7 +313,7 @@ const mentionEnd = source.indexOf("  function getCloudProviderStatus(settings) {
 assert.ok(mentionStart >= 0 && mentionEnd > mentionStart, "Composer selection helpers must be testable");
 const mentionContext = {};
 vm.runInNewContext(
-  `function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? Array.from(new Set(ids)).filter(function (id) { return id === 'aljam3' || id === 'shamela'; }) : []; }
+  `function normalizeSelectedServerIds(ids) { return Array.isArray(ids) ? Array.from(new Set(ids)).filter(function (id) { return id === 'aljam3' || id === 'shamela' || id === 'shamela_direct'; }) : []; }
 ${source.slice(mentionStart, mentionEnd)}
 globalThis.__mentionHelpers = { getMentionContext, updateSourceTokenRanges, getSelectedServerIds, stripSelectedSourceLabels };`,
   mentionContext
@@ -371,5 +371,9 @@ assert.equal(JSON.stringify(selectionHelpers.normalizeSelectedServerIds(["shamel
 assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3"]));
 assert.equal(JSON.stringify(selectionHelpers.getGeminiTools(["shamela"]).map(function (tool) { return tool.name; })), JSON.stringify(["shamela"]));
 assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3", "shamela"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3", "shamela"]));
+assert.equal(JSON.stringify(selectionHelpers.normalizeSelectedServerIds(["shamela_direct", "unknown"])), JSON.stringify(["shamela_direct"]));
+assert.equal(selectionHelpers.getSelectedMcpServers(["shamela_direct"]).length, 0,
+  "The direct Shamela browser session must not be sent to a cloud MCP provider.");
+assert.equal(JSON.stringify(selectionHelpers.getGroqTools(["aljam3", "shamela_direct"]).map(function (tool) { return tool.server_label; })), JSON.stringify(["aljam3"]));
 
 console.log("Cloud MCP provider routing tests passed.");
