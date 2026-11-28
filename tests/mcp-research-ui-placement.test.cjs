@@ -44,7 +44,7 @@ assert.doesNotMatch(uiSource, /AR_MCP_RESEARCH_SETTINGS|AR_MCP_RESEARCH_THREAD.*
 
 assert.match(
   uiSource,
-  /const chatId = bridge\.appendUserMessage\(visiblePrompt\)[\s\S]*?const history = bridge\.getMessages\(chatId\)[\s\S]*?callCloudResearch\(history, settings, cloudServerIds\)/,
+  /chatId = bridge\.appendUserMessage\(visiblePrompt\)[\s\S]*?const history = bridge\.getMessages\(chatId\)[\s\S]*?callCloudResearch\(history, settings, cloudServerIds\)/,
   "A source mention must keep the user's message in the active chat and pass its history to cloud MCP."
 );
 assert.match(
