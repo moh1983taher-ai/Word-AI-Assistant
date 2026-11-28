@@ -57128,6 +57128,9 @@ async function importLegacyMcpThread(record) {
 
 window.WordAIChatBridge = Object.freeze({
     ready: true,
+    getCurrentChatId: function () {
+        return currentChat ? String(currentChat.id || "") : "";
+    },
     appendUserMessage: appendMcpUserMessage,
     getMessages: getMcpChatMessages,
     appendAssistantMessage: appendMcpAssistantMessage,
